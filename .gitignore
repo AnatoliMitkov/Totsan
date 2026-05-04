@@ -1,0 +1,17 @@
+node_modules
+dist
+.vite
+.DS_Store
+
+# Environment files (NEVER commit secrets)
+.env
+.env.local
+.env.*.local
+
+# VS Code MCP config (contains Supabase Personal Access Token)
+.vscode/mcp.json
+
+# Sensitive business info — съдържа реални ключове
+info/Business Information.md
+info/client_secret*.json
+.vercel
