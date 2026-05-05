@@ -117,8 +117,11 @@ function Header() {
             <span>Съобщения</span>
             {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accentDeep px-1.5 text-[11px] font-medium text-paper">{unreadCount}</span>}
           </Link>}
+          {!session && open && (
+            <Link to="/login" onClick={close} className="btn btn-primary mobile-nav-auth lg:hidden">Вход / Регистрация</Link>
+          )}
           {session ? <UserMenu session={session} account={account} isAdmin={isAdmin} /> : (
-            <Link to="/login" className="btn btn-primary text-sm hidden sm:inline-flex">Вход</Link>
+            <Link to="/login" className="btn btn-primary text-sm hidden lg:inline-flex">Вход</Link>
           )}
           <button
             aria-label="Меню"
@@ -174,14 +177,7 @@ function Header() {
                 <button onClick={() => { close(); supabase.auth.signOut() }} className="mobile-nav-item text-left text-muted hover:text-ink">Изход</button>
                 </div>
               </div>
-            ) : (
-              <div className="mobile-nav-group">
-                <div className="mobile-nav-group__label">Достъп</div>
-                <div className="grid gap-3">
-                  <NavLink to="/login" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Вход / Регистрация</span><span className="mobile-nav-arrow">→</span></NavLink>
-                </div>
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
       )}
