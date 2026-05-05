@@ -11,7 +11,6 @@ dist
 # VS Code MCP config (contains Supabase Personal Access Token)
 .vscode/mcp.json
 
-# Sensitive business info — съдържа реални ключове
-info/Business Information.md
-info/client_secret*.json
+# Sensitive business info — съдържа реални ключове и вътрешни документи
+info/
 .vercel
