@@ -11,9 +11,13 @@ export default function Home() {
       <Promise />
       <Story />
       <LayersGrid />
+      <SectionDivider label="Услуги" />
       <ServicesStrip />
+      <SectionDivider label="Реални примери" />
       <Projects />
+      <SectionDivider label="Как работи" />
       <HowItWorks />
+      <SectionDivider label="Още от Totsan" />
       <Trust />
       <Testimonial />
       <FAQ />
@@ -24,7 +28,7 @@ export default function Home() {
 
 function Hero() {
   return (
-    <section className="section !pt-16 md:!pt-24 relative overflow-hidden flex flex-col justify-center" style={{height: 'calc(100vh - var(--header-h, 0px))'}}>
+    <section className="section home-hero !pt-8 sm:!pt-10 md:!pt-24 relative overflow-hidden flex flex-col justify-start lg:justify-center" style={{ minHeight: 'calc(100svh - var(--header-h, 0px))' }}>
       <div className="container-page grid lg:grid-cols-12 gap-10 items-center">
         <div className="lg:col-span-7 reveal">
           <div className="eyebrow mb-5">Платформа за създаване на пространство</div>
@@ -66,6 +70,18 @@ function Hero() {
         </div>
       </div>
     </section>
+  )
+}
+
+function SectionDivider({ label }) {
+  return (
+    <div className="section-divider" aria-hidden="true">
+      <div className="container-page section-divider__inner">
+        <span className="section-divider__line" />
+        <span className="section-divider__label">{label}</span>
+        <span className="section-divider__line" />
+      </div>
+    </div>
   )
 }
 

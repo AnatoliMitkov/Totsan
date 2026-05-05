@@ -67,24 +67,48 @@ export default function Layout() {
 function Header() {
   const [open, setOpen] = useState(false)
   const close = () => setOpen(false)
+  const { pathname } = useLocation()
   const { session, account, isAdmin } = useAccount()
   const unreadCount = useUnreadCount(session?.user?.id)
+  const isServicesActive = pathname.startsWith('/uslugi') || pathname.startsWith('/usluga/')
+  const isCatalogActive = pathname === '/katalog'
+
+  useEffect(() => {
+    setOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
+    if (!open) return undefined
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const onResize = () => {
+      if (window.innerWidth >= 1024) setOpen(false)
+    }
+
+    window.addEventListener('resize', onResize)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('resize', onResize)
+    }
+  }, [open])
 
   return (
-    <header className="sticky top-0 z-40 backdrop-blur bg-paper/85 border-b border-line">
+    <header className={`sticky top-0 z-40 border-b border-line ${open ? 'bg-paper shadow-[0_24px_40px_-36px_rgba(0,0,0,0.38)]' : 'backdrop-blur bg-paper/85'}`}>
       <div className="container-page flex items-center justify-between py-4 px-[var(--pad-x)]">
         <Link to="/" className="font-display text-2xl tracking-tight" onClick={close}>Totsan</Link>
 
         <nav className="hidden lg:flex items-center gap-7 text-sm">
           {LAYERS.map(l => (
             <NavLink key={l.slug} to={`/sloy/${l.slug}`}
-              className={({isActive}) => `text-muted hover:text-ink transition ${isActive ? '!text-ink' : ''}`}>
+              className={({isActive}) => desktopNavClassName(isActive)}>
               {l.number} · {l.title.split(' ')[0]}
             </NavLink>
           ))}
-          <span className="w-px h-4 bg-line"></span>
-          <NavLink to="/uslugi" className={({isActive}) => `text-muted hover:text-ink transition ${isActive ? '!text-ink' : ''}`}>Услуги</NavLink>
-          <NavLink to="/katalog" className={({isActive}) => `text-muted hover:text-ink transition ${isActive ? '!text-ink' : ''}`}>Каталог</NavLink>
+          <span className="nav-divider" aria-hidden="true"></span>
+          <NavLink to="/uslugi" className={() => desktopNavClassName(isServicesActive)}>Услуги</NavLink>
+          <NavLink to="/katalog" className={() => desktopNavClassName(isCatalogActive)}>Каталог</NavLink>
         </nav>
 
         <div className="flex items-center gap-2">
@@ -99,43 +123,78 @@ function Header() {
           <button
             aria-label="Меню"
             onClick={() => setOpen(o => !o)}
-            className="lg:hidden btn btn-ghost text-sm !px-3 !py-2">
+            aria-expanded={open}
+            className={`lg:hidden btn text-sm !px-3 !py-2 ${open ? 'btn-primary' : 'btn-ghost'}`}>
             {open ? <X size={18}/> : <Menu size={18}/>}
           </button>
         </div>
       </div>
 
       {open && (
-        <div className="lg:hidden border-t border-line bg-paper">
-          <div className="container-page px-[var(--pad-x)] py-5 grid gap-2 text-sm">
-            {LAYERS.map(l => (
-              <NavLink key={l.slug} to={`/sloy/${l.slug}`} onClick={close} className="py-2 border-b border-line/60 flex justify-between">
-                <span>{l.number} · {l.title}</span><span className="text-muted">→</span>
-              </NavLink>
-            ))}
-            <NavLink to="/uslugi" onClick={close} className="py-2 border-b border-line/60 flex justify-between"><span>Услуги</span><span className="text-muted">→</span></NavLink>
-            <NavLink to="/katalog" onClick={close} className="py-2 border-b border-line/60 flex justify-between"><span>Каталог</span><span className="text-muted">→</span></NavLink>
-            <NavLink to="/kak-raboti" onClick={close} className="py-2 border-b border-line/60 flex justify-between"><span>Как работи Totsan</span><span className="text-muted">→</span></NavLink>
-            <NavLink to="/za-nas" onClick={close} className="py-2 border-b border-line/60 flex justify-between"><span>За нас</span><span className="text-muted">→</span></NavLink>
-            <NavLink to="/contact" onClick={close} className="py-2 border-b border-line/60 flex justify-between"><span>Контакт</span><span className="text-muted">→</span></NavLink>
+        <div className="mobile-nav-shell lg:hidden">
+          <div className="container-page mobile-nav-panel px-[var(--pad-x)] pb-8 pt-5 text-sm">
+            <div className="mobile-nav-group">
+              <div className="mobile-nav-group__label">Петте слоя</div>
+              <div className="grid gap-3">
+                {LAYERS.map(l => (
+                  <NavLink
+                    key={l.slug}
+                    to={`/sloy/${l.slug}`}
+                    onClick={close}
+                    className={({ isActive }) => mobileNavClassName(isActive)}
+                  >
+                    <span>{l.number} · {l.title}</span>
+                    <span className="mobile-nav-arrow">→</span>
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+
+            <div className="mobile-nav-group">
+              <div className="mobile-nav-group__label">Разгледай</div>
+              <div className="grid gap-3">
+                <NavLink to="/uslugi" onClick={close} className={() => mobileNavClassName(isServicesActive)}><span>Услуги</span><span className="mobile-nav-arrow">→</span></NavLink>
+                <NavLink to="/katalog" onClick={close} className={() => mobileNavClassName(isCatalogActive)}><span>Каталог</span><span className="mobile-nav-arrow">→</span></NavLink>
+                <NavLink to="/kak-raboti" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Как работи Totsan</span><span className="mobile-nav-arrow">→</span></NavLink>
+                <NavLink to="/za-nas" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>За нас</span><span className="mobile-nav-arrow">→</span></NavLink>
+                <NavLink to="/contact" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Контакт</span><span className="mobile-nav-arrow">→</span></NavLink>
+              </div>
+            </div>
+
             {session ? (
-              <>
+              <div className="mobile-nav-group">
+                <div className="mobile-nav-group__label">Профил</div>
+                <div className="grid gap-3">
                 {isAdmin && (
-                  <NavLink to="/admin" onClick={close} className="py-2 border-b border-line/60 flex justify-between"><span>Админ</span><span className="text-muted">→</span></NavLink>
+                  <NavLink to="/admin" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Админ</span><span className="mobile-nav-arrow">→</span></NavLink>
                 )}
-                <NavLink to="/inbox" onClick={close} className="py-2 border-b border-line/60 flex justify-between"><span>Съобщения{unreadCount > 0 ? ` (${unreadCount})` : ''}</span><span className="text-muted">→</span></NavLink>
-                <NavLink to="/porachki" onClick={close} className="py-2 border-b border-line/60 flex justify-between"><span>Поръчки</span><span className="text-muted">→</span></NavLink>
-                <NavLink to="/moy-profil" onClick={close} className="py-2 border-b border-line/60 flex justify-between"><span>Моят профил</span><span className="text-muted">→</span></NavLink>
-                <button onClick={() => { close(); supabase.auth.signOut() }} className="py-2 text-left text-muted">Изход</button>
-              </>
+                <NavLink to="/inbox" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Съобщения{unreadCount > 0 ? ` (${unreadCount})` : ''}</span><span className="mobile-nav-arrow">→</span></NavLink>
+                <NavLink to="/porachki" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Поръчки</span><span className="mobile-nav-arrow">→</span></NavLink>
+                <NavLink to="/moy-profil" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Моят профил</span><span className="mobile-nav-arrow">→</span></NavLink>
+                <button onClick={() => { close(); supabase.auth.signOut() }} className="mobile-nav-item text-left text-muted hover:text-ink">Изход</button>
+                </div>
+              </div>
             ) : (
-              <NavLink to="/login" onClick={close} className="py-2 flex justify-between"><span>Вход / Регистрация</span><span className="text-muted">→</span></NavLink>
+              <div className="mobile-nav-group">
+                <div className="mobile-nav-group__label">Достъп</div>
+                <div className="grid gap-3">
+                  <NavLink to="/login" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Вход / Регистрация</span><span className="mobile-nav-arrow">→</span></NavLink>
+                </div>
+              </div>
             )}
           </div>
         </div>
       )}
     </header>
   )
+}
+
+function desktopNavClassName(isActive) {
+  return `nav-pill ${isActive ? 'nav-pill-active' : ''}`
+}
+
+function mobileNavClassName(isActive) {
+  return `mobile-nav-item ${isActive ? 'mobile-nav-item-active' : ''}`
 }
 
 function useUnreadCount(userId) {
