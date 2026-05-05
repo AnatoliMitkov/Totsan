@@ -1,30 +1,30 @@
--- ============================================================================
--- TOTSAN V2 — Supabase Schema
--- Пейсни целия този файл в Supabase Dashboard → SQL Editor → Run.
--- Това създава таблиците + правилата за сигурност (Row Level Security).
+﻿-- ============================================================================
+-- TOTSAN V2 â€” Supabase Schema
+-- ÐŸÐµÐ¹ÑÐ½Ð¸ Ñ†ÐµÐ»Ð¸Ñ Ñ‚Ð¾Ð·Ð¸ Ñ„Ð°Ð¹Ð» Ð² Supabase Dashboard â†’ SQL Editor â†’ Run.
+-- Ð¢Ð¾Ð²Ð° ÑÑŠÐ·Ð´Ð°Ð²Ð° Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð¸Ñ‚Ðµ + Ð¿Ñ€Ð°Ð²Ð¸Ð»Ð°Ñ‚Ð° Ð·Ð° ÑÐ¸Ð³ÑƒÑ€Ð½Ð¾ÑÑ‚ (Row Level Security).
 -- ============================================================================
 
--- 1) Контактни запитвания от формата
+-- 1) ÐšÐ¾Ð½Ñ‚Ð°ÐºÑ‚Ð½Ð¸ Ð·Ð°Ð¿Ð¸Ñ‚Ð²Ð°Ð½Ð¸Ñ Ð¾Ñ‚ Ñ„Ð¾Ñ€Ð¼Ð°Ñ‚Ð°
 create table if not exists public.inquiries (
   id          uuid primary key default gen_random_uuid(),
   created_at  timestamptz not null default now(),
   name        text not null,
-  contact     text not null,                  -- email или телефон
-  layer_slug  text,                            -- 01-05 или null
+  contact     text not null,                  -- email Ð¸Ð»Ð¸ Ñ‚ÐµÐ»ÐµÑ„Ð¾Ð½
+  layer_slug  text,                            -- 01-05 Ð¸Ð»Ð¸ null
   message     text not null,
   source      text default 'contact_form',    -- contact_form | pro_inquiry | product_inquiry
-  target_slug text,                            -- ако е насочено към специалист/продукт
+  target_slug text,                            -- Ð°ÐºÐ¾ Ðµ Ð½Ð°ÑÐ¾Ñ‡ÐµÐ½Ð¾ ÐºÑŠÐ¼ ÑÐ¿ÐµÑ†Ð¸Ð°Ð»Ð¸ÑÑ‚/Ð¿Ñ€Ð¾Ð´ÑƒÐºÑ‚
   status      text not null default 'new'    -- new | seen | replied | closed
 );
 
--- 2) Newsletter абонати (за бъдещ footer)
+-- 2) Newsletter Ð°Ð±Ð¾Ð½Ð°Ñ‚Ð¸ (Ð·Ð° Ð±ÑŠÐ´ÐµÑ‰ footer)
 create table if not exists public.subscribers (
   id          uuid primary key default gen_random_uuid(),
   created_at  timestamptz not null default now(),
   email       text not null unique
 );
 
--- 3) Партньорски заявки (специалисти/фирми, които искат да влязат в Totsan)
+-- 3) ÐŸÐ°Ñ€Ñ‚Ð½ÑŒÐ¾Ñ€ÑÐºÐ¸ Ð·Ð°ÑÐ²ÐºÐ¸ (ÑÐ¿ÐµÑ†Ð¸Ð°Ð»Ð¸ÑÑ‚Ð¸/Ñ„Ð¸Ñ€Ð¼Ð¸, ÐºÐ¾Ð¸Ñ‚Ð¾ Ð¸ÑÐºÐ°Ñ‚ Ð´Ð° Ð²Ð»ÑÐ·Ð°Ñ‚ Ð² Totsan)
 create table if not exists public.partner_applications (
   id          uuid primary key default gen_random_uuid(),
   created_at  timestamptz not null default now(),
@@ -37,7 +37,7 @@ create table if not exists public.partner_applications (
   status      text not null default 'pending'
 );
 
--- 4) Публични профили на специалисти, които се редактират през /admin
+-- 4) ÐŸÑƒÐ±Ð»Ð¸Ñ‡Ð½Ð¸ Ð¿Ñ€Ð¾Ñ„Ð¸Ð»Ð¸ Ð½Ð° ÑÐ¿ÐµÑ†Ð¸Ð°Ð»Ð¸ÑÑ‚Ð¸, ÐºÐ¾Ð¸Ñ‚Ð¾ ÑÐµ Ñ€ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð°Ñ‚ Ð¿Ñ€ÐµÐ· /admin
 create table if not exists public.profiles (
   id            uuid primary key default gen_random_uuid(),
   created_at    timestamptz not null default now(),
@@ -75,8 +75,8 @@ before update on public.profiles
 for each row execute function public.set_updated_at();
 
 -- ============================================================================
--- Row Level Security: позволяваме INSERT от анонимни (формите),
--- но НЕ позволяваме SELECT/UPDATE/DELETE от анонимни (само сервизният роля чете).
+-- Row Level Security: Ð¿Ð¾Ð·Ð²Ð¾Ð»ÑÐ²Ð°Ð¼Ðµ INSERT Ð¾Ñ‚ Ð°Ð½Ð¾Ð½Ð¸Ð¼Ð½Ð¸ (Ñ„Ð¾Ñ€Ð¼Ð¸Ñ‚Ðµ),
+-- Ð½Ð¾ ÐÐ• Ð¿Ð¾Ð·Ð²Ð¾Ð»ÑÐ²Ð°Ð¼Ðµ SELECT/UPDATE/DELETE Ð¾Ñ‚ Ð°Ð½Ð¾Ð½Ð¸Ð¼Ð½Ð¸ (ÑÐ°Ð¼Ð¾ ÑÐµÑ€Ð²Ð¸Ð·Ð½Ð¸ÑÑ‚ Ñ€Ð¾Ð»Ñ Ñ‡ÐµÑ‚Ðµ).
 -- ============================================================================
 
 alter table public.inquiries           enable row level security;
@@ -111,7 +111,7 @@ create policy "public can read published profiles"
   to anon, authenticated
   using (is_published = true);
 
--- Admin policies: само тези имейли могат да четат и управляват данни през /admin.
+-- Admin policies: ÑÐ°Ð¼Ð¾ Ñ‚ÐµÐ·Ð¸ Ð¸Ð¼ÐµÐ¹Ð»Ð¸ Ð¼Ð¾Ð³Ð°Ñ‚ Ð´Ð° Ñ‡ÐµÑ‚Ð°Ñ‚ Ð¸ ÑƒÐ¿Ñ€Ð°Ð²Ð»ÑÐ²Ð°Ñ‚ Ð´Ð°Ð½Ð½Ð¸ Ð¿Ñ€ÐµÐ· /admin.
 drop policy if exists "admins can read inquiries"      on public.inquiries;
 drop policy if exists "admins can update inquiries"    on public.inquiries;
 drop policy if exists "admins can read subscribers"    on public.subscribers;
@@ -121,45 +121,45 @@ drop policy if exists "admins can update applications" on public.partner_applica
 create policy "admins can read inquiries"
   on public.inquiries for select
   to authenticated
-  using ((auth.jwt() ->> 'email') in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin());
 
 create policy "admins can update inquiries"
   on public.inquiries for update
   to authenticated
-  using ((auth.jwt() ->> 'email') in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check ((auth.jwt() ->> 'email') in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 create policy "admins can read subscribers"
   on public.subscribers for select
   to authenticated
-  using ((auth.jwt() ->> 'email') in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin());
 
 create policy "admins can read applications"
   on public.partner_applications for select
   to authenticated
-  using ((auth.jwt() ->> 'email') in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin());
 
 create policy "admins can update applications"
   on public.partner_applications for update
   to authenticated
-  using ((auth.jwt() ->> 'email') in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check ((auth.jwt() ->> 'email') in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 create policy "admins can read profiles"
   on public.profiles for select
   to authenticated
-  using ((auth.jwt() ->> 'email') in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin());
 
 create policy "admins can insert profiles"
   on public.profiles for insert
   to authenticated
-  with check ((auth.jwt() ->> 'email') in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  with check (public.is_admin());
 
 create policy "admins can update profiles"
   on public.profiles for update
   to authenticated
-  using ((auth.jwt() ->> 'email') in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check ((auth.jwt() ->> 'email') in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 insert into storage.buckets (id, name, public)
 values ('profile-images', 'profile-images', true)
@@ -182,7 +182,7 @@ create policy "admins can upload profile images"
   to authenticated
   with check (
     bucket_id = 'profile-images'
-    and (auth.jwt() ->> 'email') in ('a.mitkov@totsan.com', 'manager@totsan.com')
+    and public.is_admin()
   );
 
 create policy "admins can update profile images"
@@ -190,15 +190,15 @@ create policy "admins can update profile images"
   to authenticated
   using (
     bucket_id = 'profile-images'
-    and (auth.jwt() ->> 'email') in ('a.mitkov@totsan.com', 'manager@totsan.com')
+    and public.is_admin()
   )
   with check (
     bucket_id = 'profile-images'
-    and (auth.jwt() ->> 'email') in ('a.mitkov@totsan.com', 'manager@totsan.com')
+    and public.is_admin()
   );
 
 -- ============================================================================
--- Индекси за бързи заявки от админ панел в бъдеще
+-- Ð˜Ð½Ð´ÐµÐºÑÐ¸ Ð·Ð° Ð±ÑŠÑ€Ð·Ð¸ Ð·Ð°ÑÐ²ÐºÐ¸ Ð¾Ñ‚ Ð°Ð´Ð¼Ð¸Ð½ Ð¿Ð°Ð½ÐµÐ» Ð² Ð±ÑŠÐ´ÐµÑ‰Ðµ
 -- ============================================================================
 
 create index if not exists idx_inquiries_created on public.inquiries (created_at desc);
@@ -207,9 +207,9 @@ create index if not exists idx_profiles_layer    on public.profiles (layer_slug)
 create index if not exists idx_profiles_visible  on public.profiles (is_published);
 
 -- ============================================================================
--- АКАУНТ СИСТЕМА (Phase B)
--- Свързваме profiles и partner_applications с auth.users.
--- Позволяваме на специалистите да редактират собствения си профил.
+-- ÐÐšÐÐ£ÐÐ¢ Ð¡Ð˜Ð¡Ð¢Ð•ÐœÐ (Phase B)
+-- Ð¡Ð²ÑŠÑ€Ð·Ð²Ð°Ð¼Ðµ profiles Ð¸ partner_applications Ñ auth.users.
+-- ÐŸÐ¾Ð·Ð²Ð¾Ð»ÑÐ²Ð°Ð¼Ðµ Ð½Ð° ÑÐ¿ÐµÑ†Ð¸Ð°Ð»Ð¸ÑÑ‚Ð¸Ñ‚Ðµ Ð´Ð° Ñ€ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð°Ñ‚ ÑÐ¾Ð±ÑÑ‚Ð²ÐµÐ½Ð¸Ñ ÑÐ¸ Ð¿Ñ€Ð¾Ñ„Ð¸Ð».
 -- ============================================================================
 
 alter table public.profiles
@@ -235,7 +235,7 @@ alter table public.partner_applications
 create index if not exists idx_applications_user   on public.partner_applications (user_id);
 create index if not exists idx_applications_status on public.partner_applications (status);
 
--- Pro: чете и редактира собствения си профил (дори ако is_published = false).
+-- Pro: Ñ‡ÐµÑ‚Ðµ Ð¸ Ñ€ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð° ÑÐ¾Ð±ÑÑ‚Ð²ÐµÐ½Ð¸Ñ ÑÐ¸ Ð¿Ñ€Ð¾Ñ„Ð¸Ð» (Ð´Ð¾Ñ€Ð¸ Ð°ÐºÐ¾ is_published = false).
 drop policy if exists "pros can read own profile"   on public.profiles;
 drop policy if exists "pros can update own profile" on public.profiles;
 
@@ -250,7 +250,7 @@ create policy "pros can update own profile"
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 
--- Всеки логнат потребител може да създаде заявка за себе си и да чете своите.
+-- Ð’ÑÐµÐºÐ¸ Ð»Ð¾Ð³Ð½Ð°Ñ‚ Ð¿Ð¾Ñ‚Ñ€ÐµÐ±Ð¸Ñ‚ÐµÐ» Ð¼Ð¾Ð¶Ðµ Ð´Ð° ÑÑŠÐ·Ð´Ð°Ð´Ðµ Ð·Ð°ÑÐ²ÐºÐ° Ð·Ð° ÑÐµÐ±Ðµ ÑÐ¸ Ð¸ Ð´Ð° Ñ‡ÐµÑ‚Ðµ ÑÐ²Ð¾Ð¸Ñ‚Ðµ.
 drop policy if exists "users can insert own application" on public.partner_applications;
 drop policy if exists "users can read own applications"  on public.partner_applications;
 
@@ -264,7 +264,7 @@ create policy "users can read own applications"
   to authenticated
   using (user_id = auth.uid());
 
--- Pro може да качва собствените си снимки в profile-images (папка = user.id).
+-- Pro Ð¼Ð¾Ð¶Ðµ Ð´Ð° ÐºÐ°Ñ‡Ð²Ð° ÑÐ¾Ð±ÑÑ‚Ð²ÐµÐ½Ð¸Ñ‚Ðµ ÑÐ¸ ÑÐ½Ð¸Ð¼ÐºÐ¸ Ð² profile-images (Ð¿Ð°Ð¿ÐºÐ° = user.id).
 drop policy if exists "pros can upload own profile image" on storage.objects;
 drop policy if exists "pros can update own profile image" on storage.objects;
 
@@ -289,8 +289,8 @@ create policy "pros can update own profile image"
   );
 
 -- ============================================================================
--- ACCOUNTS — единна таблица за роля и статус на потребителя
--- (id = auth.users.id, един ред на акаунт, авто-създаване при signup).
+-- ACCOUNTS â€” ÐµÐ´Ð¸Ð½Ð½Ð° Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° Ð·Ð° Ñ€Ð¾Ð»Ñ Ð¸ ÑÑ‚Ð°Ñ‚ÑƒÑ Ð½Ð° Ð¿Ð¾Ñ‚Ñ€ÐµÐ±Ð¸Ñ‚ÐµÐ»Ñ
+-- (id = auth.users.id, ÐµÐ´Ð¸Ð½ Ñ€ÐµÐ´ Ð½Ð° Ð°ÐºÐ°ÑƒÐ½Ñ‚, Ð°Ð²Ñ‚Ð¾-ÑÑŠÐ·Ð´Ð°Ð²Ð°Ð½Ðµ Ð¿Ñ€Ð¸ signup).
 -- ============================================================================
 
 create table if not exists public.accounts (
@@ -309,8 +309,26 @@ create trigger set_accounts_updated_at
 before update on public.accounts
 for each row execute function public.set_updated_at();
 
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.accounts
+    where id = auth.uid()
+      and role = 'admin'
+  );
+$$;
+
+grant execute on function public.is_admin() to anon, authenticated;
+
 -- Auto-create account row when a new auth.users is inserted.
--- Чете role от user_metadata: ако е 'pro' / 'specialist' → role='specialist', specialist_status='pending'.
+-- Ð§ÐµÑ‚Ðµ role Ð¾Ñ‚ user_metadata: Ð°ÐºÐ¾ Ðµ 'pro' / 'specialist' â†’ role='specialist', specialist_status='pending'.
+-- Admin Ð´Ð¾ÑÑ‚ÑŠÐ¿ÑŠÑ‚ Ðµ role-based Ð¿Ñ€ÐµÐ· public.accounts.role='admin' Ð¸ ÑÐµ Ð·Ð°Ð´Ð°Ð²Ð° Ð¸Ð·Ñ€Ð¸Ñ‡Ð½Ð¾ Ð¸Ð·Ð²ÑŠÐ½ Ñ‚Ð¾Ð·Ð¸ trigger.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -323,11 +341,8 @@ declare
   resolved_status text := null;
   resolved_full_name text := coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', new.raw_user_meta_data->>'user_name');
   resolved_display_name text := coalesce(new.raw_user_meta_data->>'display_name', new.raw_user_meta_data->>'name', new.raw_user_meta_data->>'user_name', split_part(new.email, '@', 1));
-  admin_emails text[] := array['a.mitkov@totsan.com','manager@totsan.com'];
 begin
-  if lower(coalesce(new.email, '')) = any(admin_emails) then
-    resolved_role := 'admin';
-  elsif meta_role in ('specialist', 'pro') then
+  if meta_role in ('specialist', 'pro') then
     resolved_role := 'specialist';
     resolved_status := 'pending';
   end if;
@@ -338,18 +353,15 @@ begin
   set email = excluded.email,
       full_name = coalesce(excluded.full_name, public.accounts.full_name),
       display_name = coalesce(excluded.display_name, public.accounts.display_name),
-      role = case
-        when lower(coalesce(excluded.email, '')) = any(admin_emails) then 'admin'
-        else public.accounts.role
-      end,
+      role = public.accounts.role,
       specialist_status = case
-        when lower(coalesce(excluded.email, '')) = any(admin_emails) then null
+        when public.accounts.role = 'admin' then null
         else coalesce(public.accounts.specialist_status, excluded.specialist_status)
       end;
 
   return new;
 exception when others then
-  -- Никога не позволяваме trigger да блокира създаването на auth.users.
+  -- ÐÐ¸ÐºÐ¾Ð³Ð° Ð½Ðµ Ð¿Ð¾Ð·Ð²Ð¾Ð»ÑÐ²Ð°Ð¼Ðµ trigger Ð´Ð° Ð±Ð»Ð¾ÐºÐ¸Ñ€Ð° ÑÑŠÐ·Ð´Ð°Ð²Ð°Ð½ÐµÑ‚Ð¾ Ð½Ð° auth.users.
   raise warning 'handle_new_user failed for %: %', new.id, sqlerrm;
   return new;
 end;
@@ -364,7 +376,7 @@ for each row execute function public.handle_new_user();
 
 alter table public.accounts enable row level security;
 
--- Потребителят чете само своя ред.
+-- ÐŸÐ¾Ñ‚Ñ€ÐµÐ±Ð¸Ñ‚ÐµÐ»ÑÑ‚ Ñ‡ÐµÑ‚Ðµ ÑÐ°Ð¼Ð¾ ÑÐ²Ð¾Ñ Ñ€ÐµÐ´.
 drop policy if exists "users can read own account"   on public.accounts;
 drop policy if exists "users can update own account" on public.accounts;
 drop policy if exists "admins can read all accounts" on public.accounts;
@@ -375,17 +387,17 @@ create policy "users can read own account"
   to authenticated
   using (id = auth.uid());
 
--- Админите четат и редактират всички акаунти.
+-- ÐÐ´Ð¼Ð¸Ð½Ð¸Ñ‚Ðµ Ñ‡ÐµÑ‚Ð°Ñ‚ Ð¸ Ñ€ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð°Ñ‚ Ð²ÑÐ¸Ñ‡ÐºÐ¸ Ð°ÐºÐ°ÑƒÐ½Ñ‚Ð¸.
 create policy "admins can read all accounts"
   on public.accounts for select
   to authenticated
-  using (lower(coalesce(auth.jwt() ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin());
 
 create policy "admins can update all accounts"
   on public.accounts for update
   to authenticated
-  using (lower(coalesce(auth.jwt() ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check (lower(coalesce(auth.jwt() ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 create index if not exists idx_accounts_role on public.accounts (role);
 create index if not exists idx_accounts_email on public.accounts (email);
@@ -438,30 +450,26 @@ select
   u.email,
   coalesce(u.raw_user_meta_data->>'full_name', u.raw_user_meta_data->>'name', u.raw_user_meta_data->>'user_name'),
   coalesce(u.raw_user_meta_data->>'display_name', u.raw_user_meta_data->>'name', u.raw_user_meta_data->>'user_name', split_part(u.email, '@', 1)),
-  case when lower(coalesce(u.email, '')) in ('a.mitkov@totsan.com', 'manager@totsan.com') then 'admin' else 'user' end,
+  'user',
   null
 from auth.users u
 on conflict (id) do update
 set email = excluded.email,
     full_name = coalesce(nullif(public.accounts.full_name, ''), excluded.full_name),
     display_name = coalesce(nullif(public.accounts.display_name, ''), excluded.display_name),
-    role = case
-      when lower(coalesce(excluded.email, '')) in ('a.mitkov@totsan.com', 'manager@totsan.com') then 'admin'
-      else public.accounts.role
-    end,
+    role = public.accounts.role,
     specialist_status = case
-      when lower(coalesce(excluded.email, '')) in ('a.mitkov@totsan.com', 'manager@totsan.com') then null
+      when public.accounts.role = 'admin' then null
       else public.accounts.specialist_status
     end;
 
--- ВАЖНО: първите админи се задават автоматично
+-- Ð’ÐÐ–ÐÐž: Ð¿ÑŠÑ€Ð²Ð¸Ñ‚Ðµ Ð°Ð´Ð¼Ð¸Ð½Ð¸ ÑÐµ Ð·Ð°Ð´Ð°Ð²Ð°Ñ‚ Ð¸Ð·Ñ€Ð¸Ñ‡Ð½Ð¾ Ñ‡Ñ€ÐµÐ· public.accounts.role = 'admin'
 -- ============================================================================
--- Имейлите a.mitkov@totsan.com и manager@totsan.com стават admin при signup
--- и при backfill на вече съществуващи auth.users записи.
+-- Signup Ð¸ backfill Ð½Ðµ Ð¿Ñ€Ð¾Ð¼Ð¾Ñ‚Ð¸Ñ€Ð°Ñ‚ Ð°Ð´Ð¼Ð¸Ð½Ð¸ Ð¿Ð¾ Ð¸Ð¼ÐµÐ¹Ð».
 -- ============================================================================
 
 -- ============================================================================
--- PHASE 1 — Клиентски профил v2: лични данни, активен проект и project media
+-- PHASE 1 â€” ÐšÐ»Ð¸ÐµÐ½Ñ‚ÑÐºÐ¸ Ð¿Ñ€Ð¾Ñ„Ð¸Ð» v2: Ð»Ð¸Ñ‡Ð½Ð¸ Ð´Ð°Ð½Ð½Ð¸, Ð°ÐºÑ‚Ð¸Ð²ÐµÐ½ Ð¿Ñ€Ð¾ÐµÐºÑ‚ Ð¸ project media
 -- ============================================================================
 
 alter table public.accounts
@@ -593,8 +601,8 @@ create policy "users can delete own client projects"
 create policy "admins can manage client projects"
   on public.client_projects for all
   to authenticated
-  using (lower(coalesce(auth.jwt() ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check (lower(coalesce(auth.jwt() ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 drop policy if exists "users can read own project media" on public.client_project_media;
 drop policy if exists "users can insert own project media" on public.client_project_media;
@@ -638,8 +646,8 @@ create policy "users can delete own project media"
 create policy "admins can manage project media"
   on public.client_project_media for all
   to authenticated
-  using (lower(coalesce(auth.jwt() ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check (lower(coalesce(auth.jwt() ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 insert into storage.buckets (id, name, public)
 values ('project-media', 'project-media', false)
@@ -657,7 +665,7 @@ create policy "users can read own project media objects"
   );
 
 -- ============================================================================
--- PHASE 2 — Партньорски профил v2: разширени полета, портфолио и статистики
+-- PHASE 2 â€” ÐŸÐ°Ñ€Ñ‚Ð½ÑŒÐ¾Ñ€ÑÐºÐ¸ Ð¿Ñ€Ð¾Ñ„Ð¸Ð» v2: Ñ€Ð°Ð·ÑˆÐ¸Ñ€ÐµÐ½Ð¸ Ð¿Ð¾Ð»ÐµÑ‚Ð°, Ð¿Ð¾Ñ€Ñ‚Ñ„Ð¾Ð»Ð¸Ð¾ Ð¸ ÑÑ‚Ð°Ñ‚Ð¸ÑÑ‚Ð¸ÐºÐ¸
 -- ============================================================================
 
 alter table public.profiles
@@ -764,8 +772,8 @@ create policy "pros can delete own portfolio"
 create policy "admins can manage portfolio"
   on public.profile_portfolio for all
   to authenticated
-  using (lower(coalesce(auth.jwt() ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check (lower(coalesce(auth.jwt() ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 insert into storage.buckets (id, name, public)
 values ('portfolio-media', 'portfolio-media', true)
@@ -795,7 +803,7 @@ left join (
 alter view public.vw_profile_stats set (security_invoker = true);
 
 -- ============================================================================
--- PHASE 3 — Админ панел v2: audit trail, account status and dashboard KPIs
+-- PHASE 3 â€” ÐÐ´Ð¼Ð¸Ð½ Ð¿Ð°Ð½ÐµÐ» v2: audit trail, account status and dashboard KPIs
 -- ============================================================================
 
 alter table public.accounts
@@ -826,7 +834,7 @@ drop policy if exists "admins can read audit log" on public.audit_log;
 create policy "admins can read audit log"
   on public.audit_log for select
   to authenticated
-  using (lower(coalesce(auth.jwt() ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin());
 
 create or replace view public.vw_admin_dashboard as
 select
@@ -852,7 +860,7 @@ select
 alter view public.vw_admin_dashboard set (security_invoker = true);
 grant select on public.vw_admin_dashboard to authenticated;
 
--- Phase 7 — Verified reviews and trust
+-- Phase 7 â€” Verified reviews and trust
 create table if not exists public.reviews (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null unique references public.orders(id) on delete cascade,
@@ -913,7 +921,7 @@ security invoker
 set search_path = public
 as $$
 declare
-  is_admin boolean := lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com');
+  is_admin boolean := public.is_admin();
 begin
   if is_admin then
     return new;
@@ -921,7 +929,7 @@ begin
 
   if (select auth.uid()) = old.partner_id then
     if old.partner_reply is not null then
-      raise exception 'Партньорът вече е отговорил на този отзив.';
+      raise exception 'ÐŸÐ°Ñ€Ñ‚Ð½ÑŒÐ¾Ñ€ÑŠÑ‚ Ð²ÐµÑ‡Ðµ Ðµ Ð¾Ñ‚Ð³Ð¾Ð²Ð¾Ñ€Ð¸Ð» Ð½Ð° Ñ‚Ð¾Ð·Ð¸ Ð¾Ñ‚Ð·Ð¸Ð².';
     end if;
 
     if new.id is distinct from old.id
@@ -936,11 +944,11 @@ begin
       or new.body is distinct from old.body
       or new.moderation_status is distinct from old.moderation_status
       or new.created_at is distinct from old.created_at then
-      raise exception 'Партньорът може да добави само отговор към отзива.';
+      raise exception 'ÐŸÐ°Ñ€Ñ‚Ð½ÑŒÐ¾Ñ€ÑŠÑ‚ Ð¼Ð¾Ð¶Ðµ Ð´Ð° Ð´Ð¾Ð±Ð°Ð²Ð¸ ÑÐ°Ð¼Ð¾ Ð¾Ñ‚Ð³Ð¾Ð²Ð¾Ñ€ ÐºÑŠÐ¼ Ð¾Ñ‚Ð·Ð¸Ð²Ð°.';
     end if;
 
     if nullif(trim(coalesce(new.partner_reply, '')), '') is null then
-      raise exception 'Отговорът не може да е празен.';
+      raise exception 'ÐžÑ‚Ð³Ð¾Ð²Ð¾Ñ€ÑŠÑ‚ Ð½Ðµ Ð¼Ð¾Ð¶Ðµ Ð´Ð° Ðµ Ð¿Ñ€Ð°Ð·ÐµÐ½.';
     end if;
 
     new.partner_reply := trim(new.partner_reply);
@@ -948,7 +956,7 @@ begin
     return new;
   end if;
 
-  raise exception 'Нямаш право да редактираш този отзив.';
+  raise exception 'ÐÑÐ¼Ð°Ñˆ Ð¿Ñ€Ð°Ð²Ð¾ Ð´Ð° Ñ€ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð°Ñˆ Ñ‚Ð¾Ð·Ð¸ Ð¾Ñ‚Ð·Ð¸Ð².';
 end;
 $$;
 
@@ -1023,14 +1031,14 @@ create policy "reviews select access"
   using (
     moderation_status = 'visible'
     or (select auth.uid()) in (client_id, partner_id)
-    or lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com')
+    or public.is_admin()
   );
 
 create policy "reviews insert verified or admin"
   on public.reviews for insert
   to authenticated
   with check (
-    lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com')
+    public.is_admin()
     or (
       client_id = (select auth.uid())
       and partner_id <> (select auth.uid())
@@ -1052,18 +1060,18 @@ create policy "reviews partner reply or admin update"
   on public.reviews for update
   to authenticated
   using (
-    lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com')
+    public.is_admin()
     or (partner_id = (select auth.uid()) and moderation_status = 'visible' and partner_reply is null)
   )
   with check (
-    lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com')
+    public.is_admin()
     or (partner_id = (select auth.uid()) and moderation_status = 'visible')
   );
 
 create policy "admins can delete reviews"
   on public.reviews for delete
   to authenticated
-  using (lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin());
 
 drop policy if exists "users can report visible reviews" on public.review_reports;
 drop policy if exists "users can read own review reports" on public.review_reports;
@@ -1077,7 +1085,7 @@ create policy "review reports insert access"
   on public.review_reports for insert
   to authenticated
   with check (
-    lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com')
+    public.is_admin()
     or (
       reporter_id = (select auth.uid())
       and status = 'open'
@@ -1095,19 +1103,19 @@ create policy "review reports select access"
   to authenticated
   using (
     reporter_id = (select auth.uid())
-    or lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com')
+    or public.is_admin()
   );
 
 create policy "admins can update review reports"
   on public.review_reports for update
   to authenticated
-  using (lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check (lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 create policy "admins can delete review reports"
   on public.review_reports for delete
   to authenticated
-  using (lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin());
 
 create or replace view public.vw_profile_stats as
 select
@@ -1179,7 +1187,7 @@ alter view public.vw_admin_dashboard set (security_invoker = true);
 grant select on public.vw_admin_dashboard to authenticated;
 
 -- ============================================================================
--- PHASE 4 — Чат + оферти в чата
+-- PHASE 4 â€” Ð§Ð°Ñ‚ + Ð¾Ñ„ÐµÑ€Ñ‚Ð¸ Ð² Ñ‡Ð°Ñ‚Ð°
 -- ============================================================================
 
 create table if not exists public.conversations (
@@ -1280,8 +1288,8 @@ create policy "participants can update conversations"
 create policy "admins can manage conversations"
   on public.conversations for all
   to authenticated
-  using (lower(coalesce(auth.jwt() ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check (lower(coalesce(auth.jwt() ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 create policy "participants can read messages"
   on public.messages for select
@@ -1312,8 +1320,8 @@ create policy "participants can update messages"
 create policy "admins can manage messages"
   on public.messages for all
   to authenticated
-  using (lower(coalesce(auth.jwt() ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check (lower(coalesce(auth.jwt() ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 create policy "participants can read offers"
   on public.offers for select
@@ -1335,8 +1343,8 @@ create policy "partners can update own offers"
 create policy "admins can manage offers"
   on public.offers for all
   to authenticated
-  using (lower(coalesce(auth.jwt() ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check (lower(coalesce(auth.jwt() ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 do $$
 begin
@@ -1352,7 +1360,7 @@ begin
 end $$;
 
 -- ============================================================================
--- PHASE 5 — Партньорски услуги / публикации
+-- PHASE 5 â€” ÐŸÐ°Ñ€Ñ‚Ð½ÑŒÐ¾Ñ€ÑÐºÐ¸ ÑƒÑÐ»ÑƒÐ³Ð¸ / Ð¿ÑƒÐ±Ð»Ð¸ÐºÐ°Ñ†Ð¸Ð¸
 -- ============================================================================
 
 create table if not exists public.partner_services (
@@ -1539,8 +1547,8 @@ create policy "owners can delete own partner services"
 create policy "admins can manage partner services"
   on public.partner_services for all
   to authenticated
-  using (lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check (lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 drop policy if exists "public can read approved partner service packages" on public.partner_service_packages;
 drop policy if exists "owners can manage own partner service packages" on public.partner_service_packages;
@@ -1560,8 +1568,8 @@ create policy "owners can manage own partner service packages"
 create policy "admins can manage partner service packages"
   on public.partner_service_packages for all
   to authenticated
-  using (lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check (lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 drop policy if exists "public can read approved partner service faq" on public.partner_service_faq;
 drop policy if exists "owners can manage own partner service faq" on public.partner_service_faq;
@@ -1581,8 +1589,8 @@ create policy "owners can manage own partner service faq"
 create policy "admins can manage partner service faq"
   on public.partner_service_faq for all
   to authenticated
-  using (lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check (lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 insert into storage.buckets (id, name, public)
 values ('service-media', 'service-media', true)
@@ -1613,7 +1621,7 @@ alter view public.vw_admin_dashboard set (security_invoker = true);
 grant select on public.vw_admin_dashboard to authenticated;
 
 -- ============================================================================
--- PHASE 6 — Поръчки и плащания (Stripe sandbox + mock fallback)
+-- PHASE 6 â€” ÐŸÐ¾Ñ€ÑŠÑ‡ÐºÐ¸ Ð¸ Ð¿Ð»Ð°Ñ‰Ð°Ð½Ð¸Ñ (Stripe sandbox + mock fallback)
 -- ============================================================================
 
 alter table public.accounts
@@ -1705,8 +1713,8 @@ create policy "participants can read orders"
 create policy "admins can manage orders"
   on public.orders for all
   to authenticated
-  using (lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check (lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 create policy "participants can read order events"
   on public.order_events for select
@@ -1719,8 +1727,8 @@ create policy "participants can read order events"
 create policy "admins can manage order events"
   on public.order_events for all
   to authenticated
-  using (lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check (lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 create policy "participants can read payment transactions"
   on public.payment_transactions for select
@@ -1733,8 +1741,8 @@ create policy "participants can read payment transactions"
 create policy "admins can manage payment transactions"
   on public.payment_transactions for all
   to authenticated
-  using (lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'))
-  with check (lower(coalesce((select auth.jwt()) ->> 'email', '')) in ('a.mitkov@totsan.com', 'manager@totsan.com'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 do $$
 begin

@@ -1,6 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.8'
 
-const ADMIN_EMAILS = new Set(['a.mitkov@totsan.com', 'manager@totsan.com'])
 const INQUIRY_STATUSES = new Set(['new', 'seen', 'replied', 'closed'])
 const ACCOUNT_ROLES = new Set(['user', 'specialist', 'admin'])
 const SPECIALIST_STATUSES = new Set(['pending', 'approved', 'rejected'])
@@ -91,7 +90,7 @@ Deno.serve(async (req) => {
     .maybeSingle()
 
   const actorEmail = String(actorAccount?.email || user.email || '').toLowerCase()
-  if (actorError || (actorAccount?.role !== 'admin' && !ADMIN_EMAILS.has(actorEmail))) {
+  if (actorError || actorAccount?.role !== 'admin') {
     return jsonResponse(403, { error: 'Admin access required.' })
   }
 

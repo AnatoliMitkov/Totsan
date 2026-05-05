@@ -13,4 +13,5 @@ dist
 
 # Sensitive business info — съдържа реални ключове и вътрешни документи
 info/
+.github/prompts/
 .vercel
