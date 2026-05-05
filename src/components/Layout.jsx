@@ -81,7 +81,13 @@ function Header() {
     if (!open) return undefined
 
     const previousOverflow = document.body.style.overflow
+    const previousPaddingRight = document.body.style.paddingRight
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth
+
     document.body.style.overflow = 'hidden'
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`
+    }
 
     const onResize = () => {
       if (window.innerWidth >= 1024) setOpen(false)
@@ -90,6 +96,7 @@ function Header() {
     window.addEventListener('resize', onResize)
     return () => {
       document.body.style.overflow = previousOverflow
+      document.body.style.paddingRight = previousPaddingRight
       window.removeEventListener('resize', onResize)
     }
   }, [open])
@@ -117,18 +124,19 @@ function Header() {
             <span>Съобщения</span>
             {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accentDeep px-1.5 text-[11px] font-medium text-paper">{unreadCount}</span>}
           </Link>}
-          {!session && open && (
-            <Link to="/login" onClick={close} className="btn btn-primary mobile-nav-auth lg:hidden">Вход / Регистрация</Link>
-          )}
           {session ? <UserMenu session={session} account={account} isAdmin={isAdmin} /> : (
-            <Link to="/login" className="btn btn-primary text-sm hidden lg:inline-flex">Вход</Link>
+            <>
+              <Link to="/login" className="mobile-header-auth">Вход</Link>
+              <Link to="/login" className="desktop-header-auth">Вход</Link>
+            </>
           )}
           <button
             aria-label="Меню"
             onClick={() => setOpen(o => !o)}
             aria-expanded={open}
-            className={`lg:hidden btn text-sm !px-3 !py-2 ${open ? 'btn-primary' : 'btn-ghost'}`}>
-            {open ? <X size={18}/> : <Menu size={18}/>}
+            className={`mobile-menu-toggle ${open ? 'is-open' : ''}`}>
+            <span className="mobile-menu-toggle__icon mobile-menu-toggle__icon--menu" aria-hidden="true"><Menu size={18}/></span>
+            <span className="mobile-menu-toggle__icon mobile-menu-toggle__icon--close" aria-hidden="true"><X size={18}/></span>
           </button>
         </div>
       </div>
