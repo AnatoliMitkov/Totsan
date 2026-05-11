@@ -45,7 +45,7 @@ export default function HowItWorks() {
               { t:'Безплатно за теб', d:'Като клиент не плащаш на платформата. Платформата живее от партньорите.' }
             ].map((p,i) => (
               <div key={i} className="reveal border-t border-paper/20 pt-5">
-                <div className="font-display text-2xl text-accent">0{i+1}</div>
+                <div className="font-display text-2xl text-accentDeep">0{i+1}</div>
                 <div className="font-display text-xl mt-2 text-paper">{p.t}</div>
                 <p className="text-paper/70 mt-2 text-sm">{p.d}</p>
               </div>

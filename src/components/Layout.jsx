@@ -1,10 +1,15 @@
 import { Outlet, Link, NavLink, useLocation } from 'react-router-dom'
 import { LAYERS } from '../data/layers.js'
 import { useEffect, useRef, useState } from 'react'
-import { Menu, MessageCircle, X } from 'lucide-react'
+import { Menu, MessageCircle, Volume1, Volume2, VolumeX, X } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { getAccountDisplayName, getAccountInitial, useAccount } from '../lib/account.js'
 import { loadUnreadConversationCount, subscribeToConversationList } from '../lib/chat.js'
+
+const MUSIC_TRACKS = [
+  '/Music/the_mountain-lofi-lofi-music-496553.mp3',
+  '/Music/watermello-lofi-lofi-girl-lofi-chill-484610.mp3',
+]
 
 export default function Layout() {
   const { pathname } = useLocation()
@@ -66,15 +71,28 @@ export default function Layout() {
 
 function Header() {
   const [open, setOpen] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
   const close = () => setOpen(false)
   const { pathname } = useLocation()
   const { session, account, isAdmin } = useAccount()
   const unreadCount = useUnreadCount(session?.user?.id)
+  const isHomePage = pathname === '/'
   const isServicesActive = pathname.startsWith('/uslugi') || pathname.startsWith('/usluga/')
   const isCatalogActive = pathname === '/katalog'
+  const isHomeHeroMode = isHomePage && !isScrolled && !open
 
   useEffect(() => {
     setOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
+    const syncScrolledState = () => {
+      setIsScrolled(window.scrollY > 24)
+    }
+
+    syncScrolledState()
+    window.addEventListener('scroll', syncScrolledState, { passive: true })
+    return () => window.removeEventListener('scroll', syncScrolledState)
   }, [pathname])
 
   useEffect(() => {
@@ -102,39 +120,40 @@ function Header() {
   }, [open])
 
   return (
-    <header className={`sticky top-0 z-40 border-b border-line ${open ? 'bg-paper shadow-[0_24px_40px_-36px_rgba(0,0,0,0.38)]' : 'backdrop-blur bg-paper/85'}`}>
-      <div className="container-page flex items-center justify-between py-4 px-[var(--pad-x)]">
-        <Link to="/" className="font-display text-2xl tracking-tight" onClick={close}>Totsan</Link>
+    <header className={`${isHomePage ? 'fixed inset-x-0 top-0' : 'sticky top-0'} z-40 border-b transition-[background-color,border-color,box-shadow,backdrop-filter] duration-300 ${isHomeHeroMode ? 'border-transparent bg-transparent shadow-none' : 'border-line bg-paper/90 shadow-[0_24px_44px_-36px_rgba(0,0,0,0.5)] backdrop-blur-xl'}`}>
+      <div className="container-page flex items-center gap-4 py-4 px-[var(--pad-x)] xl:gap-6">
+        <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 lg:mr-12 xl:mr-16 ${isHomeHeroMode ? 'text-paper [text-shadow:0_10px_28px_rgba(0,0,0,0.48)]' : 'text-ink'}`} onClick={close}>Totsan</Link>
 
-        <nav className="hidden lg:flex items-center gap-7 text-sm">
+        <nav className="hidden min-w-0 flex-1 items-center justify-center gap-2 text-[0.78rem] lg:flex xl:gap-3 xl:text-sm">
           {LAYERS.map(l => (
             <NavLink key={l.slug} to={`/sloy/${l.slug}`}
-              className={({isActive}) => desktopNavClassName(isActive)}>
+              className={({isActive}) => desktopNavClassName(isActive, isHomeHeroMode)}>
               {l.number} · {l.title.split(' ')[0]}
             </NavLink>
           ))}
           <span className="nav-divider" aria-hidden="true"></span>
-          <NavLink to="/uslugi" className={() => desktopNavClassName(isServicesActive)}>Услуги</NavLink>
-          <NavLink to="/katalog" className={() => desktopNavClassName(isCatalogActive)}>Каталог</NavLink>
+          <NavLink to="/uslugi" className={() => desktopNavClassName(isServicesActive, isHomeHeroMode)}>Услуги</NavLink>
+          <NavLink to="/katalog" className={() => desktopNavClassName(isCatalogActive, isHomeHeroMode)}>Каталог</NavLink>
         </nav>
 
-        <div className="flex items-center gap-2">
-          {session && <Link to="/inbox" className="relative hidden items-center gap-2 rounded-full border border-line bg-paper px-3 py-2 text-sm text-muted transition hover:border-ink/40 hover:text-ink sm:inline-flex">
+        <div className="ml-auto flex items-center gap-2">
+          {session && <Link to="/inbox" className={desktopUtilityLinkClassName(isHomeHeroMode)}>
             <MessageCircle size={17} />
             <span>Съобщения</span>
             {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accentDeep px-1.5 text-[11px] font-medium text-paper">{unreadCount}</span>}
           </Link>}
           {session ? <UserMenu session={session} account={account} isAdmin={isAdmin} /> : (
             <>
-              <Link to="/login" className="mobile-header-auth">Вход</Link>
-              <Link to="/login" className="desktop-header-auth">Вход</Link>
+              <Link to="/login" className={`mobile-header-auth ${isHomeHeroMode ? 'mobile-header-auth-on-dark' : ''}`}>Вход</Link>
+              <Link to="/login" className={`desktop-header-auth ${isHomeHeroMode ? 'desktop-header-auth-on-dark' : ''}`}>Вход</Link>
             </>
           )}
+          <HeaderMusicControl isHomeHeroMode={isHomeHeroMode} />
           <button
             aria-label="Меню"
             onClick={() => setOpen(o => !o)}
             aria-expanded={open}
-            className={`mobile-menu-toggle ${open ? 'is-open' : ''}`}>
+            className={`mobile-menu-toggle ${open ? 'is-open' : ''} ${isHomeHeroMode ? 'mobile-menu-toggle-on-dark' : ''}`}>
             <span className="mobile-menu-toggle__icon mobile-menu-toggle__icon--menu" aria-hidden="true"><Menu size={18}/></span>
             <span className="mobile-menu-toggle__icon mobile-menu-toggle__icon--close" aria-hidden="true"><X size={18}/></span>
           </button>
@@ -193,12 +212,167 @@ function Header() {
   )
 }
 
-function desktopNavClassName(isActive) {
-  return `nav-pill ${isActive ? 'nav-pill-active' : ''}`
+function desktopNavClassName(isActive, onDarkHero = false) {
+  return `nav-pill ${onDarkHero ? 'nav-pill-on-dark' : ''} ${isActive ? 'nav-pill-active' : ''}`
 }
 
 function mobileNavClassName(isActive) {
   return `mobile-nav-item ${isActive ? 'mobile-nav-item-active' : ''}`
+}
+
+function desktopUtilityLinkClassName(onDarkHero = false) {
+  return `desktop-header-utility ${onDarkHero ? 'desktop-header-utility-on-dark' : ''}`
+}
+
+function HeaderMusicControl({ isHomeHeroMode = false }) {
+  const audioRef = useRef(null)
+  const hasPlaybackStartedRef = useRef(false)
+  const lastAudibleVolumeRef = useRef(0.42)
+  const [trackIndex, setTrackIndex] = useState(0)
+  const [volume, setVolume] = useState(() => {
+    if (typeof window === 'undefined') return 0.42
+
+    const stored = Number(window.localStorage.getItem('totsan-audio-volume'))
+    return Number.isFinite(stored) && stored >= 0 && stored <= 1 ? stored : 0.42
+  })
+  const [isMuted, setIsMuted] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.localStorage.getItem('totsan-audio-muted') === '1'
+  })
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return undefined
+
+    audio.volume = Math.max(0, Math.min(volume, 1))
+    audio.muted = isMuted || volume <= 0
+    return undefined
+  }, [volume, isMuted])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    window.localStorage.setItem('totsan-audio-volume', String(volume))
+    window.localStorage.setItem('totsan-audio-muted', isMuted ? '1' : '0')
+    return undefined
+  }, [volume, isMuted])
+
+  useEffect(() => {
+    if (volume > 0) lastAudibleVolumeRef.current = volume
+  }, [volume])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio) return undefined
+
+    const nextSrc = MUSIC_TRACKS[trackIndex]
+    if (!nextSrc) return undefined
+
+    audio.src = nextSrc
+    audio.load()
+    audio.volume = Math.max(0, Math.min(volume, 1))
+    audio.muted = isMuted || volume <= 0
+
+    if (hasPlaybackStartedRef.current) {
+      const nextPlay = audio.play()
+      if (typeof nextPlay?.catch === 'function') nextPlay.catch(() => {})
+    }
+
+    return undefined
+  }, [trackIndex])
+
+  useEffect(() => {
+    const unlockPlayback = () => {
+      const audio = audioRef.current
+      if (!audio || hasPlaybackStartedRef.current) return
+
+      hasPlaybackStartedRef.current = true
+      const playAttempt = audio.play()
+      if (typeof playAttempt?.catch === 'function') playAttempt.catch(() => {})
+    }
+
+    window.addEventListener('pointerdown', unlockPlayback, { passive: true, once: true })
+    window.addEventListener('keydown', unlockPlayback, { once: true })
+
+    return () => {
+      window.removeEventListener('pointerdown', unlockPlayback)
+      window.removeEventListener('keydown', unlockPlayback)
+    }
+  }, [])
+
+  const ensurePlayback = () => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    hasPlaybackStartedRef.current = true
+    const playAttempt = audio.play()
+    if (typeof playAttempt?.catch === 'function') playAttempt.catch(() => {})
+  }
+
+  const effectiveVolume = isMuted ? 0 : volume
+  const volumePercent = Math.round(effectiveVolume * 100)
+  const Icon = effectiveVolume <= 0 ? VolumeX : effectiveVolume < 0.58 ? Volume1 : Volume2
+
+  const toggleMute = () => {
+    ensurePlayback()
+
+    if (effectiveVolume <= 0) {
+      const restoredVolume = lastAudibleVolumeRef.current > 0 ? lastAudibleVolumeRef.current : 0.42
+      setVolume(restoredVolume)
+      setIsMuted(false)
+      return
+    }
+
+    setIsMuted(true)
+  }
+
+  const handleVolumeChange = (event) => {
+    const nextVolume = Number(event.target.value) / 100
+    ensurePlayback()
+
+    if (nextVolume <= 0) {
+      setVolume(0)
+      setIsMuted(true)
+      return
+    }
+
+    setVolume(nextVolume)
+    setIsMuted(false)
+  }
+
+  return (
+    <div className={`music-control ${isHomeHeroMode ? 'music-control-on-dark' : ''}`}>
+      <button
+        type="button"
+        className="music-control__button"
+        onClick={toggleMute}
+        aria-label={effectiveVolume <= 0 ? 'Пусни музиката' : 'Спри музиката'}
+        title={effectiveVolume <= 0 ? 'Пусни музиката' : 'Спри музиката'}>
+        <Icon size={17} />
+      </button>
+
+      <div className="music-control__slider-shell">
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value={volumePercent}
+          onChange={handleVolumeChange}
+          className="music-control__slider"
+          aria-label="Сила на звука"
+        />
+      </div>
+
+      <audio
+        ref={audioRef}
+        preload="auto"
+        onEnded={() => {
+          setTrackIndex((current) => (current + 1) % MUSIC_TRACKS.length)
+        }}
+      />
+    </div>
+  )
 }
 
 function useUnreadCount(userId) {

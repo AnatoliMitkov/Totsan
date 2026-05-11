@@ -54,7 +54,7 @@ export default function Service() {
             <h1 className="h-display mt-3 text-paper">{service.name}</h1>
             <p className="mt-5 max-w-2xl text-paper/85" style={{fontSize:'var(--step-md)'}}>{service.work}</p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <a href="#majstori" className="btn btn-primary !bg-accent !text-ink hover:!bg-paper">Виж специалистите</a>
+              <a href="#majstori" className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">Виж специалистите</a>
               <Link to="/contact" state={{ subject: `Запитване: ${service.name}` }} className="btn btn-ghost !border-paper/40 !text-paper hover:!bg-paper hover:!text-ink">Заяви услуга</Link>
             </div>
           </div>
@@ -121,7 +121,7 @@ export default function Service() {
             <p className="mt-3 text-paper/70 max-w-2xl">Кажи ни кратко какво ти трябва — връщаме се с подходящ специалист и оферта.</p>
           </div>
           <div className="md:col-span-4 flex md:justify-end gap-3 flex-wrap">
-            <Link to="/contact" state={{ subject: `Запитване: ${service.name}` }} className="btn btn-primary !bg-accent !text-ink hover:!bg-paper">Заяви услуга</Link>
+            <Link to="/contact" state={{ subject: `Запитване: ${service.name}` }} className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">Заяви услуга</Link>
           </div>
         </div>
       </section>

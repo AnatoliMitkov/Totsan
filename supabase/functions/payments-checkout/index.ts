@@ -239,6 +239,21 @@ async function stripeSecret(admin: SupabaseAdmin) {
   throw new Error('Липсва STRIPE_SECRET_KEY за Stripe Sandbox.')
 }
 
+function stripeDashboardConnectUrl(secretKey: string) {
+  return secretKey.startsWith('sk_live_') ? 'https://dashboard.stripe.com/connect' : 'https://dashboard.stripe.com/test/connect'
+}
+
+function stripeErrorMessage(secretKey: string, data: Record<string, unknown>) {
+  const rawMessage = cleanText((data as { error?: { message?: string } })?.error?.message)
+  if (!rawMessage) return 'Stripe заявката не беше успешна.'
+
+  if (/you can only create new accounts if you've signed up for connect/i.test(rawMessage) || /signed up for connect/i.test(rawMessage)) {
+    return `Stripe Connect още не е активиран за този Stripe акаунт. Влез в ${stripeDashboardConnectUrl(secretKey)}, довърши настройката на Connect и после натисни „Активирай плащания“ отново.`
+  }
+
+  return rawMessage
+}
+
 async function stripeRequest(admin: SupabaseAdmin, path: string, options: { method?: string; body?: URLSearchParams } = {}) {
   const secretKey = await stripeSecret(admin)
   const response = await fetch(`https://api.stripe.com/v1/${path}`, {
@@ -250,7 +265,7 @@ async function stripeRequest(admin: SupabaseAdmin, path: string, options: { meth
     body: options.body,
   })
   const data = await response.json()
-  if (!response.ok) throw new Error(data?.error?.message || 'Stripe заявката не беше успешна.')
+  if (!response.ok) throw new Error(stripeErrorMessage(secretKey, data))
   return data
 }
 

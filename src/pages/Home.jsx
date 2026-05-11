@@ -4,6 +4,12 @@ import { LAYERS } from '../data/layers.js'
 import { SERVICE_DETAILS } from '../data/catalog.js'
 import { HOME_PROJECTS, HERO_COLLAGE, PARTNER_LOGOS, SERVICE_IMAGES, LAYER_HEROS } from '../data/images.js'
 
+const HERO_POSTER_SRC = '/Videos/totsan-hero-video-building-layers.webp'
+const HERO_VIDEO_SOURCES = [
+  { src: '/Videos/totsan-hero-video-building-layers.webm', type: 'video/webm' },
+  { src: '/Videos/totsan-hero-video-building-layers.mp4', type: 'video/mp4' },
+]
+
 export default function Home() {
   return (
     <>
@@ -27,45 +33,51 @@ export default function Home() {
 }
 
 function Hero() {
+  const [videoReady, setVideoReady] = useState(false)
+
   return (
-    <section className="section home-hero !pt-8 sm:!pt-10 md:!pt-24 relative overflow-hidden flex flex-col justify-start lg:justify-center" style={{ minHeight: 'calc(100svh - var(--header-h, 0px))' }}>
-      <div className="container-page grid lg:grid-cols-12 gap-10 items-center">
-        <div className="lg:col-span-7 reveal">
-          <div className="eyebrow mb-5">Платформа за създаване на пространство</div>
-          <h1 className="h-display">
-            Пространството ти — <br />
-            <span className="text-accentDeep italic">създадено както трябва.</span>
+    <section className="home-hero">
+      <div className="home-hero__media-shell" aria-hidden="true">
+        <img
+          src={HERO_POSTER_SRC}
+          alt=""
+          className={`home-hero__image ${videoReady ? 'is-hidden' : ''}`}
+          loading="eager"
+          decoding="async"
+        />
+        <video
+          className={`home-hero__video ${videoReady ? 'is-ready' : ''}`}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          poster={HERO_POSTER_SRC}
+          onCanPlay={() => {
+            setVideoReady(true)
+          }}
+          onError={() => {
+            setVideoReady(false)
+          }}>
+          {HERO_VIDEO_SOURCES.map((source) => (
+            <source key={source.src} src={source.src} type={source.type} />
+          ))}
+        </video>
+      </div>
+      <div className="home-hero__scrim" aria-hidden="true" />
+      <div className="container-page home-hero__overlay">
+        <div className="home-hero__content">
+          <div className="eyebrow home-hero__eyebrow mb-4">Контрол, качество и сигурност</div>
+          <h1 className="h-display home-hero__title text-paper">
+            <span className="home-hero__title-line home-hero__title-line--top">Твоят - сигурен избор в</span>
+            <span className="home-hero__title-line home-hero__title-line--bottom text-accent italic">строителството.</span>
           </h1>
-          <p className="mt-6 max-w-xl text-muted" style={{fontSize:'var(--step-md)'}}>
+          <p className="home-hero__lead mt-5 max-w-xl" style={{fontSize:'var(--step-md)'}}>
             Една къща, един ресторант, един апартамент или градина. Започваш от идеята, минаваш през правилните хора, материали и услуги — и стигаш до своя дом. Всичко на едно място. Без хаос.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Link to="/sloy/ideya" className="btn btn-primary">Започни от идея →</Link>
-            <a href="#story" className="btn btn-ghost">Виж как работи</a>
-          </div>
-          <div className="mt-10 grid grid-cols-3 gap-6 max-w-md">
-            <Stat n="320+" l="Проверени майстори" />
-            <Stat n="1 800" l="Материали и марки" />
-            <Stat n="5" l="Ясни слоя" />
-          </div>
-        </div>
-        <div className="lg:col-span-5 reveal">
-          <div className="relative aspect-[4/5]">
-            <div className="absolute inset-0 grid grid-cols-6 grid-rows-6 gap-3">
-              <div className="col-span-4 row-span-4 rounded-3xl overflow-hidden border border-line shadow-[0_30px_60px_-30px_rgba(0,0,0,0.25)]">
-                <img src={HERO_COLLAGE[0]} alt="" className="img-cover" />
-              </div>
-              <div className="col-span-2 row-span-3 col-start-5 row-start-1 rounded-2xl overflow-hidden border border-line">
-                <img src={HERO_COLLAGE[1]} alt="" className="img-cover" />
-              </div>
-              <div className="col-span-3 row-span-2 col-start-4 row-start-5 rounded-2xl overflow-hidden border border-line">
-                <img src={HERO_COLLAGE[2]} alt="" className="img-cover" />
-              </div>
-              <div className="col-span-3 row-span-2 col-start-1 row-start-5 rounded-2xl bg-paper border border-line p-5 flex flex-col justify-between">
-                <div className="eyebrow">Петте слоя</div>
-                <div className="font-display text-accentDeep text-lg leading-tight">От идея до финален щрих.</div>
-              </div>
-            </div>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Link to="/sloy/ideya" className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">Започни от идея →</Link>
+            <a href="#story" className="btn btn-ghost !border-paper/25 !bg-paper/10 !text-paper hover:!border-paper/50 hover:!bg-paper/15">Виж как работи</a>
           </div>
         </div>
       </div>
@@ -85,11 +97,13 @@ function SectionDivider({ label }) {
   )
 }
 
-function Stat({ n, l }) {
+function Stat({ n, l, tone = 'light' }) {
+  const isDark = tone === 'dark'
+
   return (
-    <div>
-      <div className="font-display text-3xl text-ink">{n}</div>
-      <div className="text-xs text-muted mt-1 leading-snug">{l}</div>
+    <div className={isDark ? 'border-t border-paper/10 pt-3' : ''}>
+      <div className={`font-display ${isDark ? 'text-2xl text-paper' : 'text-3xl text-ink'}`}>{n}</div>
+      <div className={`mt-1 leading-snug ${isDark ? 'text-[0.72rem] text-paper/60' : 'text-xs text-muted'}`}>{l}</div>
     </div>
   )
 }
@@ -360,7 +374,7 @@ function CTA() {
           <p className="mt-3 text-paper/70 max-w-2xl">Кажи ни в две изречения какво искаш — ние се връщаме към теб с правилните хора още същата седмица.</p>
         </div>
         <div className="md:col-span-4 flex md:justify-end gap-3 flex-wrap">
-          <Link to="/contact" className="btn btn-primary !bg-accent !text-ink hover:!bg-paper">Заяви консултация</Link>
+          <Link to="/contact" className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">Заяви консултация</Link>
           <Link to="/sloy/ideya" className="btn btn-ghost !border-paper/30 !text-paper">Разгледай слоевете</Link>
         </div>
       </div>

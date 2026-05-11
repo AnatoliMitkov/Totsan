@@ -62,7 +62,7 @@ export default function About() {
           <h2 className="h-section text-paper">Искаш да станеш партньор?</h2>
           <p className="mt-3 text-paper/70 max-w-2xl">Архитект, изпълнител, производител, майстор. Ако работиш качествено, разкажи ни.</p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link to="/contact" className="btn btn-primary !bg-accent !text-ink hover:!bg-paper">Свържи се с нас</Link>
+            <Link to="/contact" className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">Свържи се с нас</Link>
           </div>
         </div>
       </section>

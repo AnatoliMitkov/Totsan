@@ -42,7 +42,7 @@ export default function Services() {
             <p className="mt-3 text-paper/70 max-w-2xl">Кажи ни с две изречения какво ти трябва — намираме правилния човек и се връщаме до 24 часа.</p>
           </div>
           <div className="md:col-span-4 flex md:justify-end gap-3 flex-wrap">
-            <Link to="/contact" className="btn btn-primary !bg-accent !text-ink hover:!bg-paper">Заяви услуга</Link>
+            <Link to="/contact" className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">Заяви услуга</Link>
           </div>
         </div>
       </section>

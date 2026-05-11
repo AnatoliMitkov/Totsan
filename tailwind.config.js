@@ -4,17 +4,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: '#1B1D1F',           // графит (по-меко от черно)
-        graphite: '#2A2D30',
-        paper: '#FFFFFF',          // чисто бяло
-        soft: '#F5F6F7',           // леко сиво за секции
-        cloud: '#ECEEF0',          // по-плътно сиво
-        cream: '#F5F6F7',          // alias за стара употреба
-        line: '#E3E5E8',
-        muted: '#6B7075',
-        accent: '#B8825A',         // топъл бронз/охра (запазен акцент)
-        accentDeep: '#8C5E3C',
-        accentSoft: '#EFE3D5'      // много меко за подложки
+        ink: '#0D2340',            // deep navy за доверие и стабилност
+        graphite: '#163250',
+        paper: '#F8FBFF',
+        soft: '#EEF4FA',
+        cloud: '#E1EAF2',
+        cream: '#EEF4FA',
+        line: '#D2DEE9',
+        muted: '#61758F',
+        accent: '#2C6FE8',         // trust blue
+        accentDeep: '#163EA2',
+        accentSoft: '#E5EEFF',
+        trustGreen: '#2F8F74',
+        trustPurple: '#6657B7'
       },
       fontFamily: {
         display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
