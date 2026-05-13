@@ -1,6 +1,6 @@
 import { Outlet, Link, NavLink, useLocation } from 'react-router-dom'
 import { LAYERS } from '../data/layers.js'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Menu, MessageCircle, Volume1, Volume2, VolumeX, X } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { getAccountDisplayName, getAccountInitial, useAccount } from '../lib/account.js'
@@ -10,9 +10,6 @@ const MUSIC_TRACKS = [
   '/Music/the_mountain-lofi-lofi-music-496553.mp3',
   '/Music/watermello-lofi-lofi-girl-lofi-chill-484610.mp3',
 ]
-
-const HEADER_DESKTOP_MIN_WIDTH = 1024
-const HEADER_FIT_BUFFER = 16
 
 export default function Layout() {
   const { pathname } = useLocation()
@@ -75,14 +72,6 @@ export default function Layout() {
 function Header() {
   const [open, setOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
-  const [showDesktopNav, setShowDesktopNav] = useState(() => {
-    if (typeof window === 'undefined') return true
-    return window.innerWidth >= HEADER_DESKTOP_MIN_WIDTH
-  })
-  const headerInnerRef = useRef(null)
-  const logoRef = useRef(null)
-  const navMeasureRef = useRef(null)
-  const desktopActionsRef = useRef(null)
   const close = () => setOpen(false)
   const { pathname } = useLocation()
   const { session, account, isAdmin } = useAccount()
@@ -91,19 +80,6 @@ function Header() {
   const isServicesActive = pathname.startsWith('/uslugi') || pathname.startsWith('/usluga/')
   const isCatalogActive = pathname === '/katalog'
   const isHomeHeroMode = isHomePage && !isScrolled && !open
-  const desktopNavItems = (
-    <>
-      {LAYERS.map(l => (
-        <NavLink key={l.slug} to={`/sloy/${l.slug}`}
-          className={({isActive}) => desktopNavClassName(isActive, isHomeHeroMode)}>
-          {l.number} · {l.title.split(' ')[0]}
-        </NavLink>
-      ))}
-      <span className="nav-divider" aria-hidden="true"></span>
-      <NavLink to="/uslugi" className={() => desktopNavClassName(isServicesActive, isHomeHeroMode)}>Услуги</NavLink>
-      <NavLink to="/katalog" className={() => desktopNavClassName(isCatalogActive, isHomeHeroMode)}>Каталог</NavLink>
-    </>
-  )
 
   useEffect(() => {
     setOpen(false)
@@ -130,104 +106,64 @@ function Header() {
     if (scrollbarWidth > 0) {
       document.body.style.paddingRight = `${scrollbarWidth}px`
     }
+
+    const onResize = () => {
+      if (window.innerWidth >= 1024) setOpen(false)
+    }
+
+    window.addEventListener('resize', onResize)
     return () => {
       document.body.style.overflow = previousOverflow
       document.body.style.paddingRight = previousPaddingRight
+      window.removeEventListener('resize', onResize)
     }
   }, [open])
 
-  useLayoutEffect(() => {
-    if (typeof window === 'undefined') return undefined
-
-    const syncDesktopNav = () => {
-      const headerInner = headerInnerRef.current
-      const logo = logoRef.current
-      const navMeasure = navMeasureRef.current
-      const desktopActions = desktopActionsRef.current
-
-      if (window.innerWidth < HEADER_DESKTOP_MIN_WIDTH || !headerInner || !logo || !navMeasure || !desktopActions) {
-        setShowDesktopNav(false)
-        return
-      }
-
-      const headerStyles = window.getComputedStyle(headerInner)
-      const inlinePadding = parseFloat(headerStyles.paddingLeft) + parseFloat(headerStyles.paddingRight)
-      const columnGap = parseFloat(headerStyles.columnGap || headerStyles.gap) || 0
-      const availableWidth = headerInner.clientWidth - inlinePadding
-      const logoWidth = logo.getBoundingClientRect().width
-      const navWidth = navMeasure.scrollWidth || navMeasure.getBoundingClientRect().width
-      const desktopActionsWidth = desktopActions.getBoundingClientRect().width
-      const requiredWidth = logoWidth + navWidth + desktopActionsWidth + (columnGap * 2) + HEADER_FIT_BUFFER
-
-      setShowDesktopNav(availableWidth >= requiredWidth)
-    }
-
-    syncDesktopNav()
-
-    let frameId = 0
-    const scheduleSync = () => {
-      window.cancelAnimationFrame(frameId)
-      frameId = window.requestAnimationFrame(syncDesktopNav)
-    }
-    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(scheduleSync)
-    const observedNodes = [headerInnerRef.current, logoRef.current, navMeasureRef.current, desktopActionsRef.current].filter(Boolean)
-
-    observedNodes.forEach(node => resizeObserver?.observe(node))
-    window.addEventListener('resize', scheduleSync)
-    document.fonts?.ready?.then(scheduleSync)
-
-    return () => {
-      window.cancelAnimationFrame(frameId)
-      resizeObserver?.disconnect()
-      window.removeEventListener('resize', scheduleSync)
-    }
-  }, [session?.user?.id, account, unreadCount, isHomeHeroMode])
-
-  useEffect(() => {
-    if (showDesktopNav) setOpen(false)
-  }, [showDesktopNav])
-
   return (
-    <header className={`${isHomePage ? 'fixed inset-x-0 top-0' : 'sticky top-0'} z-40 border-b transition-[background-color,border-color,box-shadow,backdrop-filter] duration-300 ${isHomeHeroMode ? 'border-transparent bg-transparent shadow-none' : 'border-line bg-paper/90 shadow-[0_24px_44px_-36px_rgba(0,0,0,0.5)] backdrop-blur-xl'}`}>
-      <div ref={headerInnerRef} className="container-page flex items-center gap-3 py-4 px-[var(--pad-x)] lg:grid lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center lg:gap-x-3 xl:gap-x-4 2xl:gap-x-6">
-        <Link ref={logoRef} to="/" className={`brand-logo shrink-0 transition-colors duration-300 lg:col-start-1 ${isHomeHeroMode ? 'text-paper [text-shadow:0_10px_28px_rgba(0,0,0,0.48)]' : 'text-ink'}`} onClick={close}>Totsan</Link>
+    <>
+      <header className={`${isHomePage ? 'fixed inset-x-0 top-0' : 'sticky top-0'} z-40 border-b transition-[background-color,border-color,box-shadow,backdrop-filter] duration-300 ${isHomeHeroMode ? 'border-transparent bg-transparent shadow-none' : 'border-line bg-paper/90 shadow-[0_24px_44px_-36px_rgba(0,0,0,0.5)] backdrop-blur-xl'}`}>
+        <div className="container-page grid grid-cols-[auto_1fr_auto] items-center gap-4 py-4 px-[var(--pad-x)] xl:gap-8">
+          <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 ${isHomeHeroMode ? 'text-paper [text-shadow:0_10px_28px_rgba(0,0,0,0.48)]' : 'text-ink'}`} onClick={close}>Totsan</Link>
 
-        <nav ref={navMeasureRef} aria-hidden="true" className="site-header__nav-measure min-w-max items-center justify-start gap-1 text-[0.7rem] xl:justify-center xl:gap-1.5 xl:text-[0.76rem] 2xl:gap-3 2xl:text-sm">
-          {desktopNavItems}
+        <nav className="hidden items-center justify-center gap-2 text-[0.78rem] lg:flex xl:gap-3 xl:text-sm">
+          {LAYERS.map(l => (
+            <NavLink key={l.slug} to={`/sloy/${l.slug}`}
+              className={({isActive}) => desktopNavClassName(isActive, isHomeHeroMode)}>
+              {l.number} · {l.title.split(' ')[0]}
+            </NavLink>
+          ))}
+          <span className="nav-divider" aria-hidden="true"></span>
+          <NavLink to="/uslugi" className={() => desktopNavClassName(isServicesActive, isHomeHeroMode)}>Услуги</NavLink>
+          <NavLink to="/katalog" className={() => desktopNavClassName(isCatalogActive, isHomeHeroMode)}>Каталог</NavLink>
         </nav>
 
-        <nav className={`site-header__nav min-w-0 items-center justify-start gap-1 text-[0.7rem] lg:col-start-2 xl:justify-center xl:gap-1.5 xl:text-[0.76rem] 2xl:gap-3 2xl:text-sm ${showDesktopNav ? 'site-header__nav--visible' : 'site-header__nav--hidden'}`}>
-          {desktopNavItems}
-        </nav>
-
-        <div className="ml-auto flex shrink-0 items-center gap-2 lg:col-start-3 lg:ml-0 lg:justify-self-end lg:pl-4">
-          <div ref={desktopActionsRef} className="site-header__desktop-actions flex shrink-0 items-center gap-2">
-            {session && <Link to="/inbox" aria-label="Съобщения" title="Съобщения" className={desktopUtilityLinkClassName(isHomeHeroMode)}>
-              <MessageCircle size={17} />
-              <span className="sr-only">Съобщения</span>
-              {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accentDeep px-1.5 text-[11px] font-medium text-paper">{unreadCount}</span>}
-            </Link>}
-            {session ? <UserMenu session={session} account={account} isAdmin={isAdmin} /> : (
-              <>
-                <Link to="/login" className={`mobile-header-auth ${isHomeHeroMode ? 'mobile-header-auth-on-dark' : ''}`}>Вход</Link>
-                <Link to="/login" className={`desktop-header-auth ${isHomeHeroMode ? 'desktop-header-auth-on-dark' : ''}`}>Вход</Link>
-              </>
-            )}
-            <HeaderMusicControl isHomeHeroMode={isHomeHeroMode} isCompact={!showDesktopNav} />
-          </div>
+        <div className="flex items-center justify-end gap-2">
+          {session && <Link to="/inbox" className={desktopUtilityLinkClassName(isHomeHeroMode)}>
+            <MessageCircle size={17} />
+            <span>Съобщения</span>
+            {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accentDeep px-1.5 text-[11px] font-medium text-paper">{unreadCount}</span>}
+          </Link>}
+          {session ? <UserMenu session={session} account={account} isAdmin={isAdmin} /> : (
+            <>
+              <Link to="/login" className={`mobile-header-auth ${isHomeHeroMode ? 'mobile-header-auth-on-dark' : ''}`}>Вход</Link>
+              <Link to="/login" className={`desktop-header-auth ${isHomeHeroMode ? 'desktop-header-auth-on-dark' : ''}`}>Вход</Link>
+            </>
+          )}
+          <HeaderMusicControl isHomeHeroMode={isHomeHeroMode} />
           <button
             aria-label="Меню"
             onClick={() => setOpen(o => !o)}
             aria-expanded={open}
-            className={`mobile-menu-toggle site-header__menu-toggle ${open ? 'is-open' : ''} ${!showDesktopNav ? 'site-header__menu-toggle--visible' : ''} ${isHomeHeroMode ? 'mobile-menu-toggle-on-dark' : ''}`}>
+            className={`mobile-menu-toggle ${open ? 'is-open' : ''} ${isHomeHeroMode ? 'mobile-menu-toggle-on-dark' : ''}`}>
             <span className="mobile-menu-toggle__icon mobile-menu-toggle__icon--menu" aria-hidden="true"><Menu size={18}/></span>
             <span className="mobile-menu-toggle__icon mobile-menu-toggle__icon--close" aria-hidden="true"><X size={18}/></span>
           </button>
         </div>
-      </div>
+        </div>
+      </header>
 
       {open && (
-        <div className={`mobile-nav-shell ${!showDesktopNav ? 'site-header__mobile-nav--visible' : ''}`}>
+        <div className="mobile-nav-shell lg:hidden">
           <div className="container-page mobile-nav-panel px-[var(--pad-x)] pb-8 pt-5 text-sm">
             <div className="mobile-nav-group">
               <div className="mobile-nav-group__label">Петте слоя</div>
@@ -274,7 +210,7 @@ function Header() {
           </div>
         </div>
       )}
-    </header>
+    </>
   )
 }
 
@@ -290,7 +226,7 @@ function desktopUtilityLinkClassName(onDarkHero = false) {
   return `desktop-header-utility ${onDarkHero ? 'desktop-header-utility-on-dark' : ''}`
 }
 
-function HeaderMusicControl({ isHomeHeroMode = false, isCompact = false }) {
+function HeaderMusicControl({ isHomeHeroMode = false }) {
   const audioRef = useRef(null)
   const hasPlaybackStartedRef = useRef(false)
   const lastAudibleVolumeRef = useRef(0.42)
@@ -407,7 +343,7 @@ function HeaderMusicControl({ isHomeHeroMode = false, isCompact = false }) {
   }
 
   return (
-    <div className={`music-control ${isHomeHeroMode ? 'music-control-on-dark' : ''} ${isCompact ? 'music-control-compact' : ''}`}>
+    <div className={`music-control ${isHomeHeroMode ? 'music-control-on-dark' : ''}`}>
       <button
         type="button"
         className="music-control__button"
@@ -485,10 +421,10 @@ function UserMenu({ session, account, isAdmin }) {
   }, [])
 
   return (
-    <div ref={ref} className="relative hidden shrink-0 sm:block">
-      <button onClick={() => setOpen(o => !o)} aria-label={displayName || email || 'Профил'} title={displayName || email || 'Профил'} className="flex items-center gap-1.5 rounded-full border border-line bg-paper px-1.5 py-1.5 text-sm hover:border-ink/40 transition xl:gap-2 xl:px-2">
+    <div ref={ref} className="relative hidden sm:block">
+      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 rounded-full border border-line bg-paper px-2 py-1.5 text-sm hover:border-ink/40 transition">
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-ink text-paper text-xs font-medium">{initial}</span>
-        <span className="sr-only">{displayName}</span>
+        <span className="max-w-[10rem] truncate text-muted">{displayName}</span>
       </button>
       {open && (
         <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-line bg-paper shadow-lg overflow-hidden">

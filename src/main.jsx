@@ -29,6 +29,7 @@ function AppRoutes() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
+          <Route path="/landing" element={<Home />} />
           <Route path="/sloy/:slug" element={<Layer />} />
           <Route path="/uslugi" element={<Services />} />
           <Route path="/uslugi/:slug" element={<PartnerService />} />
