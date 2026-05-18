@@ -80,6 +80,10 @@ function Header() {
   const isServicesActive = pathname.startsWith('/uslugi') || pathname.startsWith('/usluga/')
   const isCatalogActive = pathname === '/katalog'
   const isHomeHeroMode = isHomePage && !isScrolled && !open
+  const shouldShowScrolledShadow = isScrolled && !open
+  const headerSurfaceClass = isHomeHeroMode
+    ? 'border-transparent bg-transparent shadow-none'
+    : `border-line bg-paper/90 backdrop-blur-xl ${open ? 'shadow-[0_10px_18px_-18px_rgba(13,35,64,0.38)]' : shouldShowScrolledShadow ? 'shadow-[0_10px_22px_-18px_rgba(13,35,64,0.4)]' : 'shadow-none'}`
 
   useEffect(() => {
     setOpen(false)
@@ -121,7 +125,7 @@ function Header() {
 
   return (
     <>
-      <header className={`${isHomePage ? 'fixed inset-x-0 top-0' : 'sticky top-0'} z-40 border-b transition-[background-color,border-color,box-shadow,backdrop-filter] duration-300 ${isHomeHeroMode ? 'border-transparent bg-transparent shadow-none' : 'border-line bg-paper/90 shadow-[0_24px_44px_-36px_rgba(0,0,0,0.5)] backdrop-blur-xl'}`}>
+      <header className={`${isHomePage ? 'fixed inset-x-0 top-0' : 'sticky top-0'} z-40 border-b transition-[background-color,border-color,box-shadow,backdrop-filter] duration-300 ${headerSurfaceClass}`}>
         <div className="container-page grid grid-cols-[auto_1fr_auto] items-center gap-4 py-4 px-[var(--pad-x)] xl:gap-8">
           <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 ${isHomeHeroMode ? 'text-paper [text-shadow:0_10px_28px_rgba(0,0,0,0.48)]' : 'text-ink'}`} onClick={close}>Totsan</Link>
 
@@ -164,7 +168,7 @@ function Header() {
 
       {open && (
         <div className="mobile-nav-shell lg:hidden">
-          <div className="container-page mobile-nav-panel px-[var(--pad-x)] pb-8 pt-5 text-sm">
+          <div className="container-page mobile-nav-panel px-[var(--pad-x)] pb-8 text-sm">
             <div className="mobile-nav-group">
               <div className="mobile-nav-group__label">Петте слоя</div>
               <div className="grid gap-3">
