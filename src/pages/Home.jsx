@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Pause, Play } from 'lucide-react'
 import { LAYERS } from '../data/layers.js'
 import { SERVICE_DETAILS } from '../data/catalog.js'
 import { HOME_PROJECTS, HERO_COLLAGE, PARTNER_LOGOS, SERVICE_IMAGES, LAYER_HEROS } from '../data/images.js'
@@ -33,7 +34,81 @@ export default function Home() {
 }
 
 function Hero() {
+  const videoRef = useRef(null)
   const [videoReady, setVideoReady] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(true)
+  const [duration, setDuration] = useState(0)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [isSeeking, setIsSeeking] = useState(false)
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return undefined
+
+    const updateDuration = () => {
+      setDuration(Number.isFinite(video.duration) ? video.duration : 0)
+    }
+    const updateTime = () => {
+      if (!isSeeking) {
+        setCurrentTime(video.currentTime || 0)
+      }
+    }
+    const updatePlaying = () => {
+      setIsPlaying(!video.paused)
+    }
+
+    updateDuration()
+    updateTime()
+    updatePlaying()
+
+    video.addEventListener('loadedmetadata', updateDuration)
+    video.addEventListener('durationchange', updateDuration)
+    video.addEventListener('timeupdate', updateTime)
+    video.addEventListener('play', updatePlaying)
+    video.addEventListener('pause', updatePlaying)
+
+    return () => {
+      video.removeEventListener('loadedmetadata', updateDuration)
+      video.removeEventListener('durationchange', updateDuration)
+      video.removeEventListener('timeupdate', updateTime)
+      video.removeEventListener('play', updatePlaying)
+      video.removeEventListener('pause', updatePlaying)
+    }
+  }, [isSeeking])
+
+  const formatTime = (seconds) => {
+    if (!Number.isFinite(seconds)) return '0:00'
+    const totalSeconds = Math.max(0, Math.floor(seconds))
+    const minutes = Math.floor(totalSeconds / 60)
+    const remainingSeconds = totalSeconds % 60
+
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+  }
+
+  const togglePlayback = async () => {
+    const video = videoRef.current
+    if (!video) return
+
+    if (video.paused) {
+      try {
+        await video.play()
+      } catch {
+        setIsPlaying(false)
+      }
+      return
+    }
+
+    video.pause()
+  }
+
+  const handleSeek = (event) => {
+    const nextTime = Number(event.target.value)
+    setCurrentTime(nextTime)
+
+    if (videoRef.current) {
+      videoRef.current.currentTime = nextTime
+    }
+  }
 
   return (
     <section className="home-hero">
@@ -46,6 +121,7 @@ function Hero() {
           decoding="async"
         />
         <video
+          ref={videoRef}
           className={`home-hero__video ${videoReady ? 'is-ready' : ''}`}
           autoPlay
           muted
@@ -65,6 +141,34 @@ function Hero() {
         </video>
       </div>
       <div className="home-hero__scrim" aria-hidden="true" />
+      <div className="home-hero__video-controls" aria-label="Hero video controls">
+        <button
+          type="button"
+          className={`home-hero__video-button ${isPlaying ? 'is-playing' : ''}`}
+          onClick={togglePlayback}
+          aria-label={isPlaying ? 'Pause hero video' : 'Play hero video'}>
+          <span className="home-hero__video-button-icon" aria-hidden="true">
+            {isPlaying ? <Pause size={18} strokeWidth={2.4} /> : <Play size={18} strokeWidth={2.4} />}
+          </span>
+        </button>
+        <span className="home-hero__video-time">{formatTime(currentTime)}</span>
+        <input
+          className="home-hero__video-slider"
+          type="range"
+          min="0"
+          max={duration || 0}
+          step="0.1"
+          value={Math.min(currentTime, duration || 0)}
+          onChange={handleSeek}
+          onPointerDown={() => setIsSeeking(true)}
+          onPointerUp={() => setIsSeeking(false)}
+          onKeyDown={() => setIsSeeking(true)}
+          onKeyUp={() => setIsSeeking(false)}
+          aria-label="Seek hero video"
+          style={{ '--video-progress': `${duration ? (currentTime / duration) * 100 : 0}%` }}
+        />
+        <span className="home-hero__video-time">{formatTime(duration)}</span>
+      </div>
       <div className="container-page home-hero__overlay">
         <div className="home-hero__content">
           <div className="eyebrow home-hero__eyebrow mb-4">Контрол, качество и сигурност</div>
