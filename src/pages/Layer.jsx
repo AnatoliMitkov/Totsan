@@ -151,12 +151,10 @@ function WhatYouFind({ layer }) {
           <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {layer.whatYouFind.map((w, i) => {
               const showQuizBtn = Boolean(w.quizSlug && QUIZ_CONFIG_LOADERS[w.quizSlug])
-              return (
-                <article
-                  key={w.key || i}
-                  className={`card img-zoom-host bg-paper p-0 overflow-hidden ${showQuizBtn ? 'cursor-pointer hover:border-ink/30 transition-colors' : ''}`}
-                  onClick={() => showQuizBtn && setActiveQuizSlug(w.quizSlug)}
-                >
+              const isGardenLink = w.key === 'garden'
+
+              const cardContent = (
+                <>
                   <div className="media-frame aspect-[4/3]">
                     <img src={imgs[w.key]} alt={w.title} loading="lazy" decoding="async" className="img-cover img-zoom" />
                   </div>
@@ -164,7 +162,30 @@ function WhatYouFind({ layer }) {
                     <div className="font-display text-xl">{w.title}</div>
                     <p className="text-muted text-sm mt-2">{w.text}</p>
                     {showQuizBtn && <div className="mt-4 text-xs font-semibold text-accentDeep flex items-center gap-1">Стартирай избора &rarr;</div>}
+                    {isGardenLink && <div className="mt-4 text-xs font-semibold text-accentDeep flex items-center gap-1">Разгледай секцията &rarr;</div>}
                   </div>
+                </>
+              )
+
+              if (isGardenLink) {
+                return (
+                  <Link
+                    key={w.key || i}
+                    to="/gradina-i-dvor"
+                    className="card img-zoom-host bg-paper p-0 overflow-hidden cursor-pointer hover:border-ink/30 transition-colors block"
+                  >
+                    {cardContent}
+                  </Link>
+                )
+              }
+
+              return (
+                <article
+                  key={w.key || i}
+                  className={`card img-zoom-host bg-paper p-0 overflow-hidden ${showQuizBtn ? 'cursor-pointer hover:border-ink/30 transition-colors' : ''}`}
+                  onClick={() => showQuizBtn && setActiveQuizSlug(w.quizSlug)}
+                >
+                  {cardContent}
                 </article>
               )
             })}

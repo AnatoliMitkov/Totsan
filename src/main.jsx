@@ -21,6 +21,7 @@ import Inbox from './pages/Inbox.jsx'
 import Checkout from './pages/Checkout.jsx'
 import Order from './pages/Order.jsx'
 import MyOrders from './pages/MyOrders.jsx'
+import GardenAndYard from './pages/GardenAndYard.jsx'
 function AppRoutes() {
   const location = useLocation()
 
@@ -41,6 +42,7 @@ function AppRoutes() {
           <Route path="/za-nas" element={<About />} />
           <Route path="/kontakt" element={<Contact />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/gradina-i-dvor" element={<GardenAndYard />} />
           <Route path="/login" element={<Admin />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/moy-profil" element={<MyProfile />} />

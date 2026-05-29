@@ -929,3 +929,80 @@ body { font-family: theme('fontFamily.sans'); font-size: var(--step-sm); line-he
     letter-spacing: 0.16em;
   }
 }
+
+/* Custom additions for premium animations and widgets */
+.bg-gradient-radial {
+  background-image: radial-gradient(var(--tw-gradient-stops));
+}
+
+.glow-card {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glow-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(135deg, rgba(44, 111, 232, 0.4), transparent, rgba(44, 111, 232, 0.2));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.glow-card:hover::before {
+  opacity: 1;
+}
+
+/* Layer Explorer Timeline */
+.timeline-btn {
+  position: relative;
+  transition: all 0.3s ease;
+}
+.timeline-btn::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%) scaleX(0);
+  transform-origin: left;
+  width: 1.5rem;
+  height: 2px;
+  background: theme('colors.accent');
+  transition: transform 0.3s ease;
+}
+.timeline-btn.active::after {
+  transform: translateY(-50%) scaleX(1);
+}
+
+/* Quiz styling */
+.quiz-option-card {
+  border: 1px solid theme('colors.line');
+  background: theme('colors.paper');
+  transition: all 0.25s ease;
+}
+.quiz-option-card:hover {
+  border-color: theme('colors.accent');
+  background: theme('colors.accentSoft');
+}
+.quiz-option-card.selected {
+  border-color: theme('colors.accent');
+  background: theme('colors.accentSoft');
+  box-shadow: 0 0 0 1px theme('colors.accent');
+}
+
+/* Stats roll animate styling */
+.stat-number {
+  font-feature-settings: "tnum";
+}
+
+/* Gradient text anim */
+.gradient-text {
+  background: linear-gradient(135deg, theme('colors.ink') 0%, theme('colors.accentDeep') 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
