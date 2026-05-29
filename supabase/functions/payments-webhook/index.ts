@@ -73,12 +73,14 @@ async function markPaid(session: Record<string, unknown>) {
     ? session.payment_intent
     : (session.payment_intent as Record<string, unknown> | null)?.id || null
 
-  const { data: updatedOrder, error: updateError } = await admin.from('orders').update({
+  const { data: updatedRows, error: updateError } = await admin.from('orders').update({
     status: 'paid',
     stripe_checkout_session_id: session.id,
     stripe_payment_intent_id: paymentIntent,
-  }).eq('id', order.id).select('*').single()
+  }).eq('id', order.id).eq('status', 'pending_payment').select('*')
   if (updateError) throw updateError
+  const updatedOrder = updatedRows?.[0]
+  if (!updatedOrder) return { ok: true, order }
 
   await admin.from('payment_transactions').insert({
     order_id: order.id,
@@ -116,11 +118,13 @@ async function markPaidFromPaymentIntent(paymentIntent: Record<string, unknown>)
   if (!order) return { skipped: true, reason: 'order_not_found' }
   if (order.status !== 'pending_payment') return { ok: true, order }
 
-  const { data: updatedOrder, error: updateError } = await admin.from('orders').update({
+  const { data: updatedRows, error: updateError } = await admin.from('orders').update({
     status: 'paid',
     stripe_payment_intent_id: paymentIntent.id,
-  }).eq('id', order.id).select('*').single()
+  }).eq('id', order.id).eq('status', 'pending_payment').select('*')
   if (updateError) throw updateError
+  const updatedOrder = updatedRows?.[0]
+  if (!updatedOrder) return { ok: true, order }
 
   await admin.from('payment_transactions').insert({
     order_id: order.id,

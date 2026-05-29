@@ -35,11 +35,37 @@ export default function Home() {
 
 function Hero() {
   const videoRef = useRef(null)
+  const heroRef = useRef(null)
+  const hideTimerRef = useRef(null)
   const [videoReady, setVideoReady] = useState(false)
   const [isPlaying, setIsPlaying] = useState(true)
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
   const [isSeeking, setIsSeeking] = useState(false)
+  const [isTouchMode, setIsTouchMode] = useState(false)
+  const [controlsVisible, setControlsVisible] = useState(false)
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(hover: none), (pointer: coarse)')
+    const syncTouchMode = () => {
+      setIsTouchMode(mediaQuery.matches)
+    }
+
+    syncTouchMode()
+    mediaQuery.addEventListener('change', syncTouchMode)
+
+    return () => {
+      mediaQuery.removeEventListener('change', syncTouchMode)
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (hideTimerRef.current) {
+        window.clearTimeout(hideTimerRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     const video = videoRef.current
@@ -110,8 +136,65 @@ function Hero() {
     }
   }
 
+  const scheduleHideControls = () => {
+    if (hideTimerRef.current) {
+      window.clearTimeout(hideTimerRef.current)
+    }
+    hideTimerRef.current = window.setTimeout(() => {
+      setControlsVisible(false)
+    }, 3000)
+  }
+
+  const showControlsWithTimeout = () => {
+    setControlsVisible(true)
+    scheduleHideControls()
+  }
+
+  const handleHeroPointerDown = (event) => {
+    if (!heroRef.current) return
+
+    if (event.pointerType === 'mouse') {
+      showControlsWithTimeout()
+      return
+    }
+
+    if (!isTouchMode) return
+
+    const controls = heroRef.current.querySelector('.home-hero__video-controls')
+    const content = heroRef.current.querySelector('.home-hero__content')
+
+    if (controls?.contains(event.target) || content?.contains(event.target)) return
+
+    setControlsVisible((visible) => {
+      if (visible) {
+        if (hideTimerRef.current) {
+          window.clearTimeout(hideTimerRef.current)
+        }
+        return false
+      }
+      scheduleHideControls()
+      return true
+    })
+  }
+
+  const handleHeroPointerMove = (event) => {
+    if (event.pointerType !== 'mouse') return
+    showControlsWithTimeout()
+  }
+
+  const handleControlsInteraction = () => {
+    showControlsWithTimeout()
+  }
+
   return (
-    <section className="home-hero">
+    <section
+      ref={heroRef}
+      className={`home-hero ${controlsVisible ? 'home-hero--controls-visible' : ''}`}
+      onPointerDown={handleHeroPointerDown}
+      onPointerMove={handleHeroPointerMove}
+      onMouseLeave={() => setControlsVisible(false)}
+      onKeyDown={handleControlsInteraction}
+      onFocus={handleControlsInteraction}>
       <div className="home-hero__media-shell" aria-hidden="true">
         <img
           src={HERO_POSTER_SRC}
@@ -141,11 +224,14 @@ function Hero() {
         </video>
       </div>
       <div className="home-hero__scrim" aria-hidden="true" />
-      <div className="home-hero__video-controls" aria-label="Hero video controls">
+      <div
+        className={`home-hero__video-controls ${controlsVisible ? 'is-visible' : ''}`}
+        aria-label="Hero video controls">
         <button
           type="button"
           className={`home-hero__video-button ${isPlaying ? 'is-playing' : ''}`}
           onClick={togglePlayback}
+          onPointerDown={handleControlsInteraction}
           aria-label={isPlaying ? 'Pause hero video' : 'Play hero video'}>
           <span className="home-hero__video-button-icon" aria-hidden="true">
             {isPlaying ? <Pause size={18} strokeWidth={2.4} /> : <Play size={18} strokeWidth={2.4} />}
@@ -160,6 +246,7 @@ function Hero() {
           step="0.1"
           value={Math.min(currentTime, duration || 0)}
           onChange={handleSeek}
+          onInput={handleControlsInteraction}
           onPointerDown={() => setIsSeeking(true)}
           onPointerUp={() => setIsSeeking(false)}
           onKeyDown={() => setIsSeeking(true)}

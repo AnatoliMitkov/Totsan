@@ -40,6 +40,14 @@ function jsonArray(value) {
   return Array.isArray(value) ? value : []
 }
 
+function normalizeAccountParty(row = {}) {
+  return {
+    id: row.id || '',
+    name: row.full_name || row.display_name || '',
+    email: row.email || '',
+  }
+}
+
 export function normalizeOrder(row = {}) {
   return {
     id: row.id || '',
@@ -66,6 +74,8 @@ export function normalizeOrder(row = {}) {
     stripeCheckoutSessionId: row.stripe_checkout_session_id || '',
     stripePaymentIntentId: row.stripe_payment_intent_id || '',
     stripeTransferId: row.stripe_transfer_id || '',
+    clientAccount: normalizeAccountParty(row.client_account || {}),
+    partnerAccount: normalizeAccountParty(row.partner_account || {}),
   }
 }
 
@@ -175,8 +185,29 @@ export async function loadOrderDetails(orderId) {
   if (orderError) throw orderError
   if (eventsError) throw eventsError
   if (paymentsError) throw paymentsError
+
+  let orderWithParties = order || null
+  if (orderWithParties) {
+    const partyIds = [...new Set([orderWithParties.client_id, orderWithParties.partner_id].filter(Boolean))]
+    if (partyIds.length > 0) {
+      const { data: accounts } = await supabase
+        .from('accounts')
+        .select('id, email, full_name, display_name')
+        .in('id', partyIds)
+
+      if (Array.isArray(accounts)) {
+        const accountMap = new Map(accounts.map((row) => [row.id, row]))
+        orderWithParties = {
+          ...orderWithParties,
+          client_account: accountMap.get(orderWithParties.client_id) || null,
+          partner_account: accountMap.get(orderWithParties.partner_id) || null,
+        }
+      }
+    }
+  }
+
   return {
-    order: order ? normalizeOrder(order) : null,
+    order: orderWithParties ? normalizeOrder(orderWithParties) : null,
     events: (events || []).map(normalizeOrderEvent),
     payments: (payments || []).map(normalizePayment),
   }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CreditCard, RefreshCw, Search } from 'lucide-react'
+import { supabase } from '../../lib/supabase.js'
 import { ADMIN_INPUT_CLASS, ADMIN_SELECT_CLASS, adminUpdateOrderStatus, formatAdminDate, loadAdminOrders } from '../../lib/admin.js'
 import { ORDER_STATUS_LABELS, formatOrderMoney, orderStatusTone } from '../../lib/orders.js'
 
@@ -24,6 +25,7 @@ export default function OrdersManager({ globalQuery }) {
   const [filter, setFilter] = useState('all')
   const [localQuery, setLocalQuery] = useState('')
   const [drafts, setDrafts] = useState({})
+  const [partyMap, setPartyMap] = useState({})
   const [actionState, setActionState] = useState({ status: 'idle', message: '' })
 
   useEffect(() => { load() }, [])
@@ -34,7 +36,8 @@ export default function OrdersManager({ globalQuery }) {
     try {
       const rows = await loadAdminOrders()
       setOrders(rows)
-      setDrafts(Object.fromEntries(rows.map(order => [order.id, { status: order.status, note: '' }])))
+      setDrafts(Object.fromEntries(rows.map((order) => [order.id, { status: order.status, note: '' }])))
+      await hydrateParties(rows)
       setStatus('ready')
     } catch (loadError) {
       setStatus('error')
@@ -42,17 +45,36 @@ export default function OrdersManager({ globalQuery }) {
     }
   }
 
+  async function hydrateParties(rows) {
+    const ids = [...new Set(rows.flatMap((order) => [order.client_id, order.partner_id]).filter(Boolean))]
+    if (ids.length === 0) {
+      setPartyMap({})
+      return
+    }
+    const { data } = await supabase.from('accounts').select('id, email, full_name, display_name').in('id', ids)
+    const nextMap = {}
+    if (Array.isArray(data)) {
+      data.forEach((row) => {
+        nextMap[row.id] = row
+      })
+    }
+    setPartyMap(nextMap)
+  }
+
   const filtered = useMemo(() => {
     const needle = `${globalQuery || ''} ${localQuery || ''}`.trim().toLowerCase()
     return orders.filter((order) => {
       if (filter !== 'all' && order.status !== filter) return false
       if (!needle) return true
-      return `${order.title} ${order.description || ''} ${order.id} ${order.client_id} ${order.partner_id}`.toLowerCase().includes(needle)
+      const client = partyMap[order.client_id]
+      const partner = partyMap[order.partner_id]
+      const partyText = `${client?.full_name || ''} ${client?.display_name || ''} ${client?.email || ''} ${partner?.full_name || ''} ${partner?.display_name || ''} ${partner?.email || ''}`
+      return `${order.title} ${order.description || ''} ${order.id} ${order.client_id} ${order.partner_id} ${partyText}`.toLowerCase().includes(needle)
     })
-  }, [filter, globalQuery, localQuery, orders])
+  }, [filter, globalQuery, localQuery, orders, partyMap])
 
   function updateDraft(orderId, key, value) {
-    setDrafts(current => ({ ...current, [orderId]: { ...(current[orderId] || {}), [key]: value } }))
+    setDrafts((current) => ({ ...current, [orderId]: { ...(current[orderId] || {}), [key]: value } }))
   }
 
   async function saveStatus(order) {
@@ -86,14 +108,16 @@ export default function OrdersManager({ globalQuery }) {
         </div>
         <label className="relative mt-5 block max-w-xl">
           <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
-          <input value={localQuery} onChange={event => setLocalQuery(event.target.value)} className={`${ADMIN_INPUT_CLASS} !mt-0 pl-11`} placeholder="Търси по заглавие или ID" />
+          <input value={localQuery} onChange={(event) => setLocalQuery(event.target.value)} className={`${ADMIN_INPUT_CLASS} !mt-0 pl-11`} placeholder="Търси по заглавие, ID, име, имейл" />
         </label>
         {actionState.message && <div className={`mt-4 rounded-2xl p-3 text-sm ${actionState.status === 'error' ? 'bg-red-50 text-red-700' : 'bg-soft text-muted'}`}>{actionState.message}</div>}
       </div>
 
       <div className="grid gap-4">
-        {filtered.map(order => {
+        {filtered.map((order) => {
           const draft = drafts[order.id] || { status: order.status, note: '' }
+          const client = partyMap[order.client_id]
+          const partner = partyMap[order.partner_id]
           return (
             <article key={order.id} className="rounded-3xl border border-line bg-paper p-5 md:p-6">
               <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
@@ -106,16 +130,16 @@ export default function OrdersManager({ globalQuery }) {
                   <p className="mt-2 text-sm text-muted">{order.description || 'Без описание'}</p>
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
                     <Info label="Сума" value={formatOrderMoney(order.amount_total, order.currency)} />
-                    <Info label="Клиент" value={shortId(order.client_id)} />
-                    <Info label="Партньор" value={shortId(order.partner_id)} />
+                    <Info label="Клиент" value={<PartyMini account={client} id={order.client_id} />} />
+                    <Info label="Партньор" value={<PartyMini account={partner} id={order.partner_id} />} />
                   </div>
                 </div>
                 <div className="space-y-3">
                   <Link to={`/order/${order.id}`} className="btn btn-ghost w-full justify-center"><CreditCard size={18} /> Детайли</Link>
-                  <select value={draft.status} onChange={event => updateDraft(order.id, 'status', event.target.value)} className={`${ADMIN_SELECT_CLASS} w-full rounded-2xl px-4 py-3`}>
-                    {STATUS_OPTIONS.map(option => <option key={option} value={option}>{ORDER_STATUS_LABELS[option] || option}</option>)}
+                  <select value={draft.status} onChange={(event) => updateDraft(order.id, 'status', event.target.value)} className={`${ADMIN_SELECT_CLASS} w-full rounded-2xl px-4 py-3`}>
+                    {STATUS_OPTIONS.map((option) => <option key={option} value={option}>{ORDER_STATUS_LABELS[option] || option}</option>)}
                   </select>
-                  <textarea rows={3} value={draft.note} onChange={event => updateDraft(order.id, 'note', event.target.value)} className={ADMIN_INPUT_CLASS} placeholder="Админ бележка" />
+                  <textarea rows={3} value={draft.note} onChange={(event) => updateDraft(order.id, 'note', event.target.value)} className={ADMIN_INPUT_CLASS} placeholder="Админ бележка" />
                   <button type="button" onClick={() => saveStatus(order)} disabled={actionState.status === 'saving'} className="btn btn-primary w-full justify-center">Запази статус</button>
                 </div>
               </div>
@@ -130,6 +154,17 @@ export default function OrdersManager({ globalQuery }) {
 
 function shortId(value = '') {
   return value ? value.slice(0, 8) : '—'
+}
+
+function PartyMini({ account, id }) {
+  const name = account?.full_name || account?.display_name || `ID ${shortId(id)}`
+  const email = account?.email || ''
+  return (
+    <div className="min-w-0">
+      <div className="truncate text-sm font-medium text-ink">{name}</div>
+      <div className="truncate text-xs text-muted">{email || `ID: ${shortId(id)}`}</div>
+    </div>
+  )
 }
 
 function Info({ label, value }) {

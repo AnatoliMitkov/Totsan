@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import ConversationList from '../components/chat/ConversationList.jsx'
 import ChatThread from '../components/chat/ChatThread.jsx'
 import ComposeBar from '../components/chat/ComposeBar.jsx'
@@ -31,6 +31,7 @@ export default function Inbox() {
   const [error, setError] = useState('')
   const [draft, setDraft] = useState('')
   const [offerOpen, setOfferOpen] = useState(false)
+  const refreshTimerRef = useRef(null)
 
   const activeConversation = useMemo(() => conversations.find((conversation) => conversation.id === conversationId) || null, [conversations, conversationId])
   const role = conversationRole(activeConversation, userId)
@@ -64,6 +65,14 @@ export default function Inbox() {
     }
   }, [conversationId, navigate, userId])
 
+  const scheduleRefresh = useCallback(() => {
+    if (refreshTimerRef.current) return
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null
+      loadAll({ keepStatus: true })
+    }, 120)
+  }, [loadAll])
+
   useEffect(() => {
     if (loading || !userId) return
     loadAll()
@@ -71,13 +80,21 @@ export default function Inbox() {
 
   useEffect(() => {
     if (!userId) return undefined
-    return subscribeToConversationList(userId, () => loadAll({ keepStatus: true }))
-  }, [userId, loadAll])
+    return subscribeToConversationList(userId, scheduleRefresh)
+  }, [userId, scheduleRefresh])
 
   useEffect(() => {
     if (!conversationId) return undefined
-    return subscribeToConversation(conversationId, () => loadAll({ keepStatus: true }))
-  }, [conversationId, loadAll])
+    return subscribeToConversation(conversationId, scheduleRefresh)
+  }, [conversationId, scheduleRefresh])
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) {
+        window.clearTimeout(refreshTimerRef.current)
+      }
+    }
+  }, [])
 
   async function submitMessage(event) {
     event.preventDefault()

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
-import { ArrowRight, BarChart3, ClipboardList, CreditCard, FileClock, FolderKanban, KeyRound, Mail, MessagesSquare, PackageCheck, ScrollText, Search, ShieldCheck, Sparkles, Star, UserCog, Users, CheckCircle2, Circle } from 'lucide-react'
+import { ArrowRight, BarChart3, ClipboardList, CreditCard, FileClock, FolderKanban, KeyRound, Mail, MessagesSquare, PackageCheck, ScrollText, Search, ShieldCheck, Sparkles, Star, UserCog, Users, CheckCircle2, Circle, Eye, EyeOff } from 'lucide-react'
 import { brand, supabase } from '../lib/supabase.js'
 import { HERO_COLLAGE, HOME_PROJECTS } from '../data/images.js'
 import { getAccountDisplayName, useAccount } from '../lib/account.js'
@@ -169,6 +169,8 @@ function LoginPanel() {
   const [status, setStatus] = useState('idle')
   const [message, setMessage] = useState('')
   const [pendingAction, setPendingAction] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const pwdRules = {
     length: password.length >= 8,
@@ -358,14 +360,28 @@ function LoginPanel() {
                 <span>Парола</span>
                 {isLogin && <button type="button" className="text-accent hover:underline">Забравена парола?</button>}
               </div>
-              <input
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                type="password"
-                autoComplete={isLogin ? 'current-password' : 'new-password'}
-                placeholder="••••••••"
-                className={INPUT_CLASS}
-              />
+              <div className="relative mt-2">
+                <input
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete={isLogin ? 'current-password' : 'new-password'}
+                  placeholder="••••••••"
+                  className={`${INPUT_CLASS} mt-0 pr-12`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(value => !value)}
+                  aria-label={showPassword ? 'Скрий паролата' : 'Покажи паролата'}
+                  aria-pressed={showPassword}
+                  className="group absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted transition-all duration-300 hover:scale-110 hover:bg-soft hover:text-accent active:scale-95 active:rotate-6"
+                >
+                  <span className="relative inline-flex h-5 w-5 items-center justify-center">
+                    <Eye className={`absolute h-5 w-5 transition-all duration-300 ${showPassword ? 'scale-75 rotate-[-16deg] opacity-0' : 'scale-100 rotate-0 opacity-100'}`} />
+                    <EyeOff className={`absolute h-5 w-5 transition-all duration-300 ${showPassword ? 'scale-100 rotate-0 opacity-100' : 'scale-75 rotate-[16deg] opacity-0'}`} />
+                  </span>
+                </button>
+              </div>
             </label>
 
             {!isLogin && password && (
@@ -382,14 +398,28 @@ function LoginPanel() {
             {!isLogin && (
               <label className="block text-sm font-medium text-ink mt-4">
                 Потвърди паролата
-                <input
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="••••••••"
-                  className={INPUT_CLASS}
-                />
+                <div className="relative mt-2">
+                  <input
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    placeholder="••••••••"
+                    className={`${INPUT_CLASS} mt-0 pr-12`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(value => !value)}
+                    aria-label={showConfirmPassword ? 'Скрий потвърждението за паролата' : 'Покажи потвърждението за паролата'}
+                    aria-pressed={showConfirmPassword}
+                    className="group absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted transition-all duration-300 hover:scale-110 hover:bg-soft hover:text-accent active:scale-95 active:rotate-6"
+                  >
+                    <span className="relative inline-flex h-5 w-5 items-center justify-center">
+                      <Eye className={`absolute h-5 w-5 transition-all duration-300 ${showConfirmPassword ? 'scale-75 rotate-[-16deg] opacity-0' : 'scale-100 rotate-0 opacity-100'}`} />
+                      <EyeOff className={`absolute h-5 w-5 transition-all duration-300 ${showConfirmPassword ? 'scale-100 rotate-0 opacity-100' : 'scale-75 rotate-[16deg] opacity-0'}`} />
+                    </span>
+                  </button>
+                </div>
               </label>
             )}
 

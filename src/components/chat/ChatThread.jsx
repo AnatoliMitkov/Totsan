@@ -1,13 +1,29 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import MessageBubble from './MessageBubble.jsx'
 
 export default function ChatThread({ conversation, messages, userId, onOfferAction }) {
-  const bottomRef = useRef(null)
+  const threadBodyRef = useRef(null)
+  const visibleMessages = useMemo(() => {
+    const seenSystemKeys = new Set()
+    return messages.filter((message) => {
+      if (message.kind !== 'system') return true
+      const systemKey = `${message.offer_id || ''}|${message.sender_id || ''}|${message.body || ''}`
+      if (seenSystemKeys.has(systemKey)) return false
+      seenSystemKeys.add(systemKey)
+      return true
+    })
+  }, [messages])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [messages.length, conversation?.id])
+    const container = threadBodyRef.current
+    if (!container) return
+
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: visibleMessages.length > 0 ? 'smooth' : 'auto',
+    })
+  }, [visibleMessages.length, conversation?.id])
 
   if (!conversation) {
     return (
@@ -33,10 +49,9 @@ export default function ChatThread({ conversation, messages, userId, onOfferActi
         </div>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-auto px-4 py-5 md:px-6">
-        {messages.map((message) => <MessageBubble key={message.id} message={message} userId={userId} conversation={conversation} onOfferAction={onOfferAction} />)}
-        {messages.length === 0 && <div className="rounded-2xl border border-dashed border-line p-6 text-center text-sm text-muted">Започни разговора с кратко съобщение.</div>}
-        <div ref={bottomRef} />
+      <div ref={threadBodyRef} className="flex-1 space-y-4 overflow-auto px-4 py-5 md:px-6">
+        {visibleMessages.map((message) => <MessageBubble key={message.id} message={message} userId={userId} conversation={conversation} onOfferAction={onOfferAction} />)}
+        {visibleMessages.length === 0 && <div className="rounded-2xl border border-dashed border-line p-6 text-center text-sm text-muted">Започни разговора с кратко съобщение.</div>}
       </div>
     </div>
   )

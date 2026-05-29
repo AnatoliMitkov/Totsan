@@ -269,9 +269,23 @@ async function stripeRequest(admin: SupabaseAdmin, path: string, options: { meth
   return data
 }
 
+function orderTransferGroup(order: Record<string, unknown>) {
+  return `totsan_order_${String(order.id || '').replace(/[^a-zA-Z0-9_-]/g, '_')}`
+}
+
+async function latestChargeForPaymentIntent(admin: SupabaseAdmin, paymentIntentId: unknown) {
+  const id = cleanText(paymentIntentId)
+  if (!id.startsWith('pi_')) return ''
+  const paymentIntent = await stripeRequest(admin, `payment_intents/${encodeURIComponent(id)}?expand[]=latest_charge`)
+  const latestCharge = (paymentIntent as { latest_charge?: string | { id?: string } }).latest_charge
+  if (typeof latestCharge === 'string') return latestCharge
+  return cleanText(latestCharge?.id)
+}
+
 async function createStripeCheckout(admin: SupabaseAdmin, order: Record<string, unknown>, origin: string, sourceType: string, sourceId: string) {
   const currency = String(order.currency || 'EUR').toLowerCase()
   const amount = toStripeAmount(Number(order.amount_total || 0), currency)
+  const transferGroup = orderTransferGroup(order)
   const params = new URLSearchParams()
   params.set('mode', 'payment')
   params.set('client_reference_id', String(order.id))
@@ -289,6 +303,7 @@ async function createStripeCheckout(admin: SupabaseAdmin, order: Record<string, 
   params.set('payment_intent_data[metadata][source_type]', sourceType)
   params.set('payment_intent_data[metadata][partner_id]', String(order.partner_id))
   params.set('payment_intent_data[description]', `Totsan order ${order.id}`)
+  params.set('payment_intent_data[transfer_group]', transferGroup)
 
   const session = await stripeRequest(admin, 'checkout/sessions', { method: 'POST', body: params })
   const { data: updatedOrder, error: updateError } = await admin.from('orders').update({
@@ -312,6 +327,19 @@ async function createStripeCheckout(admin: SupabaseAdmin, order: Record<string, 
 async function insertSystemMessage(admin: SupabaseAdmin, offerId: string, actorId: string, body: string) {
   const { data: offer, error: offerError } = await admin.from('offers').select('conversation_id').eq('id', offerId).maybeSingle()
   if (offerError || !offer?.conversation_id) return
+
+  const { data: existingMessages, error: existingError } = await admin
+    .from('messages')
+    .select('id')
+    .eq('conversation_id', offer.conversation_id)
+    .eq('kind', 'system')
+    .eq('offer_id', offerId)
+    .eq('body', body)
+    .limit(1)
+
+  if (existingError) return
+  if (existingMessages && existingMessages.length > 0) return
+
   const { data: conversation } = await admin.from('conversations').select('*').eq('id', offer.conversation_id).maybeSingle()
   const { data: message } = await admin.from('messages').insert({
     conversation_id: offer.conversation_id,
@@ -334,11 +362,13 @@ async function markPaid(admin: SupabaseAdmin, order: Record<string, unknown>, ac
   if (order.status !== 'pending_payment') return order
   const paymentIntent = typeof raw.payment_intent === 'string' ? raw.payment_intent : raw.payment_intent?.id || null
   const provider = raw.provider === 'mock' ? 'mock' : 'stripe'
-  const { data: updatedOrder, error } = await admin.from('orders').update({
+  const { data: updatedRows, error } = await admin.from('orders').update({
     status: 'paid',
     stripe_payment_intent_id: paymentIntent,
-  }).eq('id', order.id).select('*').single()
+  }).eq('id', order.id).eq('status', 'pending_payment').select('*')
   if (error) throw error
+  const updatedOrder = updatedRows?.[0]
+  if (!updatedOrder) return order
 
   await admin.from('payment_transactions').insert({
     order_id: order.id,
@@ -483,10 +513,13 @@ async function releasePayout(admin: SupabaseAdmin, order: Record<string, unknown
       } else {
         const currency = String(order.currency || 'EUR').toLowerCase()
         const params = new URLSearchParams()
+        const sourceCharge = await latestChargeForPaymentIntent(admin, order.stripe_payment_intent_id)
         params.set('amount', String(toStripeAmount(Number(order.partner_payout || 0), currency)))
         params.set('currency', currency)
         params.set('destination', partnerAccount.stripe_account_id)
+        params.set('transfer_group', orderTransferGroup(order))
         params.set('metadata[order_id]', String(order.id))
+        if (sourceCharge) params.set('source_transaction', sourceCharge)
         const transfer = await stripeRequest(admin, 'transfers', { method: 'POST', body: params })
         status = 'succeeded'
         raw = transfer

@@ -129,9 +129,13 @@ export async function loadMessages(conversationId) {
 export async function markConversationRead(conversation, userId) {
   if (!conversation?.id || !userId) return
   const patch = isClient(conversation, userId)
-    ? { is_read_by_client: true }
+    ? conversation.is_read_by_client
+      ? null
+      : { is_read_by_client: true }
     : isPartner(conversation, userId)
-      ? { is_read_by_partner: true }
+      ? conversation.is_read_by_partner
+        ? null
+        : { is_read_by_partner: true }
       : null
   if (!patch) return
   await supabase.from('conversations').update(patch).eq('id', conversation.id)
@@ -169,8 +173,8 @@ export function subscribeToConversationList(userId, onChange) {
   const channelId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
   const channel = supabase
     .channel(`conversation-list:${userId}:${channelId}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, onChange)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `client_id=eq.${userId}` }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `partner_id=eq.${userId}` }, onChange)
     .subscribe()
 
   return () => { supabase.removeChannel(channel) }
