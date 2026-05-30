@@ -268,7 +268,7 @@ function GardenBudgetCalculator() {
 
           {/* Results Summary Right */}
           <div className="lg:col-span-5 flex flex-col gap-6">
-            <div className="card p-8 bg-gradient-to-br from-ink to-graphite text-paper border-0 shadow-lg rounded-3xl relative overflow-hidden">
+            <div className="card p-8 border-0 shadow-lg rounded-3xl relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #0D2340 0%, #163250 100%)', color: '#F8FBFF' }}>
               <div className="absolute top-0 right-0 w-48 h-48 bg-trustGreen/20 rounded-full blur-[70px] pointer-events-none" />
               
               <div className="relative z-10 text-center">
@@ -567,11 +567,11 @@ function GardenFAQ() {
 function GardenCTA() {
   return (
     <section className="section bg-paper !pt-0">
-      <div className="container-page rounded-3xl bg-gradient-to-br from-ink via-graphite to-ink text-paper p-10 md:p-16 grid md:grid-cols-12 gap-8 items-center relative overflow-hidden shadow-xl">
+      <div className="container-page rounded-3xl p-10 md:p-16 grid md:grid-cols-12 gap-8 items-center relative overflow-hidden shadow-xl" style={{ background: 'linear-gradient(135deg, #0D2340 0%, #163250 100%)', color: '#F8FBFF' }}>
         <div className="absolute top-0 right-0 w-80 h-80 bg-trustGreen/15 rounded-full blur-[100px] pointer-events-none" />
         
         <div className="md:col-span-8 relative z-10">
-          <h2 className="h-section text-paper font-display">Твоят мечтан двор е на един разказ разстояние</h2>
+          <h2 className="h-section text-white font-display">Твоят мечтан двор е на един разказ разстояние</h2>
           <p className="mt-3 text-white/70 max-w-2xl leading-relaxed text-sm">
             Сподели ни как изглежда твоята идеална градина или тераса. Нашите специалисти ще превърнат концепцията ти в реалност — от почвените изследвания до последната пергола.
           </p>
