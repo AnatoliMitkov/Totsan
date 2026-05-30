@@ -45,7 +45,7 @@ export default function Admin() {
   if (!session) return <LoginPanel />
 
   if (location.pathname === '/login') {
-    return <Navigate to={account?.role === 'admin' ? '/admin' : '/moy-profil'} replace />
+    return <Navigate to={resolvePostLoginTarget(location, account)} replace />
   }
 
   if (account?.role !== 'admin') {
@@ -57,6 +57,28 @@ export default function Admin() {
   }
 
   return <AdminShell session={session} account={account}><AdminWorkspace session={session} account={account} /></AdminShell>
+}
+
+function resolvePostLoginTarget(location, account) {
+  const params = new URLSearchParams(location.search || '')
+  const next = normalizeNextPath(params.get('next') || '')
+
+  if (account?.role === 'admin') {
+    return next && next !== '/' ? next : '/admin'
+  }
+
+  if (next && next !== '/' && !next.startsWith('/admin')) {
+    return next
+  }
+
+  return '/moy-profil'
+}
+
+function normalizeNextPath(value = '') {
+  const raw = String(value || '').trim()
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return ''
+  if (raw.startsWith('/login')) return ''
+  return raw
 }
 
 function AdminShell({ children, session, account }) {
@@ -151,7 +173,9 @@ function AdminSectionFallback() {
 
 function LoginPanel() {
   const location = useLocation()
-  const isSignup = new URLSearchParams(location.search).get('signup') === 'true'
+  const params = new URLSearchParams(location.search)
+  const isSignup = params.get('signup') === 'true'
+  const nextPath = normalizeNextPath(params.get('next') || '')
   const [isLogin, setIsLogin] = useState(!isSignup)
 
   useEffect(() => {
@@ -171,6 +195,7 @@ function LoginPanel() {
   const [pendingAction, setPendingAction] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [rememberFor30Days, setRememberFor30Days] = useState(true)
 
   const pwdRules = {
     length: password.length >= 8,
@@ -186,9 +211,9 @@ function LoginPanel() {
     setPendingAction(provider)
     setMessage('')
 
-    const options = {
-      redirectTo: `${window.location.origin}/login`,
-    }
+    const loginRedirect = new URL('/login', window.location.origin)
+    if (nextPath) loginRedirect.searchParams.set('next', nextPath)
+    const options = { redirectTo: loginRedirect.toString() }
 
     if (provider === 'google') {
       options.queryParams = { prompt: 'select_account' }
@@ -449,10 +474,20 @@ function LoginPanel() {
             )}
 
             {isLogin ? (
-              <label className="flex items-center gap-2 text-sm text-muted">
-                <input type="checkbox" className="rounded border-line text-accent focus:ring-accent" />
-                Запомни ме за 30 дни
-              </label>
+              <div className="rounded-2xl border border-line bg-soft px-3 py-2.5">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={rememberFor30Days}
+                  onClick={() => setRememberFor30Days((value) => !value)}
+                  className="flex w-full items-center justify-between gap-4 text-left"
+                >
+                  <span className="text-sm text-ink">Запомни ме за 30 дни</span>
+                  <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${rememberFor30Days ? 'bg-accent' : 'bg-line'}`}>
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-paper shadow transition ${rememberFor30Days ? 'translate-x-5' : 'translate-x-1'}`} />
+                  </span>
+                </button>
+              </div>
             ) : (
               <label className="flex items-center gap-2 text-sm text-muted">
                 <input type="checkbox" required className="rounded border-line text-accent focus:ring-accent" />
