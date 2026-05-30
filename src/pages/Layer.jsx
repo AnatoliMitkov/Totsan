@@ -150,8 +150,13 @@ function WhatYouFind({ layer }) {
           <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {layer.whatYouFind.map((w, i) => {
               const showQuizBtn = Boolean(w.quizSlug && QUIZ_CONFIG_LOADERS[w.quizSlug])
-              const isGardenLink = w.key === 'garden'
-              const isWallpaperLink = w.key === 'wallpaper'
+              const sectionRoute = w.key === 'garden'
+                ? '/gradina-i-dvor'
+                : w.key === 'wallpaper'
+                  ? '/tapeti-i-cvetove'
+                : w.key === 'decor'
+                  ? '/dekorativni-akcenti'
+                  : ''
 
               const cardContent = (
                 <>
@@ -162,17 +167,16 @@ function WhatYouFind({ layer }) {
                     <div className="font-display text-xl">{w.title}</div>
                     <p className="text-muted text-sm mt-2">{w.text}</p>
                     {showQuizBtn && <div className="mt-4 text-xs font-semibold text-accentDeep flex items-center gap-1">Стартирай избора &rarr;</div>}
-                    {(isGardenLink || isWallpaperLink) && <div className="mt-4 text-xs font-semibold text-accentDeep flex items-center gap-1">Разгледай секцията &rarr;</div>}
+                    {sectionRoute && <div className="mt-4 text-xs font-semibold text-accentDeep flex items-center gap-1">Разгледай секцията &rarr;</div>}
                   </div>
                 </>
               )
 
-              if (isGardenLink || isWallpaperLink) {
-                const targetTo = isGardenLink ? "/gradina-i-dvor" : "/tapeti-i-cvetove"
+              if (sectionRoute) {
                 return (
                   <Link
                     key={w.key || i}
-                    to={targetTo}
+                    to={sectionRoute}
                     className="card img-zoom-host bg-paper p-0 overflow-hidden cursor-pointer hover:border-ink/30 transition-colors block"
                   >
                     {cardContent}

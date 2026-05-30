@@ -12,7 +12,7 @@ const MUSIC_TRACKS = [
 ]
 
 export default function Layout() {
-  const { pathname } = useLocation()
+  const { pathname, search, hash } = useLocation()
   const isAuthPage = pathname === '/login'
 
   // На всяка смяна на страница: скрол нагоре + ново наблюдение за reveal анимациите
@@ -35,14 +35,20 @@ export default function Layout() {
       root.querySelectorAll('.reveal:not(.in)').forEach(observeReveal)
     }
 
-    scanReveals(document.body)
+    const root = document.body
+    if (!(root instanceof Element)) {
+      io.disconnect()
+      return () => io.disconnect()
+    }
+
+    scanReveals(root)
 
     const mo = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => scanReveals(node))
       })
     })
-    mo.observe(document.body, { childList: true, subtree: true })
+    mo.observe(root, { childList: true, subtree: true })
 
     return () => {
       mo.disconnect()
@@ -73,7 +79,7 @@ function Header() {
   const [open, setOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const close = () => setOpen(false)
-  const { pathname } = useLocation()
+  const { pathname, search, hash } = useLocation()
   const { session, account, isAdmin } = useAccount()
   const unreadCount = useUnreadCount(session?.user?.id)
   const isHomePage = pathname === '/'
@@ -84,6 +90,7 @@ function Header() {
   const headerSurfaceClass = isHomeHeroMode
     ? 'border-transparent bg-transparent shadow-none'
     : `border-line bg-paper/90 backdrop-blur-xl ${open ? 'shadow-[0_10px_18px_-18px_rgba(13,35,64,0.38)]' : shouldShowScrolledShadow ? 'shadow-[0_10px_22px_-18px_rgba(13,35,64,0.4)]' : 'shadow-none'}`
+  const loginHref = `/login?next=${encodeURIComponent(`${pathname}${search}${hash}`)}`
 
   useEffect(() => {
     setOpen(false)
@@ -149,8 +156,8 @@ function Header() {
           </Link>}
           {session ? <UserMenu session={session} account={account} isAdmin={isAdmin} /> : (
             <>
-              <Link to="/login" className={`mobile-header-auth ${isHomeHeroMode ? 'mobile-header-auth-on-dark' : ''}`}>Вход</Link>
-              <Link to="/login" className={`desktop-header-auth ${isHomeHeroMode ? 'desktop-header-auth-on-dark' : ''}`}>Вход</Link>
+              <Link to={loginHref} className={`mobile-header-auth ${isHomeHeroMode ? 'mobile-header-auth-on-dark' : ''}`}>Вход</Link>
+              <Link to={loginHref} className={`desktop-header-auth ${isHomeHeroMode ? 'desktop-header-auth-on-dark' : ''}`}>Вход</Link>
             </>
           )}
           <HeaderMusicControl isHomeHeroMode={isHomeHeroMode} />

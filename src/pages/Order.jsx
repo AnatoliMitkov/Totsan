@@ -272,8 +272,8 @@ function orderEventMessage(event) {
     order_created: 'Поръчката е създадена',
     checkout_refreshed: 'Сесията за плащане е обновена',
     payment_succeeded: 'Плащането е потвърдено',
-    payment_succeeded_webhook: 'Плащането е потвърдено (Stripe)',
-    payment_intent_succeeded_webhook: 'Плащането е потвърдено (Stripe)',
+    payment_succeeded_webhook: 'Плащането е потвърдено',
+    payment_intent_succeeded_webhook: 'Плащането е потвърдено',
     admin_status_update: 'Админ промени статуса',
     start_work: 'Работата е започната',
     mark_delivered: 'Поръчката е маркирана като предадена',
@@ -324,13 +324,21 @@ function dedupeEvents(events = []) {
   const grouped = new Map()
 
   events.forEach((event) => {
-    const key = [
-      event.type || '',
-      event.message || '',
-      event.fromStatus || '',
-      event.toStatus || '',
-      event.payload ? JSON.stringify(event.payload) : '',
-    ].join('|')
+    const normalizedType = normalizeOrderEventType(event.type)
+    const key = normalizedType === 'payment_succeeded'
+      ? [
+        normalizedType,
+        event.fromStatus || '',
+        event.toStatus || '',
+        paymentEventId(event),
+      ].join('|')
+      : [
+        normalizedType,
+        event.message || '',
+        event.fromStatus || '',
+        event.toStatus || '',
+        event.payload ? JSON.stringify(event.payload) : '',
+      ].join('|')
 
     const existing = grouped.get(key)
     if (!existing) {
@@ -346,4 +354,18 @@ function dedupeEvents(events = []) {
   })
 
   return [...grouped.values()].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+}
+
+function normalizeOrderEventType(type = '') {
+  if (['payment_succeeded', 'payment_succeeded_webhook', 'payment_intent_succeeded_webhook'].includes(type)) {
+    return 'payment_succeeded'
+  }
+  return type || ''
+}
+
+function paymentEventId(event = {}) {
+  const payload = event.payload || {}
+  const paymentIntent = payload.payment_intent || payload.paymentIntentId || payload.payment_intent_id || ''
+  const checkoutSession = payload.checkout_session_id || payload.checkoutSessionId || payload.id || ''
+  return String(paymentIntent || checkoutSession || '')
 }
