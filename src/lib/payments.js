@@ -40,3 +40,7 @@ export function runOrderAction(orderId, orderAction, note = '') {
 export function createConnectOnboarding(origin = window.location.origin) {
   return invokePaymentAction('connect_onboarding', { origin })
 }
+
+export function getConnectStatus() {
+  return invokePaymentAction('connect_status')
+}

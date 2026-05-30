@@ -14,7 +14,7 @@ import {
   savePortfolioItem,
   uploadPortfolioImage,
 } from '../../lib/portfolio.js'
-import { createConnectOnboarding } from '../../lib/payments.js'
+import { createConnectOnboarding, getConnectStatus } from '../../lib/payments.js'
 import PortfolioGallery from './PortfolioGallery.jsx'
 import PartnerStats from './PartnerStats.jsx'
 import PartnerServiceEditor from './PartnerServiceEditor.jsx'
@@ -78,6 +78,19 @@ function makePortfolioDraft(item = null, profile) {
   }
 }
 
+function paymentMessageFromStripe(result) {
+  switch (result?.status) {
+    case 'active':
+      return 'Stripe профилът е активен. Оттук нататък бутонът ще те води към управлението на плащанията.'
+    case 'pending_review':
+      return 'Данните са изпратени към Stripe. Профилът чака преглед и може да отнеме малко време, преди плащанията да станат активни.'
+    case 'needs_information':
+      return 'Stripe има нужда от още данни, преди да активира плащанията.'
+    default:
+      return 'Проверихме Stripe профила.'
+  }
+}
+
 export default function PartnerProfileWorkspace({ profile, userId, account, onSaved }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [currentProfile, setCurrentProfile] = useState(profile)
@@ -114,6 +127,34 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
     load()
     return () => { active = false }
   }, [profile.id])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const paymentsState = params.get('payments')
+    if (!paymentsState || !account?.stripe_account_id) return undefined
+
+    let active = true
+    setPaymentState({ status: 'saving', message: 'Проверяваме Stripe профила…' })
+
+    async function loadStripeStatus() {
+      try {
+        const result = await getConnectStatus()
+        if (!active) return
+        setPaymentState({ status: result.status === 'needs_information' ? 'idle' : 'saved', message: paymentMessageFromStripe(result) })
+      } catch (error) {
+        if (!active) return
+        setPaymentState({ status: 'error', message: error.message || 'Не успяхме да проверим Stripe профила.' })
+      } finally {
+        params.delete('payments')
+        const query = params.toString()
+        const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash || ''}`
+        window.history.replaceState({}, '', nextUrl)
+      }
+    }
+
+    loadStripeStatus()
+    return () => { active = false }
+  }, [account?.stripe_account_id])
 
   const preview = useMemo(() => normalizeProfile({
     ...currentProfile,
@@ -244,6 +285,14 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
     setPaymentState({ status: 'opening', message: 'Отваряме Stripe onboarding…' })
     try {
       const result = await createConnectOnboarding()
+      if (result.dashboardUrl) {
+        window.location.href = result.dashboardUrl
+        return
+      }
+      if (result.status && result.status !== 'active' && !result.onboardingUrl) {
+        setPaymentState({ status: result.status === 'needs_information' ? 'idle' : 'saved', message: paymentMessageFromStripe(result) })
+        return
+      }
       if (result.onboardingUrl) {
         window.location.href = result.onboardingUrl
         return

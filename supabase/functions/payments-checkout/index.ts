@@ -269,6 +269,49 @@ async function stripeRequest(admin: SupabaseAdmin, path: string, options: { meth
   return data
 }
 
+function stripeConnectState(stripeAccount: Record<string, unknown>) {
+  const requirements = (stripeAccount.requirements as Record<string, unknown> | undefined) || {}
+  const currentlyDue = asArray(requirements.currently_due)
+  const pendingVerification = asArray(requirements.pending_verification)
+  const pastDue = asArray(requirements.past_due)
+  const eventuallyDue = asArray(requirements.eventually_due)
+  const detailsSubmitted = Boolean(stripeAccount.details_submitted)
+  const payoutsEnabled = Boolean(stripeAccount.payouts_enabled)
+  const chargesEnabled = Boolean(stripeAccount.charges_enabled)
+  const disabledReason = cleanText(requirements.disabled_reason)
+
+  let status: 'active' | 'pending_review' | 'needs_information' = 'needs_information'
+  if (payoutsEnabled || chargesEnabled) {
+    status = 'active'
+  } else if (detailsSubmitted && currentlyDue.length === 0 && pastDue.length === 0) {
+    status = 'pending_review'
+  }
+
+  return {
+    status,
+    detailsSubmitted,
+    payoutsEnabled,
+    chargesEnabled,
+    disabledReason,
+    currentlyDue,
+    pendingVerification,
+    pastDue,
+    eventuallyDue,
+  }
+}
+
+async function loadStripeConnectAccount(admin: SupabaseAdmin, stripeAccountId: string) {
+  return stripeRequest(admin, `accounts/${encodeURIComponent(stripeAccountId)}`)
+}
+
+async function createStripeExpressLoginLink(admin: SupabaseAdmin, stripeAccountId: string) {
+  const link = await stripeRequest(admin, `accounts/${encodeURIComponent(stripeAccountId)}/login_links`, {
+    method: 'POST',
+    body: new URLSearchParams(),
+  })
+  return cleanText((link as { url?: string }).url)
+}
+
 function orderTransferGroup(order: Record<string, unknown>) {
   return `totsan_order_${String(order.id || '').replace(/[^a-zA-Z0-9_-]/g, '_')}`
 }
@@ -564,13 +607,38 @@ async function connectOnboarding(req: Request, admin: SupabaseAdmin, userId: str
     await admin.from('accounts').update({ stripe_account_id: stripeAccountId }).eq('id', userId)
   }
 
+  const stripeAccount = await loadStripeConnectAccount(admin, stripeAccountId)
+  const accountState = stripeConnectState(stripeAccount)
+  if (accountState.status === 'active') {
+    const dashboardUrl = await createStripeExpressLoginLink(admin, stripeAccountId)
+    return jsonResponse(200, { ok: true, stripeAccountId, status: accountState.status, dashboardUrl, accountState })
+  }
+  if (accountState.status === 'pending_review') {
+    return jsonResponse(200, { ok: true, stripeAccountId, status: accountState.status, accountState })
+  }
+
   const linkParams = new URLSearchParams()
   linkParams.set('account', stripeAccountId)
   linkParams.set('type', 'account_onboarding')
   linkParams.set('refresh_url', `${origin}/moy-profil?payments=refresh`)
   linkParams.set('return_url', `${origin}/moy-profil?payments=connected`)
   const link = await stripeRequest(admin, 'account_links', { method: 'POST', body: linkParams })
-  return jsonResponse(200, { ok: true, stripeAccountId, onboardingUrl: link.url })
+  return jsonResponse(200, { ok: true, stripeAccountId, status: accountState.status, onboardingUrl: link.url, accountState })
+}
+
+async function connectStatus(admin: SupabaseAdmin, userId: string) {
+  const { data: account, error } = await admin
+    .from('accounts')
+    .select('role, stripe_account_id')
+    .eq('id', userId)
+    .maybeSingle()
+  if (error) throw error
+  if (!account || account.role !== 'specialist') throw new Error('Само партньорски профил може да активира плащания.')
+  if (!account.stripe_account_id) return jsonResponse(200, { ok: true, status: 'not_started' })
+
+  const stripeAccount = await loadStripeConnectAccount(admin, account.stripe_account_id)
+  const accountState = stripeConnectState(stripeAccount)
+  return jsonResponse(200, { ok: true, stripeAccountId: account.stripe_account_id, status: accountState.status, accountState })
 }
 
 Deno.serve(async (req) => {
@@ -599,6 +667,7 @@ Deno.serve(async (req) => {
     if (action === 'sync_stripe_session') return await syncStripeSession(admin, user.id, payload)
     if (action === 'order_action') return await orderAction(admin, user.id, payload)
     if (action === 'connect_onboarding') return await connectOnboarding(req, admin, user.id, payload)
+    if (action === 'connect_status') return await connectStatus(admin, user.id)
     return jsonResponse(400, { error: 'Unsupported payment action.' })
   } catch (error) {
     console.error('payments-checkout error', error)
