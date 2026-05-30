@@ -22,6 +22,7 @@ import Checkout from './pages/Checkout.jsx'
 import Order from './pages/Order.jsx'
 import MyOrders from './pages/MyOrders.jsx'
 import GardenAndYard from './pages/GardenAndYard.jsx'
+import WallpapersAndColors from './pages/WallpapersAndColors.jsx'
 function AppRoutes() {
   const location = useLocation()
 
@@ -43,6 +44,7 @@ function AppRoutes() {
           <Route path="/kontakt" element={<Contact />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/gradina-i-dvor" element={<GardenAndYard />} />
+          <Route path="/tapeti-i-cvetove" element={<WallpapersAndColors />} />
           <Route path="/login" element={<Admin />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/moy-profil" element={<MyProfile />} />
