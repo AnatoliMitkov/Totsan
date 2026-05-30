@@ -1,10 +1,11 @@
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Globe2, Languages, Mail, MapPin, Phone } from 'lucide-react'
+import { ArrowRight, BriefcaseBusiness, CheckCircle2, Globe2, Languages, MapPin } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { LAYER_HEROS } from '../data/images.js'
 import { getProfileImage, getProfileImageStyle, slugify, useProfileDirectory } from '../lib/profiles.js'
 import { loadProfilePortfolio, loadProfileStats } from '../lib/portfolio.js'
+import { loadPublicPartnerServicesForProfile, packagePriceLabel } from '../lib/partner-services.js'
 import { useAccount } from '../lib/account.js'
 import { createConversationFromProfile } from '../lib/chat.js'
 import PortfolioGallery from '../components/profile/PortfolioGallery.jsx'
@@ -19,6 +20,7 @@ export default function Pro() {
   const { session } = useAccount()
   const [portfolio, setPortfolio] = useState([])
   const [stats, setStats] = useState(null)
+  const [services, setServices] = useState([])
   const [chatState, setChatState] = useState({ status: 'idle', message: '' })
   const item = useMemo(() => {
     const liveProfile = profiles.find((profile) => profile.slug === slug)
@@ -36,24 +38,28 @@ export default function Pro() {
     if (!item?.id || item.isStatic) {
       setPortfolio([])
       setStats(null)
+      setServices([])
       return undefined
     }
 
     let active = true
     async function loadV2Data() {
       try {
-        const [portfolioRows, statsRow] = await Promise.all([
+        const [portfolioRows, statsRow, serviceRows] = await Promise.all([
           loadProfilePortfolio(item.id),
           loadProfileStats(item.id),
+          loadPublicPartnerServicesForProfile(item.id),
         ])
         if (!active) return
         setPortfolio(portfolioRows)
         setStats(statsRow)
+        setServices(serviceRows)
       } catch (error) {
         if (!active) return
         console.error('Profile v2 data load failed:', error)
         setPortfolio([])
         setStats(null)
+        setServices([])
       }
     }
 
@@ -140,6 +146,8 @@ export default function Pro() {
               </div>
             )}
 
+            <ProfileServicesSection services={services} profile={item} />
+
             <div className="mt-10 eyebrow">Как работят</div>
             <div className="mt-4 grid sm:grid-cols-2 gap-4">
               {layer.process.map(p => (
@@ -180,6 +188,44 @@ function MetaTile({ icon: Icon, label, value }) {
       <Icon size={18} className="text-accentDeep" />
       <div className="mt-3 text-xs uppercase tracking-[0.14em] text-muted">{label}</div>
       <div className="mt-1 text-sm font-medium text-ink">{value}</div>
+    </div>
+  )
+}
+
+function ProfileServicesSection({ services, profile }) {
+  return (
+    <div className="mt-10">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="eyebrow">Услуги</div>
+          <h2 className="mt-2 font-display text-3xl text-ink">Публикувани оферти от {profile.name}</h2>
+        </div>
+        <Link to="/uslugi" className="inline-flex items-center gap-2 text-sm font-medium text-ink underline underline-offset-4">
+          Всички услуги <ArrowRight size={16} />
+        </Link>
+      </div>
+
+      {services.length > 0 ? (
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          {services.map(service => (
+            <Link key={service.id} to={`/uslugi/${service.slug}`} className="rounded-2xl border border-line bg-paper p-5 transition hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <BriefcaseBusiness size={20} className="mt-1 text-accentDeep" />
+                <span className="rounded-full bg-soft px-3 py-1 text-xs text-muted">{packagePriceLabel(service)}</span>
+              </div>
+              <h3 className="mt-4 font-display text-2xl leading-tight text-ink">{service.title}</h3>
+              {service.subtitle && <p className="mt-2 line-clamp-2 text-sm text-muted">{service.subtitle}</p>}
+              <div className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-ink">
+                Детайли <ArrowRight size={16} />
+              </div>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-5 rounded-2xl border border-dashed border-line bg-soft p-5 text-sm text-muted">
+          Този партньор още няма публични услуги. Можеш да започнеш разговор директно от бутона за контакт.
+        </div>
+      )}
     </div>
   )
 }

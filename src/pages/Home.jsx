@@ -15,8 +15,7 @@ import {
 } from 'lucide-react'
 import { gsap } from 'gsap'
 import { LAYERS } from '../data/layers.js'
-import { SERVICE_DETAILS } from '../data/catalog.js'
-import { HOME_PROJECTS, PARTNER_LOGOS, SERVICE_IMAGES, LAYER_HEROS } from '../data/images.js'
+import { HOME_PROJECTS, PARTNER_LOGOS, LAYER_HEROS } from '../data/images.js'
 
 const HERO_POSTER_SRC = '/Videos/totsan-hero-video-building-layers.webp'
 const HERO_VIDEO_SOURCES = [
@@ -76,10 +75,6 @@ function Hero() {
       gsap.fromTo('.hero-animate-cta',
         { opacity: 0, scale: 0.96, y: 10 },
         { opacity: 1, scale: 1, y: 0, duration: 0.8, ease: 'back.out(1.2)', delay: 0.7, stagger: 0.1 }
-      )
-      gsap.fromTo('.home-hero__video-controls',
-        { opacity: 0, y: 30 },
-        { opacity: 1, y: 0, duration: 1, ease: 'power3.out', delay: 1 }
       )
     }, heroRef)
 
@@ -442,27 +437,27 @@ function LayersTimelineExplorer() {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-[22rem_1fr] gap-10 items-start">
+        <div className="grid min-w-0 lg:grid-cols-[22rem_minmax(0,1fr)] gap-10 items-start">
           {/* Vertical Menu Timeline */}
-          <div className="flex flex-col gap-3 relative border-l border-line pl-4 py-2">
+          <div className="flex w-full min-w-0 flex-col gap-3 relative border-l border-line pl-4 py-2">
             {LAYERS.map((layer, index) => {
               const isActive = index === activeIndex
               return (
                 <button
                   key={layer.slug}
                   onClick={() => setActiveIndex(index)}
-                  className={`timeline-btn text-left py-3 px-4 rounded-xl transition-all duration-300 relative focus:outline-none ${
+                  className={`timeline-btn w-full max-w-full text-left py-3 px-4 rounded-xl transition-all duration-300 relative focus:outline-none overflow-hidden ${
                     isActive 
                       ? 'bg-accentSoft text-accentDeep font-bold border-l-2 border-accent' 
                       : 'hover:bg-soft text-muted hover:text-ink'
                   }`}>
-                  <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
                     <span className={`font-mono text-sm px-2 py-0.5 rounded ${
                       isActive ? 'bg-accent text-paper' : 'bg-cloud text-ink/70'
                     }`}>
                       {layer.number}
                     </span>
-                    <span className="font-display text-lg">{layer.title}</span>
+                    <span className="font-display text-lg min-w-0 truncate">{layer.title}</span>
                   </div>
                   <p className="text-xs text-muted/70 mt-1 pl-10 font-normal truncate">
                     {layer.short}
@@ -475,19 +470,19 @@ function LayersTimelineExplorer() {
           {/* Interactive Glassmorphic Display Panel */}
           <div 
             ref={detailPanelRef}
-            className="layer-detail-panel card p-8 bg-gradient-to-br from-soft/50 via-paper to-cloud/20 border border-line shadow-md rounded-3xl grid md:grid-cols-12 gap-8 min-h-[30rem] items-stretch">
+            className="layer-detail-panel card w-full max-w-full p-8 bg-gradient-to-br from-soft/50 via-paper to-cloud/20 border border-line shadow-md rounded-3xl grid md:grid-cols-12 gap-8 min-h-[30rem] items-stretch min-w-0 overflow-hidden">
             
-            <div className="md:col-span-7 flex flex-col justify-between gap-6">
+            <div className="md:col-span-7 flex min-w-0 flex-col justify-between gap-6">
               <div>
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 items-center gap-3">
                   <span className="font-display text-4xl text-accentDeep font-bold">
                     {activeLayer.number}
                   </span>
                   <div className="h-px w-8 bg-accent" />
-                  <span className="eyebrow tracking-wider">{activeLayer.title}</span>
+                  <span className="eyebrow min-w-0 tracking-wider">{activeLayer.title}</span>
                 </div>
 
-                <h3 className="font-display text-3xl text-ink font-bold mt-4">
+                <h3 className="font-display text-3xl text-ink font-bold mt-4 min-w-0">
                   {activeLayer.short}
                 </h3>
                 
@@ -504,7 +499,7 @@ function LayersTimelineExplorer() {
                     <Sparkles size={14} className="text-accent" />
                     <span>Какво включва:</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid sm:grid-cols-2 gap-2">
                     {activeLayer.pros.map((pro, i) => (
                       <div key={i} className="flex items-center gap-2 text-xs text-muted">
                         <CheckCircle2 size={12} className="text-trustGreen" />
@@ -829,6 +824,12 @@ function DreamBuilderQuiz() {
 }
 
 function ServicesStrip() {
+  const serviceCards = [
+    { title: 'Реални оферти', text: 'Публикувани услуги от активни партньори, не демо категории.' },
+    { title: 'Ясен партньор', text: 'Всяка услуга води към профил, цена и директна заявка.' },
+    { title: 'Едно място', text: 'Клиентът намира услугата, профила и поръчката без обикаляне.' },
+  ]
+
   return (
     <section className="section !py-16 bg-ink text-paper">
       <div className="container-page">
@@ -841,21 +842,16 @@ function ServicesStrip() {
             </p>
           </div>
           <div className="lg:col-span-8 reveal">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {SERVICE_DETAILS.slice(0, 8).map(s => (
-                <Link 
-                  key={s.slug} 
-                  to={`/usluga/${s.slug}`} 
-                  className="group border border-paper/20 rounded-xl overflow-hidden hover:border-accent transition-all duration-300 block bg-graphite/40 backdrop-blur-sm glow-card">
-                  <div className="media-frame aspect-square">
-                    <img 
-                      src={SERVICE_IMAGES[s.slug]} 
-                      alt={s.name} 
-                      loading="lazy" 
-                      className="img-cover img-zoom group-hover:scale-105 transition duration-500" 
-                    />
-                  </div>
-                  <div className="p-3 text-sm font-display text-center truncate">{s.name}</div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {serviceCards.map((card) => (
+                <Link
+                  key={card.title}
+                  to="/uslugi"
+                  className="group rounded-2xl border border-paper/20 bg-graphite/40 p-5 backdrop-blur-sm transition hover:-translate-y-0.5 hover:border-accent"
+                >
+                  <div className="font-display text-2xl text-paper">{card.title}</div>
+                  <p className="mt-3 text-sm leading-relaxed text-paper/65">{card.text}</p>
+                  <div className="mt-5 text-sm font-medium text-accent">Отвори услугите →</div>
                 </Link>
               ))}
             </div>
@@ -1043,8 +1039,8 @@ function CTA() {
   return (
     <section className="section bg-paper">
       <div className="container-page rounded-3xl bg-ink text-paper p-10 md:p-16 grid md:grid-cols-12 gap-8 items-center relative overflow-hidden shadow-xl">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-accent/20 rounded-full blur-[100px] pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-80 h-80 bg-trustPurple/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="hidden sm:block absolute top-0 right-0 w-80 h-80 bg-accent/20 rounded-full blur-[100px] pointer-events-none" />
+        <div className="hidden sm:block absolute bottom-0 left-0 w-80 h-80 bg-trustPurple/10 rounded-full blur-[100px] pointer-events-none" />
         
         <div className="md:col-span-8 relative z-10">
           <h2 className="h-section text-paper">Готов да започнеш своя проект?</h2>

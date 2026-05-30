@@ -1,7 +1,6 @@
 import { Link, useParams } from 'react-router-dom'
 import { useEffect, useState, useRef } from 'react'
-import { LAYER_HEROS, WHAT_YOU_FIND_IMAGES, SHOWCASE_IMAGES, SERVICE_IMAGES, productImageFor } from '../data/images.js'
-import { SERVICE_DETAILS } from '../data/catalog.js'
+import { LAYER_HEROS, WHAT_YOU_FIND_IMAGES, SHOWCASE_IMAGES, productImageFor } from '../data/images.js'
 import ProfessionalCard from '../components/ProfessionalCard.jsx'
 import { useProfileDirectory } from '../lib/profiles.js'
 
@@ -324,6 +323,11 @@ function ProcessSection({ layer }) {
 }
 
 function ServicesBand() {
+  const cards = [
+    { title: 'Публикувани услуги', text: 'Само реални оферти от партньори с профил в Totsan.', to: '/uslugi' },
+    { title: 'Каталог', text: 'Прегледай специалисти, услуги и продукти на едно място.', to: '/katalog' },
+  ]
+
   return (
     <section className="section !py-16">
       <div className="container-page">
@@ -334,13 +338,12 @@ function ServicesBand() {
             <p className="text-muted mt-3 text-sm">Електричар, ВиК, отопление, smart home — добавяш ги към всеки слой, по всяко време.</p>
             <Link to="/uslugi" className="link-arrow inline-flex mt-5 text-sm">Всички услуги →</Link>
           </div>
-          <div className="md:col-span-8 reveal grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {SERVICE_DETAILS.slice(0,8).map(s => (
-              <Link key={s.slug} to={`/usluga/${s.slug}`} className="group border border-line rounded-xl overflow-hidden hover:border-ink transition block">
-                <div className="media-frame aspect-square">
-                  <img src={SERVICE_IMAGES[s.slug]} alt={s.name} loading="lazy" decoding="async" className="img-cover img-zoom group-hover:scale-105 transition" />
-                </div>
-                <div className="p-3 text-sm">{s.name}</div>
+          <div className="md:col-span-8 reveal grid gap-4 sm:grid-cols-2">
+            {cards.map(card => (
+              <Link key={card.title} to={card.to} className="rounded-2xl border border-line bg-paper p-6 transition hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-sm">
+                <div className="font-display text-3xl text-ink">{card.title}</div>
+                <p className="mt-3 text-sm leading-relaxed text-muted">{card.text}</p>
+                <div className="mt-5 text-sm font-medium text-ink underline underline-offset-4">Отвори →</div>
               </Link>
             ))}
           </div>

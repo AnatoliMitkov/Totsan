@@ -156,6 +156,33 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
     return () => { active = false }
   }, [account?.stripe_account_id])
 
+  useEffect(() => {
+    if (!account?.stripe_account_id) return undefined
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('payments')) return undefined
+
+    let active = true
+
+    async function loadStripeStatusQuietly() {
+      try {
+        const result = await getConnectStatus()
+        if (!active || !result?.status || result.status === 'not_started') return
+        setPaymentState((current) => {
+          if (current.status === 'opening' || current.status === 'saving') return current
+          return {
+            status: result.status === 'needs_information' ? 'idle' : 'saved',
+            message: paymentMessageFromStripe(result),
+          }
+        })
+      } catch {
+        // Keep the page usable even if Stripe status cannot be loaded in the background.
+      }
+    }
+
+    loadStripeStatusQuietly()
+    return () => { active = false }
+  }, [account?.stripe_account_id])
+
   const preview = useMemo(() => normalizeProfile({
     ...currentProfile,
     ...profileDraft,

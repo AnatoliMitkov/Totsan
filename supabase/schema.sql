@@ -1513,6 +1513,19 @@ create policy "public can read approved partner services"
 
 drop policy if exists "public can read profiles with approved services" on public.profiles;
 
+create policy "public can read profiles with approved services"
+  on public.profiles for select
+  to anon, authenticated
+  using (
+    exists (
+      select 1
+      from public.partner_services s
+      where s.profile_id = profiles.id
+        and s.is_published = true
+        and s.moderation_status = 'approved'
+    )
+  );
+
 create policy "owners can read own partner services"
   on public.partner_services for select
   to authenticated

@@ -40,7 +40,20 @@ export default function PartnerService() {
     return () => { active = false }
   }, [slug])
 
-  const profile = useMemo(() => service?.profile ? normalizeProfile(service.profile) : null, [service])
+  const profile = useMemo(() => {
+    if (!service) return null
+    if (service.profile) return normalizeProfile(service.profile)
+    return normalizeProfile({
+      id: service.profileId,
+      slug: '',
+      name: 'Партньор в Totsan',
+      tag: 'Партньор',
+      city: service.deliveryAreas?.[0] || '',
+      layer_slug: service.layerSlug,
+      is_published: true,
+      user_id: service.partnerId,
+    })
+  }, [service])
   const packages = useMemo(() => service?.packages?.filter(item => item.isActive) || [], [service])
   const activePackage = packages[0]
   const cover = service?.coverUrl || service?.media?.[0]?.url || profile?.imageUrl
@@ -76,17 +89,24 @@ export default function PartnerService() {
     <>
       <section className="section !pt-10 bg-soft">
         <div className="container-page">
-          <Link to="/katalog" className="inline-flex items-center gap-2 text-sm font-medium text-muted transition hover:text-ink"><ArrowLeft size={17} /> Назад към каталога</Link>
+          <Link to="/uslugi" className="inline-flex items-center gap-2 text-sm font-medium text-muted transition hover:text-ink"><ArrowLeft size={17} /> Назад към услугите</Link>
           <div className="mt-6 grid gap-8 lg:grid-cols-12 lg:items-start">
             <div className="lg:col-span-7">
               <div className="eyebrow">Партньорска услуга</div>
               <h1 className="mt-3 font-display text-[clamp(2.5rem,2rem+2vw,5rem)] leading-none text-ink">{service.title}</h1>
               {service.subtitle && <p className="mt-5 max-w-3xl text-lg text-muted">{service.subtitle}</p>}
               <div className="mt-6 flex flex-wrap items-center gap-3">
-                <Link to={`/profil/${profile.slug}`} className="inline-flex items-center gap-3 rounded-full border border-line bg-paper px-3 py-2 text-sm text-ink transition hover:border-ink/40">
-                  <span className="h-9 w-9 overflow-hidden rounded-full bg-soft"><img src={getProfileImage(profile)} alt={profile.name} className="img-cover" style={getProfileImageStyle(profile)} /></span>
-                  <span>{profile.name}</span>
-                </Link>
+                {profile.slug ? (
+                  <Link to={`/profil/${profile.slug}`} className="inline-flex items-center gap-3 rounded-full border border-line bg-paper px-3 py-2 text-sm text-ink transition hover:border-ink/40">
+                    <span className="h-9 w-9 overflow-hidden rounded-full bg-soft"><img src={getProfileImage(profile)} alt={profile.name} className="img-cover" style={getProfileImageStyle(profile)} /></span>
+                    <span>{profile.name}</span>
+                  </Link>
+                ) : (
+                  <span className="inline-flex items-center gap-3 rounded-full border border-line bg-paper px-3 py-2 text-sm text-ink">
+                    <span className="h-9 w-9 overflow-hidden rounded-full bg-soft"><img src={getProfileImage(profile)} alt={profile.name} className="img-cover" style={getProfileImageStyle(profile)} /></span>
+                    <span>{profile.name}</span>
+                  </span>
+                )}
                 <span className="inline-flex items-center gap-2 rounded-full bg-paper px-4 py-2 text-sm text-muted"><Star size={16} /> {profile.rating.toFixed(1)}</span>
               </div>
             </div>
@@ -125,7 +145,7 @@ export default function PartnerService() {
                 <div>
                   <h3 className="font-display text-3xl text-ink">{profile.name}</h3>
                   <p className="mt-1 text-sm text-muted">{profile.tag} · {profile.city}</p>
-                  <Link to={`/profil/${profile.slug}`} className="mt-3 inline-flex text-sm font-medium text-ink underline underline-offset-4">Виж профила</Link>
+                  {profile.slug && <Link to={`/profil/${profile.slug}`} className="mt-3 inline-flex text-sm font-medium text-ink underline underline-offset-4">Виж профила</Link>}
                 </div>
               </div>
             </Panel>
@@ -194,7 +214,7 @@ function StatusPanel({ title, text }) {
       <div className="container-page max-w-xl text-center">
         <h1 className="h-section">{title}</h1>
         <p className="mt-3 text-muted">{text}</p>
-        <Link to="/katalog" className="btn btn-primary mt-6 inline-flex">Към каталога</Link>
+        <Link to="/uslugi" className="btn btn-primary mt-6 inline-flex">Към услугите</Link>
       </div>
     </section>
   )
