@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Eye, ImagePlus, Plus, Save, Trash2 } from 'lucide-react'
+import { ArrowUpRight, CheckCircle2, CircleDot, Eye, ImagePlus, Plus, Save, Trash2 } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
 import {
   SERVICE_STATUS_LABELS,
@@ -147,10 +147,13 @@ export default function PartnerServiceEditor({ profile, userId }) {
   return (
     <div className="space-y-5">
       <section className="rounded-3xl border border-line bg-paper p-5 md:p-7">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <div className="eyebrow">Моите услуги</div>
             <h2 className="mt-2 font-display text-3xl text-ink">{sectionTitle}</h2>
+            <p className="mt-2 max-w-2xl text-sm text-muted">
+              Създай ясна публична оферта, която клиентът вижда в услугите, каталога и профила ти.
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             {draft.isPublished && <Link to={`/uslugi/${draft.slug}`} className="btn btn-ghost"><Eye size={18} /> Виж публично</Link>}
@@ -159,21 +162,31 @@ export default function PartnerServiceEditor({ profile, userId }) {
           </div>
         </div>
 
-        {items.length > 0 && (
-          <label className="mt-5 block text-sm font-medium text-ink">
-            Избери услуга за редакция
-            <select value={draft.id || ''} onChange={event => selectService(event.target.value)} className={INPUT}>
-              <option value="">Нова услуга</option>
-              {items.map(item => <option key={item.id} value={item.id}>{item.title || 'Услуга'} · {SERVICE_STATUS_LABELS[item.moderationStatus] || item.moderationStatus}</option>)}
-            </select>
-          </label>
+        {items.length > 0 ? (
+          <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {items.map(item => (
+              <ServicePickerCard
+                key={item.id}
+                item={item}
+                active={draft.id === item.id}
+                onSelect={() => selectService(item.id)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-6 rounded-2xl border border-dashed border-line bg-soft p-5 text-sm text-muted">
+            Все още няма създадени услуги. Започни с първата оферта и я публикувай, за да се появи пред клиентите.
+          </div>
         )}
 
-        <div className="mt-5 flex flex-wrap gap-2 rounded-2xl bg-soft p-1">
-          {SECTIONS.map(([section, label]) => (
-            <button key={section} type="button" onClick={() => setActiveSection(section)} className={`rounded-full px-4 py-2 text-sm transition ${activeSection === section ? 'bg-ink text-paper' : 'text-muted hover:bg-paper hover:text-ink'}`}>{label}</button>
-          ))}
-          <button type="button" onClick={() => setShowPreview(value => !value)} className={`rounded-full px-4 py-2 text-sm transition ${showPreview ? 'bg-ink text-paper' : 'text-muted hover:bg-paper hover:text-ink'}`}>Преглед</button>
+        <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+          <div className="flex flex-wrap gap-2 rounded-2xl bg-soft p-1">
+            {SECTIONS.map(([section, label]) => (
+              <button key={section} type="button" onClick={() => setActiveSection(section)} className={`rounded-full px-4 py-2 text-sm transition ${activeSection === section ? 'bg-ink text-paper' : 'text-muted hover:bg-paper hover:text-ink'}`}>{label}</button>
+            ))}
+            <button type="button" onClick={() => setShowPreview(value => !value)} className={`rounded-full px-4 py-2 text-sm transition ${showPreview ? 'bg-ink text-paper' : 'text-muted hover:bg-paper hover:text-ink'}`}>Преглед</button>
+          </div>
+          <VisibilityPanel draft={draft} state={state} />
         </div>
       </section>
 
@@ -196,10 +209,59 @@ export default function PartnerServiceEditor({ profile, userId }) {
           <div className={`text-sm ${state.status === 'error' ? 'text-red-700' : 'text-muted'}`}>{state.message || 'Запази чернова или създай публична услуга.'}</div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => handleSave(false)} disabled={state.status === 'saving'} className="btn btn-ghost"><Save size={18} /> Запази чернова</button>
-            <button type="button" onClick={() => handleSave(true)} disabled={state.status === 'saving'} className="btn btn-primary">Създай услугата</button>
+            <button type="button" onClick={() => handleSave(true)} disabled={state.status === 'saving'} className="btn btn-primary">{draft.id ? 'Публикувай промените' : 'Публикувай услугата'}</button>
           </div>
         </div>
       </section>
+    </div>
+  )
+}
+
+function ServicePickerCard({ item, active, onSelect }) {
+  const statusLabel = SERVICE_STATUS_LABELS[item.moderationStatus] || item.moderationStatus
+  const isPublic = item.isPublished && item.moderationStatus === 'approved'
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${active ? 'border-ink bg-ink text-paper' : 'border-line bg-soft text-ink hover:border-ink/30'}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className={`truncate text-xs uppercase tracking-[0.14em] ${active ? 'text-paper/60' : 'text-muted'}`}>{statusLabel}</div>
+          <div className="mt-2 line-clamp-2 font-display text-xl leading-tight">{item.title || 'Услуга без заглавие'}</div>
+        </div>
+        {isPublic ? <CheckCircle2 size={19} className={active ? 'text-paper' : 'text-accentDeep'} /> : <CircleDot size={19} className={active ? 'text-paper/80' : 'text-muted'} />}
+      </div>
+      <div className={`mt-3 text-sm ${active ? 'text-paper/70' : 'text-muted'}`}>
+        {item.lowestPrice ? formatServicePrice(item.lowestPrice) : 'Цена по оферта'}
+      </div>
+    </button>
+  )
+}
+
+function VisibilityPanel({ draft, state }) {
+  const isPublic = draft.isPublished && draft.moderationStatus === 'approved' && draft.slug
+  const statusLabel = SERVICE_STATUS_LABELS[draft.moderationStatus] || draft.moderationStatus || 'Чернова'
+  return (
+    <div className={`rounded-2xl border p-4 ${isPublic ? 'border-accentDeep/30 bg-accentDeep/5' : 'border-line bg-soft'}`}>
+      <div className="flex items-center gap-2 text-sm font-medium text-ink">
+        {isPublic ? <CheckCircle2 size={18} className="text-accentDeep" /> : <CircleDot size={18} className="text-muted" />}
+        {isPublic ? 'Видима за клиенти' : statusLabel}
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-muted">
+        {isPublic ? 'Показва се в “Услуги”, “Каталог” и публичния ти профил.' : 'Черновите са видими само за теб, докато не ги публикуваш.'}
+      </p>
+      {isPublic && (
+        <Link to={`/uslugi/${draft.slug}`} className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-ink underline underline-offset-4">
+          Отвори страницата <ArrowUpRight size={16} />
+        </Link>
+      )}
+      {state.message && state.status !== 'ready' && (
+        <div className={`mt-3 rounded-xl px-3 py-2 text-xs ${state.status === 'error' ? 'bg-red-50 text-red-700' : 'bg-paper text-muted'}`}>
+          {state.message}
+        </div>
+      )}
     </div>
   )
 }

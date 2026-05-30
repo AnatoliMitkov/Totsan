@@ -300,6 +300,20 @@ export async function loadPublicPartnerServices({ layer = 'all', query = '' } = 
   return normalized.filter(service => `${service.title} ${service.subtitle} ${service.tags.join(' ')} ${service.profile?.name || ''}`.toLowerCase().includes(needle))
 }
 
+export async function loadPublicPartnerServicesForProfile(profileId) {
+  if (!profileId) return []
+  const { data, error } = await supabase
+    .from('partner_services')
+    .select(`${PARTNER_SERVICE_COLUMNS}, profile:profiles(${PROFILE_PUBLIC_COLUMNS})`)
+    .eq('profile_id', profileId)
+    .eq('is_published', true)
+    .eq('moderation_status', 'approved')
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return attachServiceRelations(data || [])
+}
+
 export async function loadPartnerServiceBySlug(slug) {
   const { data, error } = await supabase
     .from('partner_services')
@@ -337,6 +351,15 @@ export async function savePartnerService(profile, draft, { submit = false } = {}
 
   const { data: serviceRow, error: serviceError } = await request.select(PARTNER_SERVICE_COLUMNS).single()
   if (serviceError) throw serviceError
+
+  if (submit && !profile.isPublished) {
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ is_published: true })
+      .eq('id', profile.id)
+      .eq('user_id', profile.userId)
+    if (profileError) throw profileError
+  }
 
   const packageRows = [packagePayload(serviceRow.id, primaryPackage)]
   const { error: packagesError } = await supabase

@@ -15,8 +15,7 @@ import {
 } from 'lucide-react'
 import { gsap } from 'gsap'
 import { LAYERS } from '../data/layers.js'
-import { SERVICE_DETAILS } from '../data/catalog.js'
-import { HOME_PROJECTS, PARTNER_LOGOS, SERVICE_IMAGES, LAYER_HEROS } from '../data/images.js'
+import { HOME_PROJECTS, PARTNER_LOGOS, LAYER_HEROS } from '../data/images.js'
 
 const HERO_POSTER_SRC = '/Videos/totsan-hero-video-building-layers.webp'
 const HERO_VIDEO_SOURCES = [
@@ -829,6 +828,12 @@ function DreamBuilderQuiz() {
 }
 
 function ServicesStrip() {
+  const serviceCards = [
+    { title: 'Реални оферти', text: 'Публикувани услуги от активни партньори, не демо категории.' },
+    { title: 'Ясен партньор', text: 'Всяка услуга води към профил, цена и директна заявка.' },
+    { title: 'Едно място', text: 'Клиентът намира услугата, профила и поръчката без обикаляне.' },
+  ]
+
   return (
     <section className="section !py-16 bg-ink text-paper">
       <div className="container-page">
@@ -841,21 +846,16 @@ function ServicesStrip() {
             </p>
           </div>
           <div className="lg:col-span-8 reveal">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {SERVICE_DETAILS.slice(0, 8).map(s => (
-                <Link 
-                  key={s.slug} 
-                  to={`/usluga/${s.slug}`} 
-                  className="group border border-paper/20 rounded-xl overflow-hidden hover:border-accent transition-all duration-300 block bg-graphite/40 backdrop-blur-sm glow-card">
-                  <div className="media-frame aspect-square">
-                    <img 
-                      src={SERVICE_IMAGES[s.slug]} 
-                      alt={s.name} 
-                      loading="lazy" 
-                      className="img-cover img-zoom group-hover:scale-105 transition duration-500" 
-                    />
-                  </div>
-                  <div className="p-3 text-sm font-display text-center truncate">{s.name}</div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {serviceCards.map((card) => (
+                <Link
+                  key={card.title}
+                  to="/uslugi"
+                  className="group rounded-2xl border border-paper/20 bg-graphite/40 p-5 backdrop-blur-sm transition hover:-translate-y-0.5 hover:border-accent"
+                >
+                  <div className="font-display text-2xl text-paper">{card.title}</div>
+                  <p className="mt-3 text-sm leading-relaxed text-paper/65">{card.text}</p>
+                  <div className="mt-5 text-sm font-medium text-accent">Отвори услугите →</div>
                 </Link>
               ))}
             </div>

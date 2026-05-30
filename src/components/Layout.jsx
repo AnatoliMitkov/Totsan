@@ -77,7 +77,7 @@ function Header() {
   const { session, account, isAdmin } = useAccount()
   const unreadCount = useUnreadCount(session?.user?.id)
   const isHomePage = pathname === '/'
-  const isServicesActive = pathname.startsWith('/uslugi') || pathname.startsWith('/usluga/')
+  const isServicesActive = pathname.startsWith('/uslugi')
   const isCatalogActive = pathname === '/katalog'
   const isHomeHeroMode = isHomePage && !isScrolled && !open
   const shouldShowScrolledShadow = isScrolled && !open
