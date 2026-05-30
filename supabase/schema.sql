@@ -1822,3 +1822,28 @@ select
 
 alter view public.vw_admin_dashboard set (security_invoker = true);
 grant select on public.vw_admin_dashboard to authenticated;
+-- SQL ÑÐºÑ€Ð¸Ð¿Ñ‚ Ð·Ð° Ð´Ð¾Ð±Ð°Ð²ÑÐ½Ðµ Ð½Ð° RLS Ð¿Ñ€Ð°Ð²Ð° Ð·Ð° Ð¿Ð°Ñ€Ñ‚Ð½ÑŒÐ¾Ñ€Ð¸ ÐºÑŠÐ¼ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð°Ñ‚Ð° `inquiries`
+-- Ð˜Ð·Ð¿ÑŠÐ»Ð½Ð¸ Ñ‚Ð¾Ð·Ð¸ ÑÐºÑ€Ð¸Ð¿Ñ‚ Ð² SQL Editor-Ð° Ð½Ð° Supabase
+
+create policy "partners can read their own inquiries"
+  on public.inquiries for select
+  to authenticated
+  using (
+    target_slug in (
+      select slug from public.profiles where user_id = auth.uid()
+    )
+  );
+
+create policy "partners can update their own inquiries"
+  on public.inquiries for update
+  to authenticated
+  using (
+    target_slug in (
+      select slug from public.profiles where user_id = auth.uid()
+    )
+  )
+  with check (
+    target_slug in (
+      select slug from public.profiles where user_id = auth.uid()
+    )
+  );
