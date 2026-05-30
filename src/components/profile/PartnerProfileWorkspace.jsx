@@ -421,7 +421,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
         )}
 
         {activeTab === 'inquiries' && (
-          <PartnerInquiries profileSlug={currentProfile.slug} />
+          <PartnerInquiries profileSlug={currentProfile.slug} partnerId={userId} />
         )}
 
         {activeTab === 'contact' && (

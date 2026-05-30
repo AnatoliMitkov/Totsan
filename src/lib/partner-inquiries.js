@@ -34,3 +34,19 @@ export async function updatePartnerInquiryStatus(id, status) {
 
   return data
 }
+
+export async function loadInquiryProjects(clientIds) {
+  if (!clientIds || clientIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .from('client_projects')
+    .select('*')
+    .in('user_id', clientIds)
+
+  if (error) {
+    console.error('Failed to load inquiry projects:', error)
+    return []
+  }
+
+  return data || []
+}

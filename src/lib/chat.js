@@ -153,6 +153,25 @@ export async function createConversationFromProfile({ profileId, partnerId, proj
   return result.conversation
 }
 
+export async function createConversationWithClient({ clientId, partnerId, subject = '' }) {
+  const { data, error } = await supabase
+    .from('conversations')
+    .insert({
+      client_id: clientId,
+      partner_id: partnerId,
+      subject: subject || 'Връзка по ваше запитване',
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Failed to create conversation with client:', error)
+    throw error
+  }
+
+  return data
+}
+
 export async function sendTextMessage({ conversationId, body }) {
   const result = await invokeChatAction('send_message', { conversationId, body, kind: 'text' })
   return result

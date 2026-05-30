@@ -173,7 +173,7 @@ export default function Pro() {
           <aside id="zapitvane" className="lg:col-span-4 reveal">
             <ContactCard profile={item} onStartChat={startChat} chatState={chatState} />
             <div className="mt-5">
-              <InquiryBox proName={item.name} layerSlug={item.layerSlug || item.layer} targetSlug={item.slug} />
+              <InquiryBox proName={item.name} layerSlug={item.layerSlug || item.layer} targetSlug={item.slug} clientId={session?.user?.id} />
             </div>
           </aside>
         </div>
@@ -264,7 +264,7 @@ function LoadingProfile() {
   )
 }
 
-function InquiryBox({ proName, layerSlug, targetSlug }) {
+function InquiryBox({ proName, layerSlug, targetSlug, clientId }) {
   const [form, setForm] = useState({ name: '', contact: '', message: '' })
   const [status, setStatus] = useState('idle')
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
@@ -280,6 +280,7 @@ function InquiryBox({ proName, layerSlug, targetSlug }) {
       message: form.message.trim(),
       source: 'pro_inquiry',
       target_slug: targetSlug || proName,
+      client_id: clientId || null,
     })
     setStatus(error ? 'error' : 'sent')
     if (!error) setForm({ name: '', contact: '', message: '' })

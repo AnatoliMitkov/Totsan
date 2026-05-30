@@ -1847,3 +1847,27 @@ create policy "partners can update their own inquiries"
       select slug from public.profiles where user_id = auth.uid()
     )
   );
+-- 1. Ð”Ð¾Ð±Ð°Ð²ÑÐ½Ðµ Ð½Ð° ÐºÐ¾Ð»Ð¾Ð½Ð° client_id ÐºÑŠÐ¼ inquiries
+alter table public.inquiries
+add column if not exists client_id uuid references auth.users(id) on delete set null;
+
+-- 2. Ð”Ð¾Ð±Ð°Ð²ÑÐ½Ðµ Ð½Ð° RLS Ð¿Ð¾Ð»Ð¸Ñ‚Ð¸ÐºÐ°, ÐºÐ¾ÑÑ‚Ð¾ Ð¿Ð¾Ð·Ð²Ð¾Ð»ÑÐ²Ð° Ð½Ð° Ð¿Ð°Ñ€Ñ‚Ð½ÑŒÐ¾Ñ€ Ð´Ð° Ñ‡ÐµÑ‚Ðµ Ð¿Ñ€Ð¾ÐµÐºÑ‚Ð° Ð½Ð° ÐºÐ»Ð¸ÐµÐ½Ñ‚, 
+-- ÐÐšÐž Ñ‚Ð¾Ð·Ð¸ ÐºÐ»Ð¸ÐµÐ½Ñ‚ Ðµ Ð¸Ð·Ð¿Ñ€Ð°Ñ‚Ð¸Ð» Ð·Ð°Ð¿Ð¸Ñ‚Ð²Ð°Ð½Ðµ Ð´Ð¾ Ñ‚Ð¾Ð·Ð¸ Ð¿Ð°Ñ€Ñ‚Ð½ÑŒÐ¾Ñ€.
+create policy "partners can read client projects if inquired"
+  on public.client_projects for select
+  to authenticated
+  using (
+    exists (
+      select 1 from public.inquiries
+      where inquiries.client_id = client_projects.user_id
+      and inquiries.target_slug in (
+        select slug from public.profiles where user_id = auth.uid()
+      )
+    )
+  );
+
+-- 3. Ð”Ð¾Ð±Ð°Ð²ÑÐ½Ðµ Ð½Ð° RLS Ð¿Ð¾Ð»Ð¸Ñ‚Ð¸ÐºÐ° Ð·Ð° Ð²Ð¼ÑŠÐºÐ²Ð°Ð½Ðµ Ð½Ð° Ñ‡Ð°Ñ‚Ð¾Ð²Ðµ Ð¾Ñ‚ Ð¿Ð°Ñ€Ñ‚Ð½ÑŒÐ¾Ñ€Ð¸
+create policy "participants can insert conversations"
+  on public.conversations for insert
+  to authenticated
+  with check (auth.uid() in (client_id, partner_id));
