@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CheckCircle2, Mail, User, Clock } from 'lucide-react'
 import { loadPartnerInquiries, updatePartnerInquiryStatus, loadInquiryProjects } from '../../lib/partner-inquiries.js'
 import { formatAdminDate } from '../../lib/admin.js'
@@ -12,6 +12,8 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
   const [projects, setProjects] = useState({})
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
+  const [chatAction, setChatAction] = useState({ id: '', status: 'idle', message: '' })
+  const openingInquiryRef = useRef('')
 
   useEffect(() => {
     let active = true
@@ -63,12 +65,23 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
   }
 
   async function startChat(clientId, inquiryId) {
+    if (openingInquiryRef.current) return
+
+    openingInquiryRef.current = inquiryId
+    setChatAction({ id: inquiryId, status: 'opening', message: 'Отваряме защитен чат...' })
+
     try {
       const conv = await createConversationWithClient({ clientId, partnerId, subject: 'Връзка по ваше запитване' })
       await markAsSeen(inquiryId)
+      setChatAction({ id: inquiryId, status: 'opened', message: '' })
       navigate(`/inbox/${conv.id}`)
     } catch (err) {
-      alert('Възникна грешка при създаване на чата: ' + err.message)
+      openingInquiryRef.current = ''
+      setChatAction({
+        id: inquiryId,
+        status: 'error',
+        message: err.message || 'Чатът не се отвори. Опитай пак след малко.',
+      })
     }
   }
 
@@ -100,11 +113,13 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
           <h3 className="font-display text-2xl text-ink">Активни запитвания ({activeInquiries.length})</h3>
           {activeInquiries.map(inq => {
             const project = inq.client_id ? projects[inq.client_id] : null
+            const isOpeningChat = chatAction.id === inq.id && chatAction.status === 'opening'
+            const chatError = chatAction.id === inq.id && chatAction.status === 'error' ? chatAction.message : ''
 
             return (
-              <div key={inq.id} className={`rounded-3xl border p-5 md:p-7 transition-colors ${inq.status === 'new' ? 'border-accent/30 bg-accent/5' : 'border-line bg-paper'}`}>
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                  <div>
+              <div key={inq.id} className={`overflow-hidden rounded-3xl border p-5 transition-colors md:p-7 ${inq.status === 'new' ? 'border-accent/30 bg-accent/5' : 'border-line bg-paper'}`}>
+                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2 font-medium text-ink">
                       <User size={18} className="text-accentDeep" /> {inq.name}
                       {inq.status === 'new' && <span className="rounded-full bg-accent px-2 py-0.5 text-xs text-white">Ново</span>}
@@ -116,14 +131,20 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
                       <Clock size={14} /> {formatAdminDate(inq.created_at)}
                     </div>
                   </div>
-                  <div className="flex flex-col gap-2 min-w-[140px]">
+                  <div className="flex w-full flex-col gap-2 md:w-[13rem] md:min-w-[13rem]">
                     {inq.client_id && (
-                      <button type="button" onClick={() => startChat(inq.client_id, inq.id)} className="btn btn-primary w-full justify-center text-sm">
-                        Започни чат
+                      <button
+                        type="button"
+                        onClick={() => startChat(inq.client_id, inq.id)}
+                        disabled={isOpeningChat}
+                        className="btn btn-primary w-full justify-center text-sm disabled:cursor-wait disabled:opacity-60"
+                      >
+                        {isOpeningChat ? 'Отваряме...' : 'Започни чат'}
                       </button>
                     )}
                     {inq.status === 'new' && <button type="button" onClick={() => markAsSeen(inq.id)} className="btn btn-ghost w-full justify-center text-sm border border-line">Маркирай като видяно</button>}
                     <button type="button" onClick={() => markAsDone(inq.id)} className="btn btn-ghost w-full justify-center text-sm text-muted hover:text-ink"><CheckCircle2 size={16} /> Приключи</button>
+                    {chatError && <div className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{chatError}</div>}
                   </div>
                 </div>
 
@@ -136,7 +157,7 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
                   {project && (
                     <div className="rounded-2xl bg-soft p-4 md:p-5 border border-line">
                       <div className="mb-3 text-xs font-medium text-muted uppercase tracking-wider">Данни за имота на клиента</div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
                         {project.property_type && (
                           <div>
                             <div className="text-muted text-xs uppercase tracking-wider mb-1">Тип</div>

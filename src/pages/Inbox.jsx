@@ -175,7 +175,14 @@ export default function Inbox() {
         <Panel title="Съобщенията не се заредиха"><p className="mt-2 text-sm text-red-700">{error}</p><button type="button" onClick={() => loadAll()} className="btn btn-ghost mt-5">Опитай пак</button></Panel>
       ) : (
         <div className="grid gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
-          <ConversationList conversations={conversations} activeId={conversationId} userId={userId} onSelect={(id) => navigate(`/inbox/${id}`)} />
+          <ConversationList
+            conversations={conversations}
+            activeId={conversationId}
+            userId={userId}
+            onSelect={(id) => {
+              if (id && id !== conversationId) navigate(`/inbox/${id}`)
+            }}
+          />
           <div className="min-w-0 space-y-4">
             <ChatThread conversation={activeConversation} messages={messages} userId={userId} onOfferAction={handleOfferAction} />
             {activeConversation && activeConversation.status === 'open' && (

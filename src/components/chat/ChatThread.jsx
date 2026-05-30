@@ -27,19 +27,19 @@ export default function ChatThread({ conversation, messages, userId, onOfferActi
 
   if (!conversation) {
     return (
-      <div className="flex min-h-[32rem] items-center justify-center rounded-3xl border border-dashed border-line bg-paper p-8 text-center text-sm text-muted">
+      <div className="flex min-h-[24rem] items-center justify-center rounded-3xl border border-dashed border-line bg-paper p-8 text-center text-sm text-muted md:min-h-[32rem]">
         Избери разговор, за да видиш съобщенията.
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-[32rem] flex-col rounded-3xl border border-line bg-paper">
+    <div className="flex min-h-[24rem] flex-col rounded-3xl border border-line bg-paper md:min-h-[32rem]">
       <div className="border-b border-line p-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="eyebrow">Активен чат</div>
-            <h1 className="mt-2 font-display text-3xl text-ink">{conversation.subject || 'Разговор в Totsan'}</h1>
+            <h1 className="mt-2 font-display text-2xl leading-tight text-ink md:text-3xl">{conversation.subject || 'Разговор в Totsan'}</h1>
           </div>
           <span className="rounded-full border border-line bg-soft px-3 py-1 text-xs text-muted">{conversation.status === 'open' ? 'Отворен' : conversation.status}</span>
         </div>
