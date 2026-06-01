@@ -158,6 +158,14 @@ function WhatYouFind({ layer }) {
                   ? '/dekorativni-akcenti'
                 : w.key === 'terrace'
                   ? '/terasi-i-vunshni-zoni'
+                : w.key === 'kitchen'
+                  ? '/kuhni'
+                : w.key === 'bedroom'
+                  ? '/spalnya-i-dnevna'
+                : w.key === 'bathroom'
+                  ? '/banya'
+                : w.key === 'lighting'
+                  ? '/osvetlenie-i-tekstil'
                   : ''
 
               const cardContent = (

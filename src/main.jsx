@@ -25,6 +25,10 @@ import GardenAndYard from './pages/GardenAndYard.jsx'
 import WallpapersAndColors from './pages/WallpapersAndColors.jsx'
 import DecorativeAccents from './pages/DecorativeAccents.jsx'
 import TerracesAndOutdoor from './pages/TerracesAndOutdoor.jsx'
+import Kitchens from './pages/Kitchens.jsx'
+import BedroomAndLiving from './pages/BedroomAndLiving.jsx'
+import Bathroom from './pages/Bathroom.jsx'
+import LightingAndTextiles from './pages/LightingAndTextiles.jsx'
 function AppRoutes() {
   const location = useLocation()
 
@@ -50,6 +54,10 @@ function AppRoutes() {
           <Route path="/dekorativni-akcenti" element={<DecorativeAccents />} />
           <Route path="/terasi-i-vunshni-zoni" element={<TerracesAndOutdoor />} />
           <Route path="/tapeti-i-cvetove" element={<WallpapersAndColors />} />
+          <Route path="/kuhni" element={<Kitchens />} />
+          <Route path="/spalnya-i-dnevna" element={<BedroomAndLiving />} />
+          <Route path="/banya" element={<Bathroom />} />
+          <Route path="/osvetlenie-i-tekstil" element={<LightingAndTextiles />} />
           <Route path="/login" element={<Admin />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/moy-profil" element={<MyProfile />} />
