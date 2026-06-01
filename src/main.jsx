@@ -24,6 +24,7 @@ import MyOrders from './pages/MyOrders.jsx'
 import GardenAndYard from './pages/GardenAndYard.jsx'
 import WallpapersAndColors from './pages/WallpapersAndColors.jsx'
 import DecorativeAccents from './pages/DecorativeAccents.jsx'
+import TerracesAndOutdoor from './pages/TerracesAndOutdoor.jsx'
 function AppRoutes() {
   const location = useLocation()
 
@@ -47,6 +48,7 @@ function AppRoutes() {
           <Route path="/gradina-i-dvor" element={<GardenAndYard />} />
           <Route path="/tapeti-i-cvetove" element={<WallpapersAndColors />} />
           <Route path="/dekorativni-akcenti" element={<DecorativeAccents />} />
+          <Route path="/terasi-i-vunshni-zoni" element={<TerracesAndOutdoor />} />
           <Route path="/tapeti-i-cvetove" element={<WallpapersAndColors />} />
           <Route path="/login" element={<Admin />} />
           <Route path="/admin" element={<Admin />} />

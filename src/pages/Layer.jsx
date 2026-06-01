@@ -156,6 +156,8 @@ function WhatYouFind({ layer }) {
                   ? '/tapeti-i-cvetove'
                 : w.key === 'decor'
                   ? '/dekorativni-akcenti'
+                : w.key === 'terrace'
+                  ? '/terasi-i-vunshni-zoni'
                   : ''
 
               const cardContent = (

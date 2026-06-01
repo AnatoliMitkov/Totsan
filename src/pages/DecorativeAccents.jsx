@@ -17,6 +17,10 @@ import { LAYER_HEROS, SHOWCASE_IMAGES, WHAT_YOU_FIND_IMAGES } from '../data/imag
 
 const U = (id, w = 1200) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&q=80&w=${w}`
 
+// Официален фиксиран курс: 1 EUR = 1.95583 лв.
+const EUR_RATE = 1.95583
+const fmtEur = (lv) => Math.round(lv / EUR_RATE)
+
 const DECOR_IMAGES = {
   hero: LAYER_HEROS.dekoraciya,
   decor: WHAT_YOU_FIND_IMAGES.dekoraciya.decor,
@@ -251,7 +255,9 @@ function DecorPlanner() {
             <div className="mt-7">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold text-ink">Базов бюджет</span>
-                <span className="text-sm font-semibold text-trustPurple">{baseBudget.toLocaleString('bg-BG')} лв.</span>
+                <span className="text-sm font-semibold text-trustPurple">
+                  {fmtEur(baseBudget).toLocaleString('bg-BG')} € / {baseBudget.toLocaleString('bg-BG')} лв.
+                </span>
               </div>
               <input
                 type="range"
@@ -288,7 +294,7 @@ function DecorPlanner() {
                         <span className="min-w-0">
                           <span className="block text-sm font-medium text-ink">{feature.label}</span>
                           <span className="block text-xs text-muted">
-                            {feature.min.toLocaleString('bg-BG')} - {feature.max.toLocaleString('bg-BG')} лв.
+                            {fmtEur(feature.min).toLocaleString('bg-BG')} – {fmtEur(feature.max).toLocaleString('bg-BG')} € &nbsp;·&nbsp; {feature.min.toLocaleString('bg-BG')} – {feature.max.toLocaleString('bg-BG')} лв.
                           </span>
                         </span>
                       </span>
@@ -306,7 +312,10 @@ function DecorPlanner() {
             <div className="rounded-3xl bg-gradient-to-br from-ink via-graphite to-ink p-8 text-paper shadow-lg">
               <div className="text-xs font-semibold tracking-[0.16em] text-accentSoft">ОРИЕНТИРОВЪЧЕН БЮДЖЕТ</div>
               <div className="mt-4 font-display text-4xl leading-tight">
-                {estimate.min.toLocaleString('bg-BG')} - {estimate.max.toLocaleString('bg-BG')} лв.
+                {fmtEur(estimate.min).toLocaleString('bg-BG')} – {fmtEur(estimate.max).toLocaleString('bg-BG')} €
+              </div>
+              <div className="mt-1 text-base text-paper/55">
+                {estimate.min.toLocaleString('bg-BG')} – {estimate.max.toLocaleString('bg-BG')} лв.
               </div>
               <p className="mt-3 text-sm text-paper/75">
                 За {selectedRoom.label.toLowerCase()} в стил „{selectedMood.label.toLowerCase()}“ с избраните елементи.
@@ -329,7 +338,11 @@ function DecorPlanner() {
                 </li>
               </ul>
 
-              <Link to="/contact" className="btn btn-primary mt-7 w-full justify-center !bg-trustPurple !text-paper hover:!bg-trustPurple/90">
+              <p className="mt-5 text-center text-xs text-paper/35">
+                1 € = 1.95583 лв. · официален фиксиран курс
+              </p>
+
+              <Link to="/contact" className="btn btn-primary mt-4 w-full justify-center !bg-trustPurple !text-paper hover:!bg-trustPurple/90">
                 Поискай точна оферта
               </Link>
             </div>
