@@ -5,6 +5,7 @@ const ACCOUNT_ROLES = new Set(['user', 'specialist', 'admin'])
 const SPECIALIST_STATUSES = new Set(['pending', 'approved', 'rejected'])
 const ACCOUNT_STATUSES = new Set(['active', 'banned'])
 const ORDER_STATUSES = new Set(['pending_payment', 'paid', 'in_progress', 'delivered', 'completed', 'disputed', 'refunded', 'cancelled'])
+const ADMIN_ROLE_MANAGER_EMAILS = new Set(['a.mitkov@totsan.com'])
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -57,6 +58,10 @@ async function writeAudit(adminClient: ReturnType<typeof createClient>, actorId:
   })
 
   if (error) console.error('admin-action audit error', error)
+}
+
+function canManageAdminRoles(email: string) {
+  return ADMIN_ROLE_MANAGER_EMAILS.has(String(email || '').trim().toLowerCase())
 }
 
 Deno.serve(async (req) => {
@@ -184,10 +189,27 @@ Deno.serve(async (req) => {
       const id = assertUuid(payload.id, 'Account id')
       const updates = (payload.updates && typeof payload.updates === 'object' ? payload.updates : {}) as Record<string, unknown>
       const patch: Record<string, unknown> = { last_admin_action_at: new Date().toISOString() }
+      const { data: targetAccount, error: targetAccountError } = await adminClient
+        .from('accounts')
+        .select('id, email, full_name, display_name, role, specialist_status, account_status')
+        .eq('id', id)
+        .single()
+
+      if (targetAccountError) throw targetAccountError
+      if (targetAccount.role === 'admin' && !canManageAdminRoles(actorEmail)) {
+        throw new Error('Only a.mitkov@totsan.com can manage admin accounts.')
+      }
 
       if ('role' in updates) {
         const role = String(updates.role || '')
         if (!ACCOUNT_ROLES.has(role)) throw new Error('Account role is invalid.')
+        const touchesAdminRole = role === 'admin' || targetAccount.role === 'admin'
+        if (touchesAdminRole && !canManageAdminRoles(actorEmail)) {
+          throw new Error('Only a.mitkov@totsan.com can grant or remove admin access.')
+        }
+        if (id === user.id && role !== targetAccount.role) {
+          throw new Error('You cannot change your own admin role from the admin panel.')
+        }
         patch.role = role
         if (role !== 'specialist') patch.specialist_status = null
       }
@@ -208,7 +230,26 @@ Deno.serve(async (req) => {
 
       const { data, error } = await adminClient.from('accounts').update(patch).eq('id', id).select('*').single()
       if (error) throw error
-      await writeAudit(adminClient, user.id, action, 'account', id, { updates, actor_email: actorEmail })
+      await writeAudit(adminClient, user.id, action, 'account', id, {
+        updates,
+        actor_email: actorEmail,
+        target: {
+          id: targetAccount.id,
+          email: targetAccount.email,
+          full_name: targetAccount.full_name,
+          display_name: targetAccount.display_name,
+        },
+        before: {
+          role: targetAccount.role,
+          specialist_status: targetAccount.specialist_status,
+          account_status: targetAccount.account_status,
+        },
+        after: {
+          role: data.role,
+          specialist_status: data.specialist_status,
+          account_status: data.account_status,
+        },
+      })
       return jsonResponse(200, { ok: true, row: data })
     }
 
