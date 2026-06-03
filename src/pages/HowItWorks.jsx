@@ -9,8 +9,32 @@ export default function HowItWorks() {
           <div className="eyebrow">Как работи Totsan</div>
           <h1 className="h-display mt-3">От мечта до завършено пространство — стъпка по стъпка.</h1>
           <p className="mt-5 text-muted" style={{fontSize:'var(--step-md)'}}>
-            Никой не започва от плочка. Започваш от усещане. Затова сме разделили целия процес на пет ясни слоя — и ти показваме точно кой какво прави на всеки от тях.
+            Никой не започва от плочка. Започваш от нужда. Затова първата практична стъпка е краткият Guided Project Brief, а после Totsan те насочва към правилния слой, специалист или следващо действие.
           </p>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Link to="/start" className="btn btn-primary">Започни проект →</Link>
+            <Link to="/katalog" className="btn btn-ghost">Разгледай каталога</Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container-page">
+          <div className="eyebrow reveal">Реалният път</div>
+          <h2 className="h-section mt-2 reveal max-w-3xl">Как започва един проект в Totsan.</h2>
+          <div className="mt-10 grid md:grid-cols-3 gap-6">
+            {[
+              { n: '01', t: 'Описваш проекта', d: 'Разказваш какво планираш, на какъв етап си и какво ти е най-важно.' },
+              { n: '02', t: 'Получаваш насока', d: 'Totsan ти показва най-подходящия слой, първи ход и как да не губиш време.' },
+              { n: '03', t: 'Свързваш се с проверен специалист', d: 'Изпращаш запитване и продължаваш с точните хора, продукти или услуги.' },
+            ].map((item) => (
+              <div key={item.n} className="reveal border border-line rounded-2xl bg-paper p-6">
+                <div className="font-display text-3xl text-accentDeep">{item.n}</div>
+                <div className="font-display text-2xl mt-3">{item.t}</div>
+                <p className="text-muted text-sm mt-3">{item.d}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -41,8 +65,8 @@ export default function HowItWorks() {
             {[
               { t:'Лична проверка', d:'Всеки специалист минава през преглед — реални проекти, отзиви, документи.' },
               { t:'Прозрачни цени', d:'Виждаш цени, наличности и условия — без скрити „звездички“.' },
-              { t:'Посредничество', d:'Ако нещо засече, имаш на кого да се обадиш. Стоим между теб и изпълнителя.' },
-              { t:'Безплатно за теб', d:'Като клиент не плащаш на платформата. Платформата живее от партньорите.' }
+              { t:'Защитено плащане', d:'Когато платиш през Totsan, парите се задържат и се освобождават едва след като потвърдиш завършването.' },
+              { t:'Безплатно за теб', d:'Като клиент не плащаш такси на платформата. Totsan живее от партньорите.' }
             ].map((p,i) => (
               <div key={i} className="reveal border-t border-paper/20 pt-5">
                 <div className="font-display text-2xl text-accentDeep">0{i+1}</div>
@@ -57,9 +81,9 @@ export default function HowItWorks() {
       <section className="section">
         <div className="container-page rounded-3xl bg-soft border border-line p-10 md:p-16 reveal">
           <h2 className="h-section">Готов за първа стъпка?</h2>
-          <p className="text-muted mt-3 max-w-2xl">Започни от слоя, на който си днес. Ако не знаеш — започни от Слой 01.</p>
+          <p className="text-muted mt-3 max-w-2xl">Ако не си сигурен откъде да тръгнеш, започни с Guided Project Brief и ще получиш ясна насока още в първите минути.</p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link to="/sloy/ideya" className="btn btn-primary">Започни от 01 →</Link>
+            <Link to="/start" className="btn btn-primary">Започни проект →</Link>
             <Link to="/katalog" className="btn btn-ghost">Разгледай каталога</Link>
           </div>
         </div>

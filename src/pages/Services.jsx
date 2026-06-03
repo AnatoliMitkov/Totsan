@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, BriefcaseBusiness, MapPin, Search, SlidersHorizontal, UserRound } from 'lucide-react'
+import { ArrowRight, BriefcaseBusiness, CheckCircle2, MapPin, Search, ShieldCheck, SlidersHorizontal, UserRound, X } from 'lucide-react'
 import { useProfileDirectory } from '../lib/profiles.js'
 import { loadPublicPartnerServices, packagePriceLabel } from '../lib/partner-services.js'
+
+function serviceAreas(service) {
+  return [service.profile?.city, ...(service.deliveryAreas || [])]
+    .map(value => String(value || '').trim())
+    .filter(Boolean)
+}
 
 export default function Services() {
   const { layers } = useProfileDirectory()
@@ -11,6 +17,7 @@ export default function Services() {
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [layer, setLayer] = useState('all')
+  const [city, setCity] = useState('all')
 
   useEffect(() => {
     let active = true
@@ -35,10 +42,28 @@ export default function Services() {
     return () => { active = false }
   }, [])
 
+  const availableCities = useMemo(() => {
+    const cities = new Set()
+    services.forEach(service => serviceAreas(service).forEach(area => cities.add(area)))
+    return Array.from(cities).sort((left, right) => left.localeCompare(right, 'bg'))
+  }, [services])
+
+  useEffect(() => {
+    if (city !== 'all' && availableCities.length > 0 && !availableCities.includes(city)) {
+      setCity('all')
+    }
+  }, [availableCities, city])
+
+  const selectedLayer = useMemo(() => {
+    if (layer === 'all') return null
+    return layers.find(item => item.slug === layer) || null
+  }, [layer, layers])
+
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
     return services.filter((service) => {
       if (layer !== 'all' && service.layerSlug !== layer) return false
+      if (city !== 'all' && !serviceAreas(service).includes(city)) return false
       if (!needle) return true
       const haystack = [
         service.title,
@@ -51,25 +76,37 @@ export default function Services() {
       ].filter(Boolean).join(' ').toLowerCase()
       return haystack.includes(needle)
     })
-  }, [layer, query, services])
+  }, [city, layer, query, services])
 
   const partnerCount = useMemo(() => {
     return new Set(services.map(service => service.profileId).filter(Boolean)).size
   }, [services])
 
+  const hasActiveFilters = query.trim() || layer !== 'all' || city !== 'all'
+  const resetFilters = () => {
+    setQuery('')
+    setLayer('all')
+    setCity('all')
+  }
+
   return (
     <>
       <section className="section !pt-20 bg-gradient-to-br from-soft to-cloud">
         <div className="container-page max-w-5xl reveal">
-          <div className="eyebrow">Услуги</div>
-          <h1 className="h-display mt-3">Реални услуги от партньори в Totsan.</h1>
+          <div className="eyebrow">Услуги и пакети</div>
+          <h1 className="h-display mt-3">Пакетирани услуги от партньори в Totsan.</h1>
           <p className="mt-5 max-w-3xl text-muted" style={{ fontSize: 'var(--step-md)' }}>
-            Тук се виждат само публикувани партньорски услуги. Старите демо категории вече не се показват като реални оферти.
+            Тук виждаш конкретни услуги с ясен обхват, партньор и цена. Ако пакетът пасва, можеш да поръчаш директно от детайлната страница; ако има неясноти, първо задай въпрос.
           </p>
+          <div className="mt-6 flex flex-wrap gap-2 text-sm text-muted">
+            <span className="inline-flex items-center gap-2 rounded-full border border-line bg-paper/70 px-3 py-1.5"><CheckCircle2 size={15} className="text-accentDeep" /> Одобрени услуги</span>
+            <span className="inline-flex items-center gap-2 rounded-full border border-line bg-paper/70 px-3 py-1.5"><BriefcaseBusiness size={15} className="text-accentDeep" /> Ясен обхват</span>
+            <span className="inline-flex items-center gap-2 rounded-full border border-line bg-paper/70 px-3 py-1.5"><ShieldCheck size={15} className="text-accentDeep" /> Защитено плащане при checkout</span>
+          </div>
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
-            <StatTile icon={BriefcaseBusiness} label="Публикувани услуги" value={services.length} />
+            <StatTile icon={BriefcaseBusiness} label="Публикувани пакети" value={services.length} />
             <StatTile icon={UserRound} label="Партньори" value={partnerCount} />
-            <StatTile icon={SlidersHorizontal} label="Филтри" value={layers.length} />
+            <StatTile icon={SlidersHorizontal} label="Слоеве" value={layers.length} />
           </div>
         </div>
       </section>
@@ -84,19 +121,38 @@ export default function Services() {
                   value={query}
                   onChange={event => setQuery(event.target.value)}
                   placeholder="Търси услуга, партньор, град или ключова дума"
-                  className="w-full rounded-2xl border border-line bg-soft py-3 pl-11 pr-4 text-sm outline-none transition focus:border-ink focus:bg-paper"
+                  className="w-full rounded-full border border-line bg-soft py-3 pl-11 pr-4 text-sm outline-none transition focus:border-ink focus:bg-paper"
                 />
               </label>
               <select
                 value={layer}
                 onChange={event => setLayer(event.target.value)}
-                className="rounded-2xl border border-line bg-soft px-4 py-3 text-sm outline-none transition focus:border-ink focus:bg-paper"
+                className="rounded-full border border-line bg-soft px-4 py-3 text-sm outline-none transition focus:border-ink focus:bg-paper"
               >
                 <option value="all">Всички слоеве</option>
                 {layers.map(item => <option key={item.slug} value={item.slug}>Слой {item.number} · {item.title}</option>)}
               </select>
+              <select
+                value={city}
+                onChange={event => setCity(event.target.value)}
+                className="rounded-full border border-line bg-soft px-4 py-3 text-sm outline-none transition focus:border-ink focus:bg-paper"
+              >
+                <option value="all">Всички градове</option>
+                {availableCities.map(item => <option key={item} value={item}>{item}</option>)}
+              </select>
             </div>
           </div>
+
+          {hasActiveFilters && (
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm reveal">
+              {selectedLayer && <FilterChip label={`Слой ${selectedLayer.number} · ${selectedLayer.title}`} onClear={() => setLayer('all')} />}
+              {city !== 'all' && <FilterChip label={`Град: ${city}`} onClear={() => setCity('all')} />}
+              {query.trim() && <FilterChip label={`Търсене: ${query.trim()}`} onClear={() => setQuery('')} />}
+              <button type="button" onClick={resetFilters} className="inline-flex items-center gap-2 text-sm font-medium text-ink underline underline-offset-4">
+                <SlidersHorizontal size={16} /> Изчисти всички
+              </button>
+            </div>
+          )}
 
           {error && (
             <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -105,9 +161,9 @@ export default function Services() {
           )}
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm text-muted reveal">
-            <span>{status === 'loading' ? 'Зареждаме услугите…' : `${filtered.length} резултата`}</span>
-            <Link to="/katalog" className="inline-flex items-center gap-2 font-medium text-ink hover:underline">
-              Виж и каталога <ArrowRight size={16} />
+            <span>{status === 'loading' ? 'Зареждаме услугите…' : `${filtered.length} пакета`}</span>
+            <Link to="/katalog?kind=service" className="inline-flex items-center gap-2 font-medium text-ink hover:underline">
+              Виж услугите в каталога <ArrowRight size={16} />
             </Link>
           </div>
 
@@ -119,13 +175,13 @@ export default function Services() {
 
           {status !== 'loading' && filtered.length === 0 && (
             <div className="mt-6 rounded-3xl border border-dashed border-line bg-paper p-10 text-center reveal">
-              <h2 className="font-display text-3xl text-ink">Няма публикувани услуги тук.</h2>
+              <h2 className="font-display text-3xl text-ink">Няма услуги за тези филтри.</h2>
               <p className="mx-auto mt-3 max-w-xl text-muted">
-                Ако току-що си публикувал услуга като партньор, провери дали профилът и услугата са активни, после опресни страницата.
+                Разшири търсенето или започни с краткия brief, ако още не знаеш кой пакет или специалист ти трябва.
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-3">
-                <Link to="/moy-profil" className="btn btn-primary">Към моя профил</Link>
-                <Link to="/katalog" className="btn btn-ghost">Към каталога</Link>
+                <button type="button" onClick={resetFilters} className="btn btn-primary">Изчисти филтрите</button>
+                <Link to="/start" className="btn btn-ghost">Започни от brief</Link>
               </div>
             </div>
           )}
@@ -145,6 +201,17 @@ function StatTile({ icon: Icon, label, value }) {
   )
 }
 
+function FilterChip({ label, onClear }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-line bg-soft px-3 py-1.5 text-ink">
+      {label}
+      <button type="button" onClick={onClear} className="rounded-full text-muted transition hover:text-ink" aria-label={`Премахни филтър ${label}`}>
+        <X size={14} />
+      </button>
+    </span>
+  )
+}
+
 function ServiceCard({ service, layers }) {
   const layerInfo = layers.find(item => item.slug === service.layerSlug)
   const cover = service.coverUrl || service.media?.[0]?.url || service.profile?.image_url || ''
@@ -158,6 +225,9 @@ function ServiceCard({ service, layers }) {
           {cover ? <img src={cover} alt={service.title} loading="lazy" decoding="async" className="img-cover img-zoom" /> : null}
           <span className="absolute left-3 top-3 rounded-full bg-paper/90 px-3 py-1 text-xs text-ink backdrop-blur">
             {layerInfo ? `Слой ${layerInfo.number}` : 'Услуга'}
+          </span>
+          <span className="absolute right-3 top-3 rounded-full bg-ink/90 px-3 py-1 text-xs text-paper backdrop-blur">
+            Пакет
           </span>
         </div>
         <div className="p-5">
@@ -173,9 +243,10 @@ function ServiceCard({ service, layers }) {
               <div className="font-display text-2xl text-ink">{packagePriceLabel(service)}</div>
             </div>
             <span className="inline-flex items-center gap-2 text-sm font-medium text-ink">
-              Детайли <ArrowRight size={16} />
+              Виж пакета <ArrowRight size={16} />
             </span>
           </div>
+          <p className="mt-3 text-xs text-muted">На детайлната страница можеш да поръчаш директно или да попиташ първо.</p>
         </div>
       </Link>
       <div className="border-t border-line px-5 py-4">

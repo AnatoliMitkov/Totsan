@@ -10,6 +10,9 @@ export default function About() {
           <p className="mt-5 text-muted" style={{fontSize:'var(--step-md)'}}>
             Преди години, ако искаш да си построиш или обзаведеш нещо, обикаляш десет фирми, питаш роднини, гадаеш цени, надяваш се. Totsan събира всичко на едно място — и подрежда хаоса в пет ясни слоя.
           </p>
+          <p className="mt-4 text-muted">
+            Затова започваме с кратък guided brief, който подрежда нуждите ти и те насочва към правилната следваща стъпка.
+          </p>
         </div>
       </section>
 
@@ -26,12 +29,12 @@ export default function About() {
           </div>
           <aside className="lg:col-span-5 reveal">
             <div className="border border-line rounded-2xl p-6 bg-paper">
-              <div className="eyebrow">В числа</div>
+              <div className="eyebrow">Накратко</div>
               <div className="grid grid-cols-2 gap-6 mt-4">
-                <Stat n="320+" l="Проверени специалисти" />
-                <Stat n="1 800" l="Материали и марки" />
                 <Stat n="5" l="Слоя на създаване" />
-                <Stat n="48ч" l="Среден отговор" />
+                <Stat n="100%" l="Проверени партньори" />
+                <Stat n="0%" l="Такси за клиента" />
+                <Stat n="Ранен достъп" l="Етап на платформата" />
               </div>
             </div>
           </aside>

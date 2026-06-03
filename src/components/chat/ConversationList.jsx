@@ -8,12 +8,18 @@ export default function ConversationList({ conversations, activeId, userId, onSe
         <div className="eyebrow">Разговори</div>
         <h2 className="mt-2 font-display text-3xl text-ink">Съобщения</h2>
       </div>
-      <div className="mt-2 max-h-[calc(100vh-16rem)] space-y-1 overflow-auto pr-1">
+      <div className="mt-2 max-h-72 space-y-1 overflow-auto pr-1 lg:max-h-[calc(100vh-16rem)]">
         {conversations.map((conversation) => {
           const unread = isUnread(conversation, userId)
           const active = conversation.id === activeId
           return (
-            <button key={conversation.id} type="button" onClick={() => onSelect(conversation.id)} className={`w-full rounded-2xl border px-4 py-4 text-left transition ${active ? 'border-ink bg-soft' : 'border-transparent hover:border-line hover:bg-soft/70'}`}>
+            <button
+              key={conversation.id}
+              type="button"
+              onClick={() => !active && onSelect(conversation.id)}
+              aria-current={active ? 'true' : undefined}
+              className={`w-full rounded-2xl border px-4 py-4 text-left transition ${active ? 'border-ink bg-soft' : 'border-transparent hover:border-line hover:bg-soft/70'}`}
+            >
               <div className="flex items-start gap-3">
                 <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-paper"><MessageCircle size={17} /></span>
                 <span className="min-w-0 flex-1">

@@ -39,6 +39,7 @@ export default function Home() {
       <HowItWorks />
       <SectionDivider label="Още от Totsan" />
       <Trust />
+      <ProTeaser />
       <Testimonial />
       <FAQ />
       <CTA />
@@ -295,21 +296,26 @@ function Hero() {
       </div>
       <div className="container-page home-hero__overlay">
         <div className="home-hero__content">
-          <div className="eyebrow home-hero__eyebrow mb-4 hero-animate-eyebrow">Контрол, качество и сигурност</div>
+          <div className="eyebrow home-hero__eyebrow mb-4 hero-animate-eyebrow">Платформа за ремонт, строителство и обзавеждане</div>
           <h1 className="h-display home-hero__title text-paper">
             <span className="home-hero__title-line home-hero__title-line--top hero-animate-title-line">Твоят сигурен избор в</span>
             <span className="home-hero__title-line home-hero__title-line--bottom text-accent italic hero-animate-title-line">строителството.</span>
           </h1>
           <p className="home-hero__lead mt-5 max-w-xl hero-animate-lead" style={{fontSize:'var(--step-md)'}}>
-            Една къща, един ресторант, един апартамент или градина. Започваш от идеята, минаваш през правилните хора, материали и услуги — и стигаш до своя дом. Всичко на едно място. Без хаос.
+            От идея до завършен дом — на едно място. Отговаряш на няколко въпроса, а ние те насочваме към правилните проверени специалисти, материали и услуги. Безплатно за теб, със защитено плащане.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link to="/sloy/ideya" className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep hero-animate-cta">
-              Започни от идея →
+            <Link to="/start" className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep hero-animate-cta">
+              Започни оттук — безплатно →
             </Link>
             <a href="#layers-explorer" className="btn btn-ghost !border-paper/25 !bg-paper/10 !text-paper hover:!border-paper/50 hover:!bg-paper/15 hero-animate-cta">
               Виж слоевете
             </a>
+          </div>
+          <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-paper/80 hero-animate-cta">
+            <span className="inline-flex items-center gap-2"><ShieldCheck size={16} className="text-accent" /> Защитено плащане</span>
+            <span className="inline-flex items-center gap-2"><UserCheck size={16} className="text-accent" /> Проверени партньори</span>
+            <span className="inline-flex items-center gap-2"><CheckCircle2 size={16} className="text-accent" /> Безплатно за клиенти</span>
           </div>
         </div>
       </div>
@@ -409,10 +415,28 @@ function AnimatedStatCounter({ end, suffix = '', label }) {
 }
 
 function TrustPromise() {
+  const staticStats = [
+    { value: '5', label: 'Слоя на процеса' },
+    { value: '0 лв.', label: 'Такса за клиента' },
+    { value: 'Проверени', label: 'Партньори и услуги' },
+    { value: 'Защитено', label: 'Плащане при поръчка' }
+  ]
+  const statVisuals = [
+    { badge: 'Път', icon: <Compass size={18} className="text-accentDeep" /> },
+    { badge: 'Клиент', icon: <CheckCircle2 size={18} className="text-accentDeep" /> },
+    { badge: 'Verify', icon: <UserCheck size={18} className="text-accentDeep" /> },
+    { badge: 'Shield', icon: <ShieldCheck size={18} className="text-accentDeep" /> }
+  ]
+  const statDescriptions = [
+    'Ясен път от идея до реализация.',
+    'Платформата не взима такса от клиента.',
+    'Видими след преглед и активиране.',
+    'Сигурна поръчка през платформата.'
+  ]
   const items = [
-    { k:'Само проверени', v:'Никой не влиза в Totsan, ако не доказва качество.', icon: <UserCheck className="text-accent" size={24} /> },
-    { k:'Един разказ', v:'Сайтът те води стъпка по стъпка, без да ровиш в Google.', icon: <Compass className="text-accent" size={24} /> },
-    { k:'Реални оферти', v:'Виждаш цени, наличности и условия — без скрити „звездички“.', icon: <ShieldCheck className="text-accent" size={24} /> }
+    { k:'Проверка преди видимост', v:'Партньорите минават през преглед, преди да бъдат показани като активни в платформата.', icon: <UserCheck className="text-accent" size={24} /> },
+    { k:'Ясен път', v:'Започваш с кратък бриф, получаваш насока и стигаш до правилния слой, специалист или услуга.', icon: <Compass className="text-accent" size={24} /> },
+    { k:'По-малко догадки', v:'Виждаш обхват, ориентир за цена и следваща стъпка, преди да губиш време в разговори.', icon: <ShieldCheck className="text-accent" size={24} /> }
   ]
   const [stats, setStats] = useState({
     publishedServices: 0,
@@ -458,15 +482,49 @@ function TrustPromise() {
   return (
     <section className="section bg-soft border-y border-line">
       <div className="container-page">
-        {/* Rolling Counters Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
-          <AnimatedStatCounter end={stats.publishedServices} label="Публични услуги" suffix="+" />
-          <AnimatedStatCounter end={stats.completedProjects} label="Завършени обекта" suffix="+" />
-          <AnimatedStatCounter end={stats.verifiedSpecialists} label="Проверени майстори" suffix="+" />
-          <AnimatedStatCounter end={stats.activeLayers} label="Активни слоеве" suffix="" />
+        <div className="mb-6 flex justify-center">
+          <span className="inline-flex items-center gap-2 rounded-full border border-line bg-paper px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted">
+            <Sparkles size={14} className="text-accent" /> Ранен достъп · пилотна фаза
+          </span>
         </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
+          <AnimatedStatCounter key="published-services" end={stats.publishedServices} label="Публични услуги" suffix="+" />
+          <AnimatedStatCounter key="completed-projects" end={stats.completedProjects} label="Завършени обекта" suffix="+" />
+          <AnimatedStatCounter key="verified-specialists" end={stats.verifiedSpecialists} label="Проверени майстори" suffix="+" />
+          <AnimatedStatCounter key="active-layers" end={stats.activeLayers} label="Активни слоеве" suffix="" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
+          {staticStats.map((stat, index) => (
+            <div key={stat.label} className="rounded-2xl border border-line bg-paper/60 px-5 py-6 text-center shadow-sm">
+              <div className="mb-5 flex justify-center">
+                <span className="inline-flex h-16 w-16 items-center justify-center rounded-[1.4rem] bg-accentSoft">
+                  {index === 0 ? <Compass size={30} className="text-accentDeep" /> : null}
+                  {index === 1 ? <CheckCircle2 size={30} className="text-accentDeep" /> : null}
+                  {index === 2 ? <UserCheck size={30} className="text-accentDeep" /> : null}
+                  {index === 3 ? <ShieldCheck size={30} className="text-accentDeep" /> : null}
+                </span>
+              </div>
+              <div className="font-display text-[clamp(2rem,1.6rem+1vw,3.25rem)] leading-none text-accentDeep font-bold">
+                {index === 1 ? '0 €' : stat.value}
+              </div>
+              <div className="mt-3 font-display text-xl leading-tight text-ink">
+                {stat.label}
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-muted">
+                {statDescriptions[index]}
+              </p>
+            </div>
+          ))}
+        </div>
+        {false && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
+          <AnimatedStatCounter end={5} label="Слоя на създаване" suffix="" />
+          <AnimatedStatCounter end={100} label="Проверени партньори" suffix="%" />
+          <AnimatedStatCounter end={0} label="Такси за клиента" suffix="%" />
+          <AnimatedStatCounter end={100} label="Защитено плащане" suffix="%" />
+        </div>
+        )}
 
-        {/* Value Propositions */}
         <div className="grid md:grid-cols-3 gap-8">
           {items.map((i, idx) => (
             <div key={idx} className="reveal flex gap-4 p-6 bg-paper rounded-2xl border border-line shadow-sm">
@@ -659,6 +717,33 @@ function DreamBuilderQuiz() {
     setStep(1)
   }
 
+  const saveResultAsProjectBrief = () => {
+    if (!result?.layer || typeof window === 'undefined') return
+
+    window.localStorage.setItem('totsan.pendingProjectBrief', JSON.stringify({
+      title: `Проект: ${result.layer.title}`,
+      currentLayerSlug: result.layer.slug,
+      ideaDescription: [
+        'Начален резултат от Totsan quiz:',
+        result.description,
+        'Препоръчителни стъпки:',
+        ...result.steps.map((item, index) => `${index + 1}. ${item}`),
+      ].join('\n'),
+      quizAnswers: {
+        home: {
+          title: 'Начален Totsan quiz',
+          answers,
+          recommendation: {
+            layerSlug: result.layer.slug,
+            layerTitle: result.layer.title,
+            description: result.description,
+            steps: result.steps,
+          },
+        },
+      },
+    }))
+  }
+
   const calculateResult = () => {
     let recommendedLayer = 'ideya'
     let text = ''
@@ -729,13 +814,13 @@ function DreamBuilderQuiz() {
   const progressPercent = (step / 3) * 100
 
   return (
-    <section className="section bg-soft border-y border-line" ref={quizRef}>
+    <section id="start" className="section bg-soft border-y border-line" ref={quizRef}>
       <div className="container-page max-w-3xl">
         <div className="text-center mb-10">
-          <div className="eyebrow reveal">Интерактивен съветник</div>
+          <div className="eyebrow reveal">Започни оттук · безплатно</div>
           <h2 className="h-section mt-2 reveal">Откъде да започнеш?</h2>
           <p className="mt-3 text-muted reveal">
-            Отговори на 3 бързи въпроса и нашият алгоритъм ще те насочи към правилния слой и следващи стъпки.
+            Отговори на 3 бързи въпроса и ще те насочим към правилния етап, проверени специалисти и следващи стъпки — без обвързване.
           </p>
         </div>
 
@@ -887,11 +972,20 @@ function DreamBuilderQuiz() {
                 Започни отначало
               </button>
               <Link 
-                to={`/sloy/${result.layer.slug}`} 
+                to={`/sloy/${result.layer.slug}#specialisti`} 
                 className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">
-                Влез в Слой {result.layer.number} →
+                Виж проверени специалисти →
+              </Link>
+              <Link
+                to="/moy-profil?tab=project&from=quiz"
+                onClick={saveResultAsProjectBrief}
+                className="btn btn-ghost !border-line hover:!border-ink">
+                Запази като проект
               </Link>
             </div>
+            <p className="mt-4 text-center text-xs text-muted">
+              Безплатно и без обвързване · плащането е защитено и се освобождава едва след завършване.
+            </p>
           </div>
         )}
       </div>
@@ -983,7 +1077,7 @@ function HowItWorks() {
     { n:'01', t:'Кажи къде си', d:'Избери своя слой в Timeline или опиши мечтата си през интерактивния съветник.' },
     { n:'02', t:'Виж избраните за теб', d:'Показваме ти само проверени марки, продукти и хора, подходящи за твоя етап.' },
     { n:'03', t:'Сравни и реши спокойно', d:'Реални оферти, наличности, цени и условия — без скрити „звездички“.' },
-    { n:'04', t:'Свърши работата', d:'Свържи се директно с майсторите или поръчай продукти. Ние сме до теб на всяка крачка.' }
+    { n:'04', t:'Свърши работата спокойно', d:'Заяви услуга или приеми оферта през Totsan. Плащането е защитено и се освобождава едва след като потвърдиш завършването.' }
   ]
   return (
     <section className="section bg-soft border-y border-line">
@@ -1016,6 +1110,53 @@ function Trust() {
         <div className="eyebrow text-center reveal">Работим с производители и марки, които познаваш</div>
         <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 items-center reveal">
           {PARTNER_LOGOS.map(p => <PartnerLogoTile key={p.name} brand={p} />)}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ProTeaser() {
+  const points = [
+    { icon: UserCheck, title: 'Проверен профил', text: 'Портфолио, услуги, градове, рейтинг и ясна специализация.' },
+    { icon: Clock, title: 'По-малко шум', text: 'Заявки с контекст: бюджет, срок, снимки и реална нужда.' },
+    { icon: ShieldCheck, title: 'Доверие', text: 'Admin одобрение, verified отзиви и видима история на работа.' },
+  ]
+
+  return (
+    <section className="section bg-ink text-paper">
+      <div className="container-page grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+        <div className="reveal">
+          <div className="eyebrow !text-paper/55">За професионалисти</div>
+          <h2 className="h-section mt-3 max-w-3xl">Totsan Pro е платената страна на платформата.</h2>
+          <p className="mt-4 max-w-2xl text-paper/70">
+            Клиентът използва Totsan безплатно. Професионалистите, студиата и марките получават профил, услуги, заявки, чат и доверие — и плащат, когато платформата започне да носи реална работа.
+          </p>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Link to="/pro" className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">
+              Виж Totsan Pro <ArrowRight size={18} />
+            </Link>
+            <Link to="/login?signup=true&role=pro" className="btn btn-ghost !border-paper/25 !text-paper hover:!bg-paper/10">
+              Стани партньор
+            </Link>
+          </div>
+        </div>
+
+        <div className="grid gap-4">
+          {points.map((point) => {
+            const Icon = point.icon
+            return (
+              <article key={point.title} className="reveal rounded-3xl border border-paper/15 bg-paper/10 p-5">
+                <div className="flex items-start gap-4">
+                  <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-paper text-accentDeep"><Icon size={21} /></span>
+                  <div>
+                    <h3 className="font-display text-2xl">{point.title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-paper/65">{point.text}</p>
+                  </div>
+                </div>
+              </article>
+            )
+          })}
         </div>
       </div>
     </section>
@@ -1091,7 +1232,7 @@ function FAQItem({ question, answer }) {
 
 function FAQ() {
   const items = [
-    { q:'Колко струва да използвам Totsan?', a:'За теб като клиент — нищо. Платформата е напълно безплатна. Плащаш единствено директно на специалистите и марките, с които решиш да работиш.' },
+    { q:'Колко струва да използвам Totsan?', a:'За теб като клиент Totsan е безплатен — не взимаме такси от клиенти. Когато платиш услуга през платформата, парите се задържат защитено и се освобождават към специалиста едва след като потвърдиш, че работата е завършена.' },
     { q:'Как избирате кои хора влизат?', a:'Всеки специалист минава през преглед от нашия екип — реално завършени проекти, отзиви от клиенти и проверка на документи. Ако не отговаря на стандартите, не влиза.' },
     { q:'Ами ако нещо се обърка по време на работа?', a:'Имаш на кого да се обадиш. Ние посредничим и съдействаме за намиране на бързо решение, ако възникне спор, забавяне или недоразумение с изпълнител.' },
     { q:'Мога ли да започна, без да зная какво точно искам?', a:'Точно за това е Слой 01. Кажи ни мечтата си в две изречения или използвай нашия бърз Интерактивен съветник — ние ще те насочим към правилната посока.' }

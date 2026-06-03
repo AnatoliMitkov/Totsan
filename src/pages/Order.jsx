@@ -42,6 +42,7 @@ export default function Order() {
   const visibleEvents = useMemo(() => dedupeEvents(details.events), [details.events])
   const visiblePayments = useMemo(() => dedupePayments(details.payments), [details.payments])
   const checkoutPath = order ? checkoutTarget(order) : ''
+  const canSeeFinancialBreakdown = role === 'partner' || isAdminView
 
   async function run(action) {
     if (!order?.id) return
@@ -114,7 +115,11 @@ export default function Order() {
             <div className="rounded-3xl border border-line bg-paper p-5 md:p-6">
               <div className="eyebrow">Действия</div>
               <div className="mt-3 font-display text-4xl text-ink">{formatOrderMoney(order.amountTotal, order.currency)}</div>
-              <p className="mt-2 text-sm text-muted">Такса: {formatOrderMoney(order.platformFee, order.currency)} · към партньора: {formatOrderMoney(order.partnerPayout, order.currency)}</p>
+              {canSeeFinancialBreakdown ? (
+                <p className="mt-2 text-sm text-muted">Такса: {formatOrderMoney(order.platformFee, order.currency)} · към партньора: {formatOrderMoney(order.partnerPayout, order.currency)}</p>
+              ) : (
+                <p className="mt-2 text-sm text-muted">Плащането е защитено до потвърждение на завършването.</p>
+              )}
               {message && <div className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">{message}</div>}
               {checkoutPath && order.status === 'pending_payment' && <Link to={checkoutPath} className="btn btn-primary mt-5 w-full justify-center"><CreditCard size={18} /> Плати</Link>}
               {order.conversationId && <Link to={`/inbox/${order.conversationId}`} className="btn btn-ghost mt-3 w-full justify-center"><MessageSquare size={18} /> Чат</Link>}
@@ -272,8 +277,8 @@ function orderEventMessage(event) {
     order_created: 'Поръчката е създадена',
     checkout_refreshed: 'Сесията за плащане е обновена',
     payment_succeeded: 'Плащането е потвърдено',
-    payment_succeeded_webhook: 'Плащането е потвърдено (Stripe)',
-    payment_intent_succeeded_webhook: 'Плащането е потвърдено (Stripe)',
+    payment_succeeded_webhook: 'Плащането е потвърдено',
+    payment_intent_succeeded_webhook: 'Плащането е потвърдено',
     admin_status_update: 'Админ промени статуса',
     start_work: 'Работата е започната',
     mark_delivered: 'Поръчката е маркирана като предадена',
@@ -324,13 +329,21 @@ function dedupeEvents(events = []) {
   const grouped = new Map()
 
   events.forEach((event) => {
-    const key = [
-      event.type || '',
-      event.message || '',
-      event.fromStatus || '',
-      event.toStatus || '',
-      event.payload ? JSON.stringify(event.payload) : '',
-    ].join('|')
+    const normalizedType = normalizeOrderEventType(event.type)
+    const key = normalizedType === 'payment_succeeded'
+      ? [
+        normalizedType,
+        event.fromStatus || '',
+        event.toStatus || '',
+        paymentEventId(event),
+      ].join('|')
+      : [
+        normalizedType,
+        event.message || '',
+        event.fromStatus || '',
+        event.toStatus || '',
+        event.payload ? JSON.stringify(event.payload) : '',
+      ].join('|')
 
     const existing = grouped.get(key)
     if (!existing) {
@@ -346,4 +359,18 @@ function dedupeEvents(events = []) {
   })
 
   return [...grouped.values()].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+}
+
+function normalizeOrderEventType(type = '') {
+  if (['payment_succeeded', 'payment_succeeded_webhook', 'payment_intent_succeeded_webhook'].includes(type)) {
+    return 'payment_succeeded'
+  }
+  return type || ''
+}
+
+function paymentEventId(event = {}) {
+  const payload = event.payload || {}
+  const paymentIntent = payload.payment_intent || payload.paymentIntentId || payload.payment_intent_id || ''
+  const checkoutSession = payload.checkout_session_id || payload.checkoutSessionId || payload.id || ''
+  return String(paymentIntent || checkoutSession || '')
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, RefreshCcw, Search, XCircle } from 'lucide-react'
 import { ADMIN_INPUT_CLASS, ADMIN_SELECT_CLASS, APPLICATION_STATUS_LABELS, approveSpecialist, formatAdminDate, loadPartnerApplications, matchesSearch, paginateRows, rejectSpecialist } from '../../lib/admin.js'
+import { supabase } from '../../lib/supabase.js'
 
 export default function ApplicationsManager({ globalQuery = '' }) {
   const [rows, setRows] = useState([])
@@ -55,6 +56,19 @@ export default function ApplicationsManager({ globalQuery = '' }) {
     }
   }
 
+  async function deleteApplication(row) {
+    if (!window.confirm('Сигурни ли сте, че искате да изтриете тази кандидатура?')) return
+    setMessage('Изтриване...')
+    try {
+      const { error: delError } = await supabase.from('partner_applications').delete().eq('id', row.id)
+      if (delError) throw delError
+      setRows(current => current.filter(item => item.id !== row.id))
+      setMessage('Кандидатурата е изтрита.')
+    } catch (err) {
+      setMessage(err.message || 'Грешка при изтриване.')
+    }
+  }
+
   if (status === 'loading') return <Panel title="Зареждаме кандидатурите…" />
   if (status === 'error') return <Panel title="Кандидатурите не се заредиха"><p className="text-sm text-red-700">{error}</p><button type="button" onClick={load} className="btn btn-ghost mt-5">Опитай пак</button></Panel>
 
@@ -72,7 +86,12 @@ export default function ApplicationsManager({ globalQuery = '' }) {
             <div className="flex items-start justify-between gap-4"><div><div className="font-display text-2xl text-ink">{row.name}</div><div className="mt-1 text-sm text-muted">{row.company || 'Без фирма'} · {row.email}</div>{row.phone && <div className="text-sm text-muted">{row.phone}</div>}</div><StatusPill value={row.status} /></div>
             {row.about && <p className="mt-4 whitespace-pre-wrap text-sm text-ink/80">{row.about}</p>}
             <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted"><span>{formatAdminDate(row.created_at)}</span>{row.layer_slug && <span>· слой: {row.layer_slug}</span>}{!row.user_id && <span className="text-amber-700">· без свързан акаунт</span>}</div>
-            {row.status === 'pending' && <div className="mt-5 flex flex-wrap gap-2"><button type="button" onClick={() => approve(row)} disabled={!row.user_id} className="btn btn-primary !py-2 text-sm disabled:opacity-50"><CheckCircle2 size={17} /> Одобри</button><button type="button" onClick={() => reject(row)} className="btn btn-ghost !py-2 text-sm"><XCircle size={17} /> Отхвърли</button></div>}
+            <div className="mt-5 flex flex-wrap gap-2 items-center justify-between">
+              <div className="flex gap-2">
+                {row.status === 'pending' && <><button type="button" onClick={() => approve(row)} disabled={!row.user_id} className="btn btn-primary !py-2 text-sm disabled:opacity-50"><CheckCircle2 size={17} /> Одобри</button><button type="button" onClick={() => reject(row)} className="btn btn-ghost !py-2 text-sm"><XCircle size={17} /> Отхвърли</button></>}
+              </div>
+              <button type="button" onClick={() => deleteApplication(row)} className="text-red-600 hover:text-red-700 text-sm font-medium">Изтрий</button>
+            </div>
           </article>
         ))}
         {pageData.rows.length === 0 && <Empty text="Няма кандидатури по тези филтри." />}

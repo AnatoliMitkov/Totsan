@@ -5,17 +5,72 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_S
 
 export const supabaseUrl = url || ''
 export const supabasePublicKey = anonKey || ''
+export const hasSupabaseConfig = Boolean(url && anonKey)
 
-if (!url || !anonKey) {
-  console.warn('[supabase] Липсват VITE_SUPABASE_URL и публичен Supabase key (VITE_SUPABASE_ANON_KEY или VITE_SUPABASE_PUBLISHABLE_KEY) в .env.local')
+function createMissingConfigError() {
+  return new Error('Supabase is not configured. Add VITE_SUPABASE_URL and a public Supabase key (VITE_SUPABASE_ANON_KEY or VITE_SUPABASE_PUBLISHABLE_KEY) to .env.local.')
 }
 
-export const supabase = createClient(url, anonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-})
+function createMockQuery() {
+  const target = function mockQuery() {}
+
+  return new Proxy(target, {
+    apply() {
+      return createMockQuery()
+    },
+    get(_obj, prop) {
+      if (prop === 'then') {
+        return (resolve) => resolve({ data: null, error: createMissingConfigError() })
+      }
+      return createMockQuery()
+    },
+  })
+}
+
+function createMockSupabaseClient() {
+  const query = () => createMockQuery()
+
+  return {
+    auth: {
+      getSession: async () => ({ data: { session: null }, error: null }),
+      onAuthStateChange: (callback) => {
+        if (typeof callback === 'function') callback('INITIAL_SESSION', null)
+        return { data: { subscription: { unsubscribe() {} } } }
+      },
+      signOut: async () => ({ error: createMissingConfigError() }),
+      signInWithOAuth: async () => ({ data: null, error: createMissingConfigError() }),
+      signInWithPassword: async () => ({ data: null, error: createMissingConfigError() }),
+      signUp: async () => ({ data: null, error: createMissingConfigError() }),
+    },
+    from: query,
+    rpc: query,
+    channel: () => ({
+      on() { return this },
+      subscribe() { return this },
+      unsubscribe() {},
+    }),
+    removeChannel() {},
+    functions: {
+      invoke: async () => ({ data: null, error: createMissingConfigError() }),
+    },
+    storage: {
+      from: query,
+    },
+  }
+}
+
+if (!hasSupabaseConfig) {
+  console.warn('[supabase] Missing VITE_SUPABASE_URL and public Supabase key (VITE_SUPABASE_ANON_KEY or VITE_SUPABASE_PUBLISHABLE_KEY) in .env.local')
+}
+
+export const supabase = hasSupabaseConfig
+  ? createClient(url, anonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+    })
+  : createMockSupabaseClient()
 
 export const brand = {
   name: import.meta.env.VITE_BRAND_NAME || 'Totsan',

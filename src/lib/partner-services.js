@@ -4,7 +4,7 @@ import { supabase } from './supabase.js'
 
 export const SERVICE_STATUS_LABELS = {
   draft: 'Чернова',
-  pending: 'Стара заявка',
+  pending: 'Чака одобрение',
   approved: 'Публикувана',
   rejected: 'Върната',
 }
@@ -337,13 +337,41 @@ export async function loadAdminPartnerServices() {
   return attachServiceRelations(data || [])
 }
 
+export async function updateAdminPartnerServiceStatus(serviceId, moderationStatus, moderationNote = '') {
+  if (!serviceId) throw new Error('Липсва услуга за модерация.')
+  const isApproved = moderationStatus === 'approved'
+  const { data, error } = await supabase
+    .from('partner_services')
+    .update({
+      moderation_status: moderationStatus,
+      is_published: isApproved,
+      moderation_note: cleanText(moderationNote),
+    })
+    .eq('id', serviceId)
+    .select(`${PARTNER_SERVICE_COLUMNS}, profile:profiles(${PROFILE_PUBLIC_COLUMNS})`)
+    .single()
+
+  if (error) throw error
+
+  if (isApproved && data?.profile_id) {
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ is_published: true })
+      .eq('id', data.profile_id)
+    if (profileError) throw profileError
+  }
+
+  const [service] = await attachServiceRelations([data])
+  return service
+}
+
 export async function savePartnerService(profile, draft, { submit = false } = {}) {
   if (!profile?.id || !profile?.userId) throw new Error('Липсва свързан партньорски профил.')
   const primaryPackage = draft.packages[0] || makeEmptyPackage('basic')
   if (submit && !draft.title.trim()) throw new Error('Услугата има нужда от заглавие.')
   if (submit && !Number(primaryPackage.priceAmount)) throw new Error('Въведи цена в евро, за да създадеш услугата.')
 
-  const status = submit ? 'approved' : 'draft'
+  const status = submit ? 'pending' : 'draft'
   const payload = servicePayload(profile, draft, status)
   const request = draft.id
     ? supabase.from('partner_services').update(payload).eq('id', draft.id).eq('profile_id', profile.id)
@@ -351,15 +379,6 @@ export async function savePartnerService(profile, draft, { submit = false } = {}
 
   const { data: serviceRow, error: serviceError } = await request.select(PARTNER_SERVICE_COLUMNS).single()
   if (serviceError) throw serviceError
-
-  if (submit && !profile.isPublished) {
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .update({ is_published: true })
-      .eq('id', profile.id)
-      .eq('user_id', profile.userId)
-    if (profileError) throw profileError
-  }
 
   const packageRows = [packagePayload(serviceRow.id, primaryPackage)]
   const { error: packagesError } = await supabase

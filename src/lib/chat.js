@@ -153,6 +153,61 @@ export async function createConversationFromProfile({ profileId, partnerId, proj
   return result.conversation
 }
 
+async function findOpenConversation({ clientId, partnerId, projectId = '' }) {
+  if (!clientId || !partnerId) return null
+
+  let query = supabase
+    .from('conversations')
+    .select(CONVERSATION_SELECT)
+    .eq('client_id', clientId)
+    .eq('partner_id', partnerId)
+    .eq('status', 'open')
+
+  query = projectId ? query.eq('project_id', projectId) : query.is('project_id', null)
+
+  const { data, error } = await query
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
+  return data || null
+}
+
+export async function createConversationWithClient({ clientId, partnerId, projectId = '', subject = '' }) {
+  if (!clientId || !partnerId) {
+    throw new Error('Липсва клиент или партньор за създаване на чат.')
+  }
+
+  const existing = await findOpenConversation({ clientId, partnerId, projectId })
+  if (existing) return existing
+
+  const insertPayload = {
+    client_id: clientId,
+    partner_id: partnerId,
+    subject: subject || 'Връзка по ваше запитване',
+  }
+  if (projectId) insertPayload.project_id = projectId
+
+  const { data, error } = await supabase
+    .from('conversations')
+    .insert(insertPayload)
+    .select(CONVERSATION_SELECT)
+    .single()
+
+  if (error) {
+    if (error.code === '23505' || String(error.message || '').includes('idx_conversations_active_unique')) {
+      const conversation = await findOpenConversation({ clientId, partnerId, projectId })
+      if (conversation) return conversation
+    }
+
+    console.error('Failed to create conversation with client:', error)
+    throw error
+  }
+
+  return data
+}
+
 export async function sendTextMessage({ conversationId, body }) {
   const result = await invokeChatAction('send_message', { conversationId, body, kind: 'text' })
   return result

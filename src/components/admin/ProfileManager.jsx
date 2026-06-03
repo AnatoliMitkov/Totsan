@@ -1,74 +1,76 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Eye, EyeOff, RefreshCcw, Search, SlidersHorizontal, UserRound, Pencil, X, Ban } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
+import { PROFILE_SELECT_COLUMNS, buildProfileDirectory, getProfileImage, getProfileImageStyle } from '../../lib/profiles.js'
 import { supabase } from '../../lib/supabase.js'
-import { resolveProfileUploadTarget, uploadProfileMedia } from '../../lib/profile-media-upload-client.js'
-import {
-  PROFILE_SELECT_COLUMNS,
-  buildProfileDirectory,
-  getProfileImage,
-  getProfileImageStyle,
-  normalizeProfile,
-  slugify,
-} from '../../lib/profiles.js'
+import { updateAccount } from '../../lib/admin.js'
 
-const CURRENT_YEAR = new Date().getFullYear()
 const inputClassName = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
+const selectClassName = 'rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
+
+const FILTERS = [
+  { value: 'all', label: 'Всички профили' },
+  { value: 'published', label: 'Публични' },
+  { value: 'hidden', label: 'Скрити' },
+  { value: 'linked', label: 'Свързани с акаунт' },
+  { value: 'unlinked', label: 'Без акаунт' },
+]
 
 export default function ProfileManager() {
   const [rows, setRows] = useState([])
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
-  const [selectedSlug, setSelectedSlug] = useState('')
-  const [draft, setDraft] = useState(createDraft())
+  const [filter, setFilter] = useState('all')
+  const [editingProfile, setEditingProfile] = useState(null)
+  const [draft, setDraft] = useState(null)
   const [saveState, setSaveState] = useState({ status: 'idle', message: '' })
 
   const profiles = useMemo(() => buildProfileDirectory(rows, { includeUnpublished: true }), [rows])
+
   const filteredProfiles = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    if (!needle) return profiles
-    return profiles.filter((profile) => (`${profile.name} ${profile.tag} ${profile.city} ${profile.layerTitle}`).toLowerCase().includes(needle))
-  }, [profiles, query])
+
+    return profiles.filter((profile) => {
+      const matchesQuery = !needle || [
+        profile.name,
+        profile.tag,
+        profile.city,
+        profile.layerTitle,
+        profile.userId,
+      ].filter(Boolean).join(' ').toLowerCase().includes(needle)
+
+      const matchesFilter =
+        filter === 'all' ||
+        (filter === 'published' && profile.isPublished) ||
+        (filter === 'hidden' && !profile.isPublished) ||
+        (filter === 'linked' && profile.userId) ||
+        (filter === 'unlinked' && !profile.userId)
+
+      return matchesQuery && matchesFilter
+    })
+  }, [profiles, query, filter])
+
+  const stats = useMemo(() => ({
+    total: profiles.length,
+    published: profiles.filter((profile) => profile.isPublished).length,
+    hidden: profiles.filter((profile) => !profile.isPublished).length,
+    unlinked: profiles.filter((profile) => !profile.userId).length,
+  }), [profiles])
 
   useEffect(() => {
     loadProfiles()
   }, [])
 
-  useEffect(() => {
-    if (!profiles.length) return
-
-    if (!selectedSlug) {
-      const first = profiles[0]
-      setSelectedSlug(first.slug)
-      setDraft(createDraft(first))
-      return
-    }
-
-    const match = profiles.find((profile) => profile.slug === selectedSlug)
-    if (match) setDraft(createDraft(match))
-  }, [profiles, selectedSlug])
-
-  const previewProfile = useMemo(() => normalizeProfile({
-    slug: draft.slug || slugify(draft.name || 'profil'),
-    layer_slug: draft.layerSlug,
-    name: draft.name || 'Име на профила',
-    tag: draft.tag || 'Роля',
-    city: draft.city || 'Град',
-    since: draft.since || CURRENT_YEAR,
-    rating: draft.rating,
-    projects: draft.projects,
-    bio: draft.bio || 'Тук ще се вижда текстът за биото на профила.',
-    image_url: draft.imageUrl,
-    image_zoom: draft.imageZoom,
-    image_x: draft.imageX,
-    image_y: draft.imageY,
-    is_published: draft.isPublished,
-  }), [draft])
-
   async function loadProfiles() {
     setStatus('loading')
-    const { data, error: loadError } = await supabase.from('profiles').select(PROFILE_SELECT_COLUMNS).order('name')
+    setError('')
+
+    const { data, error: loadError } = await supabase
+      .from('profiles')
+      .select(PROFILE_SELECT_COLUMNS)
+      .order('name')
 
     if (loadError) {
       setRows([])
@@ -78,70 +80,45 @@ export default function ProfileManager() {
     }
 
     setRows(data || [])
-    setError('')
     setStatus('ready')
+  }
+
+  function startEditing(profile) {
+    setEditingProfile(profile)
+    setDraft({
+      layerSlug: profile.layerSlug || profile.layer || LAYERS[0]?.slug || '',
+      isPublished: profile.isPublished ?? true,
+      userId: profile.userId || '',
+    })
+    setSaveState({ status: 'idle', message: '' })
+  }
+
+  function closeEditing() {
+    setEditingProfile(null)
+    setDraft(null)
   }
 
   function updateDraft(key, value) {
     setDraft((current) => ({ ...current, [key]: value }))
   }
 
-  function editProfile(profile) {
-    setSelectedSlug(profile.slug)
-    setDraft(createDraft(profile))
-    setSaveState({ status: 'idle', message: '' })
-  }
-
-  function startNewProfile() {
-    setSelectedSlug('__new__')
-    setDraft(createDraft())
-    setSaveState({ status: 'idle', message: '' })
-  }
-
-  async function handleImageUpload(file) {
-    if (!file) return
-
-    const target = resolveProfileUploadTarget({
-      userId: draft.userId,
-      slug: draft.slug,
-      name: draft.name,
-    })
-    if (!target) {
-      setSaveState({ status: 'error', message: 'Въведи име, slug или свързан user ID преди да качиш снимка.' })
-      return
-    }
-
-    setSaveState({ status: 'uploading', message: 'Оптимизираме и качваме снимката…' })
-
-    try {
-      const result = await uploadProfileMedia({ file, target })
-      updateDraft('imageUrl', result.publicUrl)
-      const reuseMessage = result.reused
-        ? 'Същото изображение вече съществува и ползваме готовия optimized файл.'
-        : 'Снимката е качена.'
-      const compressMessage = result.precompressed ? ' Преди upload я компресирахме локално.' : ''
-      setSaveState({ status: 'uploaded', message: `${reuseMessage}${compressMessage} Натисни „Запази профила“.` })
-    } catch (error) {
-      setSaveState({ status: 'error', message: error.message || 'Качването не успя.' })
-      return
-    }
-
-  }
-
   async function submit(e) {
     e.preventDefault()
-    const payload = toPayload(draft)
 
-    if (!payload.name || !payload.tag || !payload.city) {
-      setSaveState({ status: 'error', message: 'Попълни име, роля и град.' })
-      return
+    if (!editingProfile?.id) return
+
+    setSaveState({ status: 'saving', message: 'Запазваме настройките...' })
+
+    const payload = {
+      is_published: Boolean(draft.isPublished),
+      layer_slug: draft.layerSlug || editingProfile.layerSlug,
+      user_id: draft.userId.trim() || null,
     }
-
-    setSaveState({ status: 'saving', message: 'Запазваме профила…' })
 
     const { data, error: saveError } = await supabase
       .from('profiles')
-      .upsert(payload, { onConflict: 'slug' })
+      .update(payload)
+      .eq('id', editingProfile.id)
       .select(PROFILE_SELECT_COLUMNS)
       .single()
 
@@ -150,319 +127,248 @@ export default function ProfileManager() {
       return
     }
 
-    setRows((current) => [...current.filter((row) => row.slug !== data.slug), data].sort((left, right) => left.name.localeCompare(right.name, 'bg')))
-    setSelectedSlug(data.slug)
-    setDraft(createDraft(normalizeProfile(data)))
-    setStatus('ready')
-    setError('')
-    setSaveState({ status: 'saved', message: 'Профилът е запазен.' })
+    setRows((current) => current.map((row) => (row.id === data.id ? data : row)))
+    setSaveState({ status: 'saved', message: 'Успешно запазено.' })
+    setTimeout(() => {
+      closeEditing()
+    }, 1000)
   }
 
-  const liveSlug = draft.slug || slugify(draft.name) || 'nov-profil'
+  async function blockProfile() {
+    if (!window.confirm('Сигурни ли сте, че искате да блокирате този профил?\nТова ще го скрие от публичния каталог и ще блокира достъпа на свързания акаунт (ако има такъв).')) return
+    
+    setSaveState({ status: 'saving', message: 'Блокиране на профила...' })
+
+    try {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ is_published: false })
+        .eq('id', editingProfile.id)
+
+      if (profileError) throw profileError
+
+      if (editingProfile.userId) {
+        await updateAccount(editingProfile.userId, { accountStatus: 'banned' })
+      }
+
+      await loadProfiles()
+      setSaveState({ status: 'saved', message: 'Профилът е успешно блокиран.' })
+      setTimeout(() => {
+        closeEditing()
+      }, 1500)
+    } catch (err) {
+      setSaveState({ status: 'error', message: err.message || 'Грешка при блокиране.' })
+    }
+  }
 
   return (
     <section className="mt-12">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="eyebrow">Профили</div>
-          <h2 className="h-section mt-2">Редактирай карти, снимки и био от админа.</h2>
-          <p className="mt-3 max-w-3xl text-sm text-muted">Тук сменяш име, роля, био, рейтинг, снимка и кадриране на снимката. Позицията и zoom-ът се пазят и се показват еднакво в каталога и в профилната страница.</p>
+          <h2 className="h-section mt-2">Управление на профили</h2>
+          <p className="mt-3 max-w-3xl text-sm text-muted">
+            Публичност, категоризация и свързани акаунти на всички партньори в системата.
+          </p>
         </div>
-        <button type="button" className="btn btn-primary self-start md:self-auto" onClick={startNewProfile}>Нов профил</button>
+        <button type="button" className="btn btn-ghost self-start md:self-auto" onClick={loadProfiles}>
+          <RefreshCcw size={16} />
+          Обнови
+        </button>
+      </div>
+
+      <div className="mt-6 grid gap-3 grid-cols-2 md:grid-cols-4">
+        <StatCard label="Всички" value={stats.total} />
+        <StatCard label="Публични" value={stats.published} />
+        <StatCard label="Скрити" value={stats.hidden} />
+        <StatCard label="Без акаунт" value={stats.unlinked} />
       </div>
 
       {error && (
-        <div className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
-          Профилите още не са активни в Supabase: {error}. Пусни обновения SQL файл от папка supabase/schema.sql и после презареди тази страница.
+        <div className="mt-6 rounded-3xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-800">
+          Профилите не се заредиха: {error}
         </div>
       )}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-12">
-        <aside className="lg:col-span-4 xl:col-span-3">
-          <div className="rounded-3xl border border-line bg-paper p-4">
+      <div className="mt-6 rounded-3xl border border-line bg-paper p-4 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center">
+          <label className="relative flex-1 block">
+            <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Търси по име, роля, град…"
-              className={inputClassName}
+              placeholder="Търси име, град, слой..."
+              className={`${inputClassName} !mt-0 pl-11`}
             />
-
-            <div className="mt-4 max-h-[42rem] space-y-2 overflow-auto pr-1">
-              {filteredProfiles.map((profile) => (
-                <button
-                  key={profile.slug}
-                  type="button"
-                  onClick={() => editProfile(profile)}
-                  className={`w-full rounded-2xl border px-4 py-4 text-left transition ${selectedSlug === profile.slug ? 'border-ink bg-soft' : 'border-line bg-paper hover:border-ink/40'}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="h-12 w-12 overflow-hidden rounded-full border border-line bg-soft">
-                      <img src={getProfileImage(profile)} alt={profile.name} className="img-cover" style={getProfileImageStyle(profile)} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="font-display text-lg text-ink">{profile.name}</div>
-                        {!profile.isPublished && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-900">Скрит</span>}
-                      </div>
-                      <div className="mt-1 text-xs text-muted">{profile.tag} · {profile.city}</div>
-                      <div className="mt-1 text-xs text-muted">Слой {profile.layerNumber} · {profile.layerTitle}</div>
-                    </div>
-                  </div>
-                </button>
+          </label>
+          <div className="flex w-full md:w-auto items-center gap-2">
+            <SlidersHorizontal size={16} className="text-muted shrink-0" />
+            <select value={filter} onChange={(e) => setFilter(e.target.value)} className={`${selectClassName} !mt-0 w-full min-w-[14rem]`}>
+              {FILTERS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
-
-              {filteredProfiles.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-line px-4 py-6 text-center text-sm text-muted">
-                  Няма профили по това търсене.
-                </div>
-              )}
-            </div>
-
-            {status === 'loading' && <div className="mt-4 text-xs text-muted">Зареждаме профилите…</div>}
+            </select>
           </div>
-        </aside>
+        </div>
 
-        <div className="lg:col-span-8 xl:col-span-9">
-          <form onSubmit={submit} className="rounded-3xl border border-line bg-paper p-6 md:p-8">
-            <div className="grid gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
-              <div className="space-y-6">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Field label="Име на профила">
-                    <input value={draft.name} onChange={(e) => updateDraft('name', e.target.value)} className={inputClassName} placeholder="Напр. Студио Ламбринов" />
-                  </Field>
-                  <Field label="Роля / етикет">
-                    <input value={draft.tag} onChange={(e) => updateDraft('tag', e.target.value)} className={inputClassName} placeholder="Напр. Архитект" />
-                  </Field>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <Field label="Град">
-                    <input value={draft.city} onChange={(e) => updateDraft('city', e.target.value)} className={inputClassName} placeholder="София" />
-                  </Field>
-                  <Field label="Слой">
-                    <select value={draft.layerSlug} onChange={(e) => updateDraft('layerSlug', e.target.value)} className={inputClassName}>
-                      {LAYERS.map((layer) => <option key={layer.slug} value={layer.slug}>Слой {layer.number} · {layer.title}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="От година">
-                    <input type="number" min="1900" max="2100" value={draft.since} onChange={(e) => updateDraft('since', Number(e.target.value))} className={inputClassName} />
-                  </Field>
-                  <Field label="Проекти">
-                    <input type="number" min="0" value={draft.projects} onChange={(e) => updateDraft('projects', Number(e.target.value))} className={inputClassName} />
-                  </Field>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_14rem]">
-                  <Field label="URL на снимка">
-                    <input value={draft.imageUrl} onChange={(e) => updateDraft('imageUrl', e.target.value)} className={inputClassName} placeholder="https://..." />
-                    <div className="mt-2 text-xs text-muted">Можеш да поставиш директен линк или да качиш файл отдолу.</div>
-                  </Field>
-                  <Field label="Качи файл">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className={`${inputClassName} file:mr-3 file:rounded-full file:border-0 file:bg-soft file:px-4 file:py-2 file:text-sm file:font-medium`}
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0]
-                        await handleImageUpload(file)
-                        e.target.value = ''
-                      }}
-                    />
-                  </Field>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <RangeField label="Zoom" value={draft.imageZoom} min={1} max={2.5} step={0.05} onChange={(value) => updateDraft('imageZoom', value)} />
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <RangeField label="Ляво / дясно" value={draft.imageX} min={0} max={100} step={1} onChange={(value) => updateDraft('imageX', value)} />
-                    <RangeField label="Горе / долу" value={draft.imageY} min={0} max={100} step={1} onChange={(value) => updateDraft('imageY', value)} />
-                  </div>
-                </div>
-
-                <Field label="Био / описание">
-                  <textarea
-                    rows={7}
-                    value={draft.bio}
-                    onChange={(e) => updateDraft('bio', e.target.value)}
-                    className={inputClassName}
-                    placeholder="Опиши специалиста, стила на работа, вида проекти и защо клиентът да се свърже точно с него."
-                  />
-                </Field>
-
-                <div className="rounded-2xl border border-line bg-soft/50 px-4 py-4">
-                  <label className="flex items-start gap-3 text-sm text-ink">
-                    <input type="checkbox" checked={draft.isPublished} onChange={(e) => updateDraft('isPublished', e.target.checked)} className="mt-1 h-4 w-4 rounded border-line" />
-                    <span>
-                      <span className="font-medium">Покажи профила публично</span>
-                      <span className="mt-1 block text-muted">Когато е изключено, профилът остава в админа, но не се показва на сайта.</span>
-                    </span>
-                  </label>
-                </div>
-
-                <Field label="Свързан акаунт (User ID)">
-                  <input value={draft.userId} onChange={(e) => updateDraft('userId', e.target.value)} className={inputClassName} placeholder="uuid от auth.users — празно ако няма" />
-                  <div className="mt-2 text-xs text-muted">Когато е попълнено, този потребител може да редактира профила от /moy-profil. Намираш ID-то в Supabase → Authentication → Users.</div>
-                </Field>
-              </div>
-
-              <div className="space-y-4">
-                <div className="rounded-3xl border border-line bg-soft/60 p-5">
-                  <div className="eyebrow">Live Preview</div>
-                  <div className="mt-4 card bg-paper p-6 shadow-none">
-                    <div className="flex items-start gap-4">
-                      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border border-line bg-soft">
-                        <img src={getProfileImage(previewProfile)} alt={previewProfile.name} className="img-cover" style={getProfileImageStyle(previewProfile)} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-soft px-2.5 py-1 text-xs text-ink">{previewProfile.tag}</span>
-                          <span className="text-xs text-muted">Слой {previewProfile.layerNumber} · {previewProfile.layerTitle}</span>
+        <div className="mt-6 overflow-x-auto rounded-2xl border border-line custom-scrollbar">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-soft border-b border-line text-muted uppercase text-[10px] tracking-wider font-semibold">
+              <tr>
+                <th className="px-5 py-4 w-1/3">Профил</th>
+                <th className="px-5 py-4">Слой / Категория</th>
+                <th className="px-5 py-4">Статус</th>
+                <th className="px-5 py-4">Акаунт</th>
+                <th className="px-5 py-4 text-right">Действия</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {filteredProfiles.length > 0 ? (
+                filteredProfiles.map((profile) => (
+                  <tr key={profile.slug} className="hover:bg-soft/40 transition">
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-line bg-soft">
+                          <img src={getProfileImage(profile)} alt={profile.name} className="img-cover" style={getProfileImageStyle(profile)} />
                         </div>
-                        <div className="mt-3 font-display text-xl text-ink">{previewProfile.name}</div>
-                        <div className="mt-1 text-sm text-muted">{previewProfile.city} · от {previewProfile.since} г.</div>
+                        <div>
+                          <div className="font-medium text-ink text-base">{profile.name}</div>
+                          <div className="text-xs text-muted mt-0.5">{profile.tag} · {profile.city}</div>
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-                      <div className="rounded-xl border border-line bg-soft/70 px-4 py-3">
-                        <div className="text-xs text-muted">Оценка</div>
-                        <div className="mt-1 font-medium">★ {previewProfile.rating}</div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="font-medium text-ink">Слой {profile.layerNumber}</div>
+                      <div className="text-xs text-muted mt-0.5 truncate max-w-[12rem]">{profile.layerTitle}</div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <VisibilityBadge profile={profile} />
+                    </td>
+                    <td className="px-5 py-3">
+                      {profile.userId ? (
+                        <div className="inline-flex items-center gap-1.5 text-xs text-ink bg-soft px-2.5 py-1 rounded-full border border-line/50">
+                          <UserRound size={12} />
+                          Свързан
+                        </div>
+                      ) : (
+                        <div className="inline-flex text-xs text-muted px-2.5 py-1 rounded-full border border-line bg-paper">
+                          Няма акаунт
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Link to={`/profil/${profile.slug}`} title="Отвори публичния профил" className="p-2 text-muted hover:text-ink hover:bg-soft rounded-xl transition">
+                          <Eye size={16} />
+                        </Link>
+                        <button type="button" onClick={() => startEditing(profile)} className="btn btn-ghost !px-3 !py-1.5 text-xs">
+                          <Pencil size={14} className="mr-1.5" /> Редакция
+                        </button>
                       </div>
-                      <div className="rounded-xl border border-line bg-soft/70 px-4 py-3">
-                        <div className="text-xs text-muted">Проекти</div>
-                        <div className="mt-1 font-medium">{previewProfile.projects}</div>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 rounded-full border border-line px-4 py-3 text-center font-medium">Виж профила</div>
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border border-line bg-paper p-5">
-                  <div className="eyebrow">Профилна страница</div>
-                  <div className="mt-4 flex items-center gap-4">
-                    <div className="h-20 w-20 overflow-hidden rounded-full border-2 border-paper bg-soft shadow-lg">
-                      <img src={getProfileImage(previewProfile)} alt={previewProfile.name} className="img-cover" style={getProfileImageStyle(previewProfile)} />
-                    </div>
-                    <div>
-                      <div className="font-display text-2xl text-ink">{previewProfile.name}</div>
-                      <div className="text-sm text-muted">{previewProfile.tag} · {previewProfile.city} · от {previewProfile.since} г.</div>
-                    </div>
-                  </div>
-                  <p className="mt-4 whitespace-pre-wrap text-sm text-muted">{previewProfile.bio}</p>
-                  <div className="mt-4 text-xs text-muted">Линк: /profil/{liveSlug}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 flex flex-col gap-4 border-t border-line pt-6 md:flex-row md:items-center md:justify-between">
-              <div className={`text-sm ${saveState.status === 'error' ? 'text-red-700' : 'text-muted'}`}>
-                {saveState.message || 'Промените ще се покажат в каталога и в профилната страница след запазване.'}
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <Link to={`/profil/${liveSlug}`} className="btn btn-ghost">Отвори профила</Link>
-                <button type="submit" className="btn btn-primary" disabled={saveState.status === 'saving'}>
-                  {saveState.status === 'saving' ? 'Запазва се…' : 'Запази профила'}
-                </button>
-              </div>
-            </div>
-          </form>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="px-5 py-16 text-center text-muted bg-soft/20">
+                    {status === 'loading' ? 'Зареждаме профилите...' : 'Няма намерени профили.'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
+
+      {editingProfile && draft && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/20 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-[2rem] border border-line bg-paper shadow-2xl relative max-h-[90vh] flex flex-col">
+            <button type="button" onClick={closeEditing} className="absolute right-4 top-4 p-2 text-muted hover:bg-soft hover:text-ink rounded-full transition z-10">
+              <X size={20} />
+            </button>
+            <div className="px-6 pt-6 pb-4 border-b border-line shrink-0">
+               <div className="eyebrow">Редакция на профил</div>
+               <div className="mt-2 text-xl font-display text-ink pr-8">{editingProfile.name}</div>
+            </div>
+            
+            <form onSubmit={submit} className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+              <div className="space-y-5">
+                <label className="flex items-start gap-3 rounded-2xl border border-line bg-soft/50 p-4 cursor-pointer hover:border-ink/30 transition">
+                  <input
+                    type="checkbox"
+                    checked={draft.isPublished}
+                    onChange={(e) => updateDraft('isPublished', e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-line accent-accent"
+                  />
+                  <span>
+                    <span className="block font-medium text-sm text-ink">Публичен профил</span>
+                    <span className="block text-xs text-muted mt-0.5">Ако е изключено, профилът няма да се вижда в каталога.</span>
+                  </span>
+                </label>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-ink">Слой / категория</label>
+                  <select value={draft.layerSlug} onChange={(e) => updateDraft('layerSlug', e.target.value)} className={`${selectClassName} !mt-0`}>
+                    {LAYERS.map((layer) => (
+                      <option key={layer.slug} value={layer.slug}>Слой {layer.number} · {layer.title}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-ink">Свързан акаунт (User ID)</label>
+                  <input
+                    value={draft.userId}
+                    onChange={(e) => updateDraft('userId', e.target.value)}
+                    className={`${inputClassName} !mt-0 font-mono text-xs`}
+                    placeholder="uuid от auth.users"
+                  />
+                  <div className="text-[11px] text-muted">
+                    Този акаунт може да редактира профила си през портала.
+                  </div>
+                </div>
+
+                {saveState.message && (
+                  <div className={`rounded-xl p-3 text-xs ${saveState.status === 'error' ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-green-50 text-green-700 border border-green-100'}`}>
+                    {saveState.message}
+                  </div>
+                )}
+              </div>
+              
+              <div className="mt-8 flex gap-3 pt-2">
+                <button type="button" onClick={blockProfile} disabled={saveState.status === 'saving'} className="btn border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 flex-1 justify-center transition">
+                   <Ban size={16} className="mr-1.5" /> Блокирай
+                </button>
+                <button type="button" onClick={closeEditing} className="btn btn-ghost flex-1 justify-center">Отказ</button>
+                <button type="submit" disabled={saveState.status === 'saving'} className="btn btn-primary flex-1 justify-center">
+                   {saveState.status === 'saving' ? 'Запазване...' : 'Запази'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </section>
   )
 }
 
-function Field({ label, children }) {
+function StatCard({ label, value }) {
   return (
-    <label className="block text-sm font-medium text-ink">
-      {label}
-      {children}
-    </label>
+    <div className="rounded-3xl border border-line bg-paper p-5 transition hover:border-ink/30 shadow-sm">
+      <div className="font-display text-[clamp(1.5rem,1rem+1vw,2rem)] text-ink">{value}</div>
+      <div className="mt-1 text-xs text-muted font-medium">{label}</div>
+    </div>
   )
 }
 
-function RangeField({ label, value, min, max, step, onChange }) {
-  return (
-    <label className="block text-sm font-medium text-ink">
-      <span className="flex items-center justify-between gap-4">
-        <span>{label}</span>
-        <span className="text-xs text-muted">{Number(value).toFixed(step < 1 ? 2 : 0)}</span>
-      </span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="mt-3 w-full accent-black"
-      />
-    </label>
+function VisibilityBadge({ profile }) {
+  return profile.isPublished ? (
+    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-green-100 text-green-800">
+      <Eye size={12} /> Публичен
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-900">
+      <EyeOff size={12} /> Скрит
+    </span>
   )
 }
-
-function createDraft(profile = null) {
-  if (!profile) {
-    return {
-      id: '',
-      slug: '',
-      layerSlug: LAYERS[0]?.slug || '',
-      name: '',
-      tag: '',
-      city: '',
-      since: CURRENT_YEAR,
-      rating: 4.8,
-      projects: 0,
-      bio: '',
-      imageUrl: '',
-      imageZoom: 1,
-      imageX: 50,
-      imageY: 50,
-      isPublished: true,
-      userId: '',
-    }
-  }
-
-  return {
-    id: profile.id || '',
-    slug: profile.slug || '',
-    layerSlug: profile.layerSlug || profile.layer || LAYERS[0]?.slug || '',
-    name: profile.name || '',
-    tag: profile.tag || '',
-    city: profile.city || '',
-    since: profile.since || CURRENT_YEAR,
-    rating: profile.rating ?? 4.8,
-    projects: profile.projects ?? 0,
-    bio: profile.bio || '',
-    imageUrl: profile.imageUrl || '',
-    imageZoom: profile.imageZoom ?? 1,
-    imageX: profile.imageX ?? 50,
-    imageY: profile.imageY ?? 50,
-    isPublished: profile.isPublished ?? true,
-    userId: profile.userId || '',
-  }
-}
-
-function toPayload(draft) {
-  const slug = draft.slug.trim() || slugify(draft.name)
-
-  return {
-    slug,
-    layer_slug: draft.layerSlug,
-    name: draft.name.trim(),
-    tag: draft.tag.trim(),
-    city: draft.city.trim(),
-    since: Number(draft.since) || CURRENT_YEAR,
-    rating: Number(Number(draft.rating || 0).toFixed(1)),
-    projects: Number(draft.projects) || 0,
-    bio: draft.bio.trim(),
-    image_url: draft.imageUrl.trim(),
-    image_zoom: Number(draft.imageZoom || 1),
-    image_x: Number(draft.imageX || 50),
-    image_y: Number(draft.imageY || 50),
-    is_published: Boolean(draft.isPublished),
-    user_id: draft.userId?.trim() || null,
-  }
-}
-

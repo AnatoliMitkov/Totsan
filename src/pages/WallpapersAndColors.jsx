@@ -1,17 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { 
-  Sprout, 
-  Droplet, 
-  Sun, 
-  Flame, 
+  Palette, 
+  Paintbrush, 
+  Layers, 
   Sparkles, 
   Check, 
-  ArrowRight, 
-  Clock, 
   CheckCircle2, 
-  Compass, 
-  Trees 
+  Image as ImageIcon 
 } from 'lucide-react'
 import { gsap } from 'gsap'
 
@@ -22,7 +18,7 @@ const U = (id, w = 1200) => `https://images.unsplash.com/photo-${id}?auto=format
 const EUR_RATE = 1.95583
 const fmtEur = (lv) => Math.round(lv / EUR_RATE)
 
-export default function GardenAndYard() {
+export default function WallpapersAndColors() {
   const pageRef = useRef(null)
 
   // GSAP animations on page load
@@ -46,11 +42,11 @@ export default function GardenAndYard() {
     <div ref={pageRef} className="min-h-screen bg-paper text-ink">
       <Hero />
       <Intro />
-      <GardenBudgetCalculator />
-      <GardenShowcase />
-      <LandscapeExperts />
-      <GardenFAQ />
-      <GardenCTA />
+      <WallBudgetCalculator />
+      <Showcase />
+      <Experts />
+      <WallFAQ />
+      <CTA />
     </div>
   )
 }
@@ -60,8 +56,8 @@ function Hero() {
     <section className="section relative min-h-[75svh] flex items-center overflow-hidden py-24">
       <div className="absolute inset-0 z-0">
         <img 
-          src={U('1416879595882-3373a0480b5b', 1800)} 
-          alt="Градина и двор" 
+          src={U('1558882224-dda166733046', 1800)} 
+          alt="Тапети и цветове" 
           className="img-cover garden-hero-bg"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-ink/90 via-ink/65 to-transparent z-10" />
@@ -71,28 +67,28 @@ function Hero() {
       <div className="container-page relative z-20 w-full">
         <div className="max-w-3xl text-paper">
           <div className="flex items-center gap-3 mb-6 garden-animate-fade">
-            <span className="font-mono text-xs px-3 py-1 bg-trustGreen text-paper rounded-full font-bold">
-              ВЪНШНИ ПРОСТРАНСТВА
+            <span className="font-mono text-xs px-3 py-1 bg-accent text-paper rounded-full font-bold">
+              ВЪТРЕШНИ ПРОСТРАНСТВА
             </span>
             <div className="h-px w-12 bg-paper/20" />
-            <span className="eyebrow !text-white/70">СВЕТЪТ НА ОТКРИТО</span>
+            <span className="eyebrow !text-white/70">ХАРАКТЕР НА СТЕНИТЕ</span>
           </div>
 
           <h1 className="h-display font-display text-5xl lg:text-7xl leading-none garden-animate-fade">
-            Градина <br />
-            <span className="text-trustGreen italic">&amp; Двор.</span>
+            Тапети <br />
+            <span className="text-accent italic">&amp; Цветове.</span>
           </h1>
 
           <p className="mt-6 text-white/80 text-lg leading-relaxed max-w-xl garden-animate-fade">
-            Твоят външен оазис — създаден от идея до последното растение. Ландшафтен дизайн, умна автоматизация, перголи, настилки и вечнозелени кътчета на едно място.
+            Пространството придобива душа чрез правилните цветове и текстури. Разгледай премиум тапети, декоративни мазилки и интериорни бои, които преобразяват всяка стая.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-4 garden-animate-fade">
-            <a href="#calculator" className="btn btn-primary !bg-trustGreen !text-paper hover:!bg-trustGreen/90 shadow-md">
+            <a href="#calculator" className="btn btn-primary !bg-accent !text-paper hover:!bg-accent/90 shadow-md">
               Изчисли бюджет
             </a>
             <a href="#experts" className="btn btn-ghost !border-paper/20 !bg-paper/10 !text-paper hover:!border-paper/40">
-              Виж ландшафтни архитекти
+              Виж декоратори
             </a>
           </div>
         </div>
@@ -103,9 +99,9 @@ function Hero() {
 
 function Intro() {
   const steps = [
-    { title: 'Биофилен дизайн', desc: 'Хармония с природата, подбор на местна растителност, която изисква минимални грижи.', icon: <Trees className="text-trustGreen" size={24} /> },
-    { title: 'Умна автоматизация', desc: 'Поливни системи и сензорно осветление, които контролираш директно от мобилния си телефон.', icon: <Droplet className="text-trustGreen" size={24} /> },
-    { title: 'Зони за релакс', desc: 'Проектиране на перголи, дървени декинги, барбекю кътове и огнища за споделени вечери.', icon: <Sun className="text-trustGreen" size={24} /> }
+    { title: 'Цветова хармония', desc: 'Експертен подбор на тонове, които оптически разширяват и освежават помещенията.', icon: <Palette className="text-accent" size={24} /> },
+    { title: 'Премиум тапети', desc: 'Богато разнообразие от текстури, флорални мотиви и геометрични шарки за акцентни стени.', icon: <ImageIcon className="text-accent" size={24} /> },
+    { title: 'Декоративни мазилки', desc: 'Венецианска мазилка, травертино и други ефекти, добавящи дълбочина и лукс.', icon: <Layers className="text-accent" size={24} /> }
   ]
 
   return (
@@ -114,12 +110,12 @@ function Intro() {
         <div className="grid lg:grid-cols-12 gap-12 items-center mb-16">
           <div className="lg:col-span-5 reveal">
             <p className="font-display italic text-accentDeep text-3xl lg:text-4xl leading-tight">
-              „Къщата не спира до прага на вратата. Външното пространство е естественото продължение на дома.“
+              „Цветът е клавишът, окото е чукчето, а душата е пианото с много струни.“
             </p>
           </div>
           <div className="lg:col-span-7 reveal">
             <p className="text-muted leading-relaxed text-base">
-              Често дворът остава на заден план след ремонт на интериора. В Totsan съчетаваме ландшафтните архитекти с най-добрите изпълнители на автоматизирани системи, настилки и перголи. Ние подреждаме целия процес стъпка по стъпка, гарантирайки бърз и безпроблемен резултат.
+              Стените са платното на вашия дом. Изборът между тапет, боя или мазилка не е само естетически, но и функционален. В Totsan ви свързваме с топ декоратори и доставчици на материали, за да направите най-добрия избор за вашия интериор.
             </p>
           </div>
         </div>
@@ -142,25 +138,23 @@ function Intro() {
   )
 }
 
-// ── Interactive Garden Budget Calculator ──────────────────────────────────────
-function GardenBudgetCalculator() {
-  const [size, setSize] = useState(100) // Default 100 m2
+// ── Interactive Budget Calculator ──────────────────────────────────────
+function WallBudgetCalculator() {
+  const [size, setSize] = useState(50) // Default 50 m2 wall area
   const [selectedFeatures, setSelectedFeatures] = useState({
-    irrigation: true,
-    deck: false,
-    turf: true,
-    smartLight: false,
-    pathway: false,
-    firepit: false
+    paint: true,
+    wallpaper: false,
+    plaster: false,
+    prep: true,
+    primer: true
   })
 
   const FEATURES_CONFIG = [
-    { id: 'irrigation', name: 'Автоматизирана поливна система', desc: 'Умни разпръсквачи, капково напояване и датчик за дъжд.', baseCost: 1600, icon: <Droplet size={18} /> },
-    { id: 'deck', name: 'Пергола с дървен декинг', desc: 'Зона за хранене на открито с масивна конструкция.', baseCost: 4500, icon: <Sun size={18} /> },
-    { id: 'turf', name: 'Полагане на тревен чим', desc: 'Незабавен гъст зелен килим (изчислява се според площта).', costPerM2: 12, icon: <Sprout size={18} /> },
-    { id: 'smartLight', name: 'Интелигентно градинско осветление', desc: 'LED лампи за алеи, акценти върху дървета и автоматичен таймер.', baseCost: 1100, icon: <Sparkles size={18} /> },
-    { id: 'pathway', name: 'Каменни пътеки и алеи', desc: 'Издръжливи плочи от естествен камък с пясъчна основа.', baseCost: 1900, icon: <Compass size={18} /> },
-    { id: 'firepit', name: 'Барбекю зона с огнище', desc: 'Изградено огнище от огнеупорни тухли и каменна облицовка.', baseCost: 3200, icon: <Flame size={18} /> }
+    { id: 'paint', name: 'Боядисване с интериорна боя', desc: 'Висококачествен латекс (2 ръце).', costPerM2: 7, icon: <Paintbrush size={18} /> },
+    { id: 'wallpaper', name: 'Полагане на тапети', desc: 'Премиум флис или винилови тапети за акцентна стена.', costPerM2: 25, icon: <ImageIcon size={18} /> },
+    { id: 'plaster', name: 'Декоративна мазилка', desc: 'Италианска мазилка (Оточенто, Стуко).', costPerM2: 55, icon: <Layers size={18} /> },
+    { id: 'prep', name: 'Подготовка (шпакловка)', desc: 'Фина шпакловка за идеално гладка основа.', costPerM2: 12, icon: <Check size={18} /> },
+    { id: 'primer', name: 'Грундиране', desc: 'Дълбокопроникващ грунд преди боя/тапети.', costPerM2: 3, icon: <Sparkles size={18} /> }
   ]
 
   const handleToggle = (id) => {
@@ -169,19 +163,11 @@ function GardenBudgetCalculator() {
 
   // Calculate prices dynamically
   const calculateTotal = () => {
-    let minCost = 500 // Base landscaper fee
-    let maxCost = 800
-
-    // Size impact
-    minCost += size * 10
-    maxCost += size * 15
+    let minCost = 150 // Base fee
+    let maxCost = 250
 
     FEATURES_CONFIG.forEach(f => {
       if (selectedFeatures[f.id]) {
-        if (f.baseCost) {
-          minCost += f.baseCost
-          maxCost += f.baseCost * 1.25
-        }
         if (f.costPerM2) {
           minCost += size * f.costPerM2
           maxCost += size * f.costPerM2 * 1.3
@@ -202,9 +188,9 @@ function GardenBudgetCalculator() {
       <div className="container-page">
         <div className="max-w-3xl mb-12">
           <div className="eyebrow">Бюджетен планиращ инструмент</div>
-          <h2 className="h-section mt-2">Колко би струвала твоята градина?</h2>
+          <h2 className="h-section mt-2">Колко би струвало освежаването?</h2>
           <p className="mt-3 text-muted">
-            Настрой размера на двора си и избери какви екстри желаеш. Нашата интелигентна система ще изчисли примерен ценови диапазон за материали и монтаж.
+            Настрой квадратурата на стените и избери желаните услуги. Системата ще изчисли примерен ценови диапазон за труд и базови материали.
           </p>
         </div>
 
@@ -214,27 +200,27 @@ function GardenBudgetCalculator() {
             {/* Size Slider */}
             <div className="mb-8">
               <div className="flex justify-between items-center mb-3">
-                <span className="font-display text-lg text-ink font-semibold">Размер на двора:</span>
-                <span className="text-xl text-trustGreen font-bold font-mono">{size} м²</span>
+                <span className="font-display text-lg text-ink font-semibold">Площ на стените:</span>
+                <span className="text-xl text-accent font-bold font-mono">{size} м²</span>
               </div>
               <input 
                 type="range" 
-                min="30" 
-                max="500" 
-                step="10" 
+                min="10" 
+                max="300" 
+                step="5" 
                 value={size}
                 onChange={(e) => setSize(Number(e.target.value))}
-                className="w-full h-2 bg-soft rounded-lg appearance-none cursor-pointer accent-trustGreen"
+                className="w-full h-2 bg-soft rounded-lg appearance-none cursor-pointer accent-accent"
               />
               <div className="flex justify-between text-xs text-muted mt-2">
-                <span>30 м² (Малък кът)</span>
-                <span>500 м² (Голям парцел)</span>
+                <span>10 м² (Една стена)</span>
+                <span>300 м² (Цяло жилище)</span>
               </div>
             </div>
 
             {/* Feature Checkbox Grid */}
             <div>
-              <span className="font-display text-lg text-ink font-semibold block mb-4">Избери елементи на градината:</span>
+              <span className="font-display text-lg text-ink font-semibold block mb-4">Избери обработки:</span>
               <div className="space-y-3">
                 {FEATURES_CONFIG.map(f => {
                   const active = selectedFeatures[f.id]
@@ -244,12 +230,12 @@ function GardenBudgetCalculator() {
                       onClick={() => handleToggle(f.id)}
                       className={`w-full text-left p-4 rounded-2xl border transition-all duration-300 flex items-center justify-between gap-4 ${
                         active 
-                          ? 'border-trustGreen bg-trustGreen/5 shadow-sm' 
+                          ? 'border-accent bg-accent/5 shadow-sm' 
                           : 'border-line hover:border-muted/30 bg-paper'
                       }`}>
                       <div className="flex gap-3 items-start">
                         <span className={`p-2 rounded-xl mt-0.5 ${
-                          active ? 'bg-trustGreen text-paper' : 'bg-soft text-muted'
+                          active ? 'bg-accent text-paper' : 'bg-soft text-muted'
                         }`}>
                           {f.icon}
                         </span>
@@ -259,7 +245,7 @@ function GardenBudgetCalculator() {
                         </div>
                       </div>
                       <div className={`shrink-0 w-6 h-6 rounded-full border flex items-center justify-center transition-all ${
-                        active ? 'bg-trustGreen border-trustGreen text-paper' : 'border-line bg-paper'
+                        active ? 'bg-accent border-accent text-paper' : 'border-line bg-paper'
                       }`}>
                         {active && <Check size={14} strokeWidth={3} />}
                       </div>
@@ -273,7 +259,7 @@ function GardenBudgetCalculator() {
           {/* Results Summary Right */}
           <div className="lg:col-span-5 flex flex-col gap-6">
             <div className="card p-8 border-0 shadow-lg rounded-3xl relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #0D2340 0%, #163250 100%)', color: '#F8FBFF' }}>
-              <div className="absolute top-0 right-0 w-48 h-48 bg-trustGreen/20 rounded-full blur-[70px] pointer-events-none" />
+              <div className="absolute top-0 right-0 w-48 h-48 bg-accent/20 rounded-full blur-[70px] pointer-events-none" />
               
               <div className="relative z-10 text-center">
                 <div className="text-xs uppercase tracking-wider text-accentSoft font-bold">ОРИЕНТИРОВЪЧЕН БЮДЖЕТ</div>
@@ -286,18 +272,14 @@ function GardenBudgetCalculator() {
                 </div>
                 
                 <p className="text-white/70 text-xs mt-3 leading-relaxed max-w-sm mx-auto">
-                  *Диапазонът е базиран на средните пазарни цени на материали и труд в България за 2026 г. Включва проектиране, доставка и полагане.
+                  *Диапазонът включва труд и материали от среден клас. За ексклузивни тапети и бои цената може да варира.
                 </p>
 
                 <div className="h-px bg-paper/10 my-6" />
 
                 <div className="text-left space-y-3">
                   <div className="flex justify-between text-xs text-white/80">
-                    <span>Базово оформяне &amp; труд:</span>
-                    <span className="font-mono">включено</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-white/80">
-                    <span>Подготовка на почвата (фрезоване):</span>
+                    <span>Оглед и консултация:</span>
                     <span className="font-mono">включено</span>
                   </div>
                   {FEATURES_CONFIG.map(f => {
@@ -319,7 +301,7 @@ function GardenBudgetCalculator() {
 
                 <Link 
                   to="/contact" 
-                  className="btn btn-primary !bg-trustGreen !text-paper hover:!bg-trustGreen/90 w-full justify-center">
+                  className="btn btn-primary !bg-accent !text-paper hover:!bg-accent/90 w-full justify-center">
                   Поискай точна оферта →
                 </Link>
               </div>
@@ -327,13 +309,13 @@ function GardenBudgetCalculator() {
 
             {/* Quick recommendation */}
             <div className="card p-6 bg-paper border border-line rounded-2xl flex gap-3 items-start shadow-sm">
-              <span className="p-2 bg-trustGreen/10 text-trustGreen rounded-xl shrink-0 mt-0.5">
+              <span className="p-2 bg-accent/10 text-accent rounded-xl shrink-0 mt-0.5">
                 <CheckCircle2 size={18} />
               </span>
               <div>
-                <div className="text-sm font-semibold text-ink">Безплатен първи оглед</div>
+                <div className="text-sm font-semibold text-ink">Мостри на място</div>
                 <p className="text-xs text-muted mt-1 leading-normal">
-                  Свържи се с Totsan днес и нашият ландшафтен архитект ще направи оглед на терена напълно безплатно в рамките на София и Пловдив.
+                  Нашите специалисти могат да донесат каталози с тапети и цветови ветрила директно във вашия дом за точен избор спрямо светлината.
                 </p>
               </div>
             </div>
@@ -345,27 +327,27 @@ function GardenBudgetCalculator() {
 }
 
 // ── Showcase Gallery ──────────────────────────────────────────────────────────
-function GardenShowcase() {
+function Showcase() {
   const [activeTab, setActiveTab] = useState(0)
 
   const ITEMS = [
     {
-      title: 'Модерна пергола с декинг',
-      location: 'Пловдив, Нов двор',
-      desc: 'Цялостно изграждане на дървена конструкция с автоматизирана покривна тента върху декинг от термобор. Инсталирано е интелигентно LED осветление с топла светлина.',
-      img: U('1505843513577-22bb7d21e455', 900)
+      title: 'Дълбоко синьо за акцент',
+      location: 'София, Център',
+      desc: 'Използвана е боя Farrow & Ball в нюанс Hague Blue за създаване на драматичен акцент в дневната, перфектно комбиниран с месингови елементи.',
+      img: U('1562259949-e8e7689d7828', 900)
     },
     {
-      title: 'Зелен семеен оазис',
-      location: 'София, кв. Драгалевци',
-      desc: 'Преобразяване на занемарен терен. Изравняване на почвата, полагане на бързорастящ тревен чим и засаждане на вечнозелени туи покрай оградата. Монтирана е капкова поливна система.',
-      img: U('1416879595882-3373a0480b5b', 900)
+      title: 'Флорален рай в спалнята',
+      location: 'Пловдив, Кършияка',
+      desc: 'Премиум тапети Cole & Son от серията Palm Jungle превръщат главната стена в спалнята в истинско произведение на изкуството.',
+      img: U('1558882224-dda166733046', 900)
     },
     {
-      title: 'Уютен градски балкон',
-      location: 'Варна, Тераса апартамент',
-      desc: 'Миниатюрен зелен дизайн за апартамент. Кашпи от терацо с бамбук за защита от вятър и интимност, допълнени от декоративни лампи и градински столове за следобедно кафе.',
-      img: U('1485955900006-10f4d324d411', 900)
+      title: 'Венецианска мазилка',
+      location: 'Варна, Чайка',
+      desc: 'Луксозна декоративна мазилка с перлен ефект, отразяваща светлината и придаваща неповторим уют на коридора и дневната.',
+      img: U('1505691938895-1758d7feb511', 900)
     }
   ]
 
@@ -374,9 +356,9 @@ function GardenShowcase() {
       <div className="container-page">
         <div className="text-center mb-10">
           <div className="eyebrow">Галерия проекти</div>
-          <h2 className="h-section mt-2">Реализирани външни пространства</h2>
+          <h2 className="h-section mt-2">Цветове, които говорят</h2>
           <p className="text-muted mt-3 max-w-2xl mx-auto">
-            Виж как сме преобразили различни дворове и тераси в България. Всеки проект е съобразен с изложението на терена и изискванията за поддръжка.
+            Виж как различните текстури и нюанси могат напълно да трансформират усещането за едно помещение.
           </p>
         </div>
 
@@ -388,7 +370,7 @@ function GardenShowcase() {
               onClick={() => setActiveTab(index)}
               className={`px-4 py-2 text-sm rounded-full transition-all ${
                 index === activeTab 
-                  ? 'bg-trustGreen text-paper font-semibold shadow-sm' 
+                  ? 'bg-accent text-paper font-semibold shadow-sm' 
                   : 'hover:bg-soft text-muted hover:text-ink'
               }`}>
               {item.title}
@@ -407,7 +389,7 @@ function GardenShowcase() {
           </div>
           <div className="md:col-span-5 p-8 flex flex-col justify-between">
             <div>
-              <div className="text-xs uppercase tracking-wider text-trustGreen font-bold font-mono">
+              <div className="text-xs uppercase tracking-wider text-accent font-bold font-mono">
                 {ITEMS[activeTab].location}
               </div>
               <h3 className="font-display text-2xl text-ink font-bold mt-2">
@@ -420,8 +402,8 @@ function GardenShowcase() {
             
             <Link 
               to="/contact" 
-              className="link-arrow text-sm self-start mt-6 !text-trustGreen !border-trustGreen hover:!text-ink hover:!border-ink">
-              Искам подобен дизайн →
+              className="link-arrow text-sm self-start mt-6 !text-accent !border-accent hover:!text-ink hover:!border-ink">
+              Искам подобен ефект →
             </Link>
           </div>
         </div>
@@ -432,31 +414,31 @@ function GardenShowcase() {
 }
 
 // ── Experts Directory ──────────────────────────────────────────────────────────
-function LandscapeExperts() {
+function Experts() {
   const EXPERTS = [
     {
-      name: 'арх. Велислава Колева',
-      role: 'Ландшафтен архитект',
-      rating: '4.95',
-      reviews: '28 отзива',
+      name: 'Студио „Цвят и Стил“',
+      role: 'Интериорни бояджии',
+      rating: '4.98',
+      reviews: '56 отзива',
       location: 'София и областта',
-      avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400&h=400'
-    },
-    {
-      name: 'Студио „Зелен Кът“',
-      role: 'Озеленяване & Системи',
-      rating: '4.88',
-      reviews: '41 отзива',
-      location: 'Пловдив и Пазарджик',
       avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=400&h=400'
     },
     {
-      name: 'Димитър Иванов',
-      role: 'Инженер поливни системи',
-      rating: '4.90',
-      reviews: '19 отзива',
-      location: 'Варна и Бургас',
+      name: 'Иван Петров',
+      role: 'Майстор декоративни мазилки',
+      rating: '4.92',
+      reviews: '34 отзива',
+      location: 'Пловдив',
       avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400&h=400'
+    },
+    {
+      name: 'Мария Иванова',
+      role: 'Специалист тапети',
+      rating: '4.89',
+      reviews: '22 отзива',
+      location: 'Варна',
+      avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400&h=400'
     }
   ]
 
@@ -466,9 +448,9 @@ function LandscapeExperts() {
         <div className="flex justify-between items-end mb-10 flex-wrap gap-4">
           <div>
             <div className="eyebrow">Доверени партньори</div>
-            <h2 className="h-section mt-2">Специалисти по Ландшафт</h2>
+            <h2 className="h-section mt-2">Специалисти по Декорация</h2>
           </div>
-          <Link to="/katalog" className="link-arrow text-sm !text-trustGreen !border-trustGreen hover:!text-ink hover:!border-ink">
+          <Link to="/katalog" className="link-arrow text-sm !text-accent !border-accent hover:!text-ink hover:!border-ink">
             Виж всички в каталога →
           </Link>
         </div>
@@ -485,7 +467,7 @@ function LandscapeExperts() {
                 <div>
                   <h3 className="font-display text-lg text-ink font-semibold">{ex.name}</h3>
                   <div className="text-xs text-muted font-medium mt-0.5">{ex.role}</div>
-                  <div className="flex items-center gap-1.5 text-xs text-trustGreen mt-1">
+                  <div className="flex items-center gap-1.5 text-xs text-accent mt-1">
                     <span>★ {ex.rating}</span>
                     <span className="text-muted">• {ex.reviews}</span>
                   </div>
@@ -498,7 +480,7 @@ function LandscapeExperts() {
                 <span>Регион: <b>{ex.location}</b></span>
                 <Link 
                   to="/contact" 
-                  className="text-trustGreen font-bold hover:text-ink transition flex items-center gap-0.5">
+                  className="text-accent font-bold hover:text-ink transition flex items-center gap-0.5">
                   Свържи се &rarr;
                 </Link>
               </div>
@@ -510,7 +492,7 @@ function LandscapeExperts() {
   )
 }
 
-function GardenFAQItem({ question, answer }) {
+function WallFAQItem({ question, answer }) {
   const [isOpen, setIsOpen] = useState(false)
   const contentRef = useRef(null)
 
@@ -518,11 +500,11 @@ function GardenFAQItem({ question, answer }) {
     <div className="border-b border-line py-5">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full text-left flex items-center justify-between gap-4 font-display text-xl py-2 focus:outline-none transition-colors hover:text-trustGreen font-bold"
+        className="w-full text-left flex items-center justify-between gap-4 font-display text-xl py-2 focus:outline-none transition-colors hover:text-accent font-bold"
         aria-expanded={isOpen}
       >
         <span>{question}</span>
-        <span className={`text-trustGreen text-3xl font-mono transition-transform duration-300 ${isOpen ? 'rotate-45' : ''}`}>
+        <span className={`text-accent text-3xl font-mono transition-transform duration-300 ${isOpen ? 'rotate-45' : ''}`}>
           +
         </span>
       </button>
@@ -540,23 +522,23 @@ function GardenFAQItem({ question, answer }) {
 }
 
 // ── FAQ ──────────────────────────────────────────────────────────────────────
-function GardenFAQ() {
+function WallFAQ() {
   const FAQ_ITEMS = [
     {
-      q: 'Кога е най-подходящото време за засяване или озеленяване?',
-      a: 'Пролетта (март-май) и есента (септември-ноември) са най-подходящите периоди за засаждане на растителност и полагане на тревни чимове поради по-меките температури и честите дъждове, които спомагат за по-доброто вкореняване.'
+      q: 'Каква е разликата между флис и винилови тапети?',
+      a: 'Флис тапетите са дишащи, лесни за лепене (лепилото се нанася само на стената) и екологични. Виниловите тапети имат PVC покритие, което ги прави изключително устойчиви на влага и миене, идеални за кухни и коридори.'
     },
     {
-      q: 'Колко често се полива нова градина?',
-      a: 'През първите 2-3 седмици след засаждането новата градина трябва да се полива ежедневно (сутрин или вечер). След като чимовете и храстите се вкоренят успешно, поливането може да бъде намалено до 2-3 пъти седмично, но с по-голямо количество вода.'
+      q: 'Трябва ли стената да е идеално гладка преди боядисване?',
+      a: 'Да. Всяка неравност си личи още повече след нанасяне на боята, особено ако тя е с матов завършек или при странично осветление. Затова фината шпакловка е препоръчителна.'
     },
     {
-      q: 'Каква е разликата между тревна смеска и тревен чим?',
-      a: 'Тревната смеска е по-евтина, но изисква месеци редовни грижи, плевене и поливане преди да израсне. Тревният чим дава готов зелен ефект веднага при полагане и е по-устойчив на износване от самото начало.'
+      q: 'Мога ли да сложа тапет върху стара боя?',
+      a: 'Ако старата боя е здрава и добре прилепнала, може. Задължително е обаче стената да се грундира предварително, за да се осигури добро сцепление на лепилото.'
     },
     {
-      q: 'Предлагате ли поддръжка след завършване на проекта?',
-      a: 'Да. През Totsan можете да намерите специалисти за абонаментна поддръжка, включваща косене на трева, плевене, торене, подрязване на жив плет и зазимяване/пролетно отваряне на поливната система.'
+      q: 'Колко време отнема изсъхването на декоративната мазилка?',
+      a: 'Повечето мазилки изсъхват на допир за няколко часа, но пълното им втвърдяване и придобиване на окончателна здравина може да отнеме до 2-3 седмици.'
     }
   ]
 
@@ -564,10 +546,10 @@ function GardenFAQ() {
     <section className="section bg-paper">
       <div className="container-page max-w-4xl">
         <div className="eyebrow text-center">Често задавани въпроси</div>
-        <h2 className="h-section text-center mt-2">Всичко за градинския проект</h2>
+        <h2 className="h-section text-center mt-2">Всичко за стените</h2>
         <div className="mt-10 divide-y divide-line border-y border-line">
           {FAQ_ITEMS.map((item, i) => (
-            <GardenFAQItem key={i} question={item.q} answer={item.a} />
+            <WallFAQItem key={i} question={item.q} answer={item.a} />
           ))}
         </div>
       </div>
@@ -575,24 +557,24 @@ function GardenFAQ() {
   )
 }
 
-function GardenCTA() {
+function CTA() {
   return (
     <section className="section bg-paper !pt-0">
       <div className="container-page rounded-3xl p-10 md:p-16 grid md:grid-cols-12 gap-8 items-center relative overflow-hidden shadow-xl" style={{ background: 'linear-gradient(135deg, #0D2340 0%, #163250 100%)', color: '#F8FBFF' }}>
-        <div className="absolute top-0 right-0 w-80 h-80 bg-trustGreen/15 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute top-0 right-0 w-80 h-80 bg-accent/15 rounded-full blur-[100px] pointer-events-none" />
         
         <div className="md:col-span-8 relative z-10">
-          <h2 className="h-section text-white font-display">Твоят мечтан двор е на един разказ разстояние</h2>
+          <h2 className="h-section text-white font-display">Стените, които заслужаваш</h2>
           <p className="mt-3 text-white/70 max-w-2xl leading-relaxed text-sm">
-            Сподели ни как изглежда твоята идеална градина или тераса. Нашите специалисти ще превърнат концепцията ти в реалност — от почвените изследвания до последната пергола.
+            От идеалния нюанс бяло до най-екстравагантния тапет. Сподели ни какво търсиш и ще те свържем с хората, които ще го реализират.
           </p>
         </div>
         
         <div className="md:col-span-4 flex md:justify-end gap-3 flex-wrap relative z-10">
           <Link 
             to="/contact" 
-            className="btn btn-primary !bg-trustGreen !text-paper hover:!bg-trustGreen/90 shadow-md">
-            Консултирай се безплатно
+            className="btn btn-primary !bg-accent !text-paper hover:!bg-accent/90 shadow-md">
+            Свържи се с нас
           </Link>
         </div>
       </div>

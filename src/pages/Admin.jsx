@@ -28,9 +28,9 @@ const ReviewsManagerSection = lazy(() => import('../components/admin/ReviewsMana
 const ADMIN_SECTIONS = [
   { id: 'dashboard', label: 'Обзор', hint: 'KPI и последни събития', icon: BarChart3, Component: DashboardSection },
   { id: 'users', label: 'Потребители', hint: 'Роли, статуси, ban', icon: Users, Component: UsersManagerSection },
-  { id: 'inquiries', label: 'Запитвания', hint: 'Форми и статуси', icon: ClipboardList, Component: InquiriesManagerSection },
+  { id: 'inquiries', label: 'Запитвания', hint: 'Форми, източници и статуси', icon: ClipboardList, Component: InquiriesManagerSection },
   { id: 'applications', label: 'Кандидатури', hint: 'Одобрение на специалисти', icon: UserCog, Component: ApplicationsManagerSection },
-  { id: 'profiles', label: 'Профили', hint: 'Каталог и публични карти', icon: FolderKanban, Component: ProfileManagerSection },
+  { id: 'profiles', label: 'Профили', hint: 'Публичност и профилна модерация', icon: FolderKanban, Component: ProfileManagerSection },
   { id: 'partner-services', label: 'Услуги', hint: 'Модерация на партньорски услуги', icon: PackageCheck, Component: PartnerServicesManagerSection },
   { id: 'orders', label: 'Поръчки', hint: 'Плащания, статуси, спорове', icon: CreditCard, Component: OrdersManagerSection },
   { id: 'reviews', label: 'Отзиви', hint: 'Verified отзиви и сигнали', icon: Star, Component: ReviewsManagerSection },
@@ -45,7 +45,7 @@ export default function Admin() {
   if (!session) return <LoginPanel />
 
   if (location.pathname === '/login') {
-    return <Navigate to={account?.role === 'admin' ? '/admin' : '/moy-profil'} replace />
+    return <Navigate to={resolvePostLoginTarget(location, account)} replace />
   }
 
   if (account?.role !== 'admin') {
@@ -59,6 +59,28 @@ export default function Admin() {
   return <AdminShell session={session} account={account}><AdminWorkspace session={session} account={account} /></AdminShell>
 }
 
+function resolvePostLoginTarget(location, account) {
+  const params = new URLSearchParams(location.search || '')
+  const next = normalizeNextPath(params.get('next') || '')
+
+  if (account?.role === 'admin') {
+    return next && next !== '/' ? next : '/admin'
+  }
+
+  if (next && next !== '/' && !next.startsWith('/admin')) {
+    return next
+  }
+
+  return '/moy-profil'
+}
+
+function normalizeNextPath(value = '') {
+  const raw = String(value || '').trim()
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return ''
+  if (raw.startsWith('/login')) return ''
+  return raw
+}
+
 function AdminShell({ children, session, account }) {
   const title = 'Админ контролен панел.'
   const subtitle = `Добре дошъл обратно, ${getAccountDisplayName(account, session, 'admin')}.`
@@ -70,7 +92,7 @@ function AdminShell({ children, session, account }) {
         <div className="absolute right-[-5rem] top-24 h-[18rem] w-[18rem] rounded-full bg-cloud blur-3xl"></div>
         <div className="absolute bottom-[-8rem] left-1/3 h-[18rem] w-[18rem] rounded-full bg-paper/80 blur-3xl"></div>
       </div>
-      <div className="container-page relative">
+      <div className="w-full max-w-[1920px] mx-auto px-4 sm:px-6 md:px-8 xl:px-12 relative">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
           <div>
             <div className="eyebrow">Totsan Admin</div>
@@ -98,32 +120,45 @@ function AdminWorkspace({ session, account }) {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
-      <aside className="lg:sticky lg:top-24 lg:self-start">
-        <div className="rounded-3xl border border-line bg-paper p-3 shadow-[0_20px_60px_-50px_rgba(0,0,0,0.22)]">
-          <div className="px-3 py-3">
-            <div className="eyebrow">Навигация</div>
-            <p className="mt-2 text-sm text-muted">Работен панел за модерация и поддръжка.</p>
-          </div>
-          <nav className="mt-2 grid gap-1">
+    <div className="flex flex-col lg:flex-row gap-6 items-start">
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex group lg:sticky lg:top-24 z-20 w-[4.5rem] hover:w-[16rem] transition-all duration-300 overflow-hidden rounded-[2rem] border border-line bg-paper p-2 shadow-[0_20px_60px_-50px_rgba(0,0,0,0.15)] h-[calc(100vh-8rem)] flex-col shrink-0">
+        <nav className="grid gap-1 flex-1 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar">
+          {ADMIN_SECTIONS.map((section) => {
+            const Icon = section.icon
+            const isActive = section.id === activeSection
+            return (
+              <button key={section.id} type="button" onClick={() => openSection(section.id)} title={section.label} className={`flex w-full items-center gap-4 rounded-2xl p-3 text-left transition whitespace-nowrap overflow-hidden ${isActive ? 'bg-soft text-ink' : 'text-muted hover:bg-soft/70 hover:text-ink'}`}>
+                <Icon size={20} className="shrink-0" />
+                <span className="min-w-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75">
+                  <span className="block text-sm font-medium">{section.label}</span>
+                </span>
+              </button>
+            )
+          })}
+        </nav>
+      </aside>
+
+      {/* Mobile nav (visible only below lg) */}
+      <div className="w-full lg:hidden rounded-[2rem] border border-line bg-paper p-3 mb-4">
+         <div className="px-3 py-3 overflow-hidden whitespace-nowrap">
+             <div className="eyebrow">Навигация</div>
+         </div>
+         <nav className="mt-1 flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
             {ADMIN_SECTIONS.map((section) => {
               const Icon = section.icon
               const isActive = section.id === activeSection
               return (
-                <button key={section.id} type="button" onClick={() => openSection(section.id)} className={`flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left transition ${isActive ? 'bg-soft text-ink' : 'text-muted hover:bg-soft/70 hover:text-ink'}`}>
-                  <Icon size={18} className="mt-0.5 shrink-0" />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium">{section.label}</span>
-                    <span className="mt-0.5 block text-xs opacity-75">{section.hint}</span>
-                  </span>
+                <button key={section.id} type="button" onClick={() => openSection(section.id)} className={`flex items-center gap-2 rounded-2xl p-3 whitespace-nowrap transition ${isActive ? 'bg-soft text-ink' : 'text-muted hover:bg-soft/70 hover:text-ink'}`}>
+                  <Icon size={18} className="shrink-0" />
+                  <span className="text-sm font-medium">{section.label}</span>
                 </button>
               )
             })}
-          </nav>
-        </div>
-      </aside>
+         </nav>
+      </div>
 
-      <main className="min-w-0 space-y-5">
+      <main className="min-w-0 flex-1 space-y-5 lg:min-h-[calc(100vh-8rem)]">
         <div className="rounded-3xl border border-line bg-paper p-4 md:p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
@@ -151,7 +186,10 @@ function AdminSectionFallback() {
 
 function LoginPanel() {
   const location = useLocation()
-  const isSignup = new URLSearchParams(location.search).get('signup') === 'true'
+  const params = new URLSearchParams(location.search)
+  const isSignup = params.get('signup') === 'true'
+  const requestedSignupRole = params.get('role') === 'pro' ? 'pro' : 'customer'
+  const nextPath = normalizeNextPath(params.get('next') || '')
   const [isLogin, setIsLogin] = useState(!isSignup)
 
   useEffect(() => {
@@ -163,7 +201,7 @@ function LoginPanel() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [signupRole, setSignupRole] = useState('customer') // 'customer' | 'pro'
+  const [signupRole, setSignupRole] = useState(requestedSignupRole) // 'customer' | 'pro'
   const [proPhone, setProPhone] = useState('')
   const [proAbout, setProAbout] = useState('')
   const [status, setStatus] = useState('idle')
@@ -171,6 +209,7 @@ function LoginPanel() {
   const [pendingAction, setPendingAction] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [rememberFor30Days, setRememberFor30Days] = useState(true)
 
   const pwdRules = {
     length: password.length >= 8,
@@ -181,14 +220,25 @@ function LoginPanel() {
   }
   const pwdValid = Object.values(pwdRules).every(Boolean)
 
+  useEffect(() => {
+    if (isSignup) setSignupRole(requestedSignupRole)
+  }, [isSignup, requestedSignupRole])
+
   async function signInWithProvider(provider) {
+    if (!isLogin && signupRole === 'pro') {
+      setStatus('error')
+      setPendingAction('')
+      setMessage('За Pro кандидатура използвай регистрация с имейл и парола, за да запазим ролята и данните за специалист.')
+      return
+    }
+
     setStatus('sending')
     setPendingAction(provider)
     setMessage('')
 
-    const options = {
-      redirectTo: `${window.location.origin}/login`,
-    }
+    const loginRedirect = new URL('/login', window.location.origin)
+    if (nextPath) loginRedirect.searchParams.set('next', nextPath)
+    const options = { redirectTo: loginRedirect.toString() }
 
     if (provider === 'google') {
       options.queryParams = { prompt: 'select_account' }
@@ -449,10 +499,20 @@ function LoginPanel() {
             )}
 
             {isLogin ? (
-              <label className="flex items-center gap-2 text-sm text-muted">
-                <input type="checkbox" className="rounded border-line text-accent focus:ring-accent" />
-                Запомни ме за 30 дни
-              </label>
+              <div className="rounded-2xl border border-line bg-soft px-3 py-2.5">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={rememberFor30Days}
+                  onClick={() => setRememberFor30Days((value) => !value)}
+                  className="flex w-full items-center justify-between gap-4 text-left"
+                >
+                  <span className="text-sm text-ink">Запомни ме за 30 дни</span>
+                  <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${rememberFor30Days ? 'bg-accent' : 'bg-line'}`}>
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-paper shadow transition ${rememberFor30Days ? 'translate-x-5' : 'translate-x-1'}`} />
+                  </span>
+                </button>
+              </div>
             ) : (
               <label className="flex items-center gap-2 text-sm text-muted">
                 <input type="checkbox" required className="rounded border-line text-accent focus:ring-accent" />

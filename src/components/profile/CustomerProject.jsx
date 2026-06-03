@@ -23,7 +23,7 @@ function makeDraft(project) {
   }
 }
 
-export default function CustomerProject({ project, media, onSave, onUploadMedia, onUpdateMedia, onDeleteMedia }) {
+export default function CustomerProject({ project, pendingBrief, media, onSave, onImportPendingBrief, onUploadMedia, onUpdateMedia, onDeleteMedia }) {
   const [draft, setDraft] = useState(() => makeDraft(project))
   const [saveStatus, setSaveStatus] = useState({ type: 'idle', message: '' })
   const [uploadStatus, setUploadStatus] = useState({ type: 'idle', message: '' })
@@ -37,6 +37,20 @@ export default function CustomerProject({ project, media, onSave, onUploadMedia,
   useEffect(() => {
     setDraft(makeDraft(project))
   }, [project?.id, project?.updatedAt])
+
+  useEffect(() => {
+    if (!pendingBrief) return
+
+    setDraft(current => ({
+      ...current,
+      title: current.title || pendingBrief.title || '',
+      currentLayerSlug: pendingBrief.currentLayerSlug || current.currentLayerSlug,
+      ideaDescription: current.ideaDescription ? `${current.ideaDescription}\n\n${pendingBrief.ideaDescription || ''}` : pendingBrief.ideaDescription || current.ideaDescription,
+      quizAnswers: { ...(current.quizAnswers || {}), ...(pendingBrief.quizAnswers || {}) },
+    }))
+    setSaveStatus({ type: 'idle', message: 'Импортирахме резултата от началния quiz. Прегледай и запази проекта.' })
+    onImportPendingBrief?.()
+  }, [pendingBrief, onImportPendingBrief])
 
   useEffect(() => {
     draftRef.current = draft
@@ -165,6 +179,12 @@ export default function CustomerProject({ project, media, onSave, onUploadMedia,
           <div className="eyebrow">Моят проект</div>
           <h2 className="mt-2 font-display text-3xl text-ink">Проект-паспорт</h2>
         </div>
+
+        {saveStatus.message && (
+          <div className={`rounded-2xl border p-4 text-sm ${saveStatus.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-line bg-soft text-muted'}`}>
+            {saveStatus.message}
+          </div>
+        )}
 
         <label className="block text-sm font-medium text-ink">Заглавие<input value={draft.title} onChange={event => update('title', event.target.value)} className={INPUT} placeholder="Двустаен в Лозенец" /></label>
 

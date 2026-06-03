@@ -155,7 +155,7 @@ export default function PartnerService() {
 
           <aside className="lg:col-span-4">
             <div className="lg:sticky lg:top-24 rounded-3xl border border-line bg-paper p-5 md:p-6">
-              <div className="eyebrow">Оферта</div>
+              <div className="eyebrow">Пакет и поръчка</div>
 
               {activePackage ? (
                 <div className="mt-5">
@@ -163,7 +163,8 @@ export default function PartnerService() {
                   <p className="mt-2 text-sm text-muted">{activePackage.description}</p>
                   <div className="mt-5 font-display text-4xl text-ink">{activePackage.priceAmount ? formatServicePrice(activePackage.priceAmount) : packagePriceLabel(service)}</div>
                   <div className="mt-4 grid gap-2 text-sm text-muted">
-                    <span className="inline-flex items-center gap-2"><ShieldCheck size={16} /> Плащане през Totsan</span>
+                    <span className="inline-flex items-center gap-2"><ShieldCheck size={16} /> Защитено плащане през Totsan</span>
+                    <span>Поръчай, когато обхватът е ясен. Парите се освобождават към партньора след потвърждение на завършването.</span>
                   </div>
                   {activePackage.features.length > 0 && (
                     <ul className="mt-5 space-y-2 text-sm text-ink/80">
@@ -180,8 +181,10 @@ export default function PartnerService() {
                     return
                   }
                   if (activePackage?.id) navigate(`/checkout/service/${activePackage.id}`)
-                }}>Поръчай</button>
+                }}>Поръчай пакета</button>
+                <p className="text-xs text-muted">Директно към checkout, ако условията и цената са ясни.</p>
                 <button type="button" className="btn btn-ghost w-full justify-center" onClick={startChat} disabled={chatState.status === 'opening'}><MessageSquare size={18} /> {chatState.status === 'opening' ? 'Отваряме…' : 'Питай първо'}</button>
+                <p className="text-xs text-muted">Използвай чат, ако искаш уточнение преди поръчка.</p>
                 {chatState.message && <div className={`rounded-2xl p-3 text-sm ${chatState.status === 'error' ? 'bg-red-50 text-red-700' : 'bg-soft text-muted'}`}>{chatState.message}</div>}
               </div>
             </div>

@@ -133,7 +133,7 @@ function CheckoutPayment({ type, id }) {
             <div className="mt-3 font-display text-5xl text-ink">{formatOrderMoney(preview.amountTotal, preview.currency)}</div>
             <div className="mt-5 flex gap-3 rounded-2xl border border-line bg-soft p-4 text-sm text-muted">
               <ShieldCheck size={18} className="mt-0.5 shrink-0 text-accentDeep" />
-              <p>Плащането остава в Totsan до потвърждение на завършването.</p>
+              <p>Плащането остава защитено в Totsan и се освобождава към партньора след потвърждение на завършването.</p>
             </div>
             <button type="button" onClick={() => pay('stripe')} disabled={status === 'paying' || unavailable} className="btn btn-primary mt-5 w-full justify-center">
               {status === 'paying' ? 'Обработваме…' : 'Плати със Stripe Sandbox'}
@@ -170,11 +170,32 @@ function CheckoutSuccess({ sessionId }) {
   if (loading || state.status === 'loading') return <CheckoutShell><Panel title="Потвърждаваме плащането…" /></CheckoutShell>
   if (!session) return <CheckoutShell><Panel title="Влез, за да завършим плащането"><Link to="/login" className="btn btn-primary mt-5">Вход</Link></Panel></CheckoutShell>
 
+  const isError = state.status === 'error'
+  const isPaid = state.status === 'paid'
+  const isPending = state.status === 'pending'
+
   return (
     <CheckoutShell>
-      <Panel title={state.status === 'error' ? 'Плащането не се потвърди' : 'Плащането е обработено'}>
-        <p className={`mt-2 text-sm ${state.status === 'error' ? 'text-red-700' : 'text-muted'}`}>{state.message}</p>
-        {state.order?.id && <Link to={`/order/${state.order.id}`} className="btn btn-primary mt-5">Към поръчката</Link>}
+      <Panel title={isError ? 'Плащането не се потвърди' : isPaid ? 'Плащането е успешно' : 'Плащането се обработва'}>
+        <div className={`mt-4 flex items-start gap-3 rounded-2xl border p-4 ${isError ? 'border-red-200 bg-red-50 text-red-700' : isPaid ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
+          <div>
+            <p className="text-sm font-medium">{state.message}</p>
+            {isPaid && <p className="mt-1 text-xs opacity-80">Можеш да проследиш статуса и детайлите директно в поръчката.</p>}
+            {isPending && <p className="mt-1 text-xs opacity-80">Stripe понякога потвърждава със закъснение от няколко секунди.</p>}
+          </div>
+        </div>
+
+        {state.order?.id && (
+          <div className="mt-4 text-sm text-muted">
+            Номер на поръчка: <span className="font-medium text-ink">{state.order.id.slice(0, 8)}</span>
+          </div>
+        )}
+
+        <div className="mt-5 flex flex-wrap gap-3">
+          {state.order?.id && <Link to={`/order/${state.order.id}`} className="btn btn-primary">Към поръчката</Link>}
+          <Link to="/porachki" className="btn btn-ghost">Моите поръчки</Link>
+        </div>
       </Panel>
     </CheckoutShell>
   )

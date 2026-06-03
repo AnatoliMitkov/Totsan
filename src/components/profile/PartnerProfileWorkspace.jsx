@@ -19,6 +19,7 @@ import PortfolioGallery from './PortfolioGallery.jsx'
 import PartnerStats from './PartnerStats.jsx'
 import PartnerServiceEditor from './PartnerServiceEditor.jsx'
 import PartnerOrders from './PartnerOrders.jsx'
+import PartnerInquiries from './PartnerInquiries.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const TABS = [
@@ -27,6 +28,7 @@ const TABS = [
   ['portfolio', 'Портфолио'],
   ['services', 'Услуги'],
   ['orders', 'Поръчки'],
+  ['inquiries', 'Запитвания'],
   ['contact', 'Контакт'],
 ]
 
@@ -416,6 +418,10 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
 
         {activeTab === 'orders' && (
           <PartnerOrders userId={userId} />
+        )}
+
+        {activeTab === 'inquiries' && (
+          <PartnerInquiries profileSlug={currentProfile.slug} partnerId={userId} />
         )}
 
         {activeTab === 'contact' && (
