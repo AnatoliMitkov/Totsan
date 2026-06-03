@@ -141,6 +141,13 @@ export default function OrdersManager({ globalQuery }) {
                   </select>
                   <textarea rows={3} value={draft.note} onChange={(event) => updateDraft(order.id, 'note', event.target.value)} className={ADMIN_INPUT_CLASS} placeholder="Админ бележка" />
                   <button type="button" onClick={() => saveStatus(order)} disabled={actionState.status === 'saving'} className="btn btn-primary w-full justify-center">Запази статус</button>
+                  <button type="button" onClick={async () => {
+                    if (!window.confirm('Сигурни ли сте, че искате да изтриете тази поръчка? Това действие е необратимо.')) return
+                    setActionState({ status: 'saving', message: 'Изтриване...' })
+                    const { error } = await supabase.from('orders').delete().eq('id', order.id)
+                    if (error) setActionState({ status: 'error', message: error.message || 'Грешка при изтриване.' })
+                    else { await load(); setActionState({ status: 'saved', message: 'Поръчката е изтрита.' }) }
+                  }} disabled={actionState.status === 'saving'} className="btn border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 w-full justify-center transition">Изтрий поръчка</button>
                 </div>
               </div>
             </article>

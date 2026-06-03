@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Mail, RefreshCcw, Search } from 'lucide-react'
 import { ADMIN_INPUT_CLASS, ADMIN_SELECT_CLASS, INQUIRY_STATUS_LABELS, contactHref, formatAdminDate, loadInquiries, matchesSearch, paginateRows, updateInquiryStatus } from '../../lib/admin.js'
+import { supabase } from '../../lib/supabase.js'
 
 const SOURCE_LABELS = {
   project_brief: 'Проектен бриф',
@@ -61,6 +62,19 @@ export default function InquiriesManager({ globalQuery = '' }) {
     }
   }
 
+  async function deleteInquiry(row) {
+    if (!window.confirm('Сигурни ли сте, че искате да изтриете това запитване?')) return
+    setMessage('Изтриване...')
+    try {
+      const { error: delError } = await supabase.from('inquiries').delete().eq('id', row.id)
+      if (delError) throw delError
+      setRows(current => current.filter(item => item.id !== row.id))
+      setMessage('Запитването е изтрито.')
+    } catch (err) {
+      setMessage(err.message || 'Грешка при изтриване.')
+    }
+  }
+
   if (status === 'loading') return <Panel title="Зареждаме запитванията…" />
   if (status === 'error') return <Panel title="Запитванията не се заредиха"><p className="text-sm text-red-700">{error}</p><button type="button" onClick={load} className="btn btn-ghost mt-5">Опитай пак</button></Panel>
 
@@ -95,7 +109,10 @@ export default function InquiriesManager({ globalQuery = '' }) {
               <select value={row.status} onChange={(event) => changeStatus(row, event.target.value)} className={ADMIN_SELECT_CLASS}>{Object.entries(INQUIRY_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
             </div>
             <p className="mt-4 whitespace-pre-wrap text-sm text-ink/80">{row.message}</p>
-            <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted"><span>{formatAdminDate(row.created_at)}</span><span>· {row.source || 'contact_form'}</span>{row.layer_slug && <span>· слой: {row.layer_slug}</span>}{row.target_slug && <span>· към: {row.target_slug}</span>}</div>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted items-center justify-between">
+              <div className="flex flex-wrap gap-2"><span>{formatAdminDate(row.created_at)}</span><span>· {row.source || 'contact_form'}</span>{row.layer_slug && <span>· слой: {row.layer_slug}</span>}{row.target_slug && <span>· към: {row.target_slug}</span>}</div>
+              <button type="button" onClick={() => deleteInquiry(row)} className="text-red-600 hover:text-red-700 font-medium">Изтрий</button>
+            </div>
           </article>
         ))}
         {pageData.rows.length === 0 && <Empty text="Няма запитвания по тези филтри." />}

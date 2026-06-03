@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { CheckCircle2, Clock, Eye, RefreshCw, Search, XCircle } from 'lucide-react'
 import { ADMIN_INPUT_CLASS, formatAdminDate } from '../../lib/admin.js'
 import { SERVICE_STATUS_LABELS, loadAdminPartnerServices, packagePriceLabel, updateAdminPartnerServiceStatus } from '../../lib/partner-services.js'
+import { supabase } from '../../lib/supabase.js'
 
 const STATUS_FILTERS = [
   ['all', 'Всички'],
@@ -56,6 +57,20 @@ export default function PartnerServicesManager({ globalQuery }) {
       setRows(current => current.map(item => item.id === updated.id ? updated : item))
     } catch (actionError) {
       setError(actionError.message || 'Статусът не се обнови.')
+    } finally {
+      setActionState({ id: '', status: 'idle' })
+    }
+  }
+
+  async function deleteService(service) {
+    if (!window.confirm('Сигурни ли сте, че искате да изтриете тази услуга?')) return
+    setActionState({ id: service.id, status: 'saving' })
+    try {
+      const { error: delError } = await supabase.from('partner_services').delete().eq('id', service.id)
+      if (delError) throw delError
+      setRows(current => current.filter(item => item.id !== service.id))
+    } catch (err) {
+      setError(err.message || 'Грешка при изтриване.')
     } finally {
       setActionState({ id: '', status: 'idle' })
     }
@@ -115,6 +130,7 @@ export default function PartnerServicesManager({ globalQuery }) {
                 )}
                 {service.isPublished && <Link to={`/uslugi/${service.slug}`} className="btn btn-ghost w-full justify-center"><Eye size={18} /> Публична страница</Link>}
                 {!service.isPublished && service.moderationStatus !== 'pending' && <div className="rounded-2xl border border-line bg-soft p-4 text-sm text-muted">Тази услуга не е публична за клиенти.</div>}
+                <button type="button" onClick={() => deleteService(service)} disabled={actionState.id === service.id} className="btn border border-red-200 text-red-600 hover:bg-red-50 w-full justify-center mt-2">Изтрий услугата</button>
               </div>
             </div>
           </article>

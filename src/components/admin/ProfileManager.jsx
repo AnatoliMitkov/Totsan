@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Eye, EyeOff, RefreshCcw, Search, SlidersHorizontal, UserRound, Pencil, X } from 'lucide-react'
+import { Eye, EyeOff, RefreshCcw, Search, SlidersHorizontal, UserRound, Pencil, X, Ban } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
 import { PROFILE_SELECT_COLUMNS, buildProfileDirectory, getProfileImage, getProfileImageStyle } from '../../lib/profiles.js'
 import { supabase } from '../../lib/supabase.js'
+import { updateAccount } from '../../lib/admin.js'
 
 const inputClassName = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const selectClassName = 'rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
@@ -131,6 +132,33 @@ export default function ProfileManager() {
     setTimeout(() => {
       closeEditing()
     }, 1000)
+  }
+
+  async function blockProfile() {
+    if (!window.confirm('Сигурни ли сте, че искате да блокирате този профил?\nТова ще го скрие от публичния каталог и ще блокира достъпа на свързания акаунт (ако има такъв).')) return
+    
+    setSaveState({ status: 'saving', message: 'Блокиране на профила...' })
+
+    try {
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ is_published: false })
+        .eq('id', editingProfile.id)
+
+      if (profileError) throw profileError
+
+      if (editingProfile.userId) {
+        await updateAccount(editingProfile.userId, { accountStatus: 'banned' })
+      }
+
+      await loadProfiles()
+      setSaveState({ status: 'saved', message: 'Профилът е успешно блокиран.' })
+      setTimeout(() => {
+        closeEditing()
+      }, 1500)
+    } catch (err) {
+      setSaveState({ status: 'error', message: err.message || 'Грешка при блокиране.' })
+    }
   }
 
   return (
@@ -308,6 +336,9 @@ export default function ProfileManager() {
               </div>
               
               <div className="mt-8 flex gap-3 pt-2">
+                <button type="button" onClick={blockProfile} disabled={saveState.status === 'saving'} className="btn border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 flex-1 justify-center transition">
+                   <Ban size={16} className="mr-1.5" /> Блокирай
+                </button>
                 <button type="button" onClick={closeEditing} className="btn btn-ghost flex-1 justify-center">Отказ</button>
                 <button type="submit" disabled={saveState.status === 'saving'} className="btn btn-primary flex-1 justify-center">
                    {saveState.status === 'saving' ? 'Запазване...' : 'Запази'}
