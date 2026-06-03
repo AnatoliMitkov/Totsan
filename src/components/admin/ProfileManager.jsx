@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Eye, EyeOff, Link as LinkIcon, RefreshCcw, Search, ShieldCheck, SlidersHorizontal, UserRound } from 'lucide-react'
+import { Eye, EyeOff, RefreshCcw, Search, SlidersHorizontal, UserRound, Pencil, X } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
 import { PROFILE_SELECT_COLUMNS, buildProfileDirectory, getProfileImage, getProfileImageStyle } from '../../lib/profiles.js'
 import { supabase } from '../../lib/supabase.js'
@@ -22,15 +22,11 @@ export default function ProfileManager() {
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
-  const [selectedSlug, setSelectedSlug] = useState('')
-  const [draft, setDraft] = useState(createGovernanceDraft())
+  const [editingProfile, setEditingProfile] = useState(null)
+  const [draft, setDraft] = useState(null)
   const [saveState, setSaveState] = useState({ status: 'idle', message: '' })
 
   const profiles = useMemo(() => buildProfileDirectory(rows, { includeUnpublished: true }), [rows])
-  const selectedProfile = useMemo(
-    () => profiles.find((profile) => profile.slug === selectedSlug) || profiles[0] || null,
-    [profiles, selectedSlug],
-  )
 
   const filteredProfiles = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -66,17 +62,6 @@ export default function ProfileManager() {
     loadProfiles()
   }, [])
 
-  useEffect(() => {
-    if (!profiles.length) {
-      setDraft(createGovernanceDraft())
-      return
-    }
-
-    const nextProfile = profiles.find((profile) => profile.slug === selectedSlug) || profiles[0]
-    if (!selectedSlug || nextProfile.slug !== selectedSlug) setSelectedSlug(nextProfile.slug)
-    setDraft(createGovernanceDraft(nextProfile))
-  }, [profiles, selectedSlug])
-
   async function loadProfiles() {
     setStatus('loading')
     setError('')
@@ -97,10 +82,19 @@ export default function ProfileManager() {
     setStatus('ready')
   }
 
-  function selectProfile(profile) {
-    setSelectedSlug(profile.slug)
-    setDraft(createGovernanceDraft(profile))
+  function startEditing(profile) {
+    setEditingProfile(profile)
+    setDraft({
+      layerSlug: profile.layerSlug || profile.layer || LAYERS[0]?.slug || '',
+      isPublished: profile.isPublished ?? true,
+      userId: profile.userId || '',
+    })
     setSaveState({ status: 'idle', message: '' })
+  }
+
+  function closeEditing() {
+    setEditingProfile(null)
+    setDraft(null)
   }
 
   function updateDraft(key, value) {
@@ -110,26 +104,20 @@ export default function ProfileManager() {
   async function submit(e) {
     e.preventDefault()
 
-    if (!selectedProfile?.id) {
-      setSaveState({
-        status: 'error',
-        message: 'Този профил няма стабилно ID в базата. Не е безопасно да се обнови от admin екрана.',
-      })
-      return
-    }
+    if (!editingProfile?.id) return
 
-    setSaveState({ status: 'saving', message: 'Запазваме модерационните настройки...' })
+    setSaveState({ status: 'saving', message: 'Запазваме настройките...' })
 
     const payload = {
       is_published: Boolean(draft.isPublished),
-      layer_slug: draft.layerSlug || selectedProfile.layerSlug,
+      layer_slug: draft.layerSlug || editingProfile.layerSlug,
       user_id: draft.userId.trim() || null,
     }
 
     const { data, error: saveError } = await supabase
       .from('profiles')
       .update(payload)
-      .eq('id', selectedProfile.id)
+      .eq('id', editingProfile.id)
       .select(PROFILE_SELECT_COLUMNS)
       .single()
 
@@ -139,9 +127,10 @@ export default function ProfileManager() {
     }
 
     setRows((current) => current.map((row) => (row.id === data.id ? data : row)))
-    setSelectedSlug(data.slug)
-    setDraft(createGovernanceDraft(buildProfileDirectory([data], { includeUnpublished: true })[0]))
-    setSaveState({ status: 'saved', message: 'Профилът е обновен безопасно.' })
+    setSaveState({ status: 'saved', message: 'Успешно запазено.' })
+    setTimeout(() => {
+      closeEditing()
+    }, 1000)
   }
 
   return (
@@ -149,10 +138,9 @@ export default function ProfileManager() {
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="eyebrow">Профили</div>
-          <h2 className="h-section mt-2">Публичност, категоризация и свързани акаунти.</h2>
+          <h2 className="h-section mt-2">Управление на профили</h2>
           <p className="mt-3 max-w-3xl text-sm text-muted">
-            Admin управлява дали профилът е видим, към кой слой принадлежи и кой акаунт го контролира.
-            Bio, снимки, портфолио и творческо съдържание остават работа на партньора.
+            Публичност, категоризация и свързани акаунти на всички партньори в системата.
           </p>
         </div>
         <button type="button" className="btn btn-ghost self-start md:self-auto" onClick={loadProfiles}>
@@ -161,24 +149,11 @@ export default function ProfileManager() {
         </button>
       </div>
 
-      <div className="mt-6 grid gap-3 md:grid-cols-4">
+      <div className="mt-6 grid gap-3 grid-cols-2 md:grid-cols-4">
         <StatCard label="Всички" value={stats.total} />
         <StatCard label="Публични" value={stats.published} />
         <StatCard label="Скрити" value={stats.hidden} />
         <StatCard label="Без акаунт" value={stats.unlinked} />
-      </div>
-
-      <div className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-950">
-        <div className="flex items-start gap-3">
-          <ShieldCheck size={18} className="mt-0.5 shrink-0" />
-          <div>
-            <div className="font-medium">Безопасен режим на управление</div>
-            <p className="mt-1 text-amber-900">
-              Този екран вече не създава профили и не редактира снимки, рейтинг, описание или публично copy.
-              Ако трябва cleanup/архивиране, първо е нужен ясен soft-archive модел в базата.
-            </p>
-          </div>
-        </div>
       </div>
 
       {error && (
@@ -187,271 +162,182 @@ export default function ProfileManager() {
         </div>
       )}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-12">
-        <aside className="lg:col-span-4 xl:col-span-3">
-          <div className="rounded-3xl border border-line bg-paper p-4">
-            <label className="relative block">
-              <Search size={17} className="pointer-events-none absolute left-4 top-1/2 translate-y-0.5 text-muted" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Търси име, град, слой..."
-                className={`${inputClassName} pl-11`}
-              />
-            </label>
-
-            <div className="mt-3 flex items-center gap-2">
-              <SlidersHorizontal size={16} className="text-muted" />
-              <select value={filter} onChange={(e) => setFilter(e.target.value)} className={`${selectClassName} w-full`}>
-                {FILTERS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="mt-4 max-h-[42rem] space-y-2 overflow-auto pr-1">
-              {filteredProfiles.map((profile) => (
-                <button
-                  key={profile.slug}
-                  type="button"
-                  onClick={() => selectProfile(profile)}
-                  className={`w-full rounded-2xl border px-4 py-4 text-left transition ${selectedProfile?.slug === profile.slug ? 'border-ink bg-soft' : 'border-line bg-paper hover:border-ink/40'}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="h-12 w-12 overflow-hidden rounded-full border border-line bg-soft">
-                      <img src={getProfileImage(profile)} alt={profile.name} className="img-cover" style={getProfileImageStyle(profile)} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="font-display text-lg text-ink">{profile.name}</div>
-                        <VisibilityBadge profile={profile} />
-                      </div>
-                      <div className="mt-1 text-xs text-muted">{profile.tag} · {profile.city}</div>
-                      <div className="mt-1 text-xs text-muted">Слой {profile.layerNumber} · {profile.layerTitle}</div>
-                      <div className="mt-2 text-[11px] text-muted">
-                        {profile.userId ? 'Свързан акаунт' : 'Без свързан акаунт'}
-                      </div>
-                    </div>
-                  </div>
-                </button>
+      <div className="mt-6 rounded-3xl border border-line bg-paper p-4 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center">
+          <label className="relative flex-1 block">
+            <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Търси име, град, слой..."
+              className={`${inputClassName} !mt-0 pl-11`}
+            />
+          </label>
+          <div className="flex w-full md:w-auto items-center gap-2">
+            <SlidersHorizontal size={16} className="text-muted shrink-0" />
+            <select value={filter} onChange={(e) => setFilter(e.target.value)} className={`${selectClassName} !mt-0 w-full min-w-[14rem]`}>
+              {FILTERS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
-
-              {status === 'loading' && (
-                <div className="rounded-2xl border border-line bg-soft px-4 py-6 text-center text-sm text-muted">
-                  Зареждаме профилите...
-                </div>
-              )}
-
-              {status !== 'loading' && filteredProfiles.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-line px-4 py-6 text-center text-sm text-muted">
-                  Няма профили по този филтър.
-                </div>
-              )}
-            </div>
+            </select>
           </div>
-        </aside>
+        </div>
 
-        <div className="lg:col-span-8 xl:col-span-9">
-          {selectedProfile ? (
-            <form onSubmit={submit} className="rounded-3xl border border-line bg-paper p-6 md:p-8">
-              <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
-                <div className="space-y-6">
-                  <ProfileSummary profile={selectedProfile} />
-
-                  <div className="rounded-3xl border border-line bg-soft/50 p-5">
-                    <div className="eyebrow">Admin контрол</div>
-                    <div className="mt-5 grid gap-5 md:grid-cols-2">
-                      <label className="rounded-2xl border border-line bg-paper p-4 text-sm text-ink">
-                        <span className="flex items-start gap-3">
-                          <input
-                            type="checkbox"
-                            checked={draft.isPublished}
-                            onChange={(e) => updateDraft('isPublished', e.target.checked)}
-                            className="mt-1 h-4 w-4 rounded border-line"
-                          />
-                          <span>
-                            <span className="font-medium">Публичен профил</span>
-                            <span className="mt-1 block text-muted">Изключи само при проблем, непълен профил или модерация.</span>
-                          </span>
-                        </span>
-                      </label>
-
-                      <Field label="Слой / категория">
-                        <select value={draft.layerSlug} onChange={(e) => updateDraft('layerSlug', e.target.value)} className={inputClassName}>
-                          {LAYERS.map((layer) => (
-                            <option key={layer.slug} value={layer.slug}>Слой {layer.number} · {layer.title}</option>
-                          ))}
-                        </select>
-                      </Field>
-                    </div>
-
-                    <Field label="Свързан акаунт (User ID)">
-                      <input
-                        value={draft.userId}
-                        onChange={(e) => updateDraft('userId', e.target.value)}
-                        className={inputClassName}
-                        placeholder="uuid от auth.users, празно ако няма"
-                      />
-                      <div className="mt-2 text-xs text-muted">
-                        Този акаунт редактира профила от “Моят профил”. Admin само свързва или маха връзката.
+        <div className="mt-6 overflow-x-auto rounded-2xl border border-line custom-scrollbar">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-soft border-b border-line text-muted uppercase text-[10px] tracking-wider font-semibold">
+              <tr>
+                <th className="px-5 py-4 w-1/3">Профил</th>
+                <th className="px-5 py-4">Слой / Категория</th>
+                <th className="px-5 py-4">Статус</th>
+                <th className="px-5 py-4">Акаунт</th>
+                <th className="px-5 py-4 text-right">Действия</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {filteredProfiles.length > 0 ? (
+                filteredProfiles.map((profile) => (
+                  <tr key={profile.slug} className="hover:bg-soft/40 transition">
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-line bg-soft">
+                          <img src={getProfileImage(profile)} alt={profile.name} className="img-cover" style={getProfileImageStyle(profile)} />
+                        </div>
+                        <div>
+                          <div className="font-medium text-ink text-base">{profile.name}</div>
+                          <div className="text-xs text-muted mt-0.5">{profile.tag} · {profile.city}</div>
+                        </div>
                       </div>
-                    </Field>
-                  </div>
-
-                  <div className="rounded-3xl border border-line bg-paper p-5">
-                    <div className="eyebrow">Съдържание само за преглед</div>
-                    <p className="mt-3 text-sm text-muted">
-                      Тези данни помагат за проверка, но не се редактират от admin екрана.
-                    </p>
-                    <dl className="mt-5 grid gap-4 md:grid-cols-2">
-                      <ReadOnlyItem label="Роля" value={selectedProfile.tag} />
-                      <ReadOnlyItem label="Град" value={selectedProfile.city} />
-                      <ReadOnlyItem label="Проекти" value={selectedProfile.projects} />
-                      <ReadOnlyItem label="Рейтинг" value={selectedProfile.rating} />
-                    </dl>
-                    {selectedProfile.bio && (
-                      <div className="mt-5 rounded-2xl border border-line bg-soft/50 p-4">
-                        <div className="text-xs uppercase tracking-[0.18em] text-muted">Bio</div>
-                        <p className="mt-2 whitespace-pre-wrap text-sm text-ink/80">{selectedProfile.bio}</p>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="font-medium text-ink">Слой {profile.layerNumber}</div>
+                      <div className="text-xs text-muted mt-0.5 truncate max-w-[12rem]">{profile.layerTitle}</div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <VisibilityBadge profile={profile} />
+                    </td>
+                    <td className="px-5 py-3">
+                      {profile.userId ? (
+                        <div className="inline-flex items-center gap-1.5 text-xs text-ink bg-soft px-2.5 py-1 rounded-full border border-line/50">
+                          <UserRound size={12} />
+                          Свързан
+                        </div>
+                      ) : (
+                        <div className="inline-flex text-xs text-muted px-2.5 py-1 rounded-full border border-line bg-paper">
+                          Няма акаунт
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Link to={`/profil/${profile.slug}`} title="Отвори публичния профил" className="p-2 text-muted hover:text-ink hover:bg-soft rounded-xl transition">
+                          <Eye size={16} />
+                        </Link>
+                        <button type="button" onClick={() => startEditing(profile)} className="btn btn-ghost !px-3 !py-1.5 text-xs">
+                          <Pencil size={14} className="mr-1.5" /> Редакция
+                        </button>
                       </div>
-                    )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="px-5 py-16 text-center text-muted bg-soft/20">
+                    {status === 'loading' ? 'Зареждаме профилите...' : 'Няма намерени профили.'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {editingProfile && draft && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/20 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-[2rem] border border-line bg-paper shadow-2xl relative max-h-[90vh] flex flex-col">
+            <button type="button" onClick={closeEditing} className="absolute right-4 top-4 p-2 text-muted hover:bg-soft hover:text-ink rounded-full transition z-10">
+              <X size={20} />
+            </button>
+            <div className="px-6 pt-6 pb-4 border-b border-line shrink-0">
+               <div className="eyebrow">Редакция на профил</div>
+               <div className="mt-2 text-xl font-display text-ink pr-8">{editingProfile.name}</div>
+            </div>
+            
+            <form onSubmit={submit} className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+              <div className="space-y-5">
+                <label className="flex items-start gap-3 rounded-2xl border border-line bg-soft/50 p-4 cursor-pointer hover:border-ink/30 transition">
+                  <input
+                    type="checkbox"
+                    checked={draft.isPublished}
+                    onChange={(e) => updateDraft('isPublished', e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-line accent-accent"
+                  />
+                  <span>
+                    <span className="block font-medium text-sm text-ink">Публичен профил</span>
+                    <span className="block text-xs text-muted mt-0.5">Ако е изключено, профилът няма да се вижда в каталога.</span>
+                  </span>
+                </label>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-ink">Слой / категория</label>
+                  <select value={draft.layerSlug} onChange={(e) => updateDraft('layerSlug', e.target.value)} className={`${selectClassName} !mt-0`}>
+                    {LAYERS.map((layer) => (
+                      <option key={layer.slug} value={layer.slug}>Слой {layer.number} · {layer.title}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-ink">Свързан акаунт (User ID)</label>
+                  <input
+                    value={draft.userId}
+                    onChange={(e) => updateDraft('userId', e.target.value)}
+                    className={`${inputClassName} !mt-0 font-mono text-xs`}
+                    placeholder="uuid от auth.users"
+                  />
+                  <div className="text-[11px] text-muted">
+                    Този акаунт може да редактира профила си през портала.
                   </div>
                 </div>
 
-                <aside className="space-y-4">
-                  <div className="rounded-3xl border border-line bg-soft/60 p-5">
-                    <div className="eyebrow">Публична карта</div>
-                    <div className="mt-4 card bg-paper p-5 shadow-none">
-                      <div className="flex items-start gap-4">
-                        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border border-line bg-soft">
-                          <img src={getProfileImage(selectedProfile)} alt={selectedProfile.name} className="img-cover" style={getProfileImageStyle(selectedProfile)} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-soft px-2.5 py-1 text-xs text-ink">{selectedProfile.tag}</span>
-                            <VisibilityBadge profile={selectedProfile} />
-                          </div>
-                          <div className="mt-3 font-display text-xl text-ink">{selectedProfile.name}</div>
-                          <div className="mt-1 text-sm text-muted">{selectedProfile.city} · Слой {selectedProfile.layerNumber}</div>
-                        </div>
-                      </div>
-                      <Link to={`/profil/${selectedProfile.slug}`} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full border border-line px-4 py-3 text-center font-medium transition hover:border-ink">
-                        <LinkIcon size={16} />
-                        Отвори профила
-                      </Link>
-                    </div>
+                {saveState.message && (
+                  <div className={`rounded-xl p-3 text-xs ${saveState.status === 'error' ? 'bg-red-50 text-red-700 border border-red-100' : 'bg-green-50 text-green-700 border border-green-100'}`}>
+                    {saveState.message}
                   </div>
-
-                  <div className="rounded-3xl border border-line bg-paper p-5">
-                    <div className="eyebrow">Cleanup</div>
-                    <p className="mt-3 text-sm text-muted">
-                      Не е добавен delete бутон. В текущия модел не се вижда безопасно поле като archived_at/deleted_at,
-                      затова cleanup трябва първо да мине през schema/helper решение.
-                    </p>
-                  </div>
-                </aside>
+                )}
               </div>
-
-              <div className="mt-8 flex flex-col gap-4 border-t border-line pt-6 md:flex-row md:items-center md:justify-between">
-                <div className={`text-sm ${saveState.status === 'error' ? 'text-red-700' : 'text-muted'}`}>
-                  {saveState.message || 'Запазват се само видимост, слой и свързан акаунт.'}
-                </div>
-                <button type="submit" className="btn btn-primary self-start md:self-auto" disabled={saveState.status === 'saving'}>
-                  {saveState.status === 'saving' ? 'Запазва се...' : 'Запази admin настройките'}
+              
+              <div className="mt-8 flex gap-3 pt-2">
+                <button type="button" onClick={closeEditing} className="btn btn-ghost flex-1 justify-center">Отказ</button>
+                <button type="submit" disabled={saveState.status === 'saving'} className="btn btn-primary flex-1 justify-center">
+                   {saveState.status === 'saving' ? 'Запазване...' : 'Запази'}
                 </button>
               </div>
             </form>
-          ) : (
-            <div className="rounded-3xl border border-line bg-paper p-8 text-sm text-muted">
-              Няма профили за управление.
-            </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
     </section>
-  )
-}
-
-function ProfileSummary({ profile }) {
-  return (
-    <div className="rounded-3xl border border-line bg-paper p-5">
-      <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
-        <div className="flex items-start gap-4">
-          <div className="h-20 w-20 shrink-0 overflow-hidden rounded-full border border-line bg-soft">
-            <img src={getProfileImage(profile)} alt={profile.name} className="img-cover" style={getProfileImageStyle(profile)} />
-          </div>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <VisibilityBadge profile={profile} />
-              {profile.userId ? <StatusPill icon={<UserRound size={13} />} label="Свързан акаунт" /> : <StatusPill label="Без акаунт" />}
-            </div>
-            <h3 className="mt-3 font-display text-3xl text-ink">{profile.name}</h3>
-            <p className="mt-1 text-sm text-muted">{profile.tag} · {profile.city}</p>
-            <p className="mt-1 text-sm text-muted">Слой {profile.layerNumber} · {profile.layerTitle}</p>
-          </div>
-        </div>
-        <Link to={`/profil/${profile.slug}`} className="btn btn-ghost self-start">
-          Отвори
-        </Link>
-      </div>
-    </div>
-  )
-}
-
-function Field({ label, children }) {
-  return (
-    <label className="block text-sm font-medium text-ink">
-      {label}
-      {children}
-    </label>
-  )
-}
-
-function ReadOnlyItem({ label, value }) {
-  return (
-    <div className="rounded-2xl border border-line bg-soft/50 px-4 py-3">
-      <dt className="text-xs uppercase tracking-[0.18em] text-muted">{label}</dt>
-      <dd className="mt-1 text-sm text-ink">{value || 'Няма данни'}</dd>
-    </div>
   )
 }
 
 function StatCard({ label, value }) {
   return (
-    <div className="rounded-3xl border border-line bg-paper p-5">
-      <div className="font-display text-3xl text-ink">{value}</div>
-      <div className="mt-1 text-xs text-muted">{label}</div>
+    <div className="rounded-3xl border border-line bg-paper p-5 transition hover:border-ink/30 shadow-sm">
+      <div className="font-display text-[clamp(1.5rem,1rem+1vw,2rem)] text-ink">{value}</div>
+      <div className="mt-1 text-xs text-muted font-medium">{label}</div>
     </div>
   )
 }
 
 function VisibilityBadge({ profile }) {
   return profile.isPublished ? (
-    <StatusPill icon={<Eye size={13} />} label="Публичен" tone="green" />
+    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-green-100 text-green-800">
+      <Eye size={12} /> Публичен
+    </span>
   ) : (
-    <StatusPill icon={<EyeOff size={13} />} label="Скрит" tone="amber" />
-  )
-}
-
-function StatusPill({ icon = null, label, tone = 'neutral' }) {
-  const className = tone === 'green'
-    ? 'bg-green-100 text-green-800'
-    : tone === 'amber'
-      ? 'bg-amber-100 text-amber-900'
-      : 'bg-soft text-muted'
-
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ${className}`}>
-      {icon}
-      {label}
+    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-900">
+      <EyeOff size={12} /> Скрит
     </span>
   )
-}
-
-function createGovernanceDraft(profile = null) {
-  return {
-    layerSlug: profile?.layerSlug || profile?.layer || LAYERS[0]?.slug || '',
-    isPublished: profile?.isPublished ?? true,
-    userId: profile?.userId || '',
-  }
 }

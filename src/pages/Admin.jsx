@@ -120,32 +120,48 @@ function AdminWorkspace({ session, account }) {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
-      <aside className="lg:sticky lg:top-24 lg:self-start">
-        <div className="rounded-3xl border border-line bg-paper p-3 shadow-[0_20px_60px_-50px_rgba(0,0,0,0.22)]">
-          <div className="px-3 py-3">
-            <div className="eyebrow">Навигация</div>
-            <p className="mt-2 text-sm text-muted">Работен панел за модерация и поддръжка.</p>
-          </div>
-          <nav className="mt-2 grid gap-1">
+    <div className="flex flex-col lg:flex-row gap-6 items-start">
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex group lg:sticky lg:top-24 z-20 w-[4.5rem] hover:w-[16rem] transition-all duration-300 overflow-hidden rounded-[2rem] border border-line bg-paper p-2 shadow-[0_20px_60px_-50px_rgba(0,0,0,0.15)] h-[calc(100vh-8rem)] flex-col shrink-0">
+        <div className="px-3.5 py-4 min-h-[4rem] flex items-center overflow-hidden whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 shrink-0">
+           <div className="eyebrow">Навигация</div>
+        </div>
+        <nav className="mt-1 grid gap-1 flex-1 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar">
+          {ADMIN_SECTIONS.map((section) => {
+            const Icon = section.icon
+            const isActive = section.id === activeSection
+            return (
+              <button key={section.id} type="button" onClick={() => openSection(section.id)} title={section.label} className={`flex w-full items-center gap-4 rounded-2xl p-3 text-left transition whitespace-nowrap overflow-hidden ${isActive ? 'bg-soft text-ink' : 'text-muted hover:bg-soft/70 hover:text-ink'}`}>
+                <Icon size={20} className="shrink-0" />
+                <span className="min-w-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75">
+                  <span className="block text-sm font-medium">{section.label}</span>
+                </span>
+              </button>
+            )
+          })}
+        </nav>
+      </aside>
+
+      {/* Mobile nav (visible only below lg) */}
+      <div className="w-full lg:hidden rounded-[2rem] border border-line bg-paper p-3 mb-4">
+         <div className="px-3 py-3 overflow-hidden whitespace-nowrap">
+             <div className="eyebrow">Навигация</div>
+         </div>
+         <nav className="mt-1 flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
             {ADMIN_SECTIONS.map((section) => {
               const Icon = section.icon
               const isActive = section.id === activeSection
               return (
-                <button key={section.id} type="button" onClick={() => openSection(section.id)} className={`flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left transition ${isActive ? 'bg-soft text-ink' : 'text-muted hover:bg-soft/70 hover:text-ink'}`}>
-                  <Icon size={18} className="mt-0.5 shrink-0" />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium">{section.label}</span>
-                    <span className="mt-0.5 block text-xs opacity-75">{section.hint}</span>
-                  </span>
+                <button key={section.id} type="button" onClick={() => openSection(section.id)} className={`flex items-center gap-2 rounded-2xl p-3 whitespace-nowrap transition ${isActive ? 'bg-soft text-ink' : 'text-muted hover:bg-soft/70 hover:text-ink'}`}>
+                  <Icon size={18} className="shrink-0" />
+                  <span className="text-sm font-medium">{section.label}</span>
                 </button>
               )
             })}
-          </nav>
-        </div>
-      </aside>
+         </nav>
+      </div>
 
-      <main className="min-w-0 space-y-5">
+      <main className="min-w-0 flex-1 space-y-5 lg:min-h-[calc(100vh-8rem)]">
         <div className="rounded-3xl border border-line bg-paper p-4 md:p-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
