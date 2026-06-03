@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, MessageSquare, ShieldCheck, Star } from 'lucide-react'
+import FallbackImage from '../components/FallbackImage.jsx'
 import { createConversationFromProfile } from '../lib/chat.js'
-import { getProfileImage, getProfileImageStyle, normalizeProfile } from '../lib/profiles.js'
+import { getProfileImageCandidates, getProfileImageStyle, normalizeProfile } from '../lib/profiles.js'
 import { formatServicePrice, loadPartnerServiceBySlug, packagePriceLabel } from '../lib/partner-services.js'
+import { getPartnerServiceCoverCandidates } from '../lib/service-media.js'
 import { useAccount } from '../lib/account.js'
 import ReviewsList from '../components/reviews/ReviewsList.jsx'
 
@@ -56,7 +58,8 @@ export default function PartnerService() {
   }, [service])
   const packages = useMemo(() => service?.packages?.filter(item => item.isActive) || [], [service])
   const activePackage = packages[0]
-  const cover = service?.coverUrl || service?.media?.[0]?.url || profile?.imageUrl
+  const coverCandidates = useMemo(() => getPartnerServiceCoverCandidates(service, profile), [profile, service])
+  const profileImageCandidates = useMemo(() => getProfileImageCandidates(profile), [profile])
 
   async function startChat() {
     if (!service || !profile) return
@@ -98,12 +101,12 @@ export default function PartnerService() {
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 {profile.slug ? (
                   <Link to={`/profil/${profile.slug}`} className="inline-flex items-center gap-3 rounded-full border border-line bg-paper px-3 py-2 text-sm text-ink transition hover:border-ink/40">
-                    <span className="h-9 w-9 overflow-hidden rounded-full bg-soft"><img src={getProfileImage(profile)} alt={profile.name} className="img-cover" style={getProfileImageStyle(profile)} /></span>
+                    <span className="h-9 w-9 overflow-hidden rounded-full bg-soft"><FallbackImage sources={profileImageCandidates} alt={profile.name} className="img-cover" style={getProfileImageStyle(profile)} /></span>
                     <span>{profile.name}</span>
                   </Link>
                 ) : (
                   <span className="inline-flex items-center gap-3 rounded-full border border-line bg-paper px-3 py-2 text-sm text-ink">
-                    <span className="h-9 w-9 overflow-hidden rounded-full bg-soft"><img src={getProfileImage(profile)} alt={profile.name} className="img-cover" style={getProfileImageStyle(profile)} /></span>
+                    <span className="h-9 w-9 overflow-hidden rounded-full bg-soft"><FallbackImage sources={profileImageCandidates} alt={profile.name} className="img-cover" style={getProfileImageStyle(profile)} /></span>
                     <span>{profile.name}</span>
                   </span>
                 )}
@@ -112,7 +115,7 @@ export default function PartnerService() {
             </div>
             <div className="lg:col-span-5">
               <div className="overflow-hidden rounded-3xl border border-line bg-paper">
-                <div className="aspect-[16/11] bg-soft">{cover ? <img src={cover} alt={service.title} className="img-cover" /> : null}</div>
+                <div className="aspect-[16/11] bg-soft"><FallbackImage sources={coverCandidates} alt={service.title} className="img-cover" /></div>
               </div>
             </div>
           </div>
@@ -141,7 +144,7 @@ export default function PartnerService() {
 
             <Panel eyebrow="Партньор" title="За изпълнителя">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                <div className="h-20 w-20 overflow-hidden rounded-full bg-soft"><img src={getProfileImage(profile)} alt={profile.name} className="img-cover" style={getProfileImageStyle(profile)} /></div>
+                <div className="h-20 w-20 overflow-hidden rounded-full bg-soft"><FallbackImage sources={profileImageCandidates} alt={profile.name} className="img-cover" style={getProfileImageStyle(profile)} /></div>
                 <div>
                   <h3 className="font-display text-3xl text-ink">{profile.name}</h3>
                   <p className="mt-1 text-sm text-muted">{profile.tag} · {profile.city}</p>
