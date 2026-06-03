@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Eye, EyeOff, Flag, RefreshCw, Search, Star } from 'lucide-react'
+import { CheckCircle2, Eye, EyeOff, Flag, RefreshCw, Search, Star, Trash2 } from 'lucide-react'
 import { ADMIN_INPUT_CLASS, formatAdminDate } from '../../lib/admin.js'
 import { REVIEW_STATUS_LABELS, formatReviewDate, loadAdminReviewReports, loadAdminReviews, resolveReviewReport, updateReviewModeration } from '../../lib/reviews.js'
 import { supabase } from '../../lib/supabase.js'
@@ -150,9 +150,9 @@ export default function ReviewsManager({ globalQuery }) {
                   )}
                 </div>
                 <div className="space-y-3">
-                  <button type="button" onClick={() => changeVisibility(review, 'hidden')} disabled={review.moderationStatus === 'hidden' || actionState.status === 'saving'} className="btn btn-ghost w-full justify-center disabled:opacity-50"><EyeOff size={18} /> Скрий</button>
-                  <button type="button" onClick={() => changeVisibility(review, 'visible')} disabled={review.moderationStatus === 'visible' || actionState.status === 'saving'} className="btn btn-primary w-full justify-center disabled:opacity-50"><Eye size={18} /> Покажи</button>
-                  <button type="button" onClick={() => deleteReview(review)} disabled={actionState.status === 'saving'} className="btn border border-red-200 text-red-600 hover:bg-red-50 w-full justify-center mt-2">Изтрий отзива</button>
+                  <button type="button" onClick={() => changeVisibility(review, 'hidden')} disabled={review.moderationStatus === 'hidden' || actionState.status === 'saving'} className="btn btn-ghost w-full justify-center disabled:opacity-50 whitespace-nowrap !py-2 text-sm"><EyeOff size={16} /> Скрий</button>
+                  <button type="button" onClick={() => changeVisibility(review, 'visible')} disabled={review.moderationStatus === 'visible' || actionState.status === 'saving'} className="btn btn-primary w-full justify-center disabled:opacity-50 whitespace-nowrap !py-2 text-sm"><Eye size={16} /> Покажи</button>
+                  <button type="button" onClick={() => deleteReview(review)} disabled={actionState.status === 'saving'} className="btn border border-red-200 text-red-600 hover:bg-red-50 w-full justify-center mt-2 whitespace-nowrap !py-2 text-sm"><Trash2 size={16} className="mr-1.5" /> Изтрий</button>
                 </div>
               </div>
             </article>

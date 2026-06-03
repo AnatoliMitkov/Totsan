@@ -123,10 +123,7 @@ function AdminWorkspace({ session, account }) {
     <div className="flex flex-col lg:flex-row gap-6 items-start">
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex group lg:sticky lg:top-24 z-20 w-[4.5rem] hover:w-[16rem] transition-all duration-300 overflow-hidden rounded-[2rem] border border-line bg-paper p-2 shadow-[0_20px_60px_-50px_rgba(0,0,0,0.15)] h-[calc(100vh-8rem)] flex-col shrink-0">
-        <div className="px-3.5 py-4 min-h-[4rem] flex items-center overflow-hidden whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75 shrink-0">
-           <div className="eyebrow">Навигация</div>
-        </div>
-        <nav className="mt-1 grid gap-1 flex-1 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar">
+        <nav className="grid gap-1 flex-1 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar">
           {ADMIN_SECTIONS.map((section) => {
             const Icon = section.icon
             const isActive = section.id === activeSection

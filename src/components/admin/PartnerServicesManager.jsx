@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CheckCircle2, Clock, Eye, RefreshCw, Search, XCircle } from 'lucide-react'
+import { CheckCircle2, Clock, Eye, RefreshCw, Search, XCircle, Trash2 } from 'lucide-react'
 import { ADMIN_INPUT_CLASS, formatAdminDate } from '../../lib/admin.js'
 import { SERVICE_STATUS_LABELS, loadAdminPartnerServices, packagePriceLabel, updateAdminPartnerServiceStatus } from '../../lib/partner-services.js'
 import { supabase } from '../../lib/supabase.js'
@@ -105,7 +105,7 @@ export default function PartnerServicesManager({ globalQuery }) {
       <div className="grid gap-4">
         {filtered.map(service => (
           <article key={service.id} className="rounded-3xl border border-line bg-paper p-5 md:p-6">
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_14rem]">
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_16rem]">
               <div>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
                   <span className="rounded-full bg-soft px-3 py-1">{SERVICE_STATUS_LABELS[service.moderationStatus] || service.moderationStatus}</span>
@@ -124,13 +124,13 @@ export default function PartnerServicesManager({ globalQuery }) {
               <div className="space-y-3">
                 {service.moderationStatus === 'pending' && (
                   <>
-                    <button type="button" onClick={() => updateServiceStatus(service, 'approved')} disabled={actionState.id === service.id} className="btn btn-primary w-full justify-center"><CheckCircle2 size={18} /> Одобри</button>
-                    <button type="button" onClick={() => updateServiceStatus(service, 'rejected')} disabled={actionState.id === service.id} className="btn btn-ghost w-full justify-center"><XCircle size={18} /> Върни</button>
+                    <button type="button" onClick={() => updateServiceStatus(service, 'approved')} disabled={actionState.id === service.id} className="btn btn-primary w-full justify-center whitespace-nowrap !py-2 text-sm"><CheckCircle2 size={16} /> Одобри</button>
+                    <button type="button" onClick={() => updateServiceStatus(service, 'rejected')} disabled={actionState.id === service.id} className="btn btn-ghost w-full justify-center whitespace-nowrap !py-2 text-sm"><XCircle size={16} /> Върни</button>
                   </>
                 )}
-                {service.isPublished && <Link to={`/uslugi/${service.slug}`} className="btn btn-ghost w-full justify-center"><Eye size={18} /> Публична страница</Link>}
+                {service.isPublished && <Link to={`/uslugi/${service.slug}`} className="btn btn-ghost w-full justify-center whitespace-nowrap !py-2 text-sm"><Eye size={16} /> Публична страница</Link>}
                 {!service.isPublished && service.moderationStatus !== 'pending' && <div className="rounded-2xl border border-line bg-soft p-4 text-sm text-muted">Тази услуга не е публична за клиенти.</div>}
-                <button type="button" onClick={() => deleteService(service)} disabled={actionState.id === service.id} className="btn border border-red-200 text-red-600 hover:bg-red-50 w-full justify-center mt-2">Изтрий услугата</button>
+                <button type="button" onClick={() => deleteService(service)} disabled={actionState.id === service.id} className="btn border border-red-200 text-red-600 hover:bg-red-50 w-full justify-center mt-2 whitespace-nowrap !py-2 text-sm"><Trash2 size={16} className="mr-1.5" /> Изтрий</button>
               </div>
             </div>
           </article>

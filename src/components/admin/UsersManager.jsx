@@ -12,7 +12,7 @@ import {
   updateAccount,
 } from '../../lib/admin.js'
 
-const ADMIN_ROLE_MANAGER_EMAILS = new Set(['a.mitkov@totsan.com'])
+const ADMIN_ROLE_MANAGER_EMAILS = new Set(['a.mitkov@totsan.com', 'ivelinva2@gmail.com'])
 
 export default function UsersManager({ globalQuery = '', account }) {
   const [rows, setRows] = useState([])
