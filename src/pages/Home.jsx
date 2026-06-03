@@ -380,10 +380,33 @@ function AnimatedStatCounter({ end, suffix = '', label }) {
 }
 
 function Promise() {
-  const items = [
+  const legacyItems = [
     { k:'Само проверени', v:'Никой не влиза в Totsan, ако не доказва качество.', icon: <UserCheck className="text-accent" size={24} /> },
     { k:'Един разказ', v:'Сайтът те води стъпка по стъпка, без да ровиш в Google.', icon: <Compass className="text-accent" size={24} /> },
     { k:'Реални оферти', v:'Виждаш цени, наличности и условия — без скрити „звездички“.', icon: <ShieldCheck className="text-accent" size={24} /> }
+  ]
+  const stats = [
+    { value: '5', label: 'Слоя на процеса' },
+    { value: '0 лв.', label: 'Такса за клиента' },
+    { value: 'Проверени', label: 'Партньори и услуги' },
+    { value: 'Защитено', label: 'Плащане при поръчка' }
+  ]
+  const statVisuals = [
+    { badge: 'Път', icon: <Compass size={18} className="text-accentDeep" /> },
+    { badge: 'Клиент', icon: <CheckCircle2 size={18} className="text-accentDeep" /> },
+    { badge: 'Verify', icon: <UserCheck size={18} className="text-accentDeep" /> },
+    { badge: 'Shield', icon: <ShieldCheck size={18} className="text-accentDeep" /> }
+  ]
+  const statDescriptions = [
+    'Ясен път от идея до реализация.',
+    'Платформата не взима такса от клиента.',
+    'Видими след преглед и активиране.',
+    'Сигурна поръчка през платформата.'
+  ]
+  const items = [
+    { k:'Проверка преди видимост', v:'Партньорите минават през преглед, преди да бъдат показани като активни в платформата.', icon: <UserCheck className="text-accent" size={24} /> },
+    { k:'Ясен път', v:'Започваш с кратък бриф, получаваш насока и стигаш до правилния слой, специалист или услуга.', icon: <Compass className="text-accent" size={24} /> },
+    { k:'По-малко догадки', v:'Виждаш обхват, ориентир за цена и следваща стъпка, преди да губиш време в разговори.', icon: <ShieldCheck className="text-accent" size={24} /> }
   ]
   return (
     <section className="section bg-soft border-y border-line">
@@ -393,15 +416,38 @@ function Promise() {
             <Sparkles size={14} className="text-accent" /> Ранен достъп · пилотна фаза
           </span>
         </div>
-        {/* Rolling Counters Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
+          {stats.map((stat, index) => (
+            <div key={stat.label} className="rounded-2xl border border-line bg-paper/60 px-5 py-6 text-center shadow-sm">
+              <div className="mb-5 flex justify-center">
+                <span className="inline-flex h-16 w-16 items-center justify-center rounded-[1.4rem] bg-accentSoft">
+                  {index === 0 ? <Compass size={30} className="text-accentDeep" /> : null}
+                  {index === 1 ? <CheckCircle2 size={30} className="text-accentDeep" /> : null}
+                  {index === 2 ? <UserCheck size={30} className="text-accentDeep" /> : null}
+                  {index === 3 ? <ShieldCheck size={30} className="text-accentDeep" /> : null}
+                </span>
+              </div>
+              <div className="font-display text-[clamp(2rem,1.6rem+1vw,3.25rem)] leading-none text-accentDeep font-bold">
+                {index === 1 ? '0 €' : stat.value}
+              </div>
+              <div className="mt-3 font-display text-xl leading-tight text-ink">
+                {stat.label}
+              </div>
+              <p className="mt-3 text-sm leading-relaxed text-muted">
+                {statDescriptions[index]}
+              </p>
+            </div>
+          ))}
+        </div>
+        {false && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
           <AnimatedStatCounter end={5} label="Слоя на създаване" suffix="" />
           <AnimatedStatCounter end={100} label="Проверени партньори" suffix="%" />
           <AnimatedStatCounter end={0} label="Такси за клиента" suffix="%" />
           <AnimatedStatCounter end={100} label="Защитено плащане" suffix="%" />
         </div>
+        )}
 
-        {/* Value Propositions */}
         <div className="grid md:grid-cols-3 gap-8">
           {items.map((i, idx) => (
             <div key={idx} className="reveal flex gap-4 p-6 bg-paper rounded-2xl border border-line shadow-sm">
