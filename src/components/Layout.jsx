@@ -82,6 +82,7 @@ function Header() {
   const isServicesActive = pathname.startsWith('/uslugi')
   const isCatalogActive = pathname === '/katalog'
   const isProActive = pathname === '/pro' || pathname === '/totsan-pro'
+  const isVisualizationActive = pathname === '/vizualizacia'
   const isHomeHeroMode = isHomePage && !isScrolled && !open
   const shouldShowScrolledShadow = isScrolled && !open
   const headerSurfaceClass = isHomeHeroMode
@@ -159,6 +160,7 @@ function Header() {
             isServicesActive={isServicesActive}
             isCatalogActive={isCatalogActive}
             isProActive={isProActive}
+            isVisualizationActive={isVisualizationActive}
           />
           {session && <Link to="/inbox" className={desktopUtilityLinkClassName(isHomeHeroMode)}>
             <MessageCircle size={17} />
@@ -255,7 +257,7 @@ function desktopUtilityLinkClassName(onDarkHero = false) {
   return `desktop-header-utility ${onDarkHero ? 'desktop-header-utility-on-dark' : ''}`
 }
 
-function DesktopMoreMenu({ isOpen, setIsOpen, isHomeHeroMode, isServicesActive, isCatalogActive, isProActive }) {
+function DesktopMoreMenu({ isOpen, setIsOpen, isHomeHeroMode, isServicesActive, isCatalogActive, isProActive, isVisualizationActive }) {
   const ref = useRef(null)
 
   useEffect(() => {
@@ -296,6 +298,7 @@ function DesktopMoreMenu({ isOpen, setIsOpen, isHomeHeroMode, isServicesActive, 
         <div id="desktop-more-menu" role="menu" className="absolute right-0 mt-2 w-56 overflow-hidden rounded-2xl border border-line bg-paper shadow-lg">
           <NavLink to="/uslugi" onClick={() => setIsOpen(false)} className={({ isActive }) => `block px-4 py-2.5 text-sm transition hover:bg-soft ${isServicesActive || isActive ? 'bg-accentSoft text-ink' : 'text-ink'}`}>Услуги</NavLink>
           <NavLink to="/katalog" onClick={() => setIsOpen(false)} className={({ isActive }) => `block px-4 py-2.5 text-sm transition hover:bg-soft ${isCatalogActive || isActive ? 'bg-accentSoft text-ink' : 'text-ink'}`}>Каталог</NavLink>
+          <NavLink to="/vizualizacia" onClick={() => setIsOpen(false)} className={({ isActive }) => `block px-4 py-2.5 text-sm transition hover:bg-soft ${isVisualizationActive || isActive ? 'bg-accentSoft text-ink' : 'text-ink'}`}>3D визуализация</NavLink>
           <NavLink to="/pro" onClick={() => setIsOpen(false)} className={({ isActive }) => `block px-4 py-2.5 text-sm transition hover:bg-soft ${isProActive || isActive ? 'bg-accentSoft text-ink' : 'text-ink'}`}>Totsan Pro</NavLink>
         </div>
       )}
@@ -387,6 +390,7 @@ function Footer({ isAuthPage = false }) {
           <div className="eyebrow mb-3">Сайт</div>
           <ul className="space-y-1.5 text-sm">
             <li><Link to="/start" className="text-muted hover:text-ink">Започни проект</Link></li>
+            <li><Link to="/vizualizacia" className="text-muted hover:text-ink">3D визуализация</Link></li>
             <li><Link to="/kak-raboti" className="text-muted hover:text-ink">Как работи Totsan</Link></li>
             <li><Link to="/za-nas" className="text-muted hover:text-ink">За нас</Link></li>
             <li><Link to="/uslugi" className="text-muted hover:text-ink">Услуги</Link></li>

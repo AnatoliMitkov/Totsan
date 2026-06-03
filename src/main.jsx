@@ -17,6 +17,7 @@ import Product from './pages/Product.jsx'
 import HowItWorks from './pages/HowItWorks.jsx'
 import About from './pages/About.jsx'
 import Contact from './pages/Contact.jsx'
+import Vizualizacia from './pages/Vizualizacia.jsx'
 import Admin from './pages/Admin.jsx'
 import MyProfile from './pages/MyProfile.jsx'
 import Inbox from './pages/Inbox.jsx'
@@ -54,6 +55,7 @@ function AppRoutes() {
           <Route path="/za-nas" element={<About />} />
           <Route path="/kontakt" element={<Contact />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/vizualizacia" element={<Vizualizacia />} />
           <Route path="/gradina-i-dvor" element={<GardenAndYard />} />
           <Route path="/tapeti-i-cvetove" element={<WallpapersAndColors />} />
           <Route path="/dekorativni-akcenti" element={<DecorativeAccents />} />
