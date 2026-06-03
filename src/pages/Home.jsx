@@ -415,11 +415,6 @@ function AnimatedStatCounter({ end, suffix = '', label }) {
 }
 
 function TrustPromise() {
-  const items = [
-    { k:'Само проверени', v:'Никой не влиза в Totsan, ако не доказва качество.', icon: <UserCheck className="text-accent" size={24} /> },
-    { k:'Един разказ', v:'Сайтът те води стъпка по стъпка, без да ровиш в Google.', icon: <Compass className="text-accent" size={24} /> },
-    { k:'Реални оферти', v:'Виждаш цени, наличности и условия — без скрити „звездички“.', icon: <ShieldCheck className="text-accent" size={24} /> }
-  ]
   const staticStats = [
     { value: '5', label: 'Слоя на процеса' },
     { value: '0 лв.', label: 'Такса за клиента' },
