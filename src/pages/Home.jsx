@@ -16,6 +16,7 @@ import {
 import { gsap } from 'gsap'
 import { LAYERS } from '../data/layers.js'
 import { HOME_PROJECTS, PARTNER_LOGOS, LAYER_HEROS } from '../data/images.js'
+import { supabase } from '../lib/supabase.js'
 
 const HERO_POSTER_SRC = '/Videos/totsan-hero-video-building-layers.webp'
 const HERO_VIDEO_SOURCES = [
@@ -27,7 +28,7 @@ export default function Home() {
   return (
     <>
       <Hero />
-      <Promise />
+      <TrustPromise />
       <LayersTimelineExplorer />
       <DreamBuilderQuiz />
       <SectionDivider label="Услуги" />
@@ -336,26 +337,19 @@ function SectionDivider({ label }) {
 
 function AnimatedStatCounter({ end, suffix = '', label }) {
   const [count, setCount] = useState(0)
+  const [isVisible, setIsVisible] = useState(false)
   const elementRef = useRef(null)
-  const hasAnimated = useRef(false)
+  const countRef = useRef(0)
+  const frameRef = useRef(null)
+
+  useEffect(() => {
+    countRef.current = count
+  }, [count])
 
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting && !hasAnimated.current) {
-        hasAnimated.current = true
-        let startTimestamp = null
-        const duration = 1600
-        const step = (timestamp) => {
-          if (!startTimestamp) startTimestamp = timestamp
-          const progress = Math.min((timestamp - startTimestamp) / duration, 1)
-          setCount(Math.floor(progress * end))
-          if (progress < 1) {
-            window.requestAnimationFrame(step)
-          } else {
-            setCount(end)
-          }
-        }
-        window.requestAnimationFrame(step)
+      if (entries[0]?.isIntersecting) {
+        setIsVisible(true)
       }
     }, { threshold: 0.15 })
 
@@ -363,8 +357,49 @@ function AnimatedStatCounter({ end, suffix = '', label }) {
       observer.observe(elementRef.current)
     }
 
-    return () => observer.disconnect()
-  }, [end])
+    return () => {
+      observer.disconnect()
+      if (frameRef.current) {
+        window.cancelAnimationFrame(frameRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isVisible) return
+
+    const from = countRef.current
+    if (from === end) return
+
+    let startTimestamp = null
+    const duration = 1600
+    const step = (timestamp) => {
+      if (!startTimestamp) startTimestamp = timestamp
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1)
+      const nextCount = Math.floor(from + (end - from) * progress)
+      countRef.current = nextCount
+      setCount(nextCount)
+      if (progress < 1) {
+        frameRef.current = window.requestAnimationFrame(step)
+      } else {
+        countRef.current = end
+        setCount(end)
+        frameRef.current = null
+      }
+    }
+
+    if (frameRef.current) {
+      window.cancelAnimationFrame(frameRef.current)
+    }
+    frameRef.current = window.requestAnimationFrame(step)
+
+    return () => {
+      if (frameRef.current) {
+        window.cancelAnimationFrame(frameRef.current)
+        frameRef.current = null
+      }
+    }
+  }, [end, isVisible])
 
   return (
     <div ref={elementRef} className="text-center p-4 border border-line bg-paper/50 rounded-2xl">
@@ -379,13 +414,13 @@ function AnimatedStatCounter({ end, suffix = '', label }) {
   )
 }
 
-function Promise() {
-  const legacyItems = [
+function TrustPromise() {
+  const items = [
     { k:'Само проверени', v:'Никой не влиза в Totsan, ако не доказва качество.', icon: <UserCheck className="text-accent" size={24} /> },
     { k:'Един разказ', v:'Сайтът те води стъпка по стъпка, без да ровиш в Google.', icon: <Compass className="text-accent" size={24} /> },
     { k:'Реални оферти', v:'Виждаш цени, наличности и условия — без скрити „звездички“.', icon: <ShieldCheck className="text-accent" size={24} /> }
   ]
-  const stats = [
+  const staticStats = [
     { value: '5', label: 'Слоя на процеса' },
     { value: '0 лв.', label: 'Такса за клиента' },
     { value: 'Проверени', label: 'Партньори и услуги' },
@@ -408,6 +443,47 @@ function Promise() {
     { k:'Ясен път', v:'Започваш с кратък бриф, получаваш насока и стигаш до правилния слой, специалист или услуга.', icon: <Compass className="text-accent" size={24} /> },
     { k:'По-малко догадки', v:'Виждаш обхват, ориентир за цена и следваща стъпка, преди да губиш време в разговори.', icon: <ShieldCheck className="text-accent" size={24} /> }
   ]
+  const [stats, setStats] = useState({
+    publishedServices: 0,
+    completedProjects: 0,
+    verifiedSpecialists: 0,
+    activeLayers: 0,
+  })
+
+  useEffect(() => {
+    let active = true
+
+    async function loadStats() {
+      try {
+        const [servicesResult, profilesResult] = await Promise.all([
+          supabase.from('partner_services').select('layer_slug', { count: 'exact' }),
+          supabase.from('profiles').select('projects', { count: 'exact' }),
+        ])
+
+        if (servicesResult.error) throw servicesResult.error
+        if (profilesResult.error) throw profilesResult.error
+
+        const services = servicesResult.data || []
+        const profiles = profilesResult.data || []
+        const completedProjects = profiles.reduce((sum, row) => sum + Number(row.projects || 0), 0)
+        const activeLayers = new Set(services.map((row) => row.layer_slug).filter(Boolean)).size
+
+        if (!active) return
+        setStats({
+          publishedServices: servicesResult.count || 0,
+          completedProjects,
+          verifiedSpecialists: profilesResult.count || 0,
+          activeLayers,
+        })
+      } catch (error) {
+        console.error('Failed to load homepage stats:', error)
+      }
+    }
+
+    loadStats()
+    return () => { active = false }
+  }, [])
+
   return (
     <section className="section bg-soft border-y border-line">
       <div className="container-page">
@@ -417,7 +493,13 @@ function Promise() {
           </span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
-          {stats.map((stat, index) => (
+          <AnimatedStatCounter end={stats.publishedServices} label="Публични услуги" suffix="+" />
+          <AnimatedStatCounter end={stats.completedProjects} label="Завършени обекта" suffix="+" />
+          <AnimatedStatCounter end={stats.verifiedSpecialists} label="Проверени майстори" suffix="+" />
+          <AnimatedStatCounter end={stats.activeLayers} label="Активни слоеве" suffix="" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
+          {staticStats.map((stat, index) => (
             <div key={stat.label} className="rounded-2xl border border-line bg-paper/60 px-5 py-6 text-center shadow-sm">
               <div className="mb-5 flex justify-center">
                 <span className="inline-flex h-16 w-16 items-center justify-center rounded-[1.4rem] bg-accentSoft">

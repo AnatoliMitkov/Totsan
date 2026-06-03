@@ -33,7 +33,8 @@ export default function Inbox() {
   const [offerOpen, setOfferOpen] = useState(false)
   const refreshTimerRef = useRef(null)
 
-  const activeConversation = useMemo(() => conversations.find((conversation) => conversation.id === conversationId) || null, [conversations, conversationId])
+  const activeConversationId = conversationId || conversations[0]?.id || ''
+  const activeConversation = useMemo(() => conversations.find((conversation) => conversation.id === activeConversationId) || null, [conversations, activeConversationId])
   const role = conversationRole(activeConversation, userId)
 
   const loadAll = useCallback(async ({ keepStatus = false } = {}) => {
@@ -49,7 +50,6 @@ export default function Inbox() {
       setConversations(nextConversations)
 
       const activeId = conversationId || nextConversations[0]?.id || ''
-      if (!conversationId && activeId) navigate(`/inbox/${activeId}`, { replace: true })
       if (activeId) {
         const nextMessages = await loadMessages(activeId)
         setMessages(nextMessages)
@@ -84,9 +84,9 @@ export default function Inbox() {
   }, [userId, scheduleRefresh])
 
   useEffect(() => {
-    if (!conversationId) return undefined
-    return subscribeToConversation(conversationId, scheduleRefresh)
-  }, [conversationId, scheduleRefresh])
+    if (!activeConversationId) return undefined
+    return subscribeToConversation(activeConversationId, scheduleRefresh)
+  }, [activeConversationId, scheduleRefresh])
 
   useEffect(() => {
     return () => {
@@ -98,10 +98,10 @@ export default function Inbox() {
 
   async function submitMessage(event) {
     event.preventDefault()
-    if (!conversationId || !draft.trim()) return
+    if (!activeConversationId || !draft.trim()) return
     setMessageStatus('sending')
     try {
-      await sendTextMessage({ conversationId, body: draft })
+      await sendTextMessage({ conversationId: activeConversationId, body: draft })
       setDraft('')
       await loadAll({ keepStatus: true })
       setMessageStatus('idle')
@@ -112,10 +112,10 @@ export default function Inbox() {
   }
 
   async function submitOffer(offer) {
-    if (!conversationId) return
+    if (!activeConversationId) return
     setMessageStatus('sending')
     try {
-      await sendOffer({ conversationId, offer })
+      await sendOffer({ conversationId: activeConversationId, offer })
       setOfferOpen(false)
       await loadAll({ keepStatus: true })
       setMessageStatus('idle')
@@ -177,10 +177,10 @@ export default function Inbox() {
         <div className="grid gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
           <ConversationList
             conversations={conversations}
-            activeId={conversationId}
+            activeId={activeConversationId}
             userId={userId}
             onSelect={(id) => {
-              if (id && id !== conversationId) navigate(`/inbox/${id}`)
+              if (id && id !== activeConversationId) navigate(`/inbox/${id}`)
             }}
           />
           <div className="min-w-0 space-y-4">
