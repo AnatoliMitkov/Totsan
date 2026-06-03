@@ -488,10 +488,10 @@ function TrustPromise() {
           </span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
-          <AnimatedStatCounter end={stats.publishedServices} label="Публични услуги" suffix="+" />
-          <AnimatedStatCounter end={stats.completedProjects} label="Завършени обекта" suffix="+" />
-          <AnimatedStatCounter end={stats.verifiedSpecialists} label="Проверени майстори" suffix="+" />
-          <AnimatedStatCounter end={stats.activeLayers} label="Активни слоеве" suffix="" />
+          <AnimatedStatCounter key="published-services" end={stats.publishedServices} label="Публични услуги" suffix="+" />
+          <AnimatedStatCounter key="completed-projects" end={stats.completedProjects} label="Завършени обекта" suffix="+" />
+          <AnimatedStatCounter key="verified-specialists" end={stats.verifiedSpecialists} label="Проверени майстори" suffix="+" />
+          <AnimatedStatCounter key="active-layers" end={stats.activeLayers} label="Активни слоеве" suffix="" />
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
           {staticStats.map((stat, index) => (
