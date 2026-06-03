@@ -28,9 +28,9 @@ const ReviewsManagerSection = lazy(() => import('../components/admin/ReviewsMana
 const ADMIN_SECTIONS = [
   { id: 'dashboard', label: 'Обзор', hint: 'KPI и последни събития', icon: BarChart3, Component: DashboardSection },
   { id: 'users', label: 'Потребители', hint: 'Роли, статуси, ban', icon: Users, Component: UsersManagerSection },
-  { id: 'inquiries', label: 'Запитвания', hint: 'Форми и статуси', icon: ClipboardList, Component: InquiriesManagerSection },
+  { id: 'inquiries', label: 'Запитвания', hint: 'Форми, източници и статуси', icon: ClipboardList, Component: InquiriesManagerSection },
   { id: 'applications', label: 'Кандидатури', hint: 'Одобрение на специалисти', icon: UserCog, Component: ApplicationsManagerSection },
-  { id: 'profiles', label: 'Профили', hint: 'Каталог и публични карти', icon: FolderKanban, Component: ProfileManagerSection },
+  { id: 'profiles', label: 'Профили', hint: 'Публичност и профилна модерация', icon: FolderKanban, Component: ProfileManagerSection },
   { id: 'partner-services', label: 'Услуги', hint: 'Модерация на партньорски услуги', icon: PackageCheck, Component: PartnerServicesManagerSection },
   { id: 'orders', label: 'Поръчки', hint: 'Плащания, статуси, спорове', icon: CreditCard, Component: OrdersManagerSection },
   { id: 'reviews', label: 'Отзиви', hint: 'Verified отзиви и сигнали', icon: Star, Component: ReviewsManagerSection },
@@ -175,6 +175,7 @@ function LoginPanel() {
   const location = useLocation()
   const params = new URLSearchParams(location.search)
   const isSignup = params.get('signup') === 'true'
+  const requestedSignupRole = params.get('role') === 'pro' ? 'pro' : 'customer'
   const nextPath = normalizeNextPath(params.get('next') || '')
   const [isLogin, setIsLogin] = useState(!isSignup)
 
@@ -187,7 +188,7 @@ function LoginPanel() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [signupRole, setSignupRole] = useState('customer') // 'customer' | 'pro'
+  const [signupRole, setSignupRole] = useState(requestedSignupRole) // 'customer' | 'pro'
   const [proPhone, setProPhone] = useState('')
   const [proAbout, setProAbout] = useState('')
   const [status, setStatus] = useState('idle')
@@ -206,7 +207,18 @@ function LoginPanel() {
   }
   const pwdValid = Object.values(pwdRules).every(Boolean)
 
+  useEffect(() => {
+    if (isSignup) setSignupRole(requestedSignupRole)
+  }, [isSignup, requestedSignupRole])
+
   async function signInWithProvider(provider) {
+    if (!isLogin && signupRole === 'pro') {
+      setStatus('error')
+      setPendingAction('')
+      setMessage('За Pro кандидатура използвай регистрация с имейл и парола, за да запазим ролята и данните за специалист.')
+      return
+    }
+
     setStatus('sending')
     setPendingAction(provider)
     setMessage('')

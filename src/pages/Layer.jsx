@@ -20,17 +20,22 @@ export default function Layer({ slug }) {
   useEffect(() => { window.scrollTo({ top: 0 }) }, [currentSlug])
 
   const hasProducts = !!layer.products
+  const isIdeaLayer = layer.slug === 'ideya'
+  const isConstructionLayer = layer.slug === 'postroyka'
+  const isMaterialsLayer = layer.slug === 'materiali'
+  const isFurnishingLayer = layer.slug === 'obzavezhdane'
+  const isDecorationLayer = layer.slug === 'dekoraciya'
 
   return (
     <>
       <Hero layer={layer} />
-      <Intro layer={layer} />
+      {!isIdeaLayer && !isConstructionLayer && !isMaterialsLayer && !isFurnishingLayer && !isDecorationLayer && <Intro layer={layer} />}
       <WhatYouFind layer={layer} />
       <Professionals layer={layer} />
       {hasProducts && <Products layer={layer} />}
       <Showcase layer={layer} />
       <ProcessSection layer={layer} />
-      <ServicesBand />
+      {!isIdeaLayer && !isFurnishingLayer && !isDecorationLayer && <ServicesBand layer={layer} />}
       <FAQ layer={layer} />
       <RelatedLayers prev={prev} next={next} />
       <CTA layer={layer} />
@@ -40,6 +45,11 @@ export default function Layer({ slug }) {
 
 function Hero({ layer }) {
   const heroImg = LAYER_HEROS[layer.slug]
+  const isIdeaLayer = layer.slug === 'ideya'
+  const isConstructionLayer = layer.slug === 'postroyka'
+  const isMaterialsLayer = layer.slug === 'materiali'
+  const isFurnishingLayer = layer.slug === 'obzavezhdane'
+  const isDecorationLayer = layer.slug === 'dekoraciya'
   return (
     <section className="section relative overflow-hidden">
       <div className="absolute inset-0">
@@ -55,8 +65,20 @@ function Hero({ layer }) {
           <h1 className="h-display mt-3">{layer.title}</h1>
           <p className="mt-5 max-w-2xl text-ink/80" style={{fontSize:'var(--step-md)'}}>{layer.long}</p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link to="/contact" className="btn btn-primary">Заяви консултация</Link>
-            <a href="#specialisti" className="btn btn-ghost bg-paper/80 backdrop-blur">Виж специалистите</a>
+            <Link to={isIdeaLayer || isConstructionLayer || isMaterialsLayer || isFurnishingLayer || isDecorationLayer ? '/start' : '/contact'} className="btn btn-primary">{isIdeaLayer ? 'Опиши идеята си' : isConstructionLayer ? 'Опиши какво ти трябва' : isMaterialsLayer ? 'Намери правилния материал' : isFurnishingLayer ? 'Опиши какво ти трябва' : isDecorationLayer ? 'Опиши от какво имаш нужда' : 'Заяви консултация'}</Link>
+            {isIdeaLayer ? (
+              <Link to="/katalog?layer=ideya" className="btn btn-ghost bg-paper/80 backdrop-blur">Разгледай специалистите</Link>
+            ) : isConstructionLayer ? (
+              <Link to="/katalog?layer=postroyka" className="btn btn-ghost bg-paper/80 backdrop-blur">Разгледай строителите и майсторите</Link>
+            ) : isMaterialsLayer ? (
+              <Link to="/katalog?layer=materiali&kind=product" className="btn btn-ghost bg-paper/80 backdrop-blur">Разгледай продуктите</Link>
+            ) : isFurnishingLayer ? (
+              <Link to="/katalog?layer=obzavezhdane" className="btn btn-ghost bg-paper/80 backdrop-blur">Разгледай производителите</Link>
+            ) : isDecorationLayer ? (
+              <Link to="/katalog?layer=dekoraciya" className="btn btn-ghost bg-paper/80 backdrop-blur">Разгледай специалистите</Link>
+            ) : (
+              <a href="#specialisti" className="btn btn-ghost bg-paper/80 backdrop-blur">Виж специалистите</a>
+            )}
           </div>
         </div>
         <div className="lg:col-span-4 reveal">
@@ -150,6 +172,7 @@ function WhatYouFind({ layer }) {
           <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {layer.whatYouFind.map((w, i) => {
               const showQuizBtn = Boolean(w.quizSlug && QUIZ_CONFIG_LOADERS[w.quizSlug])
+              const hasDirectHref = Boolean(w.href)
               const sectionRoute = w.key === 'garden'
                 ? '/gradina-i-dvor'
                 : w.key === 'wallpaper'
@@ -176,11 +199,24 @@ function WhatYouFind({ layer }) {
                   <div className="p-6">
                     <div className="font-display text-xl">{w.title}</div>
                     <p className="text-muted text-sm mt-2">{w.text}</p>
-                    {showQuizBtn && <div className="mt-4 text-xs font-semibold text-accentDeep flex items-center gap-1">Стартирай избора &rarr;</div>}
+                    {hasDirectHref && <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-accentSoft px-3 py-1.5 text-xs font-semibold text-accentDeep">{w.ctaText || 'Отвори'} &rarr;</div>}
+                    {showQuizBtn && <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-accentSoft px-3 py-1.5 text-xs font-semibold text-accentDeep">{w.ctaText || 'Стартирай избора'} &rarr;</div>}
                     {sectionRoute && <div className="mt-4 text-xs font-semibold text-accentDeep flex items-center gap-1">Разгледай секцията &rarr;</div>}
                   </div>
                 </>
               )
+
+              if (hasDirectHref) {
+                return (
+                  <Link
+                    key={w.key || i}
+                    to={w.href}
+                    className="card img-zoom-host bg-paper p-0 overflow-hidden cursor-pointer hover:border-ink/30 transition-colors block"
+                  >
+                    {cardContent}
+                  </Link>
+                )
+              }
 
               if (sectionRoute) {
                 return (
@@ -213,6 +249,7 @@ function WhatYouFind({ layer }) {
 
 function Professionals({ layer }) {
   const professionals = layer.professionals ?? []
+  const catalogLayerPath = `/katalog?layer=${layer.slug}`
 
   return (
     <section id="specialisti" className="section bg-soft border-y border-line">
@@ -222,7 +259,7 @@ function Professionals({ layer }) {
             <div className="eyebrow">Препоръчани за теб</div>
             <h2 className="h-section mt-2">Хора, на които можеш да разчиташ.</h2>
           </div>
-          <Link to="/katalog" className="link-arrow text-sm">Виж всички в каталога →</Link>
+          <Link to={catalogLayerPath} className="link-arrow text-sm">Виж каталога за този слой →</Link>
         </div>
 
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -242,7 +279,7 @@ function Professionals({ layer }) {
         </div>
 
         <div className="mt-10 text-center reveal">
-          <Link to="/katalog" className="btn btn-primary">Виж всички в каталога</Link>
+          <Link to={catalogLayerPath} className="btn btn-primary">Виж каталога за този слой</Link>
         </div>
       </div>
     </section>
@@ -338,10 +375,10 @@ function ProcessSection({ layer }) {
   )
 }
 
-function ServicesBand() {
+function ServicesBand({ layer }) {
   const cards = [
     { title: 'Публикувани услуги', text: 'Само реални оферти от партньори с профил в Totsan.', to: '/uslugi' },
-    { title: 'Каталог', text: 'Прегледай специалисти, услуги и продукти на едно място.', to: '/katalog' },
+    { title: 'Каталог', text: 'Прегледай специалисти, услуги и продукти за този слой.', to: `/katalog?layer=${layer.slug}` },
   ]
 
   return (
@@ -418,6 +455,11 @@ function RelatedLayers({ prev, next }) {
 }
 
 function CTA({ layer }) {
+  const isIdeaLayer = layer.slug === 'ideya'
+  const isConstructionLayer = layer.slug === 'postroyka'
+  const isMaterialsLayer = layer.slug === 'materiali'
+  const isFurnishingLayer = layer.slug === 'obzavezhdane'
+  const isDecorationLayer = layer.slug === 'dekoraciya'
   return (
     <section className="section !pt-0">
       <div className="container-page rounded-3xl bg-ink text-paper p-10 md:p-16 grid md:grid-cols-12 gap-8 items-center reveal">
@@ -426,7 +468,12 @@ function CTA({ layer }) {
           <p className="mt-3 text-paper/70 max-w-2xl">Кажи ни в две изречения какво ти трябва. Връщаме се с подходящи хора още същата седмица.</p>
         </div>
         <div className="md:col-span-4 flex md:justify-end gap-3 flex-wrap">
-          <Link to="/contact" className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">Заяви консултация</Link>
+          <Link to={isIdeaLayer || isConstructionLayer || isMaterialsLayer || isFurnishingLayer || isDecorationLayer ? '/start' : '/contact'} className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">{isIdeaLayer ? 'Опиши идеята си' : isConstructionLayer ? 'Опиши какво ти трябва' : isMaterialsLayer ? 'Намери правилния материал' : isFurnishingLayer ? 'Опиши какво ти трябва' : isDecorationLayer ? 'Опиши от какво имаш нужда' : 'Заяви консултация'}</Link>
+          {isIdeaLayer && <Link to="/katalog?layer=ideya" className="btn btn-ghost !border-paper/30 !text-paper hover:!bg-paper/10">Разгледай специалистите</Link>}
+          {isConstructionLayer && <Link to="/katalog?layer=postroyka" className="btn btn-ghost !border-paper/30 !text-paper hover:!bg-paper/10">Разгледай строителите и майсторите</Link>}
+          {isMaterialsLayer && <Link to="/katalog?layer=materiali&kind=product" className="btn btn-ghost !border-paper/30 !text-paper hover:!bg-paper/10">Разгледай продуктите</Link>}
+          {isFurnishingLayer && <Link to="/katalog?layer=obzavezhdane" className="btn btn-ghost !border-paper/30 !text-paper hover:!bg-paper/10">Разгледай производителите</Link>}
+          {isDecorationLayer && <Link to="/katalog?layer=dekoraciya" className="btn btn-ghost !border-paper/30 !text-paper hover:!bg-paper/10">Разгледай специалистите</Link>}
         </div>
       </div>
     </section>

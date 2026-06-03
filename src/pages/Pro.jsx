@@ -171,9 +171,18 @@ export default function Pro() {
           </div>
 
           <aside id="zapitvane" className="lg:col-span-4 reveal">
-            <ContactCard profile={item} onStartChat={startChat} chatState={chatState} />
-            <div className="mt-5">
-              <InquiryBox proName={item.name} layerSlug={item.layerSlug || item.layer} targetSlug={item.slug} clientId={session?.user?.id} />
+            <div className="lg:sticky lg:top-24 space-y-4">
+              <InquiryBox
+                proName={item.name}
+                title={item.name ? `Опиши проекта си на ${item.name}` : 'Опиши проекта си'}
+                layerSlug={item.layerSlug || item.layer}
+                targetSlug={item.slug}
+                clientId={session?.user?.id}
+              />
+              <div className="flex items-center gap-3 text-xs uppercase tracking-[0.14em] text-muted">
+                <span className="h-px flex-1 bg-line" />или чат след това<span className="h-px flex-1 bg-line" />
+              </div>
+              <ContactCard onStartChat={startChat} chatState={chatState} />
             </div>
           </aside>
         </div>
@@ -232,10 +241,10 @@ function ProfileServicesSection({ services, profile }) {
 
 function ContactCard({ onStartChat, chatState }) {
   return (
-    <div className="rounded-2xl border border-line bg-paper p-6 lg:sticky lg:top-24">
-      <div className="eyebrow">Контакт</div>
-      <p className="mt-2 text-sm text-muted">Започни защитен разговор в Totsan. Контакти и външни линкове се скриват автоматично.</p>
-      <button type="button" onClick={onStartChat} disabled={chatState.status === 'loading'} className="btn btn-primary mt-5 w-full justify-center disabled:opacity-50">{chatState.status === 'loading' ? 'Отваряме…' : 'Отвори чат'}</button>
+    <div className="rounded-2xl border border-line bg-paper p-6">
+      <div className="eyebrow">Чат</div>
+      <p className="mt-2 text-sm text-muted">Ако искаш по-директен разговор, можеш да отвориш защитен чат след запитването.</p>
+      <button type="button" onClick={onStartChat} disabled={chatState.status === 'loading'} className="btn btn-ghost mt-5 w-full justify-center disabled:opacity-50">{chatState.status === 'loading' ? 'Отваряме…' : 'Отвори чат'}</button>
       {chatState.message && <div className={`mt-3 text-sm ${chatState.status === 'error' ? 'text-amber-800' : 'text-muted'}`}>{chatState.message}</div>}
     </div>
   )
@@ -264,7 +273,7 @@ function LoadingProfile() {
   )
 }
 
-function InquiryBox({ proName, layerSlug, targetSlug, clientId }) {
+function InquiryBox({ proName, title, layerSlug, targetSlug, clientId }) {
   const [form, setForm] = useState({ name: '', contact: '', message: '' })
   const [status, setStatus] = useState('idle')
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
@@ -287,8 +296,8 @@ function InquiryBox({ proName, layerSlug, targetSlug, clientId }) {
   }
 
   return (
-    <form onSubmit={submit} className="border border-line rounded-2xl p-6 bg-paper sticky top-24">
-      <div className="eyebrow">Поискай оферта</div>
+    <form onSubmit={submit} className="border border-line rounded-2xl p-6 bg-paper">
+      <div className="eyebrow">{title || 'Опиши проекта си'}</div>
       {status === 'sent' ? (
         <>
           <p className="text-sm mt-3 flex items-center gap-2"><CheckCircle2 size={18} className="text-accentDeep"/> Запитването е изпратено на {proName}.</p>

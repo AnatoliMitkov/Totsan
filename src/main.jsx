@@ -5,12 +5,14 @@ import './index.css'
 import Layout from './components/Layout.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import Home from './pages/Home.jsx'
+import Start from './pages/Start.jsx'
 import Layer from './pages/Layer.jsx'
 import Services from './pages/Services.jsx'
 import Service from './pages/Service.jsx'
 import PartnerService from './pages/PartnerService.jsx'
 import Catalog from './pages/Catalog.jsx'
 import Pro from './pages/Pro.jsx'
+import TotsanPro from './pages/TotsanPro.jsx'
 import Product from './pages/Product.jsx'
 import HowItWorks from './pages/HowItWorks.jsx'
 import About from './pages/About.jsx'
@@ -37,6 +39,7 @@ function AppRoutes() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
+          <Route path="/start" element={<Start />} />
           <Route path="/landing" element={<Home />} />
           <Route path="/sloy/:slug" element={<Layer />} />
           <Route path="/uslugi" element={<Services />} />
@@ -44,6 +47,8 @@ function AppRoutes() {
           <Route path="/usluga/:slug" element={<Service />} />
           <Route path="/katalog" element={<Catalog />} />
           <Route path="/profil/:slug" element={<Pro />} />
+          <Route path="/pro" element={<TotsanPro />} />
+          <Route path="/totsan-pro" element={<TotsanPro />} />
           <Route path="/produkt/:slug" element={<Product />} />
           <Route path="/kak-raboti" element={<HowItWorks />} />
           <Route path="/za-nas" element={<About />} />

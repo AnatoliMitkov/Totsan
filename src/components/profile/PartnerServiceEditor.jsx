@@ -102,8 +102,8 @@ export default function PartnerServiceEditor({ profile, userId }) {
       const saved = await savePartnerService(profile, draft, { submit: publish })
       setItems(current => [saved, ...current.filter(item => item.id !== saved.id)])
       setDraft(makePartnerServiceDraft(profile, saved))
-      setState({ status: 'saved', message: publish ? 'Услугата е създадена и вече е публична.' : 'Черновата е запазена.' })
-      if (publish) setShowPreview(true)
+      setState({ status: 'saved', message: publish ? 'Услугата е изпратена за одобрение. Ще стане публична след преглед от Totsan.' : 'Черновата е запазена.' })
+      if (publish) setShowPreview(false)
     } catch (error) {
       setState({ status: 'error', message: error.message || 'Записът не успя.' })
     }
@@ -152,7 +152,7 @@ export default function PartnerServiceEditor({ profile, userId }) {
             <div className="eyebrow">Моите услуги</div>
             <h2 className="mt-2 font-display text-3xl text-ink">{sectionTitle}</h2>
             <p className="mt-2 max-w-2xl text-sm text-muted">
-              Създай ясна публична оферта, която клиентът вижда в услугите, каталога и профила ти.
+              Създай ясна оферта. След изпращане Totsan я преглежда и тогава я показва в услугите, каталога и профила ти.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -175,7 +175,7 @@ export default function PartnerServiceEditor({ profile, userId }) {
           </div>
         ) : (
           <div className="mt-6 rounded-2xl border border-dashed border-line bg-soft p-5 text-sm text-muted">
-            Все още няма създадени услуги. Започни с първата оферта и я публикувай, за да се появи пред клиентите.
+            Все още няма създадени услуги. Започни с първата оферта и я изпрати за одобрение, за да се появи пред клиентите.
           </div>
         )}
 
@@ -206,10 +206,10 @@ export default function PartnerServiceEditor({ profile, userId }) {
 
       <section className="rounded-3xl border border-line bg-paper p-5 md:p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className={`text-sm ${state.status === 'error' ? 'text-red-700' : 'text-muted'}`}>{state.message || 'Запази чернова или създай публична услуга.'}</div>
+          <div className={`text-sm ${state.status === 'error' ? 'text-red-700' : 'text-muted'}`}>{state.message || 'Запази чернова или изпрати услугата за одобрение.'}</div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={() => handleSave(false)} disabled={state.status === 'saving'} className="btn btn-ghost"><Save size={18} /> Запази чернова</button>
-            <button type="button" onClick={() => handleSave(true)} disabled={state.status === 'saving'} className="btn btn-primary">{draft.id ? 'Публикувай промените' : 'Публикувай услугата'}</button>
+            <button type="button" onClick={() => handleSave(true)} disabled={state.status === 'saving'} className="btn btn-primary">{draft.id ? 'Изпрати промените' : 'Изпрати за одобрение'}</button>
           </div>
         </div>
       </section>
@@ -250,7 +250,7 @@ function VisibilityPanel({ draft, state }) {
         {isPublic ? 'Видима за клиенти' : statusLabel}
       </div>
       <p className="mt-2 text-xs leading-relaxed text-muted">
-        {isPublic ? 'Показва се в “Услуги”, “Каталог” и публичния ти профил.' : 'Черновите са видими само за теб, докато не ги публикуваш.'}
+        {isPublic ? 'Показва се в “Услуги”, “Каталог” и публичния ти профил.' : 'Черновите са видими само за теб. Изпратените услуги чакат преглед от Totsan.'}
       </p>
       {isPublic && (
         <Link to={`/uslugi/${draft.slug}`} className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-ink underline underline-offset-4">

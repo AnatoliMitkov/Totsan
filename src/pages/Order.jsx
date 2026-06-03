@@ -42,6 +42,7 @@ export default function Order() {
   const visibleEvents = useMemo(() => dedupeEvents(details.events), [details.events])
   const visiblePayments = useMemo(() => dedupePayments(details.payments), [details.payments])
   const checkoutPath = order ? checkoutTarget(order) : ''
+  const canSeeFinancialBreakdown = role === 'partner' || isAdminView
 
   async function run(action) {
     if (!order?.id) return
@@ -114,7 +115,11 @@ export default function Order() {
             <div className="rounded-3xl border border-line bg-paper p-5 md:p-6">
               <div className="eyebrow">Действия</div>
               <div className="mt-3 font-display text-4xl text-ink">{formatOrderMoney(order.amountTotal, order.currency)}</div>
-              <p className="mt-2 text-sm text-muted">Такса: {formatOrderMoney(order.platformFee, order.currency)} · към партньора: {formatOrderMoney(order.partnerPayout, order.currency)}</p>
+              {canSeeFinancialBreakdown ? (
+                <p className="mt-2 text-sm text-muted">Такса: {formatOrderMoney(order.platformFee, order.currency)} · към партньора: {formatOrderMoney(order.partnerPayout, order.currency)}</p>
+              ) : (
+                <p className="mt-2 text-sm text-muted">Плащането е защитено до потвърждение на завършването.</p>
+              )}
               {message && <div className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">{message}</div>}
               {checkoutPath && order.status === 'pending_payment' && <Link to={checkoutPath} className="btn btn-primary mt-5 w-full justify-center"><CreditCard size={18} /> Плати</Link>}
               {order.conversationId && <Link to={`/inbox/${order.conversationId}`} className="btn btn-ghost mt-3 w-full justify-center"><MessageSquare size={18} /> Чат</Link>}

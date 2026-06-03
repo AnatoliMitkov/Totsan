@@ -133,7 +133,7 @@ function CheckoutPayment({ type, id }) {
             <div className="mt-3 font-display text-5xl text-ink">{formatOrderMoney(preview.amountTotal, preview.currency)}</div>
             <div className="mt-5 flex gap-3 rounded-2xl border border-line bg-soft p-4 text-sm text-muted">
               <ShieldCheck size={18} className="mt-0.5 shrink-0 text-accentDeep" />
-              <p>Плащането остава в Totsan до потвърждение на завършването.</p>
+              <p>Плащането остава защитено в Totsan и се освобождава към партньора след потвърждение на завършването.</p>
             </div>
             <button type="button" onClick={() => pay('stripe')} disabled={status === 'paying' || unavailable} className="btn btn-primary mt-5 w-full justify-center">
               {status === 'paying' ? 'Обработваме…' : 'Плати със Stripe Sandbox'}

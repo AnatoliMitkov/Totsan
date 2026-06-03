@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import { getAccountDisplayName, useAccount } from '../lib/account.js'
 import { uploadProfileMedia } from '../lib/profile-media-upload-client.js'
@@ -31,17 +31,21 @@ const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 tex
 
 export default function MyProfile() {
   const { session, account, loading, refresh } = useAccount()
+  const [searchParams] = useSearchParams()
 
   if (loading) {
     return <div className="section"><div className="container-page text-muted">Зареждане…</div></div>
   }
 
   if (!session) {
+    const fromQuiz = searchParams.get('from') === 'quiz'
     return (
       <section className="section">
         <div className="container-page max-w-xl">
           <h1 className="h-section">Моят профил</h1>
-          <p className="text-muted mt-3">За да видиш профила си, трябва първо да влезеш в акаунта си.</p>
+          <p className="text-muted mt-3">
+            {fromQuiz ? 'Резултатът от quiz-а е подготвен за проект-паспорт. Влез в акаунта си, за да го прегледаш и запазиш.' : 'За да видиш профила си, трябва първо да влезеш в акаунта си.'}
+          </p>
           <Link to="/login" className="btn btn-primary mt-6 inline-flex">Вход</Link>
         </div>
       </section>
@@ -56,10 +60,12 @@ export default function MyProfile() {
 }
 
 function CustomerProfile({ session, account, refreshAccount }) {
+  const [searchParams] = useSearchParams()
   const [mode, setMode] = useState('profile')
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') === 'project' ? 'project' : 'overview')
   const [localAccount, setLocalAccount] = useState(account)
   const [project, setProject] = useState(null)
+  const [pendingBrief, setPendingBrief] = useState(null)
   const [media, setMedia] = useState([])
   const [loadState, setLoadState] = useState({ status: 'loading', message: '' })
   const email = session.user.email || account?.email || ''
@@ -70,6 +76,26 @@ function CustomerProfile({ session, account, refreshAccount }) {
   useEffect(() => {
     setLocalAccount(account)
   }, [account])
+
+  useEffect(() => {
+    if (searchParams.get('tab') === 'project') setActiveTab('project')
+  }, [searchParams])
+
+  useEffect(() => {
+    const raw = window.localStorage.getItem('totsan.pendingProjectBrief')
+    if (!raw) return
+
+    try {
+      setPendingBrief(JSON.parse(raw))
+    } catch {
+      window.localStorage.removeItem('totsan.pendingProjectBrief')
+    }
+  }, [])
+
+  const clearPendingBrief = useCallback(() => {
+    window.localStorage.removeItem('totsan.pendingProjectBrief')
+    setPendingBrief(null)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -205,8 +231,10 @@ function CustomerProfile({ session, account, refreshAccount }) {
         {activeTab === 'project' && (
           <CustomerProject
             project={project}
+            pendingBrief={loadState.status === 'ready' ? pendingBrief : null}
             media={media}
             onSave={saveProject}
+            onImportPendingBrief={clearPendingBrief}
             onUploadMedia={uploadProjectMediaRow}
             onUpdateMedia={updateProjectMediaRow}
             onDeleteMedia={deleteProjectMediaRow}

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Clock, Eye, RefreshCw, Search } from 'lucide-react'
+import { CheckCircle2, Clock, Eye, RefreshCw, Search, XCircle } from 'lucide-react'
 import { ADMIN_INPUT_CLASS, formatAdminDate } from '../../lib/admin.js'
-import { SERVICE_STATUS_LABELS, loadAdminPartnerServices, packagePriceLabel } from '../../lib/partner-services.js'
+import { SERVICE_STATUS_LABELS, loadAdminPartnerServices, packagePriceLabel, updateAdminPartnerServiceStatus } from '../../lib/partner-services.js'
 
 const STATUS_FILTERS = [
   ['all', 'Всички'],
@@ -18,6 +18,7 @@ export default function PartnerServicesManager({ globalQuery }) {
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('all')
   const [localQuery, setLocalQuery] = useState('')
+  const [actionState, setActionState] = useState({ id: '', status: 'idle' })
 
   useEffect(() => { load() }, [])
 
@@ -43,6 +44,23 @@ export default function PartnerServicesManager({ globalQuery }) {
     })
   }, [filter, globalQuery, localQuery, rows])
 
+  async function updateServiceStatus(service, nextStatus) {
+    setActionState({ id: service.id, status: nextStatus })
+    setError('')
+    try {
+      const updated = await updateAdminPartnerServiceStatus(
+        service.id,
+        nextStatus,
+        nextStatus === 'approved' ? 'Одобрено от Totsan.' : 'Върнато за редакция от Totsan.',
+      )
+      setRows(current => current.map(item => item.id === updated.id ? updated : item))
+    } catch (actionError) {
+      setError(actionError.message || 'Статусът не се обнови.')
+    } finally {
+      setActionState({ id: '', status: 'idle' })
+    }
+  }
+
   if (status === 'loading') return <Panel title="Зареждаме услугите…" />
   if (status === 'error') return <Panel title="Услугите не се заредиха"><p className="text-sm text-red-700">{error}</p><button type="button" onClick={load} className="btn btn-ghost mt-5">Опитай пак</button></Panel>
 
@@ -53,7 +71,7 @@ export default function PartnerServicesManager({ globalQuery }) {
           <div>
             <div className="eyebrow">Управление</div>
             <h2 className="mt-2 font-display text-3xl text-ink">Партньорски услуги</h2>
-            <p className="mt-2 text-sm text-muted">Следи публичните услуги, черновите и партньорите без отделна опашка за одобрение.</p>
+            <p className="mt-2 text-sm text-muted">Преглеждай изпратени услуги преди да станат публични в каталога, услугите и партньорските профили.</p>
           </div>
           <button type="button" onClick={load} className="btn btn-ghost"><RefreshCw size={18} /> Обнови</button>
         </div>
@@ -66,6 +84,7 @@ export default function PartnerServicesManager({ globalQuery }) {
           <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
           <input value={localQuery} onChange={event => setLocalQuery(event.target.value)} className={`${ADMIN_INPUT_CLASS} !mt-0 pl-11`} placeholder="Търси по услуга, партньор или таг" />
         </label>
+        {error && <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       </div>
 
       <div className="grid gap-4">
@@ -88,8 +107,14 @@ export default function PartnerServicesManager({ globalQuery }) {
                 {service.moderationNote && <p className="mt-4 rounded-2xl bg-amber-50 p-3 text-sm text-amber-800">Последна бележка: {service.moderationNote}</p>}
               </div>
               <div className="space-y-3">
+                {service.moderationStatus === 'pending' && (
+                  <>
+                    <button type="button" onClick={() => updateServiceStatus(service, 'approved')} disabled={actionState.id === service.id} className="btn btn-primary w-full justify-center"><CheckCircle2 size={18} /> Одобри</button>
+                    <button type="button" onClick={() => updateServiceStatus(service, 'rejected')} disabled={actionState.id === service.id} className="btn btn-ghost w-full justify-center"><XCircle size={18} /> Върни</button>
+                  </>
+                )}
                 {service.isPublished && <Link to={`/uslugi/${service.slug}`} className="btn btn-ghost w-full justify-center"><Eye size={18} /> Публична страница</Link>}
-                {!service.isPublished && <div className="rounded-2xl border border-line bg-soft p-4 text-sm text-muted">Тази услуга е запазена като чернова от партньора.</div>}
+                {!service.isPublished && service.moderationStatus !== 'pending' && <div className="rounded-2xl border border-line bg-soft p-4 text-sm text-muted">Тази услуга не е публична за клиенти.</div>}
               </div>
             </div>
           </article>
