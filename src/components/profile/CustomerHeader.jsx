@@ -1,4 +1,5 @@
 import { LogOut, UserRound } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 function formatMemberDate(value) {
   if (!value) return 'днес'
@@ -8,14 +9,54 @@ function formatMemberDate(value) {
 export default function CustomerHeader({ account, displayName, completeness, onSignOut }) {
   const initial = (displayName?.[0] || '?').toUpperCase()
   const avatarUrl = account?.avatar_url || ''
-  const percent = completeness?.percent || 0
+  const targetPercent = completeness?.percent || 0
+  const [percent, setPercent] = useState(0)
+  const [isResetting, setIsResetting] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPercent(targetPercent)
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [targetPercent])
+
+  const handleMouseEnter = () => {
+    if (percent !== targetPercent) return // Prevent triggering while already animating
+    setIsResetting(true)
+    setPercent(0)
+    setTimeout(() => {
+      setIsResetting(false)
+      setPercent(targetPercent)
+    }, 50)
+  }
+
+  const circumference = 2 * Math.PI * 48
+  const strokeDashoffset = circumference - (percent / 100) * circumference
 
   return (
     <div className="rounded-3xl border border-line bg-paper p-5 md:p-7">
       <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-4">
-          <div className="relative h-24 w-24 shrink-0 rounded-full p-1" style={{ background: `conic-gradient(#1B1D1F ${percent * 3.6}deg, #ECEEF0 0deg)` }}>
-            <div className="h-full w-full overflow-hidden rounded-full border border-line bg-soft">
+          <div 
+            className="relative h-24 w-24 shrink-0 cursor-pointer rounded-full transition-all duration-300 hover:scale-[1.03] hover:shadow-[0_0_28px_rgba(0,0,0,0.12)]" 
+            onMouseEnter={handleMouseEnter}
+          >
+            <svg className="absolute inset-0 h-full w-full -rotate-90 pointer-events-none" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="48" fill="none" stroke="#ECEEF0" strokeWidth="4" />
+              <circle 
+                cx="50" 
+                cy="50" 
+                r="48" 
+                fill="none" 
+                stroke="#1B1D1F" 
+                strokeWidth="4"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                className={isResetting ? '' : 'transition-all duration-[1200ms] ease-in-out'}
+              />
+            </svg>
+            <div className="absolute inset-1 overflow-hidden rounded-full border border-line bg-soft">
               {avatarUrl ? (
                 <img src={avatarUrl} alt={displayName} className="img-cover" />
               ) : (
@@ -36,7 +77,7 @@ export default function CustomerHeader({ account, displayName, completeness, onS
         <div className="flex flex-wrap items-center gap-3 md:justify-end">
           <div className="rounded-2xl border border-line bg-soft px-4 py-3 text-sm">
             <span className="text-muted">Попълване</span>
-            <span className="ml-2 font-medium text-ink">{percent}%</span>
+            <span className="ml-2 font-medium text-ink">{targetPercent}%</span>
           </div>
           <button type="button" className="btn btn-ghost" onClick={onSignOut}>
             <LogOut size={18} />

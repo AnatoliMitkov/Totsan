@@ -109,6 +109,9 @@ function Hero() {
     const video = videoRef.current
     if (!video) return undefined
 
+    video.defaultMuted = true
+    video.muted = true
+
     const updateDuration = () => {
       setDuration(Number.isFinite(video.duration) ? video.duration : 0)
     }
@@ -121,6 +124,27 @@ function Hero() {
       setIsPlaying(!video.paused)
     }
 
+    const attemptPlay = () => {
+      const playPromise = video.play()
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          setVideoReady(true)
+          setIsPlaying(true)
+        }).catch((err) => {
+          console.warn("Video autoplay prevented:", err)
+          setIsPlaying(false)
+        })
+      } else {
+        setVideoReady(true)
+        setIsPlaying(true)
+      }
+    }
+
+    if (video.readyState >= 3) {
+      setVideoReady(true)
+      attemptPlay()
+    }
+
     updateDuration()
     updateTime()
     updatePlaying()
@@ -130,6 +154,7 @@ function Hero() {
     video.addEventListener('timeupdate', updateTime)
     video.addEventListener('play', updatePlaying)
     video.addEventListener('pause', updatePlaying)
+    video.addEventListener('canplay', attemptPlay)
 
     return () => {
       video.removeEventListener('loadedmetadata', updateDuration)
@@ -137,6 +162,7 @@ function Hero() {
       video.removeEventListener('timeupdate', updateTime)
       video.removeEventListener('play', updatePlaying)
       video.removeEventListener('pause', updatePlaying)
+      video.removeEventListener('canplay', attemptPlay)
     }
   }, [isSeeking])
 
@@ -505,7 +531,7 @@ function TrustPromise() {
                 </span>
               </div>
               <div className="font-display text-[clamp(2rem,1.6rem+1vw,3.25rem)] leading-none text-accentDeep font-bold">
-                {index === 1 ? '0 €' : stat.value}
+                {index === 1 ? '0.00€' : stat.value}
               </div>
               <div className="mt-3 font-display text-xl leading-tight text-ink">
                 {stat.label}

@@ -444,11 +444,11 @@ export function appendPartnerServiceMedia(draft, upload, caption = '') {
 
 export function packagePriceLabel(service) {
   if (!service?.lowestPrice) return 'Цена по оферта'
-  return `${new Intl.NumberFormat('bg-BG').format(Number(service.lowestPrice))} €`
+  return `${new Intl.NumberFormat('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(Number(service.lowestPrice))}€`
 }
 
 export function formatServicePrice(amount) {
   const value = Number(amount || 0)
   if (!Number.isFinite(value) || value <= 0) return 'Цена по оферта'
-  return `${new Intl.NumberFormat('bg-BG').format(value)} €`
+  return `${new Intl.NumberFormat('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}).format(value)}€`
 }

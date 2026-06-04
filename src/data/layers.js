@@ -88,12 +88,12 @@ export const LAYERS = [
       { key: 'insulation', icon: '🧱', title: 'Изолации и сухо строителство', text: 'Топлоизолация, гипсокартон и системи за по-добър комфорт и ефективност.', href: '/katalog?layer=materiali&q=%D0%B8%D0%B7%D0%BE%D0%BB%D0%B0%D1%86%D0%B8%D0%B8', ctaText: 'Виж решенията' }
     ],
     products: [
-      { name: 'Caparol Indeko-plus', cat: 'Боя за интериор', price: 'от €45 / 12.5 л', tag: 'Без миризма' },
-      { name: 'Marazzi Cement Look', cat: 'Гранитогрес 60×60', price: 'от €22 / м²', tag: 'Бестселър' },
+      { name: 'Caparol Indeko-plus', cat: 'Боя за интериор', price: 'от 45.00€ / 12.5 л', tag: 'Без миризма' },
+      { name: 'Marazzi Cement Look', cat: 'Гранитогрес 60×60', price: 'от 22.00€ / м²', tag: 'Бестселър' },
       { name: 'Schüco LivIng PVC', cat: 'Дограма', price: 'по проект', tag: '7 камери' },
-      { name: 'Knauf Diamant 12.5', cat: 'Гипсокартон', price: 'от €12 / лист', tag: 'Влагоустойчив' },
-      { name: 'Quick-Step Capture', cat: 'Ламиниран паркет', price: 'от €29 / м²', tag: 'AC5 клас' },
-      { name: 'Baumit StarTherm', cat: 'EPS изолация', price: 'от €5 / м²', tag: 'Енергоклас A' }
+      { name: 'Knauf Diamant 12.5', cat: 'Гипсокартон', price: 'от 12.00€ / лист', tag: 'Влагоустойчив' },
+      { name: 'Quick-Step Capture', cat: 'Ламиниран паркет', price: 'от 29.00€ / м²', tag: 'AC5 клас' },
+      { name: 'Baumit StarTherm', cat: 'EPS изолация', price: 'от 5.00€ / м²', tag: 'Енергоклас A' }
     ],
     showcase: { label: 'Решения по проект', items: [
       { t: 'Микроцимент в баня', who: 'Caparol · Безфугово', tone: 'from-[#EDEFF1] to-[#D6D9DD]' },
@@ -130,12 +130,12 @@ export const LAYERS = [
       { key: 'assembly', icon: '🔩', title: 'Измерване и монтаж', text: 'Професионален екип за размери, доставка, монтаж и финална проверка.', href: '/katalog?layer=obzavezhdane&q=%D0%BC%D0%BE%D0%BD%D1%82%D0%B0%D0%B6%20%D0%BC%D0%B5%D0%B1%D0%B5%D0%BB%D0%B8' }
     ],
     products: [
-      { name: 'Кухня „Линеа“', cat: 'По поръчка', price: 'от €2 150', tag: 'Безръкохватков фронт' },
-      { name: 'Hansgrohe Talis E', cat: 'Смесител за баня', price: '€215', tag: 'Хром' },
-      { name: 'Bosch Series 8', cat: 'Фурна с пара', price: '€865', tag: 'A+++' },
-      { name: 'Диван „Arno“', cat: 'Триместен, с ъгъл', price: '€1 220', tag: 'Подвижна дамаска' },
-      { name: 'Flos IC Lights', cat: 'Подова лампа', price: '€455', tag: 'Италиански дизайн' },
-      { name: 'Гардероб по поръчка', cat: 'Системно решение', price: 'от €1 075', tag: 'До таван' }
+      { name: 'Кухня „Линеа“', cat: 'По поръчка', price: 'от 2,150.00€', tag: 'Безръкохватков фронт' },
+      { name: 'Hansgrohe Talis E', cat: 'Смесител за баня', price: '215.00€', tag: 'Хром' },
+      { name: 'Bosch Series 8', cat: 'Фурна с пара', price: '865.00€', tag: 'A+++' },
+      { name: 'Диван „Arno“', cat: 'Триместен, с ъгъл', price: '1,220.00€', tag: 'Подвижна дамаска' },
+      { name: 'Flos IC Lights', cat: 'Подова лампа', price: '455.00€', tag: 'Италиански дизайн' },
+      { name: 'Гардероб по поръчка', cat: 'Системно решение', price: 'от 1,075.00€', tag: 'До таван' }
     ],
     showcase: { label: 'Цялостни обзавеждания', items: [
       { t: 'Кухня + дневна, отворен план', who: 'Линеа · По поръчка', tone: 'from-[#EDEFF1] to-[#D6D9DD]' },
@@ -172,12 +172,12 @@ export const LAYERS = [
       { key: 'decor', icon: '💡', title: 'Арт, декор и осветление', text: 'Картини, тапети, осветителни тела, аксесоари и финални щрихи.', href: '/katalog?layer=dekoraciya&kind=product' }
     ],
     products: [
-      { name: 'Cole & Son „Palm Jungle“', cat: 'Тапет', price: 'от €125 / ролка', tag: 'Дизайнерска серия' },
-      { name: 'Farrow & Ball „Hague Blue“', cat: 'Боя за акцентна стена', price: '€92 / 2.5 л', tag: 'Дълбок тон' },
-      { name: 'Пергола „Bella“', cat: 'Алуминиева, 4×3 м', price: 'от €2 970', tag: 'С био-климатик' },
-      { name: 'Поливна система', cat: 'Автоматична, до 200 м²', price: 'от €1 230', tag: 'С телефонно управление' },
-      { name: 'Външно осветление', cat: 'LED ландшафт', price: 'от €40 / тяло', tag: 'IP65' },
-      { name: 'Кашпа „Terrazo“', cat: 'Голям формат', price: '€165', tag: 'Ръчна изработка' }
+      { name: 'Cole & Son „Palm Jungle“', cat: 'Тапет', price: 'от 125.00€ / ролка', tag: 'Дизайнерска серия' },
+      { name: 'Farrow & Ball „Hague Blue“', cat: 'Боя за акцентна стена', price: '92.00€ / 2.5 л', tag: 'Дълбок тон' },
+      { name: 'Пергола „Bella“', cat: 'Алуминиева, 4×3 м', price: 'от 2,970.00€', tag: 'С био-климатик' },
+      { name: 'Поливна система', cat: 'Автоматична, до 200 м²', price: 'от 1,230.00€', tag: 'С телефонно управление' },
+      { name: 'Външно осветление', cat: 'LED ландшафт', price: 'от 40.00€ / тяло', tag: 'IP65' },
+      { name: 'Кашпа „Terrazo“', cat: 'Голям формат', price: '165.00€', tag: 'Ръчна изработка' }
     ],
     showcase: { label: 'Завършени пространства', items: [
       { t: 'Акцентна стена с тапет', who: 'Cole & Son · Хол', tone: 'from-[#EDEFF1] to-[#D6D9DD]' },

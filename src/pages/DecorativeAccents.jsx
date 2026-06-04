@@ -256,7 +256,7 @@ function DecorPlanner() {
               <div className="mb-3 flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold text-ink">Базов бюджет</span>
                 <span className="text-sm font-semibold text-trustPurple">
-                  {fmtEur(baseBudget).toLocaleString('bg-BG')} € / {baseBudget.toLocaleString('bg-BG')} лв.
+                  {fmtEur(baseBudget).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}€ / {baseBudget.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} лв.
                 </span>
               </div>
               <input
@@ -294,7 +294,7 @@ function DecorPlanner() {
                         <span className="min-w-0">
                           <span className="block text-sm font-medium text-ink">{feature.label}</span>
                           <span className="block text-xs text-muted">
-                            {fmtEur(feature.min).toLocaleString('bg-BG')} – {fmtEur(feature.max).toLocaleString('bg-BG')} € &nbsp;·&nbsp; {feature.min.toLocaleString('bg-BG')} – {feature.max.toLocaleString('bg-BG')} лв.
+                            {fmtEur(feature.min).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} – {fmtEur(feature.max).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}€ &nbsp;·&nbsp; {feature.min.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} – {feature.max.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} лв.
                           </span>
                         </span>
                       </span>
@@ -312,10 +312,10 @@ function DecorPlanner() {
             <div className="rounded-3xl bg-gradient-to-br from-ink via-graphite to-ink p-8 text-paper shadow-lg">
               <div className="text-xs font-semibold tracking-[0.16em] text-accentSoft">ОРИЕНТИРОВЪЧЕН БЮДЖЕТ</div>
               <div className="mt-4 font-display text-4xl leading-tight">
-                {fmtEur(estimate.min).toLocaleString('bg-BG')} – {fmtEur(estimate.max).toLocaleString('bg-BG')} €
+                {fmtEur(estimate.min).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} – {fmtEur(estimate.max).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}€
               </div>
               <div className="mt-1 text-base text-paper/55">
-                {estimate.min.toLocaleString('bg-BG')} – {estimate.max.toLocaleString('bg-BG')} лв.
+                {estimate.min.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} – {estimate.max.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} лв.
               </div>
               <p className="mt-3 text-sm text-paper/75">
                 За {selectedRoom.label.toLowerCase()} в стил „{selectedMood.label.toLowerCase()}“ с избраните елементи.

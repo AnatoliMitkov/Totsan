@@ -279,10 +279,10 @@ function GardenBudgetCalculator() {
                 <div className="text-xs uppercase tracking-wider text-accentSoft font-bold">ОРИЕНТИРОВЪЧЕН БЮДЖЕТ</div>
                 
                 <div className="font-display text-4xl lg:text-5xl font-bold mt-4 tracking-tight">
-                  {fmtEur(totals.min).toLocaleString('bg-BG')} – {fmtEur(totals.max).toLocaleString('bg-BG')} €
+                  {fmtEur(totals.min).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} – {fmtEur(totals.max).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}€
                 </div>
                 <div className="text-lg text-white/55 mt-1">
-                  ({totals.min.toLocaleString('bg-BG')} – {totals.max.toLocaleString('bg-BG')} лв.)
+                  ({totals.min.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} – {totals.max.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} лв.)
                 </div>
                 
                 <p className="text-white/70 text-xs mt-3 leading-relaxed max-w-sm mx-auto">
