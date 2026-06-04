@@ -7,10 +7,8 @@ import {
   formatPasskeyDate,
   getPasskeyCapability,
   getPasskeyEnvironmentWarning,
-  getPasskeySecurityState,
   markPasskeyVerifiedSession,
   normalizePasskeyError,
-  normalizePasskeyVerificationError,
   passkeyDismissKey,
 } from '../../lib/passkeys.js'
 
@@ -171,109 +169,7 @@ export function PasskeySetupPrompt({ userId }) {
   )
 }
 
-export function PasskeyVerificationGate({ session, onVerified, className = '' }) {
-  const capability = usePasskeyCapability()
-  const [status, setStatus] = useState('idle')
-  const [message, setMessage] = useState('')
-  const [showBrowserHelp, setShowBrowserHelp] = useState(false)
-  const userId = session?.user?.id || ''
-  const canUsePasskeys = Boolean(capability?.canUse)
-  const warning = capability && !canUsePasskeys ? getPasskeyEnvironmentWarning() : ''
 
-  async function handleVerify() {
-    if (!userId) return
-
-    setStatus('saving')
-    setMessage('')
-
-    const { data, error } = await supabase.auth.signInWithPasskey()
-    if (error) {
-      setStatus('error')
-      setMessage(normalizePasskeyVerificationError(error))
-      return
-    }
-
-    const returnedUserId = data?.user?.id || data?.session?.user?.id || ''
-    if (returnedUserId && returnedUserId !== userId) {
-      clearPasskeyVerifiedSession(userId)
-      setStatus('error')
-      setMessage('На това устройство няма passkey за този профил. Влез с Google/имейл и добави нов passkey от Сигурност.')
-      return
-    }
-
-    markPasskeyVerifiedSession(userId)
-    setStatus('saved')
-    setMessage('Потвърждението е успешно.')
-    onVerified?.()
-  }
-
-  return (
-    <section className={`mx-auto w-full max-w-[34rem] rounded-3xl border border-line bg-paper p-4 shadow-[0_24px_70px_-48px_rgba(0,0,0,0.35)] sm:p-5 md:p-6 ${className}`.trim()}>
-      <div className="flex items-start gap-3">
-        <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-soft text-ink sm:inline-flex">
-          <ShieldCheck size={21} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="eyebrow">Passkey</div>
-          <h2 className="mt-2 font-display text-[1.85rem] leading-none text-ink sm:text-4xl">Потвърди се</h2>
-          <p className="mt-3 text-sm leading-6 text-muted">Потвърди с биометрия.</p>
-        </div>
-      </div>
-
-      {warning && (
-        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 sm:px-4">
-          {warning}
-        </div>
-      )}
-
-      <div className="mt-4 rounded-2xl border border-line bg-soft px-3 py-3 text-sm leading-6 text-muted sm:px-4">
-        Нямаш passkey? Влез с Google или имейл.
-      </div>
-
-      <div className="mt-5 grid gap-2 sm:grid-cols-[1fr_auto]">
-        <button
-          type="button"
-          onClick={handleVerify}
-          disabled={!canUsePasskeys || status === 'saving'}
-          className="btn btn-primary w-full justify-center transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 disabled:opacity-50"
-        >
-          {status === 'saving' ? <Loader2 size={18} className="animate-spin" /> : <Fingerprint size={18} />}
-          {status === 'saving' ? 'Потвърди на устройството' : 'Потвърди с биометрия'}
-        </button>
-        <button type="button" onClick={() => signOutToHome(userId)} className="btn btn-ghost w-full justify-center transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 sm:w-auto">
-          <LogOut size={18} />
-          Изход
-        </button>
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <button
-          type="button"
-          onClick={() => setShowBrowserHelp((value) => !value)}
-          className="text-left text-sm font-medium text-accent hover:underline"
-          aria-expanded={showBrowserHelp}
-        >
-          Не работи на този браузър?
-        </button>
-        <Link to="/contact" className="text-sm font-medium text-accent hover:underline">
-          Свържи се с нас
-        </Link>
-      </div>
-
-      {showBrowserHelp && (
-        <div className="mt-3 rounded-2xl border border-line bg-soft px-3 py-3 text-sm leading-6 text-muted sm:px-4">
-          Някои мобилни браузъри може да не поддържат passkey/биометрично потвърждение коректно. Пробвай с Chrome, Firefox или Edge. Ако нямаш достъп до passkey, използвай възстановяване на достъпа.
-        </div>
-      )}
-
-      {message && (
-        <div className={`mt-4 rounded-2xl px-4 py-3 text-sm ${status === 'error' ? 'border border-amber-200 bg-amber-50 text-amber-800' : 'border border-line bg-soft text-muted'}`}>
-          {message}
-        </div>
-      )}
-    </section>
-  )
-}
 
 export default function PasskeyManager({ userId, session, className = '' }) {
   const capability = usePasskeyCapability()
@@ -281,14 +177,11 @@ export default function PasskeyManager({ userId, session, className = '' }) {
   const [status, setStatus] = useState('idle')
   const [message, setMessage] = useState('')
   const [busyId, setBusyId] = useState('')
-  const [protectionEnabled, setProtectionEnabled] = useState(() => getPasskeySecurityState(session?.user).requirePasskeyVerification)
 
   const canUsePasskeys = Boolean(capability?.canUse)
   const hasPasskeys = items.length > 0
 
-  useEffect(() => {
-    setProtectionEnabled(getPasskeySecurityState(session?.user).requirePasskeyVerification)
-  }, [session?.user?.id, session?.user?.user_metadata?.require_passkey_verification])
+
 
   useEffect(() => {
     if (!canUsePasskeys) return undefined
@@ -332,76 +225,7 @@ export default function PasskeyManager({ userId, session, className = '' }) {
     }
   }
 
-  async function updateProtectionPreference(nextValue, successMessage = '') {
-    const currentUser = session?.user
-    if (!currentUser?.id) {
-      throw new Error('Влез в профила си, за да управляваш тази защита.')
-    }
 
-    const { error } = await supabase.auth.updateUser({
-      data: {
-        ...(currentUser.user_metadata || {}),
-        require_passkey_verification: nextValue,
-      },
-    })
-
-    if (error) throw error
-
-    setProtectionEnabled(Boolean(nextValue))
-    if (nextValue) {
-      markPasskeyVerifiedSession(currentUser.id)
-    } else {
-      clearPasskeyVerifiedSession(currentUser.id)
-    }
-    if (successMessage) setMessage(successMessage)
-  }
-
-  async function handleRegister() {
-    if (!canUsePasskeys) {
-      setStatus('error')
-      setMessage(getPasskeyEnvironmentWarning())
-      return
-    }
-
-    setStatus('saving')
-    setMessage('')
-
-    const { error } = await supabase.auth.registerPasskey()
-    if (error) {
-      setStatus('error')
-      setMessage(normalizePasskeyError(error, 'Не успяхме да включим бърз вход.'))
-      return
-    }
-
-    if (userId) window.localStorage.setItem(passkeyDismissKey(userId), new Date().toISOString())
-    setMessage('Бързият вход е включен.')
-    await reload()
-  }
-
-  async function handleToggleProtection() {
-    if (!hasPasskeys) {
-      setStatus('error')
-      setMessage('Първо добави passkey, за да включиш тази допълнителна защита.')
-      return
-    }
-
-    setStatus('saving')
-    setMessage('')
-
-    try {
-      const nextValue = !protectionEnabled
-      await updateProtectionPreference(
-        nextValue,
-        nextValue
-          ? 'Допълнителната защита е включена.'
-          : 'Допълнителната защита е изключена.'
-      )
-      setStatus('ready')
-    } catch (error) {
-      setStatus('error')
-      setMessage(normalizePasskeyError(error, 'Не успяхме да обновим настройката за допълнителна защита.'))
-    }
-  }
 
   async function handleDelete(passkeyId) {
     setBusyId(passkeyId)
@@ -420,17 +244,7 @@ export default function PasskeyManager({ userId, session, className = '' }) {
     setItems(nextItems)
     setStatus('ready')
 
-    try {
-      if (nextItems.length === 0 && protectionEnabled) {
-        await updateProtectionPreference(false)
-        setMessage('Последният passkey е премахнат, затова допълнителната защита беше изключена автоматично.')
-        return
-      }
-    } catch (updateError) {
-      setStatus('error')
-      setMessage(normalizePasskeyError(updateError, 'Passkey-ът е премахнат, но не успяхме да обновим настройката за защита.'))
-      return
-    }
+
 
     setMessage('Входът е премахнат.')
   }
@@ -441,7 +255,7 @@ export default function PasskeyManager({ userId, session, className = '' }) {
         <div>
           <div className="eyebrow">Сигурност</div>
           <h3 className="mt-2 font-display text-3xl text-ink">Passkey</h3>
-          <p className="mt-2 max-w-xl text-sm text-muted">Бърз вход с биометрия.</p>
+          <p className="mt-2 max-w-xl text-sm text-muted">Бърз вход с лице, отпечатък или ключ.</p>
         </div>
         <button type="button" onClick={reload} disabled={!canUsePasskeys || status === 'loading'} className="btn btn-ghost">
           <RefreshCw size={18} />
@@ -472,41 +286,13 @@ export default function PasskeyManager({ userId, session, className = '' }) {
           <div className="mt-5 flex flex-wrap gap-3">
             <button type="button" onClick={handleRegister} disabled={status === 'saving'} className="btn btn-primary disabled:opacity-50">
               {status === 'saving' ? <Loader2 size={18} className="animate-spin" /> : <Fingerprint size={18} />}
-              {status === 'saving' ? 'Потвърди на устройството' : 'Включи бърз вход'}
+              {status === 'saving' ? 'Потвърди на устройството' : 'Добави passkey'}
             </button>
           </div>
 
           <p className="mt-3 text-sm text-muted">Ново устройство? Добави нов passkey.</p>
 
-          <div className={`mt-5 rounded-2xl border px-4 py-4 ${protectionEnabled ? 'border-green-200 bg-green-50' : 'border-line bg-soft'}`}>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="max-w-2xl">
-                <div className={protectionEnabled ? 'font-medium text-green-900' : 'font-medium text-ink'}>
-                  Допълнителна защита
-                </div>
-                <p className={`mt-1 text-sm ${protectionEnabled ? 'text-green-800' : 'text-muted'}`}>
-                  {protectionEnabled
-                    ? 'Искаме passkey преди защитените части.'
-                    : 'Искай passkey преди защитените части.'}
-                </p>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={protectionEnabled}
-                onClick={handleToggleProtection}
-                disabled={status === 'saving' || !hasPasskeys}
-                className={`relative inline-flex h-7 w-12 items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${protectionEnabled ? 'bg-accent' : 'bg-line'}`}
-              >
-                <span className={`inline-block h-5 w-5 transform rounded-full bg-paper shadow transition ${protectionEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-            </div>
-            <p className={`mt-3 text-xs ${protectionEnabled ? 'text-green-800' : 'text-muted'}`}>
-              {hasPasskeys
-                ? 'Можеш да я изключиш по всяко време.'
-                : 'Първо добави passkey.'}
-            </p>
-          </div>
+
 
           {message && (
             <div className={`mt-4 rounded-2xl px-4 py-3 text-sm ${status === 'error' ? 'border border-amber-200 bg-amber-50 text-amber-800' : 'border border-line bg-soft text-muted'}`}>

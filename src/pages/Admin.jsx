@@ -1,12 +1,12 @@
-﻿import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import { ArrowRight, BarChart3, ClipboardList, CreditCard, FileClock, FolderKanban, KeyRound, Mail, MessagesSquare, PackageCheck, ScrollText, Search, ShieldCheck, Sparkles, Star, UserCog, Users, CheckCircle2, Circle, Eye, EyeOff } from 'lucide-react'
 import { brand, supabase } from '../lib/supabase.js'
 import { HERO_COLLAGE, HOME_PROJECTS } from '../data/images.js'
 import { getAccountDisplayName, useAccount } from '../lib/account.js'
-import { PasskeySignInButton, PasskeyVerificationGate } from '../components/auth/PasskeyManager.jsx'
+import { PasskeySignInButton } from '../components/auth/PasskeyManager.jsx'
 import { TotpMfaChallengeGate } from '../components/auth/TotpMfa.jsx'
-import { isPasskeyVerifiedSession } from '../lib/passkeys.js'
+import { isPasskeyVerifiedSession, clearPasskeyVerifiedSession } from '../lib/passkeys.js'
 import { useMfaGate } from '../lib/mfa.js'
 
 const INPUT_CLASS = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
@@ -101,17 +101,6 @@ export default function Admin() {
     )
   }
 
-  if (requirePasskeyVerification && !(passkeyVerified || sessionPasskeyVerified)) {
-    return (
-      <AdminShell session={session} account={account}>
-        <PasskeyVerificationGate
-          session={session}
-          areaLabel={account?.role === 'admin' ? 'Р°РґРјРёРЅ РїР°РЅРµР»Р°' : 'РїСЂРѕС„РёР»Р° С‚Рё'}
-          onVerified={() => setPasskeyVerified(true)}
-        />
-      </AdminShell>
-    )
-  }
 
   if (location.pathname === '/login') {
     return <Navigate to={resolvePostLoginTarget(location, account)} replace />
@@ -615,13 +604,13 @@ function LoginPanel() {
                   onChange={e => setPassword(e.target.value)}
                   type={showPassword ? 'text' : 'password'}
                   autoComplete={isRecoveryMode ? 'new-password' : isLogin ? 'current-password' : 'new-password'}
-                  placeholder="вЂўвЂўвЂўвЂўвЂўвЂўвЂўвЂў"
+                  placeholder="Въведи парола"
                   className={`${INPUT_CLASS} mt-0 pr-12`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(value => !value)}
-                  aria-label={showPassword ? 'РЎРєСЂРёР№ РїР°СЂРѕР»Р°С‚Р°' : 'РџРѕРєР°Р¶Рё РїР°СЂРѕР»Р°С‚Р°'}
+                  aria-label={showPassword ? 'Скрий паролата' : 'Покажи паролата'}
                   aria-pressed={showPassword}
                   className="group absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted transition-all duration-300 hover:scale-110 hover:bg-soft hover:text-accent active:scale-95 active:rotate-6"
                 >
@@ -653,13 +642,13 @@ function LoginPanel() {
                     onChange={e => setConfirmPassword(e.target.value)}
                     type={showConfirmPassword ? 'text' : 'password'}
                     autoComplete="new-password"
-                    placeholder="вЂўвЂўвЂўвЂўвЂўвЂўвЂўвЂў"
+                    placeholder="Въведи парола"
                     className={`${INPUT_CLASS} mt-0 pr-12`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(value => !value)}
-                    aria-label={showConfirmPassword ? 'РЎРєСЂРёР№ РїРѕС‚РІСЉСЂР¶РґРµРЅРёРµС‚Рѕ Р·Р° РїР°СЂРѕР»Р°С‚Р°' : 'РџРѕРєР°Р¶Рё РїРѕС‚РІСЉСЂР¶РґРµРЅРёРµС‚Рѕ Р·Р° РїР°СЂРѕР»Р°С‚Р°'}
+                    aria-label={showConfirmPassword ? 'Скрий потвърждението' : 'Покажи потвърждението'}
                     aria-pressed={showConfirmPassword}
                     className="group absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted transition-all duration-300 hover:scale-110 hover:bg-soft hover:text-accent active:scale-95 active:rotate-6"
                   >

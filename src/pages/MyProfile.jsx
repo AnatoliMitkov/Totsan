@@ -10,7 +10,7 @@ import CustomerPersonal from '../components/profile/CustomerPersonal.jsx'
 import CustomerProject from '../components/profile/CustomerProject.jsx'
 import CompletenessBar from '../components/profile/CompletenessBar.jsx'
 import PartnerProfileWorkspace from '../components/profile/PartnerProfileWorkspace.jsx'
-import PasskeyManager, { PasskeySetupPrompt, PasskeyVerificationGate } from '../components/auth/PasskeyManager.jsx'
+import PasskeyManager, { PasskeySetupPrompt } from '../components/auth/PasskeyManager.jsx'
 import TotpMfaManager, { TotpMfaChallengeGate } from '../components/auth/TotpMfa.jsx'
 import { isPasskeyVerifiedSession } from '../lib/passkeys.js'
 import { useMfaGate } from '../lib/mfa.js'
@@ -80,19 +80,7 @@ export default function MyProfile() {
     )
   }
 
-  if (requirePasskeyVerification && !(passkeyVerified || sessionPasskeyVerified)) {
-    return (
-      <section className="section bg-soft min-h-screen">
-        <div className="container-page max-w-3xl">
-          <PasskeyVerificationGate
-            session={session}
-            areaLabel="профила ти"
-            onVerified={() => setPasskeyVerified(true)}
-          />
-        </div>
-      </section>
-    )
-  }
+
 
   if (account?.role === 'specialist') {
     return <ProEditor session={session} account={account} />

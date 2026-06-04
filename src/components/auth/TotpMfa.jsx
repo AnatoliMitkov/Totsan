@@ -285,9 +285,9 @@ export default function TotpMfaManager({ session, className = '' }) {
     <section className={`rounded-3xl border border-line bg-paper p-5 md:p-6 ${className}`.trim()}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="eyebrow">2FA</div>
-          <h3 className="mt-2 font-display text-3xl text-ink">Authenticator</h3>
-          <p className="mt-2 max-w-xl text-sm text-muted">Код при вход.</p>
+          <div className="eyebrow">Сигурност</div>
+          <h3 className="mt-2 font-display text-3xl text-ink">2FA</h3>
+          <p className="mt-2 max-w-xl text-sm text-muted">6-цифрен код при вход.</p>
         </div>
         <button type="button" onClick={() => reload()} disabled={status === 'loading' || status === 'saving'} className="btn btn-ghost">
           <RefreshCw size={18} />
