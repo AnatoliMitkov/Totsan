@@ -7,6 +7,34 @@ import { getAccountDisplayName, useAccount } from '../lib/account.js'
 import { PasskeySignInButton } from '../components/auth/PasskeyManager.jsx'
 
 const INPUT_CLASS = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
+const PRODUCTION_APP_ORIGIN = 'https://totsan.com'
+
+function normalizeOrigin(value = '') {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+
+  try {
+    return new URL(raw).origin
+  } catch {
+    return ''
+  }
+}
+
+function isLocalOrigin(origin = '') {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)
+}
+
+function getAuthRedirectOrigin() {
+  const configuredOrigin = normalizeOrigin(import.meta.env.VITE_APP_URL || import.meta.env.VITE_SITE_URL || import.meta.env.VITE_PUBLIC_APP_URL)
+  if (configuredOrigin) return configuredOrigin
+
+  if (typeof window === 'undefined') return PRODUCTION_APP_ORIGIN
+
+  const currentOrigin = window.location.origin
+  if (import.meta.env.DEV) return currentOrigin
+  if (isLocalOrigin(currentOrigin)) return PRODUCTION_APP_ORIGIN
+  return currentOrigin
+}
 
 const STATUS_LABELS = {
   new: 'Ново',
@@ -237,7 +265,7 @@ function LoginPanel() {
     setPendingAction(provider)
     setMessage('')
 
-    const loginRedirect = new URL('/login', window.location.origin)
+    const loginRedirect = new URL('/login', getAuthRedirectOrigin())
     if (nextPath) loginRedirect.searchParams.set('next', nextPath)
     const options = { redirectTo: loginRedirect.toString() }
 
