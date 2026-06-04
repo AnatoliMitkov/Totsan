@@ -12,6 +12,13 @@ import {
   savePendingMfaEnrollment,
 } from '../../lib/mfa.js'
 
+async function signOutToHome() {
+  await supabase.auth.signOut()
+  if (typeof window !== 'undefined') {
+    window.location.assign('/')
+  }
+}
+
 async function listMfaFactors() {
   const { data, error } = await supabase.auth.mfa.listFactors()
   if (error) throw error
@@ -102,11 +109,11 @@ export function TotpMfaChallengeGate({ factor, onVerified, className = '' }) {
         />
 
         <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-          <button type="submit" disabled={status === 'saving'} className="btn btn-primary w-full justify-center disabled:opacity-50">
+          <button type="submit" disabled={status === 'saving'} className="btn btn-primary w-full justify-center transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 disabled:opacity-50">
             {status === 'saving' ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
             {status === 'saving' ? 'Проверяваме…' : 'Потвърди'}
           </button>
-          <button type="button" onClick={() => supabase.auth.signOut()} className="btn btn-ghost w-full justify-center sm:w-auto">
+          <button type="button" onClick={signOutToHome} className="btn btn-ghost w-full justify-center transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 sm:w-auto">
             Изход
           </button>
         </div>
@@ -299,7 +306,7 @@ export default function TotpMfaManager({ session, className = '' }) {
 
       {!hasVerifiedFactor && !enrollment && (
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <button type="button" onClick={startEnrollment} disabled={status === 'saving'} className="btn btn-primary disabled:opacity-50">
+          <button type="button" onClick={startEnrollment} disabled={status === 'saving'} className="btn btn-primary transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 disabled:opacity-50">
             {status === 'saving' ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
             Включи 2FA
           </button>
@@ -336,7 +343,7 @@ export default function TotpMfaManager({ session, className = '' }) {
                 className="mt-4 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-center text-xl tracking-[0.2em] outline-none transition focus:border-ink"
               />
               <div className="mt-4 flex flex-wrap gap-2">
-                <button type="submit" disabled={status === 'saving'} className="btn btn-primary disabled:opacity-50">
+                <button type="submit" disabled={status === 'saving'} className="btn btn-primary transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 disabled:opacity-50">
                   {status === 'saving' ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
                   Потвърди
                 </button>

@@ -150,6 +150,14 @@ function normalizeNextPath(value = '') {
   return raw
 }
 
+async function signOutToHome(userId = '') {
+  clearPasskeyVerifiedSession(userId)
+  await supabase.auth.signOut()
+  if (typeof window !== 'undefined') {
+    window.location.assign('/')
+  }
+}
+
 function AdminShell({ children, session, account }) {
   const title = 'РђРґРјРёРЅ РєРѕРЅС‚СЂРѕР»РµРЅ РїР°РЅРµР».'
   const subtitle = `Р”РѕР±СЂРµ РґРѕС€СЉР» РѕР±СЂР°С‚РЅРѕ, ${getAccountDisplayName(account, session, 'admin')}.`
@@ -168,7 +176,12 @@ function AdminShell({ children, session, account }) {
             <h1 className="h-section mt-2 text-[clamp(2rem,1.8rem+1vw,3rem)]">{title}</h1>
             <p className="mt-3 max-w-2xl text-sm text-muted">{subtitle}</p>
           </div>
-          <button className="btn btn-ghost self-start md:self-auto" onClick={() => supabase.auth.signOut()}>РР·С…РѕРґ</button>
+          <button
+            className="btn btn-ghost self-start md:self-auto transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
+            onClick={() => signOutToHome(session?.user?.id)}
+          >
+            Изход
+          </button>
         </div>
         {children}
       </div>
@@ -262,6 +275,8 @@ function LoginPanel() {
   const nextPath = normalizeNextPath(params.get('next') || '')
   const [isLogin, setIsLogin] = useState(!isSignup)
   const [isRecoveryMode, setIsRecoveryMode] = useState(false)
+  const actionButtonClass = 'btn btn-primary w-full justify-center !py-3.5 text-base mt-2 transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20 disabled:opacity-50'
+  const subtleButtonClass = 'font-medium text-accent transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 rounded-full'
 
   useEffect(() => {
     setIsLogin(!isSignup)
@@ -339,7 +354,7 @@ function LoginPanel() {
     if (!isLogin && signupRole === 'pro') {
       setStatus('error')
       setPendingAction('')
-      setMessage('Р—Р° Pro РєР°РЅРґРёРґР°С‚СѓСЂР° РёР·РїРѕР»Р·РІР°Р№ СЂРµРіРёСЃС‚СЂР°С†РёСЏ СЃ РёРјРµР№Р» Рё РїР°СЂРѕР»Р°, Р·Р° РґР° Р·Р°РїР°Р·РёРј СЂРѕР»СЏС‚Р° Рё РґР°РЅРЅРёС‚Рµ Р·Р° СЃРїРµС†РёР°Р»РёСЃС‚.')
+      setMessage('За specialist профил използвай регистрация с имейл и парола.')
       return
     }
 
@@ -365,14 +380,14 @@ function LoginPanel() {
     }
 
     setStatus('sent')
-    setMessage('РџСЂРµРЅР°СЃРѕС‡РІР°РјРµ РєСЉРј GoogleвЂ¦')
+    setMessage('Пренасочваме към Google…')
   }
 
   async function handleForgotPassword() {
     if (!email.trim()) {
       setStatus('error')
       setPendingAction('')
-      setMessage('Р вЂ™РЎР‰Р Р†Р ВµР Т‘Р С‘ Р С‘Р СР ВµР в„–Р В».')
+      setMessage('Въведи имейл.')
       return
     }
 
@@ -396,7 +411,7 @@ function LoginPanel() {
 
     setStatus('sent')
     setPendingAction('')
-    setMessage('Р ВР В·Р С—РЎР‚Р В°РЎвЂљР С‘РЎвЂ¦Р СР Вµ Р С‘Р СР ВµР в„–Р В» Р В·Р В° РЎРѓР СРЎРЏР Р…Р В° Р Р…Р В° Р С—Р В°РЎР‚Р С•Р В»Р В°.')
+    setMessage('Изпратихме имейл за смяна на парола.')
   }
 
   async function submit(e) {
@@ -406,14 +421,14 @@ function LoginPanel() {
       if (!pwdValid) {
         setStatus('error')
         setPendingAction('')
-        setMessage('Р ВР В·Р С—Р С•Р В»Р В·Р Р†Р В°Р в„– Р С—Р С•-РЎРѓР С‘Р С–РЎС“РЎР‚Р Р…Р В° Р С—Р В°РЎР‚Р С•Р В»Р В°.')
+        setMessage('Използвай по-сигурна парола.')
         return
       }
 
       if (password !== confirmPassword) {
         setStatus('error')
         setPendingAction('')
-        setMessage('Р СџР В°РЎР‚Р С•Р В»Р С‘РЎвЂљР Вµ Р Р…Р Вµ РЎРѓРЎР‰Р Р†Р С—Р В°Р Т‘Р В°РЎвЂљ.')
+        setMessage('Паролите не съвпадат.')
         return
       }
 
@@ -432,7 +447,7 @@ function LoginPanel() {
 
       setStatus('sent')
       setPendingAction('')
-      setMessage('Р СџР В°РЎР‚Р С•Р В»Р В°РЎвЂљР В° Р Вµ РЎРѓР СР ВµР Р…Р ВµР Р…Р В°.')
+      setMessage('Паролата е сменена.')
       setIsRecoveryMode(false)
       setPassword('')
       setConfirmPassword('')
@@ -445,28 +460,28 @@ function LoginPanel() {
     if (isLogin) {
       if (!email.trim() || !password.trim()) {
         setStatus('error')
-        setMessage('Р’СЉРІРµРґРё РёРјРµР№Р» Рё РїР°СЂРѕР»Р°.')
+        setMessage('Въведи имейл и парола.')
         return
       }
     } else {
       if (!fullName.trim() || !displayName.trim()) {
         setStatus('error')
-        setMessage('РњРѕР»СЏ, РїРѕРїСЉР»РЅРµС‚Рµ Рё РґРІРµС‚Рµ РёРјРµРЅР°.')
+        setMessage('Попълни и двете имена.')
         return
       }
       if (!email.trim()) {
         setStatus('error')
-        setMessage('РњРѕР»СЏ, РІСЉРІРµРґРµС‚Рµ РёРјРµР№Р» Р°РґСЂРµСЃ.')
+        setMessage('Въведи имейл.')
         return
       }
       if (!pwdValid) {
         setStatus('error')
-        setMessage('РњРѕР»СЏ, РїРѕРєСЂРёР№С‚Рµ РІСЃРёС‡РєРё РёР·РёСЃРєРІР°РЅРёСЏ Р·Р° РїР°СЂРѕР»Р°С‚Р°.')
+        setMessage('Покрий изискванията за парола.')
         return
       }
       if (password !== confirmPassword) {
         setStatus('error')
-        setMessage('РџР°СЂРѕР»РёС‚Рµ РЅРµ СЃСЉРІРїР°РґР°С‚. РћРїРёС‚Р°Р№С‚Рµ РѕС‚РЅРѕРІРѕ.')
+        setMessage('Паролите не съвпадат.')
         return
       }
     }
@@ -507,10 +522,10 @@ function LoginPanel() {
     setPendingAction('')
     setMessage(
       isLogin
-        ? 'Р’С…РѕРґСЉС‚ Рµ СѓСЃРїРµС€РµРЅ.'
+        ? 'Входът е успешен.'
         : signupRole === 'pro'
-          ? 'Р РµРіРёСЃС‚СЂР°С†РёСЏС‚Р° Рµ РїСЂРёРµС‚Р°. РђРєРѕ Рµ РЅСѓР¶РЅРѕ РїРѕС‚РІСЉСЂР¶РґРµРЅРёРµ РЅР° РёРјРµР№Р», РїСЂРѕРІРµСЂРё РїРѕС‰Р°С‚Р° СЃРё. РЎР»РµРґ РІС…РѕРґ РѕС‚РёРІР°Р№ РІ вЂћРњРѕСЏС‚ РїСЂРѕС„РёР»вЂњ.'
-          : 'Р РµРіРёСЃС‚СЂР°С†РёСЏС‚Р° Рµ СѓСЃРїРµС€РЅР°!'
+          ? 'Регистрацията е приета. Провери имейла си, ако е нужно потвърждение.'
+          : 'Регистрацията е успешна.'
     )
   }
 
@@ -528,23 +543,23 @@ function LoginPanel() {
           <form onSubmit={submit} className={`${(isLogin || isRecoveryMode) ? 'mt-10 space-y-5' : 'mt-7 space-y-4'}`}>
             {!isLogin && !isRecoveryMode && (
               <div>
-                <div className="text-sm font-medium text-ink mb-2">РђР· СЃСЉРј</div>
+                <div className="text-sm font-medium text-ink mb-2">Аз съм</div>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setSignupRole('customer')}
-                    className={`rounded-2xl border px-4 py-3 text-sm transition ${signupRole === 'customer' ? 'border-ink bg-soft text-ink' : 'border-line text-muted hover:border-ink/40'}`}
+                    className={`rounded-2xl border px-4 py-3 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 active:scale-[0.99] ${signupRole === 'customer' ? 'border-ink bg-soft text-ink' : 'border-line text-muted hover:border-ink/40'}`}
                   >
-                    <div className="font-medium">РљР»РёРµРЅС‚</div>
-                    <div className="text-xs text-muted mt-0.5">РўСЉСЂСЃСЏ СЃРїРµС†РёР°Р»РёСЃС‚Рё</div>
+                    <div className="font-medium">Клиент</div>
+                    <div className="text-xs text-muted mt-0.5">Търся специалисти</div>
                   </button>
                   <button
                     type="button"
                     onClick={() => setSignupRole('pro')}
-                    className={`rounded-2xl border px-4 py-3 text-sm transition ${signupRole === 'pro' ? 'border-ink bg-soft text-ink' : 'border-line text-muted hover:border-ink/40'}`}
+                    className={`rounded-2xl border px-4 py-3 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 active:scale-[0.99] ${signupRole === 'pro' ? 'border-ink bg-soft text-ink' : 'border-line text-muted hover:border-ink/40'}`}
                   >
-                    <div className="font-medium">РЎРїРµС†РёР°Р»РёСЃС‚</div>
-                    <div className="text-xs text-muted mt-0.5">РџСЂРµРґР»Р°РіР°Рј СѓСЃР»СѓРіРё</div>
+                    <div className="font-medium">Специалист</div>
+                    <div className="text-xs text-muted mt-0.5">Предлагам услуги</div>
                   </button>
                 </div>
               </div>
@@ -553,17 +568,17 @@ function LoginPanel() {
             {!isLogin && !isRecoveryMode && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm font-medium text-ink">
-                  РРјРµ Рё С„Р°РјРёР»РёСЏ
+                  Име и фамилия
                   <input
                     value={fullName}
                     onChange={e => setFullName(e.target.value)}
                     type="text"
-                    placeholder="РРІР°РЅ РРІР°РЅРѕРІ"
+                    placeholder="Иван Иванов"
                     className={INPUT_CLASS}
                   />
                 </label>
                 <label className="block text-sm font-medium text-ink">
-                  РџРѕС‚СЂРµР±РёС‚РµР»СЃРєРѕ РёРјРµ
+                  Потребителско име
                   <input
                     value={displayName}
                     onChange={e => setDisplayName(e.target.value)}
@@ -577,7 +592,7 @@ function LoginPanel() {
             
             {!isRecoveryMode && (
             <label className="block text-sm font-medium text-ink">
-              РРјРµР№Р» Р°РґСЂРµСЃ
+              Имейл
               <input
                 value={email}
                 onChange={e => setEmail(e.target.value)}
@@ -591,8 +606,8 @@ function LoginPanel() {
 
             <label className="block text-sm font-medium text-ink">
               <div className="flex justify-between">
-                <span>РџР°СЂРѕР»Р°</span>
-                {isLogin && !isRecoveryMode && <button type="button" onClick={handleForgotPassword} className="text-accent hover:underline">Забравена парола?</button>}
+                <span>Парола</span>
+                {isLogin && !isRecoveryMode && <button type="button" onClick={handleForgotPassword} className={subtleButtonClass}>Забравена парола?</button>}
               </div>
               <div className="relative mt-2">
                 <input
@@ -620,18 +635,18 @@ function LoginPanel() {
 
             {!isLogin && !isRecoveryMode && password && (
               <div className="text-xs space-y-1.5 mt-2">
-                <div className="text-muted mb-2">РР·РёСЃРєРІР°РЅРёСЏ Р·Р° РїР°СЂРѕР»Р°С‚Р°:</div>
-                <RuleItem isValid={pwdRules.length} text="РњРёРЅРёРјСѓРј 8 Р·РЅР°РєР°" />
-                <RuleItem isValid={pwdRules.uppercase} text="РџРѕРЅРµ РµРґРЅР° РіР»Р°РІРЅР° Р±СѓРєРІР°" />
-                <RuleItem isValid={pwdRules.lowercase} text="РџРѕРЅРµ РµРґРЅР° РјР°Р»РєР° Р±СѓРєРІР°" />
-                <RuleItem isValid={pwdRules.number} text="РџРѕРЅРµ РµРґРЅРѕ С‡РёСЃР»Рѕ" />
-                <RuleItem isValid={pwdRules.special} text="РЎРїРµС†РёР°Р»РµРЅ СЃРёРјРІРѕР» (РЅР°РїСЂ. !@#$%^&*)" />
+                <div className="text-muted mb-2">Изисквания за паролата:</div>
+                <RuleItem isValid={pwdRules.length} text="Минимум 8 знака" />
+                <RuleItem isValid={pwdRules.uppercase} text="Поне една главна буква" />
+                <RuleItem isValid={pwdRules.lowercase} text="Поне една малка буква" />
+                <RuleItem isValid={pwdRules.number} text="Поне едно число" />
+                <RuleItem isValid={pwdRules.special} text="Специален символ" />
               </div>
             )}
 
             {(!isLogin || isRecoveryMode) && (
               <label className="block text-sm font-medium text-ink mt-4">
-                РџРѕС‚РІСЉСЂРґРё РїР°СЂРѕР»Р°С‚Р°
+                Потвърди паролата
                 <div className="relative mt-2">
                   <input
                     value={confirmPassword}
@@ -660,7 +675,7 @@ function LoginPanel() {
             {!isLogin && !isRecoveryMode && signupRole === 'pro' && (
               <div className="grid gap-3">
                 <label className="block text-sm font-medium text-ink">
-                  РўРµР»РµС„РѕРЅ (РѕРїС†РёРѕРЅР°Р»РЅРѕ)
+                  Телефон (по желание)
                   <input
                     value={proPhone}
                     onChange={e => setProPhone(e.target.value)}
@@ -670,12 +685,12 @@ function LoginPanel() {
                   />
                 </label>
                 <label className="block text-sm font-medium text-ink">
-                  РќР°РєСЂР°С‚РєРѕ Р·Р° С‚РµР± / С„РёСЂРјР°С‚Р°
+                  Накратко за теб / фирмата
                   <textarea
                     value={proAbout}
                     onChange={e => setProAbout(e.target.value)}
                     rows={3}
-                    placeholder="РљР°РєРІРѕ РїСЂР°РІРёС€, РІ РєРѕР№ РіСЂР°Рґ, РѕРїРёС‚вЂ¦"
+                    placeholder="Какво правиш, в кой град, опит…"
                     className={INPUT_CLASS}
                   />
                 </label>
@@ -704,7 +719,7 @@ function LoginPanel() {
                 Съгласявам се с общите условия и политиката за поверителност
               </label>
             )}
-            <button disabled={status === 'sending'} className="btn btn-primary w-full justify-center !py-3.5 text-base mt-2 disabled:opacity-50">
+            <button disabled={status === 'sending'} className={actionButtonClass}>
               {status === 'sending' ? 'Обработка…' : isRecoveryMode ? 'Запази' : isLogin ? 'Вход' : 'Регистрация'}
             </button>
           </form>
@@ -742,9 +757,9 @@ function LoginPanel() {
                     setMessage('')
                     setStatus('idle')
                   }}
-                  className="font-medium text-accent hover:underline"
+                  className={subtleButtonClass}
                 >
-                  {isLogin ? 'Създай нов' : 'Влез тук'}
+                  {isLogin ? 'Създай профил' : 'Вход'}
                 </button>
               </div>
             </>
@@ -772,7 +787,12 @@ function NoAccessPanel({ session, account }) {
       </p>
       <div className="mt-6 flex flex-wrap gap-3">
         <Link to="/moy-profil" className="btn btn-primary">РљСЉРј РјРѕСЏ РїСЂРѕС„РёР»</Link>
-        <button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>РР·С…РѕРґ</button>
+        <button
+          className="btn btn-ghost transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
+          onClick={() => signOutToHome(session?.user?.id)}
+        >
+          Изход
+        </button>
       </div>
     </div>
   )
@@ -1030,7 +1050,7 @@ function OAuthButton({ label, icon, disabled, onClick }) {
       type="button"
       disabled={isBusy}
       onClick={onClick}
-      className="inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-line bg-paper px-4 py-3 text-sm font-medium text-ink transition hover:border-ink disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-line bg-paper px-4 py-3 text-sm font-medium text-ink transition duration-200 hover:border-ink hover:bg-soft active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 disabled:cursor-not-allowed disabled:opacity-60"
     >
       <span className="inline-flex h-5 w-5 items-center justify-center">{icon}</span>
       {label}

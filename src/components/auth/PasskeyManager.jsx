@@ -14,6 +14,14 @@ import {
   passkeyDismissKey,
 } from '../../lib/passkeys.js'
 
+async function signOutToHome(userId = '') {
+  clearPasskeyVerifiedSession(userId)
+  await supabase.auth.signOut()
+  if (typeof window !== 'undefined') {
+    window.location.assign('/')
+  }
+}
+
 function usePasskeyCapability() {
   const [capability, setCapability] = useState(null)
 
@@ -69,7 +77,7 @@ export function PasskeySignInButton({ className = '' }) {
         type="button"
         onClick={handleSignIn}
         disabled={status === 'saving'}
-        className="btn btn-ghost w-full justify-center !py-3 disabled:opacity-50"
+        className="btn btn-ghost w-full justify-center !py-3 transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 disabled:opacity-50"
       >
         {status === 'saving' ? <Loader2 size={18} className="animate-spin" /> : <Fingerprint size={18} />}
         {status === 'saving' ? 'Потвърди на устройството' : 'Вход с биометрия'}
@@ -145,7 +153,7 @@ export function PasskeySetupPrompt({ userId }) {
           <div className="font-display text-2xl leading-tight text-ink">Бърз вход</div>
           <p className="mt-1 text-sm text-muted">Лице, пръстов отпечатък или ключ.</p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" onClick={handleRegister} disabled={status === 'saving'} className="btn btn-primary !py-2 text-sm disabled:opacity-50">
+            <button type="button" onClick={handleRegister} disabled={status === 'saving'} className="btn btn-primary !py-2 text-sm transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 disabled:opacity-50">
               {status === 'saving' ? <Loader2 size={17} className="animate-spin" /> : <ShieldCheck size={17} />}
               {status === 'saving' ? 'Потвърди' : 'Включи бърз вход'}
             </button>
@@ -227,12 +235,12 @@ export function PasskeyVerificationGate({ session, onVerified, className = '' })
           type="button"
           onClick={handleVerify}
           disabled={!canUsePasskeys || status === 'saving'}
-          className="btn btn-primary w-full justify-center disabled:opacity-50"
+          className="btn btn-primary w-full justify-center transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 disabled:opacity-50"
         >
           {status === 'saving' ? <Loader2 size={18} className="animate-spin" /> : <Fingerprint size={18} />}
           {status === 'saving' ? 'Потвърди на устройството' : 'Потвърди с биометрия'}
         </button>
-        <button type="button" onClick={() => supabase.auth.signOut()} className="btn btn-ghost w-full justify-center sm:w-auto">
+        <button type="button" onClick={() => signOutToHome(userId)} className="btn btn-ghost w-full justify-center transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 sm:w-auto">
           <LogOut size={18} />
           Изход
         </button>
