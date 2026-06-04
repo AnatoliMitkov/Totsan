@@ -5,9 +5,7 @@ import { brand, supabase } from '../lib/supabase.js'
 import { HERO_COLLAGE, HOME_PROJECTS } from '../data/images.js'
 import { getAccountDisplayName, useAccount } from '../lib/account.js'
 import { PasskeySignInButton } from '../components/auth/PasskeyManager.jsx'
-import { TotpMfaChallengeGate } from '../components/auth/TotpMfa.jsx'
 import { isPasskeyVerifiedSession, clearPasskeyVerifiedSession } from '../lib/passkeys.js'
-import { useMfaGate } from '../lib/mfa.js'
 
 const INPUT_CLASS = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const PRODUCTION_APP_ORIGIN = 'https://totsan.com'
@@ -75,7 +73,6 @@ export default function Admin() {
   const location = useLocation()
   const [passkeyVerified, setPasskeyVerified] = useState(false)
   const sessionPasskeyVerified = isPasskeyVerifiedSession(session?.user?.id)
-  const mfaGate = useMfaGate(session)
 
   useEffect(() => {
     setPasskeyVerified(sessionPasskeyVerified)
@@ -83,24 +80,6 @@ export default function Admin() {
 
   if (loading) return <div className="flex h-screen items-center justify-center bg-soft"><div className="text-muted">Зареждане…</div></div>
   if (!session) return <LoginPanel />
-
-  if (mfaGate.loading) {
-    return <div className="flex h-screen items-center justify-center bg-soft"><div className="text-muted">Проверяваме достъпа…</div></div>
-  }
-
-  if (mfaGate.needsMfa) {
-    return (
-      <section className="section bg-soft min-h-screen">
-        <div className="container-page max-w-3xl">
-        <TotpMfaChallengeGate
-          factor={mfaGate.factor}
-          onVerified={mfaGate.refresh}
-        />
-        </div>
-      </section>
-    )
-  }
-
 
   if (location.pathname === '/login') {
     return <Navigate to={resolvePostLoginTarget(location, account)} replace />

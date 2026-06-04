@@ -11,9 +11,8 @@ import CustomerProject from '../components/profile/CustomerProject.jsx'
 import CompletenessBar from '../components/profile/CompletenessBar.jsx'
 import PartnerProfileWorkspace from '../components/profile/PartnerProfileWorkspace.jsx'
 import PasskeyManager, { PasskeySetupPrompt } from '../components/auth/PasskeyManager.jsx'
-import TotpMfaManager, { TotpMfaChallengeGate } from '../components/auth/TotpMfa.jsx'
+import TotpMfaManager from '../components/auth/TotpMfa.jsx'
 import { isPasskeyVerifiedSession } from '../lib/passkeys.js'
-import { useMfaGate } from '../lib/mfa.js'
 import {
   calculateClientProfileCompleteness,
   deleteClientProjectMedia,
@@ -38,7 +37,6 @@ export default function MyProfile() {
   const [searchParams] = useSearchParams()
   const [passkeyVerified, setPasskeyVerified] = useState(false)
   const sessionPasskeyVerified = isPasskeyVerifiedSession(session?.user?.id)
-  const mfaGate = useMfaGate(session)
 
   useEffect(() => {
     setPasskeyVerified(sessionPasskeyVerified)

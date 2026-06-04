@@ -32,6 +32,7 @@ import Kitchens from './pages/Kitchens.jsx'
 import BedroomAndLiving from './pages/BedroomAndLiving.jsx'
 import Bathroom from './pages/Bathroom.jsx'
 import LightingAndTextiles from './pages/LightingAndTextiles.jsx'
+import ProtectedRoute from './components/auth/ProtectedRoute.jsx'
 function AppRoutes() {
   const location = useLocation()
 
@@ -66,14 +67,14 @@ function AppRoutes() {
           <Route path="/banya" element={<Bathroom />} />
           <Route path="/osvetlenie-i-tekstil" element={<LightingAndTextiles />} />
           <Route path="/login" element={<Admin />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/moy-profil" element={<MyProfile />} />
-          <Route path="/porachki" element={<MyOrders />} />
-          <Route path="/inbox" element={<Inbox />} />
-          <Route path="/inbox/:conversationId" element={<Inbox />} />
+          <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
+          <Route path="/moy-profil" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
+          <Route path="/porachki" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />
+          <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
+          <Route path="/inbox/:conversationId" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
           <Route path="/checkout/success" element={<Checkout />} />
           <Route path="/checkout/:type/:id" element={<Checkout />} />
-          <Route path="/order/:orderId" element={<Order />} />
+          <Route path="/order/:orderId" element={<ProtectedRoute><Order /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

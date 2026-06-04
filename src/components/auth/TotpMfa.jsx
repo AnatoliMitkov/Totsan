@@ -133,9 +133,9 @@ export function TotpMfaChallengeGate({ factor, onVerified, className = '' }) {
             <p className="mt-1 text-muted">Ако си добавил 2FA на друго устройство или приложение, използвай неговия 6-цифрен код.</p>
           </div>
           <div>
-            <div className="font-medium text-ink">2. Възстанови достъпа</div>
-            <p className="mt-1 text-muted">Ако нямаш достъп до нито един код, започни възстановяване на акаунта.</p>
-            <Link to="/login#type=recovery" className="mt-1 inline-block font-medium text-accent hover:underline">Възстанови парола и достъп</Link>
+            <div className="font-medium text-ink">2. Възстанови паролата</div>
+            <p className="mt-1 text-muted">Смяната на парола не изключва 2FA. Ако нямаш достъп до нито един Authenticator, ще е нужна допълнителна проверка.</p>
+            <Link to="/login#type=recovery" className="mt-1 inline-block font-medium text-accent hover:underline">Възстанови парола</Link>
           </div>
           <div>
             <div className="font-medium text-ink">3. Свържи се с нас</div>
@@ -162,7 +162,8 @@ export default function TotpMfaManager({ session, className = '' }) {
   const [status, setStatus] = useState('loading')
   const [message, setMessage] = useState('')
   const [busyId, setBusyId] = useState('')
-  const hasVerifiedFactor = factors.length > 0
+  const safeFactors = Array.isArray(factors) ? factors : []
+  const hasVerifiedFactor = safeFactors.length > 0
   const qrCode = sanitizeQrCode(enrollment?.totp?.qr_code)
   const secret = enrollment?.totp?.secret || ''
 
@@ -396,25 +397,31 @@ export default function TotpMfaManager({ session, className = '' }) {
 
       {hasVerifiedFactor && (
         <div className="mt-5 space-y-3">
-          {factors.map((factor, index) => (
-            <div key={factor.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-soft px-4 py-4">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 font-medium text-ink">
-                  <KeyRound size={17} />
-                  {factor.friendly_name || `Authenticator ${index + 1}`}
+          {safeFactors.map((factor, index) => {
+            if (!factor) return null
+            const factorId = factor.id || `temp-factor-${index}`
+            return (
+              <div key={factorId} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-soft px-4 py-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 font-medium text-ink">
+                    <KeyRound size={17} />
+                    {factor.friendly_name || `Authenticator ${index + 1}`}
+                  </div>
+                  <div className="mt-1 text-xs text-muted">Добавен: {formatFactorDate(factor.created_at)}</div>
                 </div>
-                <div className="mt-1 text-xs text-muted">Добавен: {formatFactorDate(factor.created_at)}</div>
+                {factor.id ? (
+                  <button type="button" onClick={() => removeFactor(factor.id)} disabled={busyId === factor.id} className="btn btn-ghost !py-2 text-sm">
+                    {busyId === factor.id ? <Loader2 size={17} className="animate-spin" /> : <Trash2 size={17} />}
+                    {busyId === factor.id ? 'Премахване…' : 'Премахни'}
+                  </button>
+                ) : null}
               </div>
-              <button type="button" onClick={() => removeFactor(factor.id)} disabled={busyId === factor.id} className="btn btn-ghost !py-2 text-sm">
-                {busyId === factor.id ? <Loader2 size={17} className="animate-spin" /> : <Trash2 size={17} />}
-                {busyId === factor.id ? 'Премахване…' : 'Премахни'}
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
-      {hasVerifiedFactor && !enrollment && factors.length < 5 && (
+      {hasVerifiedFactor && !enrollment && safeFactors.length < 5 && status !== 'loading' && (
         <div className="mt-5 rounded-2xl border border-line bg-soft p-4">
           <div className="font-medium text-ink">Резервен Authenticator</div>
           <p className="mt-1 text-sm text-muted">Добави второ приложение или устройство, ако загубиш основното.</p>
