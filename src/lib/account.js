@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase.js'
+import { clearPasskeyVerifiedSession, getPasskeySecurityState } from './passkeys.js'
 
 function metadataName(user) {
   const metadata = user?.user_metadata || {}
@@ -20,6 +21,7 @@ export function useAccount() {
   const [session, setSession] = useState(null)
   const [account, setAccount] = useState(null)
   const [loading, setLoading] = useState(true)
+  const sessionRef = useRef({ signInAt: '', userId: '' })
 
   useEffect(() => {
     let active = true
@@ -46,12 +48,29 @@ export function useAccount() {
 
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return
+      sessionRef.current = {
+        signInAt: data.session?.user?.last_sign_in_at || '',
+        userId: data.session?.user?.id || '',
+      }
       setSession(data.session)
       loadAccount(data.session)
     })
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!active) return
+      const previous = sessionRef.current
+      const next = {
+        signInAt: nextSession?.user?.last_sign_in_at || '',
+        userId: nextSession?.user?.id || '',
+      }
+      const sessionChanged = previous.signInAt !== next.signInAt || previous.userId !== next.userId
+
+      if (sessionChanged) {
+        if (previous.userId) clearPasskeyVerifiedSession(previous.userId)
+        if (next.userId) clearPasskeyVerifiedSession(next.userId)
+      }
+
+      sessionRef.current = next
       setSession(nextSession)
       setLoading(true)
       loadAccount(nextSession)
@@ -68,8 +87,13 @@ export function useAccount() {
     isAdmin: account?.role === 'admin',
     isSpecialist: account?.role === 'specialist',
     specialistStatus: account?.specialist_status || null,
+    requirePasskeyVerification: getPasskeySecurityState(session?.user).requirePasskeyVerification,
     refresh: async () => {
       const { data } = await supabase.auth.getSession()
+      sessionRef.current = {
+        signInAt: data.session?.user?.last_sign_in_at || '',
+        userId: data.session?.user?.id || '',
+      }
       setSession(data.session)
       if (data.session?.user) {
         const { data: row } = await supabase

@@ -101,3 +101,30 @@ export function formatPasskeyDate(value) {
 export function passkeyDismissKey(userId) {
   return `totsan.passkeyPrompt.dismissed.${userId || 'anonymous'}`
 }
+
+export function getPasskeySecurityState(user) {
+  const metadata = user?.user_metadata || {}
+
+  return {
+    requirePasskeyVerification: Boolean(metadata.require_passkey_verification),
+  }
+}
+
+export function passkeyVerifiedSessionKey(userId) {
+  return `totsan.passkeyVerifiedSession.${userId || 'anonymous'}`
+}
+
+export function isPasskeyVerifiedSession(userId) {
+  if (typeof window === 'undefined' || !userId) return false
+  return window.sessionStorage.getItem(passkeyVerifiedSessionKey(userId)) === 'true'
+}
+
+export function markPasskeyVerifiedSession(userId) {
+  if (typeof window === 'undefined' || !userId) return
+  window.sessionStorage.setItem(passkeyVerifiedSessionKey(userId), 'true')
+}
+
+export function clearPasskeyVerifiedSession(userId) {
+  if (typeof window === 'undefined' || !userId) return
+  window.sessionStorage.removeItem(passkeyVerifiedSessionKey(userId))
+}

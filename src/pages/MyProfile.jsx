@@ -10,7 +10,8 @@ import CustomerPersonal from '../components/profile/CustomerPersonal.jsx'
 import CustomerProject from '../components/profile/CustomerProject.jsx'
 import CompletenessBar from '../components/profile/CompletenessBar.jsx'
 import PartnerProfileWorkspace from '../components/profile/PartnerProfileWorkspace.jsx'
-import PasskeyManager, { PasskeySetupPrompt } from '../components/auth/PasskeyManager.jsx'
+import PasskeyManager, { PasskeySetupPrompt, PasskeyVerificationGate } from '../components/auth/PasskeyManager.jsx'
+import { isPasskeyVerifiedSession } from '../lib/passkeys.js'
 import {
   calculateClientProfileCompleteness,
   deleteClientProjectMedia,
@@ -31,8 +32,14 @@ import {
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 
 export default function MyProfile() {
-  const { session, account, loading, refresh } = useAccount()
+  const { session, account, loading, refresh, requirePasskeyVerification } = useAccount()
   const [searchParams] = useSearchParams()
+  const [passkeyVerified, setPasskeyVerified] = useState(false)
+  const sessionPasskeyVerified = isPasskeyVerifiedSession(session?.user?.id)
+
+  useEffect(() => {
+    setPasskeyVerified(sessionPasskeyVerified)
+  }, [session?.user?.id, session?.user?.last_sign_in_at, sessionPasskeyVerified])
 
   if (loading) {
     return <div className="section"><div className="container-page text-muted">Зареждане…</div></div>
@@ -48,6 +55,20 @@ export default function MyProfile() {
             {fromQuiz ? 'Резултатът от quiz-а е подготвен за проект-паспорт. Влез в акаунта си, за да го прегледаш и запазиш.' : 'За да видиш профила си, трябва първо да влезеш в акаунта си.'}
           </p>
           <Link to="/login" className="btn btn-primary mt-6 inline-flex">Вход</Link>
+        </div>
+      </section>
+    )
+  }
+
+  if (requirePasskeyVerification && !(passkeyVerified || sessionPasskeyVerified)) {
+    return (
+      <section className="section bg-soft min-h-screen">
+        <div className="container-page max-w-3xl">
+          <PasskeyVerificationGate
+            session={session}
+            areaLabel="профила ти"
+            onVerified={() => setPasskeyVerified(true)}
+          />
         </div>
       </section>
     )
@@ -245,7 +266,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
         )}
 
         {activeTab === 'activity' && <CustomerActivity account={localAccount} completeness={completeness} />}
-        {activeTab === 'security' && <PasskeyManager userId={userId} />}
+        {activeTab === 'security' && <PasskeyManager userId={userId} session={session} />}
       </div>
     </section>
   )
@@ -369,7 +390,7 @@ function ProEditor({ session, account }) {
     )
   }
 
-  return <PartnerProfileWorkspace profile={profile} userId={userId} account={account} onSaved={load} />
+  return <PartnerProfileWorkspace profile={profile} userId={userId} account={account} session={session} onSaved={load} />
 }
 
 function CenteredCard({ title, children }) {

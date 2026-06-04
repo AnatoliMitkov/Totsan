@@ -95,7 +95,7 @@ function paymentMessageFromStripe(result) {
   }
 }
 
-export default function PartnerProfileWorkspace({ profile, userId, account, onSaved }) {
+export default function PartnerProfileWorkspace({ profile, userId, account, session, onSaved }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [currentProfile, setCurrentProfile] = useState(profile)
   const [profileDraft, setProfileDraft] = useState(() => makeProfileDraft(profile))
@@ -428,7 +428,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
         )}
 
         {activeTab === 'security' && (
-          <PasskeyManager userId={userId} />
+          <PasskeyManager userId={userId} session={session} />
         )}
 
         {activeTab === 'contact' && (

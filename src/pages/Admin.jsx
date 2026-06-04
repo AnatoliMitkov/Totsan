@@ -4,7 +4,8 @@ import { ArrowRight, BarChart3, ClipboardList, CreditCard, FileClock, FolderKanb
 import { brand, supabase } from '../lib/supabase.js'
 import { HERO_COLLAGE, HOME_PROJECTS } from '../data/images.js'
 import { getAccountDisplayName, useAccount } from '../lib/account.js'
-import { PasskeySignInButton } from '../components/auth/PasskeyManager.jsx'
+import { PasskeySignInButton, PasskeyVerificationGate } from '../components/auth/PasskeyManager.jsx'
+import { isPasskeyVerifiedSession } from '../lib/passkeys.js'
 
 const INPUT_CLASS = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const PRODUCTION_APP_ORIGIN = 'https://totsan.com'
@@ -67,11 +68,29 @@ const ADMIN_SECTIONS = [
 ]
 
 export default function Admin() {
-  const { session, account, loading } = useAccount()
+  const { session, account, loading, requirePasskeyVerification } = useAccount()
   const location = useLocation()
+  const [passkeyVerified, setPasskeyVerified] = useState(false)
+  const sessionPasskeyVerified = isPasskeyVerifiedSession(session?.user?.id)
+
+  useEffect(() => {
+    setPasskeyVerified(sessionPasskeyVerified)
+  }, [session?.user?.id, session?.user?.last_sign_in_at, sessionPasskeyVerified])
 
   if (loading) return <div className="flex h-screen items-center justify-center bg-soft"><div className="text-muted">Зареждане…</div></div>
   if (!session) return <LoginPanel />
+
+  if (requirePasskeyVerification && !(passkeyVerified || sessionPasskeyVerified)) {
+    return (
+      <AdminShell session={session} account={account}>
+        <PasskeyVerificationGate
+          session={session}
+          areaLabel={account?.role === 'admin' ? 'админ панела' : 'профила ти'}
+          onVerified={() => setPasskeyVerified(true)}
+        />
+      </AdminShell>
+    )
+  }
 
   if (location.pathname === '/login') {
     return <Navigate to={resolvePostLoginTarget(location, account)} replace />
