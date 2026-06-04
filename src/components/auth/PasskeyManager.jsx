@@ -10,6 +10,7 @@ import {
   getPasskeySecurityState,
   markPasskeyVerifiedSession,
   normalizePasskeyError,
+  normalizePasskeyVerificationError,
   passkeyDismissKey,
 } from '../../lib/passkeys.js'
 
@@ -162,7 +163,7 @@ export function PasskeySetupPrompt({ userId }) {
   )
 }
 
-export function PasskeyVerificationGate({ session, onVerified, areaLabel = 'профила', className = '' }) {
+export function PasskeyVerificationGate({ session, onVerified, className = '' }) {
   const capability = usePasskeyCapability()
   const [status, setStatus] = useState('idle')
   const [message, setMessage] = useState('')
@@ -179,7 +180,7 @@ export function PasskeyVerificationGate({ session, onVerified, areaLabel = 'пр
     const { data, error } = await supabase.auth.signInWithPasskey()
     if (error) {
       setStatus('error')
-      setMessage(normalizePasskeyError(error, 'Не успяхме да потвърдим биометрията за този профил.'))
+      setMessage(normalizePasskeyVerificationError(error))
       return
     }
 
@@ -187,7 +188,7 @@ export function PasskeyVerificationGate({ session, onVerified, areaLabel = 'пр
     if (returnedUserId && returnedUserId !== userId) {
       clearPasskeyVerifiedSession(userId)
       setStatus('error')
-      setMessage('Този passkey е свързан с друг акаунт. Влез в правилния профил и опитай отново.')
+      setMessage('На това устройство няма passkey за този профил. Влез с Google/имейл и добави нов passkey от Сигурност.')
       return
     }
 
@@ -198,49 +199,55 @@ export function PasskeyVerificationGate({ session, onVerified, areaLabel = 'пр
   }
 
   return (
-    <section className={`rounded-3xl border border-line bg-paper p-6 md:p-8 ${className}`.trim()}>
-      <div className="max-w-2xl">
-        <div className="eyebrow">Защитен достъп</div>
-        <h2 className="mt-2 font-display text-3xl text-ink">Потвърди, че това си ти</h2>
-        <p className="mt-3 text-sm text-muted">
-          За този акаунт е включена допълнителна защита. След обикновен вход искаме още едно биометрично потвърждение, преди да отворим {areaLabel}.
-        </p>
-
-        {warning && (
-          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            {warning} Ако това устройство не поддържа passkeys, влез от вече настроено устройство и изключи опцията от Сигурност.
-          </div>
-        )}
-
-        <div className="mt-5 rounded-2xl border border-line bg-soft px-4 py-4 text-sm text-muted">
-          Ако смениш устройство, първо влез с Google/имейл и добави нов passkey от Сигурност.
+    <section className={`mx-auto w-full max-w-[34rem] rounded-3xl border border-line bg-paper p-4 shadow-[0_24px_70px_-48px_rgba(0,0,0,0.35)] sm:p-5 md:p-6 ${className}`.trim()}>
+      <div className="flex items-start gap-3">
+        <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-soft text-ink sm:inline-flex">
+          <ShieldCheck size={21} />
         </div>
-
-        <div className="mt-5 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={handleVerify}
-            disabled={!canUsePasskeys || status === 'saving'}
-            className="btn btn-primary disabled:opacity-50"
-          >
-            {status === 'saving' ? <Loader2 size={18} className="animate-spin" /> : <Fingerprint size={18} />}
-            {status === 'saving' ? 'Потвърди на устройството' : 'Потвърди с биометрия'}
-          </button>
-          <button type="button" onClick={() => supabase.auth.signOut()} className="btn btn-ghost">
-            <LogOut size={18} />
-            Изход
-          </button>
-          <Link to="/contact" className="btn btn-ghost">
-            Свържи се с нас
-          </Link>
+        <div className="min-w-0 flex-1">
+          <div className="eyebrow">Защитен достъп</div>
+          <h2 className="mt-2 font-display text-[1.85rem] leading-none text-ink sm:text-4xl">Потвърди, че това си ти</h2>
+          <p className="mt-3 text-sm leading-6 text-muted">
+            За този профил е включена допълнителна защита. Потвърди с passkey/биометрия, за да продължиш.
+          </p>
         </div>
-
-        {message && (
-          <div className={`mt-4 rounded-2xl px-4 py-3 text-sm ${status === 'error' ? 'border border-amber-200 bg-amber-50 text-amber-800' : 'border border-line bg-soft text-muted'}`}>
-            {message}
-          </div>
-        )}
       </div>
+
+      {warning && (
+        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 sm:px-4">
+          {warning}
+        </div>
+      )}
+
+      <div className="mt-4 rounded-2xl border border-line bg-soft px-3 py-3 text-sm leading-6 text-muted sm:px-4">
+        Ако смениш устройство, влез с Google/имейл и добави нов passkey от Сигурност.
+      </div>
+
+      <div className="mt-5 grid gap-2 sm:grid-cols-[1fr_auto]">
+        <button
+          type="button"
+          onClick={handleVerify}
+          disabled={!canUsePasskeys || status === 'saving'}
+          className="btn btn-primary w-full justify-center disabled:opacity-50"
+        >
+          {status === 'saving' ? <Loader2 size={18} className="animate-spin" /> : <Fingerprint size={18} />}
+          {status === 'saving' ? 'Потвърди на устройството' : 'Потвърди с биометрия'}
+        </button>
+        <button type="button" onClick={() => supabase.auth.signOut()} className="btn btn-ghost w-full justify-center sm:w-auto">
+          <LogOut size={18} />
+          Изход
+        </button>
+      </div>
+
+      <Link to="/contact" className="mt-3 inline-flex text-sm font-medium text-accent hover:underline">
+        Свържи се с нас
+      </Link>
+
+      {message && (
+        <div className={`mt-4 rounded-2xl px-4 py-3 text-sm ${status === 'error' ? 'border border-amber-200 bg-amber-50 text-amber-800' : 'border border-line bg-soft text-muted'}`}>
+          {message}
+        </div>
+      )}
     </section>
   )
 }
@@ -363,8 +370,8 @@ export default function PasskeyManager({ userId, session, className = '' }) {
       await updateProtectionPreference(
         nextValue,
         nextValue
-          ? 'Допълнителната защита при вход е включена за този профил.'
-          : 'Допълнителната защита при вход е изключена.'
+          ? 'Допълнителната защита е включена.'
+          : 'Допълнителната защита е изключена.'
       )
       setStatus('ready')
     } catch (error) {
@@ -448,11 +455,17 @@ export default function PasskeyManager({ userId, session, className = '' }) {
 
           <p className="mt-3 text-sm text-muted">Ако смениш устройство, първо влез с Google/имейл и добави нов passkey от Сигурност.</p>
 
-          <div className="mt-5 rounded-2xl border border-line bg-soft px-4 py-4">
+          <div className={`mt-5 rounded-2xl border px-4 py-4 ${protectionEnabled ? 'border-green-200 bg-green-50' : 'border-line bg-soft'}`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="max-w-2xl">
-                <div className="font-medium text-ink">Изисквай биометрично потвърждение</div>
-                <p className="mt-1 text-sm text-muted">След обикновен вход ще искаме още едно биометрично потвърждение, преди да отворим профила и защитените настройки.</p>
+                <div className={protectionEnabled ? 'font-medium text-green-900' : 'font-medium text-ink'}>
+                  Изисквай биометрично потвърждение
+                </div>
+                <p className={`mt-1 text-sm ${protectionEnabled ? 'text-green-800' : 'text-muted'}`}>
+                  {protectionEnabled
+                    ? 'Допълнителната защита е включена. След обикновен вход ще поискаме биометрично/passkey потвърждение преди защитени части на профила.'
+                    : 'След обикновен вход ще поискаме още едно биометрично/passkey потвърждение, преди да отворим профила и защитените настройки.'}
+                </p>
               </div>
               <button
                 type="button"
@@ -465,23 +478,11 @@ export default function PasskeyManager({ userId, session, className = '' }) {
                 <span className={`inline-block h-5 w-5 transform rounded-full bg-paper shadow transition ${protectionEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
               </button>
             </div>
-            <p className="mt-3 text-xs text-muted">
+            <p className={`mt-3 text-xs ${protectionEnabled ? 'text-green-800' : 'text-muted'}`}>
               {hasPasskeys
-                ? 'Опцията е доброволна и можеш да я изключиш по всяко време оттук.'
+                ? 'Това е защита на ниво приложение, не native MFA. Можеш да я изключиш по всяко време оттук.'
                 : 'Първо добави passkey, за да включиш тази допълнителна защита.'}
             </p>
-          </div>
-
-          <div className="mt-5 rounded-2xl border border-dashed border-line bg-paper px-4 py-4 opacity-80">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="font-medium text-ink">Допълнителна защита при вход — скоро</div>
-                <p className="mt-1 text-sm text-muted">По-строгото потвърждение ще го разширим още, след като recovery и fallback flow-ът е напълно финализиран.</p>
-              </div>
-              <button type="button" disabled className="btn btn-ghost !py-2 text-sm cursor-not-allowed opacity-60">
-                Скоро
-              </button>
-            </div>
           </div>
 
           {message && (

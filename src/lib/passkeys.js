@@ -88,6 +88,23 @@ export function normalizePasskeyError(error, fallback = 'Не успяхме д�
   return fallback
 }
 
+export function normalizePasskeyVerificationError(error) {
+  const raw = String(error?.message || error?.name || '').trim()
+  const lower = raw.toLowerCase()
+
+  if (
+    lower.includes('no credential') ||
+    lower.includes('no passkey') ||
+    lower.includes('credential not found') ||
+    lower.includes('unknown credential') ||
+    lower.includes('not registered')
+  ) {
+    return 'На това устройство няма passkey за този профил. Влез с Google/имейл и добави нов passkey от Сигурност.'
+  }
+
+  return 'Не успяхме да потвърдим биометрията. Опитай отново.'
+}
+
 export function formatPasskeyDate(value) {
   if (!value) return 'Още не е използван'
 
