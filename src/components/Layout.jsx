@@ -2,8 +2,7 @@ import { Outlet, Link, NavLink, useLocation } from 'react-router-dom'
 import { LAYERS } from '../data/layers.js'
 import { useEffect, useRef, useState } from 'react'
 import { Menu, MessageCircle, X } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
-import { getAccountDisplayName, getAccountInitial, getAccountAvatar, useAccount } from '../lib/account.js'
+import { getAccountDisplayName, getAccountAvatar, useAccount, signOutAndRedirect } from '../lib/account.js'
 import { loadUnreadConversationCount, subscribeToConversationList } from '../lib/chat.js'
 import Avatar from './Avatar.jsx'
 
@@ -77,8 +76,9 @@ function Header() {
   const [isMoreOpen, setIsMoreOpen] = useState(false)
   const close = () => setOpen(false)
   const { pathname, search, hash } = useLocation()
-  const { session, account, isAdmin } = useAccount()
-  const unreadCount = useUnreadCount(session?.user?.id)
+  const { session, account, isAdmin, loading, mfaRequired } = useAccount()
+  const canShowPrivateHeader = Boolean(session && account && !mfaRequired)
+  const unreadCount = useUnreadCount(session?.user?.id, !loading && canShowPrivateHeader)
   const isHomePage = pathname === '/'
   const isServicesActive = pathname.startsWith('/uslugi')
   const isCatalogActive = pathname === '/katalog'
@@ -163,12 +163,21 @@ function Header() {
             isProActive={isProActive}
             isVisualizationActive={isVisualizationActive}
           />
-          {session && <Link to="/inbox" className={desktopUtilityLinkClassName(isHomeHeroMode)}>
-            <MessageCircle size={17} />
-            <span className="hidden xl:inline">Съобщения</span>
-            {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accentDeep px-1.5 text-[11px] font-medium text-paper">{unreadCount}</span>}
-          </Link>}
-          {session ? <UserMenu session={session} account={account} isAdmin={isAdmin} /> : (
+          {loading ? null : canShowPrivateHeader ? (
+            <Link to="/inbox" className={desktopUtilityLinkClassName(isHomeHeroMode)}>
+              <MessageCircle size={17} />
+              <span className="hidden xl:inline">Съобщения</span>
+              {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accentDeep px-1.5 text-[11px] font-medium text-paper">{unreadCount}</span>}
+            </Link>
+          ) : null}
+          {loading ? (
+            <div className="hidden sm:flex items-center gap-2 rounded-full border border-transparent px-2 py-1.5">
+              <div className="h-7 w-7 rounded-full bg-line/50 animate-pulse"></div>
+              <div className="hidden xl:block h-4 w-20 bg-line/50 animate-pulse rounded"></div>
+            </div>
+          ) : canShowPrivateHeader ? (
+            <UserMenu session={session} account={account} isAdmin={isAdmin} />
+          ) : (
             <>
               <Link to={loginHref} className={`mobile-header-auth xl:hidden ${isHomeHeroMode ? 'mobile-header-auth-on-dark' : ''}`}>Вход</Link>
               <Link to={loginHref} className={`desktop-header-auth ${isHomeHeroMode ? 'desktop-header-auth-on-dark' : ''}`}>Вход</Link>
@@ -225,17 +234,17 @@ function Header() {
               </div>
             </div>
 
-            {session ? (
+            {canShowPrivateHeader && !loading ? (
               <div className="mobile-nav-group">
                 <div className="mobile-nav-group__label">Профил</div>
                 <div className="grid gap-3">
-                {isAdmin && (
-                  <NavLink to="/admin" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Админ</span><span className="mobile-nav-arrow">→</span></NavLink>
-                )}
-                <NavLink to="/inbox" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Съобщения{unreadCount > 0 ? ` (${unreadCount})` : ''}</span><span className="mobile-nav-arrow">→</span></NavLink>
-                <NavLink to="/porachki" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Поръчки</span><span className="mobile-nav-arrow">→</span></NavLink>
-                <NavLink to="/moy-profil" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Моят профил</span><span className="mobile-nav-arrow">→</span></NavLink>
-                <button onClick={() => { close(); supabase.auth.signOut() }} className="mobile-nav-item text-left text-muted hover:text-ink">Изход</button>
+                  {isAdmin && (
+                    <NavLink to="/admin" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Админ</span><span className="mobile-nav-arrow">→</span></NavLink>
+                  )}
+                  <NavLink to="/inbox" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Съобщения{unreadCount > 0 ? ` (${unreadCount})` : ''}</span><span className="mobile-nav-arrow">→</span></NavLink>
+                  <NavLink to="/porachki" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Поръчки</span><span className="mobile-nav-arrow">→</span></NavLink>
+                  <NavLink to="/moy-profil" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Моят профил</span><span className="mobile-nav-arrow">→</span></NavLink>
+                  <button onClick={() => { close(); signOutAndRedirect(session?.user?.id) }} className="mobile-nav-item text-left text-muted hover:text-ink">Изход</button>
                 </div>
               </div>
             ) : null}
@@ -307,11 +316,11 @@ function DesktopMoreMenu({ isOpen, setIsOpen, isHomeHeroMode, isServicesActive, 
   )
 }
 
-function useUnreadCount(userId) {
+function useUnreadCount(userId, isReady) {
   const [count, setCount] = useState(0)
 
   useEffect(() => {
-    if (!userId) {
+    if (!userId || !isReady) {
       setCount(0)
       return undefined
     }
@@ -332,7 +341,7 @@ function useUnreadCount(userId) {
       active = false
       unsubscribe()
     }
-  }, [userId])
+  }, [userId, isReady])
 
   return count
 }
@@ -366,7 +375,7 @@ function UserMenu({ session, account, isAdmin }) {
           {isAdmin && <Link to="/admin" onClick={() => setOpen(false)} className="block px-4 py-2.5 text-sm hover:bg-soft">Админ панел</Link>}
           <Link to="/porachki" onClick={() => setOpen(false)} className="block px-4 py-2.5 text-sm hover:bg-soft">Поръчки</Link>
           <Link to="/moy-profil" onClick={() => setOpen(false)} className="block px-4 py-2.5 text-sm hover:bg-soft">Моят профил</Link>
-          <button onClick={() => { setOpen(false); supabase.auth.signOut() }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-t border-line">Изход</button>
+          <button onClick={() => { setOpen(false); signOutAndRedirect(session?.user?.id) }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-t border-line">Изход</button>
         </div>
       )}
     </div>

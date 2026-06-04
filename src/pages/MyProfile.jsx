@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
-import { getAccountDisplayName, useAccount } from '../lib/account.js'
+import { getAccountDisplayName, useAccount, signOutAndRedirect } from '../lib/account.js'
 import { uploadProfileMedia } from '../lib/profile-media-upload-client.js'
 import { LAYERS } from '../data/layers.js'
 import CustomerHeader from '../components/profile/CustomerHeader.jsx'
@@ -202,7 +202,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
   return (
     <section className="section bg-soft min-h-screen">
       <div className="container-page space-y-5">
-        <CustomerHeader account={localAccount} displayName={displayName} completeness={completeness} onSignOut={() => supabase.auth.signOut()} />
+        <CustomerHeader account={localAccount} displayName={displayName} completeness={completeness} onSignOut={() => signOutAndRedirect(session?.user?.id)} />
         <PasskeySetupPrompt userId={userId} />
 
         <div className="flex flex-wrap items-center gap-2 rounded-3xl border border-line bg-paper p-2">
@@ -375,7 +375,7 @@ function ProEditor({ session, account }) {
         <p className="text-muted mt-3">Получихме регистрацията ти{application?.created_at ? ` на ${new Date(application.created_at).toLocaleDateString('bg-BG')}` : ''}. Ще те уведомим веднага щом профилът е активиран.</p>
         <div className="mt-6 flex gap-2">
           <Link to="/" className="btn btn-ghost">Към сайта</Link>
-          <button className="btn btn-primary" onClick={() => supabase.auth.signOut()}>Изход</button>
+          <button className="btn btn-primary" onClick={() => signOutAndRedirect(session?.user?.id)}>Изход</button>
         </div>
       </CenteredCard>
     )
@@ -387,7 +387,7 @@ function ProEditor({ session, account }) {
         <p className="text-muted mt-3">За съжаление в момента не можем да активираме профил за този акаунт.{application?.decision_note ? ` Бележка: ${application.decision_note}` : ''}</p>
         <div className="mt-6 flex gap-2">
           <Link to="/contact" className="btn btn-ghost">Свържи се с нас</Link>
-          <button className="btn btn-primary" onClick={() => supabase.auth.signOut()}>Изход</button>
+          <button className="btn btn-primary" onClick={() => signOutAndRedirect(session?.user?.id)}>Изход</button>
         </div>
       </CenteredCard>
     )
@@ -520,7 +520,7 @@ function ProForm({ profile, userId, onSaved }) {
               {profile.slug && profile.isPublished && <> Линк: <Link to={`/profil/${profile.slug}`} className="text-accent hover:underline">/profil/{profile.slug}</Link></>}
             </p>
           </div>
-          <button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Изход</button>
+          <button className="btn btn-ghost" onClick={() => signOutAndRedirect(session?.user?.id)}>Изход</button>
         </div>
 
         <form onSubmit={submit} className="grid gap-6 lg:grid-cols-12">

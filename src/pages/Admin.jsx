@@ -69,7 +69,7 @@ const ADMIN_SECTIONS = [
 ]
 
 export default function Admin() {
-  const { session, account, loading, requirePasskeyVerification } = useAccount()
+  const { session, account, loading, mfaRequired } = useAccount()
   const location = useLocation()
   const [passkeyVerified, setPasskeyVerified] = useState(false)
   const sessionPasskeyVerified = isPasskeyVerifiedSession(session?.user?.id)
@@ -78,10 +78,11 @@ export default function Admin() {
     setPasskeyVerified(sessionPasskeyVerified)
   }, [session?.user?.id, session?.user?.last_sign_in_at, sessionPasskeyVerified])
 
-  if (loading) return <div className="flex h-screen items-center justify-center bg-soft"><div className="text-muted">Зареждане…</div></div>
+  if (loading) return <div className="flex h-screen items-center justify-center bg-soft"><div className="text-muted">Проверяваме достъпа…</div></div>
   if (!session) return <LoginPanel />
 
   if (location.pathname === '/login') {
+    if (mfaRequired) return null
     return <Navigate to={resolvePostLoginTarget(location, account)} replace />
   }
 
