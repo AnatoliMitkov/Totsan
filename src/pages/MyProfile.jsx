@@ -11,7 +11,9 @@ import CustomerProject from '../components/profile/CustomerProject.jsx'
 import CompletenessBar from '../components/profile/CompletenessBar.jsx'
 import PartnerProfileWorkspace from '../components/profile/PartnerProfileWorkspace.jsx'
 import PasskeyManager, { PasskeySetupPrompt, PasskeyVerificationGate } from '../components/auth/PasskeyManager.jsx'
+import TotpMfaManager, { TotpMfaChallengeGate } from '../components/auth/TotpMfa.jsx'
 import { isPasskeyVerifiedSession } from '../lib/passkeys.js'
+import { useMfaGate } from '../lib/mfa.js'
 import {
   calculateClientProfileCompleteness,
   deleteClientProjectMedia,
@@ -36,6 +38,7 @@ export default function MyProfile() {
   const [searchParams] = useSearchParams()
   const [passkeyVerified, setPasskeyVerified] = useState(false)
   const sessionPasskeyVerified = isPasskeyVerifiedSession(session?.user?.id)
+  const mfaGate = useMfaGate(session)
 
   useEffect(() => {
     setPasskeyVerified(sessionPasskeyVerified)
@@ -55,6 +58,23 @@ export default function MyProfile() {
             {fromQuiz ? 'Резултатът от quiz-а е подготвен за проект-паспорт. Влез в акаунта си, за да го прегледаш и запазиш.' : 'За да видиш профила си, трябва първо да влезеш в акаунта си.'}
           </p>
           <Link to="/login" className="btn btn-primary mt-6 inline-flex">Вход</Link>
+        </div>
+      </section>
+    )
+  }
+
+  if (mfaGate.loading) {
+    return <div className="section"><div className="container-page text-muted">Проверяваме 2FA статуса…</div></div>
+  }
+
+  if (mfaGate.needsMfa) {
+    return (
+      <section className="section bg-soft min-h-screen">
+        <div className="container-page max-w-3xl">
+          <TotpMfaChallengeGate
+            factor={mfaGate.factor}
+            onVerified={mfaGate.refresh}
+          />
         </div>
       </section>
     )
@@ -266,7 +286,12 @@ function CustomerProfile({ session, account, refreshAccount }) {
         )}
 
         {activeTab === 'activity' && <CustomerActivity account={localAccount} completeness={completeness} />}
-        {activeTab === 'security' && <PasskeyManager userId={userId} session={session} />}
+        {activeTab === 'security' && (
+          <div className="space-y-5">
+            <PasskeyManager userId={userId} session={session} />
+            <TotpMfaManager />
+          </div>
+        )}
       </div>
     </section>
   )

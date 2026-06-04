@@ -167,6 +167,7 @@ export function PasskeyVerificationGate({ session, onVerified, className = '' })
   const capability = usePasskeyCapability()
   const [status, setStatus] = useState('idle')
   const [message, setMessage] = useState('')
+  const [showBrowserHelp, setShowBrowserHelp] = useState(false)
   const userId = session?.user?.id || ''
   const canUsePasskeys = Boolean(capability?.canUse)
   const warning = capability && !canUsePasskeys ? getPasskeyEnvironmentWarning() : ''
@@ -239,9 +240,25 @@ export function PasskeyVerificationGate({ session, onVerified, className = '' })
         </button>
       </div>
 
-      <Link to="/contact" className="mt-3 inline-flex text-sm font-medium text-accent hover:underline">
-        Свържи се с нас
-      </Link>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <button
+          type="button"
+          onClick={() => setShowBrowserHelp((value) => !value)}
+          className="text-left text-sm font-medium text-accent hover:underline"
+          aria-expanded={showBrowserHelp}
+        >
+          Не работи на този браузър?
+        </button>
+        <Link to="/contact" className="text-sm font-medium text-accent hover:underline">
+          Свържи се с нас
+        </Link>
+      </div>
+
+      {showBrowserHelp && (
+        <div className="mt-3 rounded-2xl border border-line bg-soft px-3 py-3 text-sm leading-6 text-muted sm:px-4">
+          Някои мобилни браузъри може да не поддържат passkey/биометрично потвърждение коректно. Пробвай с Chrome, Firefox или Edge. Ако нямаш достъп до passkey, използвай възстановяване на достъпа.
+        </div>
+      )}
 
       {message && (
         <div className={`mt-4 rounded-2xl px-4 py-3 text-sm ${status === 'error' ? 'border border-amber-200 bg-amber-50 text-amber-800' : 'border border-line bg-soft text-muted'}`}>

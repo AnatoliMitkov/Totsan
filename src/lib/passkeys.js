@@ -1,9 +1,16 @@
 const NOT_ALLOWED_PATTERNS = [
   'notallowederror',
-  'timed out',
   'not allowed',
   'operation either timed out',
   'the user attempted to use an authenticator',
+  'cancel',
+  'aborted',
+]
+
+const TIMEOUT_PATTERNS = [
+  'timed out',
+  'timeout',
+  'expired',
 ]
 
 export function browserSupportsPasskeys() {
@@ -57,7 +64,7 @@ export async function getPasskeyCapability() {
 
 export function getPasskeyEnvironmentWarning() {
   if (!browserSupportsPasskeys()) {
-    return 'Този браузър не предлага биометричен вход за сайта.'
+    return 'Този браузър не поддържа passkey/биометрично потвърждение надеждно. Пробвай с Chrome, Firefox или Edge.'
   }
 
   if (requiresSecurePasskeyContext()) {
@@ -92,6 +99,14 @@ export function normalizePasskeyVerificationError(error) {
   const raw = String(error?.message || error?.name || '').trim()
   const lower = raw.toLowerCase()
 
+  if (!browserSupportsPasskeys() || lower.includes('not supported') || lower.includes('unsupported')) {
+    return 'Този браузър не поддържа passkey/биометрично потвърждение надеждно. Пробвай с Chrome, Firefox или Edge.'
+  }
+
+  if (requiresSecurePasskeyContext() || lower.includes('secure context') || lower.includes('https')) {
+    return 'Биометричното потвърждение работи само през защитена връзка. Отвори сайта през https:// и опитай отново.'
+  }
+
   if (
     lower.includes('no credential') ||
     lower.includes('no passkey') ||
@@ -100,6 +115,14 @@ export function normalizePasskeyVerificationError(error) {
     lower.includes('not registered')
   ) {
     return 'На това устройство няма passkey за този профил. Влез с Google/имейл и добави нов passkey от Сигурност.'
+  }
+
+  if (TIMEOUT_PATTERNS.some((pattern) => lower.includes(pattern))) {
+    return 'Потвърждението изтече. Опитай отново и дръж прозореца отворен, докато устройството поиска биометрия.'
+  }
+
+  if (NOT_ALLOWED_PATTERNS.some((pattern) => lower.includes(pattern))) {
+    return 'Потвърждението беше отказано или прекъснато. Опитай отново.'
   }
 
   return 'Не успяхме да потвърдим биометрията. Опитай отново.'

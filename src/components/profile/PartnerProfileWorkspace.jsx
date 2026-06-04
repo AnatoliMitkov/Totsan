@@ -6,6 +6,7 @@ import { uploadProfileMedia } from '../../lib/profile-media-upload-client.js'
 import { getProfileImage, getProfileImageStyle, normalizeProfile, PROFILE_SELECT_COLUMNS } from '../../lib/profiles.js'
 import { supabase } from '../../lib/supabase.js'
 import PasskeyManager, { PasskeySetupPrompt } from '../auth/PasskeyManager.jsx'
+import TotpMfaManager from '../auth/TotpMfa.jsx'
 import {
   DEFAULT_PORTFOLIO_ITEM,
   appendPortfolioMedia,
@@ -428,7 +429,10 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
         )}
 
         {activeTab === 'security' && (
-          <PasskeyManager userId={userId} session={session} />
+          <div className="space-y-5">
+            <PasskeyManager userId={userId} session={session} />
+            <TotpMfaManager />
+          </div>
         )}
 
         {activeTab === 'contact' && (

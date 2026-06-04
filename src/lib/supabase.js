@@ -45,6 +45,15 @@ function createMockSupabaseClient() {
       registerPasskey: async () => ({ data: null, error: missingConfigError }),
       signUp: async () => ({ data: null, error: missingConfigError }),
       updateUser: async () => ({ data: null, error: missingConfigError }),
+      mfa: {
+        enroll: async () => ({ data: null, error: missingConfigError }),
+        challenge: async () => ({ data: null, error: missingConfigError }),
+        verify: async () => ({ data: null, error: missingConfigError }),
+        challengeAndVerify: async () => ({ data: null, error: missingConfigError }),
+        listFactors: async () => ({ data: { all: [], totp: [], phone: [], webauthn: [] }, error: missingConfigError }),
+        unenroll: async () => ({ data: null, error: missingConfigError }),
+        getAuthenticatorAssuranceLevel: async () => ({ data: { currentLevel: null, nextLevel: null, currentAuthenticationMethods: [] }, error: missingConfigError }),
+      },
       passkey: {
         list: async () => ({ data: null, error: missingConfigError }),
         delete: async () => ({ data: null, error: missingConfigError }),
