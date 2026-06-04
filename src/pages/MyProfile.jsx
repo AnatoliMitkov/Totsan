@@ -10,6 +10,7 @@ import CustomerPersonal from '../components/profile/CustomerPersonal.jsx'
 import CustomerProject from '../components/profile/CustomerProject.jsx'
 import CompletenessBar from '../components/profile/CompletenessBar.jsx'
 import PartnerProfileWorkspace from '../components/profile/PartnerProfileWorkspace.jsx'
+import PasskeyManager from '../components/auth/PasskeyManager.jsx'
 import {
   calculateClientProfileCompleteness,
   deleteClientProjectMedia,
@@ -260,7 +261,10 @@ function CustomerActivity({ account, completeness }) {
         </div>
       </div>
       <aside className="lg:col-span-4">
-        <CompletenessBar completeness={completeness} />
+        <div className="space-y-5">
+          <CompletenessBar completeness={completeness} />
+          <PasskeyManager mode="manage" />
+        </div>
       </aside>
     </div>
   )

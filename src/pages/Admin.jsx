@@ -4,6 +4,7 @@ import { ArrowRight, BarChart3, ClipboardList, CreditCard, FileClock, FolderKanb
 import { brand, supabase } from '../lib/supabase.js'
 import { HERO_COLLAGE, HOME_PROJECTS } from '../data/images.js'
 import { getAccountDisplayName, useAccount } from '../lib/account.js'
+import PasskeyManager from '../components/auth/PasskeyManager.jsx'
 
 const INPUT_CLASS = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 
@@ -545,6 +546,8 @@ function LoginPanel() {
               icon={<GoogleIcon />}
             />
           </div>
+
+          {isLogin && <PasskeyManager mode="login" className="mt-5" />}
 
           <div className={`${isLogin ? 'mt-10' : 'mt-7'} text-center text-sm text-muted`}>
             {isLogin ? 'Нямаш акаунт? ' : 'Вече имаш акаунт? '}

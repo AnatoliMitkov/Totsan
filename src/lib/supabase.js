@@ -29,6 +29,7 @@ function createMockQuery() {
 
 function createMockSupabaseClient() {
   const query = () => createMockQuery()
+  const missingConfigError = createMissingConfigError()
 
   return {
     auth: {
@@ -37,10 +38,16 @@ function createMockSupabaseClient() {
         if (typeof callback === 'function') callback('INITIAL_SESSION', null)
         return { data: { subscription: { unsubscribe() {} } } }
       },
-      signOut: async () => ({ error: createMissingConfigError() }),
-      signInWithOAuth: async () => ({ data: null, error: createMissingConfigError() }),
-      signInWithPassword: async () => ({ data: null, error: createMissingConfigError() }),
-      signUp: async () => ({ data: null, error: createMissingConfigError() }),
+      signOut: async () => ({ error: missingConfigError }),
+      signInWithOAuth: async () => ({ data: null, error: missingConfigError }),
+      signInWithPassword: async () => ({ data: null, error: missingConfigError }),
+      signInWithPasskey: async () => ({ data: null, error: missingConfigError }),
+      registerPasskey: async () => ({ data: null, error: missingConfigError }),
+      signUp: async () => ({ data: null, error: missingConfigError }),
+      passkey: {
+        list: async () => ({ data: null, error: missingConfigError }),
+        delete: async () => ({ data: null, error: missingConfigError }),
+      },
     },
     from: query,
     rpc: query,
@@ -68,6 +75,9 @@ export const supabase = hasSupabaseConfig
       auth: {
         persistSession: true,
         autoRefreshToken: true,
+        experimental: {
+          passkey: true,
+        },
       },
     })
   : createMockSupabaseClient()

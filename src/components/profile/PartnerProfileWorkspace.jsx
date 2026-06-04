@@ -5,6 +5,7 @@ import { LAYERS } from '../../data/layers.js'
 import { uploadProfileMedia } from '../../lib/profile-media-upload-client.js'
 import { getProfileImage, getProfileImageStyle, normalizeProfile, PROFILE_SELECT_COLUMNS } from '../../lib/profiles.js'
 import { supabase } from '../../lib/supabase.js'
+import PasskeyManager from '../auth/PasskeyManager.jsx'
 import {
   DEFAULT_PORTFOLIO_ITEM,
   appendPortfolioMedia,
@@ -383,6 +384,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
                 <div className="mt-2 font-display text-3xl text-ink">{portfolio.length}</div>
                 <p className="mt-2 text-sm text-muted">Добави поне 10 проекта за силен профил.</p>
               </div>
+              <PasskeyManager mode="manage" />
             </aside>
           </div>
         )}
