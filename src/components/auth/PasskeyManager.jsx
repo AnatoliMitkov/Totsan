@@ -142,8 +142,8 @@ export function PasskeySetupPrompt({ userId }) {
           <Fingerprint size={20} />
         </div>
         <div>
-          <div className="font-display text-2xl leading-tight text-ink">Защити профила си с биометрия</div>
-          <p className="mt-1 text-sm text-muted">Добави бърз вход с пръстов отпечатък, лице или security key. Това помага да защитиш профила си дори при слаба или компрометирана парола.</p>
+          <div className="font-display text-2xl leading-tight text-ink">Бърз вход</div>
+          <p className="mt-1 text-sm text-muted">Лице, пръстов отпечатък или ключ.</p>
           <div className="mt-4 flex flex-wrap gap-2">
             <button type="button" onClick={handleRegister} disabled={status === 'saving'} className="btn btn-primary !py-2 text-sm disabled:opacity-50">
               {status === 'saving' ? <Loader2 size={17} className="animate-spin" /> : <ShieldCheck size={17} />}
@@ -151,7 +151,7 @@ export function PasskeySetupPrompt({ userId }) {
             </button>
             <button type="button" onClick={dismiss} className="btn btn-ghost !py-2 text-sm">По-късно</button>
           </div>
-          <p className="mt-3 text-xs text-muted">Ако смениш устройство, първо влез с Google или имейл и после добави нов passkey от Сигурност.</p>
+          <p className="mt-3 text-xs text-muted">Смени устройство? Добави нов passkey от Сигурност.</p>
           {message && (
             <div className={`mt-3 rounded-2xl px-3 py-2 text-sm ${status === 'error' ? 'bg-amber-50 text-amber-800' : 'bg-soft text-muted'}`}>
               {message}
@@ -206,11 +206,9 @@ export function PasskeyVerificationGate({ session, onVerified, className = '' })
           <ShieldCheck size={21} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="eyebrow">Защитен достъп</div>
-          <h2 className="mt-2 font-display text-[1.85rem] leading-none text-ink sm:text-4xl">Потвърди, че това си ти</h2>
-          <p className="mt-3 text-sm leading-6 text-muted">
-            За този профил е включена допълнителна защита. Потвърди с passkey/биометрия, за да продължиш.
-          </p>
+          <div className="eyebrow">Passkey</div>
+          <h2 className="mt-2 font-display text-[1.85rem] leading-none text-ink sm:text-4xl">Потвърди се</h2>
+          <p className="mt-3 text-sm leading-6 text-muted">Потвърди с биометрия.</p>
         </div>
       </div>
 
@@ -221,7 +219,7 @@ export function PasskeyVerificationGate({ session, onVerified, className = '' })
       )}
 
       <div className="mt-4 rounded-2xl border border-line bg-soft px-3 py-3 text-sm leading-6 text-muted sm:px-4">
-        Ако смениш устройство, влез с Google/имейл и добави нов passkey от Сигурност.
+        Нямаш passkey? Влез с Google или имейл.
       </div>
 
       <div className="mt-5 grid gap-2 sm:grid-cols-[1fr_auto]">
@@ -434,8 +432,8 @@ export default function PasskeyManager({ userId, session, className = '' }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="eyebrow">Сигурност</div>
-          <h3 className="mt-2 font-display text-3xl text-ink">Бърз вход</h3>
-          <p className="mt-2 max-w-xl text-sm text-muted">Използвай passkey като допълнителна защита за профила си, не само като удобство при вход.</p>
+          <h3 className="mt-2 font-display text-3xl text-ink">Passkey</h3>
+          <p className="mt-2 max-w-xl text-sm text-muted">Бърз вход с биометрия.</p>
         </div>
         <button type="button" onClick={reload} disabled={!canUsePasskeys || status === 'loading'} className="btn btn-ghost">
           <RefreshCw size={18} />
@@ -453,13 +451,13 @@ export default function PasskeyManager({ userId, session, className = '' }) {
         <>
           {!hasPasskeys ? (
             <div className="mt-5 rounded-2xl border border-line bg-soft px-4 py-4">
-              <div className="font-medium text-ink">Защити профила си с биометрия</div>
-              <p className="mt-2 max-w-2xl text-sm text-muted">Добави бърз вход с пръстов отпечатък, лице или security key. Това помага да защитиш профила си дори при слаба или компрометирана парола.</p>
+              <div className="font-medium text-ink">Няма passkey</div>
+              <p className="mt-2 max-w-2xl text-sm text-muted">Добави лице, пръстов отпечатък или ключ.</p>
             </div>
           ) : (
             <div className="mt-5 rounded-2xl border border-green-200 bg-green-50 px-4 py-4">
-              <div className="font-medium text-green-900">Бързият вход е активен</div>
-              <p className="mt-2 max-w-2xl text-sm text-green-800">Този профил вече има активен passkey и може да използва по-сигурен вход на поддържаните устройства.</p>
+              <div className="font-medium text-green-900">Passkey е активен</div>
+              <p className="mt-2 max-w-2xl text-sm text-green-800">Готово за бърз вход.</p>
             </div>
           )}
 
@@ -470,18 +468,18 @@ export default function PasskeyManager({ userId, session, className = '' }) {
             </button>
           </div>
 
-          <p className="mt-3 text-sm text-muted">Ако смениш устройство, първо влез с Google/имейл и добави нов passkey от Сигурност.</p>
+          <p className="mt-3 text-sm text-muted">Ново устройство? Добави нов passkey.</p>
 
           <div className={`mt-5 rounded-2xl border px-4 py-4 ${protectionEnabled ? 'border-green-200 bg-green-50' : 'border-line bg-soft'}`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="max-w-2xl">
                 <div className={protectionEnabled ? 'font-medium text-green-900' : 'font-medium text-ink'}>
-                  Изисквай биометрично потвърждение
+                  Допълнителна защита
                 </div>
                 <p className={`mt-1 text-sm ${protectionEnabled ? 'text-green-800' : 'text-muted'}`}>
                   {protectionEnabled
-                    ? 'Допълнителната защита е включена. След обикновен вход ще поискаме биометрично/passkey потвърждение преди защитени части на профила.'
-                    : 'След обикновен вход ще поискаме още едно биометрично/passkey потвърждение, преди да отворим профила и защитените настройки.'}
+                    ? 'Искаме passkey преди защитените части.'
+                    : 'Искай passkey преди защитените части.'}
                 </p>
               </div>
               <button
@@ -497,8 +495,8 @@ export default function PasskeyManager({ userId, session, className = '' }) {
             </div>
             <p className={`mt-3 text-xs ${protectionEnabled ? 'text-green-800' : 'text-muted'}`}>
               {hasPasskeys
-                ? 'Това е защита на ниво приложение, не native MFA. Можеш да я изключиш по всяко време оттук.'
-                : 'Първо добави passkey, за да включиш тази допълнителна защита.'}
+                ? 'Можеш да я изключиш по всяко време.'
+                : 'Първо добави passkey.'}
             </p>
           </div>
 
@@ -515,7 +513,7 @@ export default function PasskeyManager({ userId, session, className = '' }) {
 
             {status !== 'loading' && !hasPasskeys && (
               <div className="rounded-2xl border border-dashed border-line bg-soft px-4 py-4 text-sm text-muted">
-                Още няма включен бърз вход за този акаунт.
+                Няма активен passkey.
               </div>
             )}
 

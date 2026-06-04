@@ -2,7 +2,15 @@ import { useEffect, useState } from 'react'
 import { KeyRound, Loader2, RefreshCw, ShieldCheck, ShieldOff, Smartphone, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase.js'
-import { getVerifiedTotpFactors, loadMfaStatus, normalizeMfaError, normalizeTotpCode } from '../../lib/mfa.js'
+import {
+  clearPendingMfaEnrollment,
+  getVerifiedTotpFactors,
+  loadMfaStatus,
+  loadPendingMfaEnrollment,
+  normalizeMfaError,
+  normalizeTotpCode,
+  savePendingMfaEnrollment,
+} from '../../lib/mfa.js'
 
 async function listMfaFactors() {
   const { data, error } = await supabase.auth.mfa.listFactors()
@@ -41,13 +49,13 @@ export function TotpMfaChallengeGate({ factor, onVerified, className = '' }) {
 
     if (!factor?.id) {
       setStatus('error')
-      setMessage('Не намерихме активен 2FA фактор за този профил.')
+      setMessage('Няма активна 2FA за този профил.')
       return
     }
 
     if (token.length !== 6) {
       setStatus('error')
-      setMessage('Въведи 6-цифрения код от authenticator приложението.')
+      setMessage('Въведи 6-цифрен код.')
       return
     }
 
@@ -66,7 +74,7 @@ export function TotpMfaChallengeGate({ factor, onVerified, className = '' }) {
     }
 
     setStatus('saved')
-    setMessage('2FA проверката е успешна.')
+    setMessage('Кодът е приет.')
     onVerified?.()
   }
 
@@ -77,31 +85,26 @@ export function TotpMfaChallengeGate({ factor, onVerified, className = '' }) {
           <ShieldCheck size={21} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="eyebrow">2FA проверка</div>
-          <h2 className="mt-2 font-display text-[1.85rem] leading-none text-ink sm:text-4xl">Въведи 6-цифрения код</h2>
-          <p className="mt-3 text-sm leading-6 text-muted">
-            Този профил има включена 2FA с Authenticator приложение. Потвърди кода, за да продължиш към защитените части.
-          </p>
+          <div className="eyebrow">2FA</div>
+          <h2 className="mt-2 font-display text-[1.85rem] leading-none text-ink sm:text-4xl">Въведи кода</h2>
+          <p className="mt-3 text-sm leading-6 text-muted">6 цифри.</p>
         </div>
       </div>
 
       <form onSubmit={submit} className="mt-5 space-y-3">
-        <label className="block text-sm font-medium text-ink">
-          Код от приложението
-          <input
-            value={code}
-            onChange={(event) => setCode(normalizeTotpCode(event.target.value))}
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            placeholder="123456"
-            className="mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-center text-xl tracking-[0.2em] outline-none transition focus:border-ink"
-          />
-        </label>
+        <input
+          value={code}
+          onChange={(event) => setCode(normalizeTotpCode(event.target.value))}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          placeholder="123456"
+          className="w-full rounded-2xl border border-line bg-paper px-4 py-3 text-center text-xl tracking-[0.2em] outline-none transition focus:border-ink"
+        />
 
         <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
           <button type="submit" disabled={status === 'saving'} className="btn btn-primary w-full justify-center disabled:opacity-50">
             {status === 'saving' ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
-            {status === 'saving' ? 'Проверяваме…' : 'Потвърди 2FA'}
+            {status === 'saving' ? 'Проверяваме…' : 'Потвърди'}
           </button>
           <button type="button" onClick={() => supabase.auth.signOut()} className="btn btn-ghost w-full justify-center sm:w-auto">
             Изход
@@ -109,13 +112,7 @@ export function TotpMfaChallengeGate({ factor, onVerified, className = '' }) {
         </div>
       </form>
 
-      <div className="mt-4 rounded-2xl border border-line bg-soft px-3 py-3 text-sm leading-6 text-muted sm:px-4">
-        Ако загубиш достъп до authenticator приложението, ще трябва да използваш възстановяване на акаунта или поддръжка. Recovery codes не са включени в този flow.
-      </div>
-
-      <Link to="/contact" className="mt-3 inline-flex text-sm font-medium text-accent hover:underline">
-        Свържи се с нас
-      </Link>
+      <div className="mt-4 text-sm text-muted">Нямаш код? <Link to="/contact" className="font-medium text-accent hover:underline">Помощ</Link></div>
 
       {message && (
         <div className={`mt-4 rounded-2xl px-4 py-3 text-sm ${status === 'error' ? 'border border-amber-200 bg-amber-50 text-amber-800' : 'border border-line bg-soft text-muted'}`}>
@@ -126,9 +123,10 @@ export function TotpMfaChallengeGate({ factor, onVerified, className = '' }) {
   )
 }
 
-export default function TotpMfaManager({ className = '' }) {
+export default function TotpMfaManager({ session, className = '' }) {
+  const userId = session?.user?.id || ''
   const [factors, setFactors] = useState([])
-  const [enrollment, setEnrollment] = useState(null)
+  const [enrollment, setEnrollment] = useState(() => loadPendingMfaEnrollment(userId))
   const [code, setCode] = useState('')
   const [status, setStatus] = useState('loading')
   const [message, setMessage] = useState('')
@@ -138,20 +136,50 @@ export default function TotpMfaManager({ className = '' }) {
   const secret = enrollment?.totp?.secret || ''
 
   useEffect(() => {
-    reload()
-  }, [])
+    setEnrollment(loadPendingMfaEnrollment(userId))
+    reload({ preserveMessage: true })
+  }, [userId])
 
-  async function reload() {
+  useEffect(() => {
+    if (!userId) return undefined
+
+    function handleVisibilityChange() {
+      if (document.visibilityState !== 'visible') return
+      const pending = loadPendingMfaEnrollment(userId)
+      if (pending?.id) {
+        setEnrollment(pending)
+        setStatus('enrolling')
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleVisibilityChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleVisibilityChange)
+    }
+  }, [userId])
+
+  async function reload(options = {}) {
+    const { preserveMessage = false } = options
     setStatus('loading')
-    setMessage('')
+    if (!preserveMessage) setMessage('')
 
     try {
       const data = await listMfaFactors()
       setFactors(data.verifiedTotp)
-      setStatus('ready')
+      if (data.verifiedTotp.length > 0) {
+        clearPendingMfaEnrollment(userId)
+        setEnrollment(null)
+      } else {
+        const pending = loadPendingMfaEnrollment(userId)
+        setEnrollment(pending)
+      }
+      setStatus(loadPendingMfaEnrollment(userId)?.id ? 'enrolling' : 'ready')
     } catch (error) {
       setStatus('error')
-      setMessage(normalizeMfaError(error, 'Не успяхме да заредим 2FA настройките.'))
+      setMessage(normalizeMfaError(error, 'Не успяхме да заредим 2FA.'))
     }
   }
 
@@ -167,6 +195,7 @@ export default function TotpMfaManager({ className = '' }) {
       })
       if (error) throw error
       setEnrollment(data)
+      savePendingMfaEnrollment(userId, data)
       setStatus('enrolling')
     } catch (error) {
       setStatus('error')
@@ -180,13 +209,13 @@ export default function TotpMfaManager({ className = '' }) {
 
     if (!enrollment?.id) {
       setStatus('error')
-      setMessage('Сесията за проверка изтече. Стартирай отново.')
+      setMessage('Стартирай отново.')
       return
     }
 
     if (token.length !== 6) {
       setStatus('error')
-      setMessage('Въведи 6-цифрения код от authenticator приложението.')
+      setMessage('Въведи 6-цифрен код.')
       return
     }
 
@@ -204,10 +233,19 @@ export default function TotpMfaManager({ className = '' }) {
       return
     }
 
+    clearPendingMfaEnrollment(userId)
     setEnrollment(null)
     setCode('')
-    setMessage('2FA е активирана.')
-    await reload()
+    setMessage('2FA е включена.')
+    await reload({ preserveMessage: true })
+  }
+
+  function cancelEnrollment() {
+    clearPendingMfaEnrollment(userId)
+    setEnrollment(null)
+    setCode('')
+    setMessage('')
+    setStatus('ready')
   }
 
   async function removeFactor(factorId) {
@@ -218,7 +256,7 @@ export default function TotpMfaManager({ className = '' }) {
       const statusData = await loadMfaStatus()
       if (statusData.currentLevel !== 'aal2') {
         setStatus('error')
-        setMessage('За да премахнеш 2FA, първо потвърди 6-цифрения код при вход.')
+        setMessage('Първо потвърди кода при вход.')
         return
       }
 
@@ -227,7 +265,7 @@ export default function TotpMfaManager({ className = '' }) {
 
       setFactors((current) => current.filter((factor) => factor.id !== factorId))
       setStatus('ready')
-      setMessage('2FA факторът е премахнат.')
+      setMessage('2FA е премахната.')
     } catch (error) {
       setStatus('error')
       setMessage(normalizeMfaError(error, 'Не успяхме да премахнем 2FA. Опитай отново.'))
@@ -240,13 +278,11 @@ export default function TotpMfaManager({ className = '' }) {
     <section className={`rounded-3xl border border-line bg-paper p-5 md:p-6 ${className}`.trim()}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="eyebrow">Native MFA</div>
-          <h3 className="mt-2 font-display text-3xl text-ink">2FA с Authenticator приложение</h3>
-          <p className="mt-2 max-w-2xl text-sm text-muted">
-            Добави втори фактор с Google Authenticator, Microsoft Authenticator, Authy или друго приложение. При вход ще въвеждаш 6-цифрен код след обичайния вход.
-          </p>
+          <div className="eyebrow">2FA</div>
+          <h3 className="mt-2 font-display text-3xl text-ink">Authenticator</h3>
+          <p className="mt-2 max-w-xl text-sm text-muted">Код при вход.</p>
         </div>
-        <button type="button" onClick={reload} disabled={status === 'loading' || status === 'saving'} className="btn btn-ghost">
+        <button type="button" onClick={() => reload()} disabled={status === 'loading' || status === 'saving'} className="btn btn-ghost">
           <RefreshCw size={18} />
           {status === 'loading' ? 'Обновяване…' : 'Обнови'}
         </button>
@@ -258,68 +294,53 @@ export default function TotpMfaManager({ className = '' }) {
             <ShieldCheck size={18} />
             2FA е активна
           </div>
-          <p className="mt-2 max-w-2xl text-sm text-green-800">Защитените части на акаунта ще изискват AAL2 с код от authenticator приложение.</p>
         </div>
-      ) : (
-        <div className="mt-5 rounded-2xl border border-line bg-soft px-4 py-4">
-          <div className="flex items-center gap-2 font-medium text-ink">
-            <Smartphone size={18} />
-            Няма активна 2FA
-          </div>
-          <p className="mt-2 max-w-2xl text-sm text-muted">Passkeys остават отделен бърз вход. Тази настройка добавя истински TOTP MFA код.</p>
-        </div>
-      )}
+      ) : null}
 
       {!hasVerifiedFactor && !enrollment && (
-        <button type="button" onClick={startEnrollment} disabled={status === 'saving'} className="btn btn-primary mt-5 disabled:opacity-50">
-          {status === 'saving' ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
-          Включи 2FA
-        </button>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <button type="button" onClick={startEnrollment} disabled={status === 'saving'} className="btn btn-primary disabled:opacity-50">
+            {status === 'saving' ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
+            Включи 2FA
+          </button>
+          <div className="flex items-center gap-2 text-sm text-muted">
+            <Smartphone size={16} />
+            Google Authenticator и др.
+          </div>
+        </div>
       )}
 
       {enrollment && (
         <form onSubmit={verifyEnrollment} className="mt-5 rounded-2xl border border-line bg-soft p-4">
-          <div className="grid gap-5 md:grid-cols-[auto_1fr]">
+          <div className="grid gap-4 md:grid-cols-[auto_1fr]">
             {qrCode && (
-              <img src={qrCode} alt="QR код за 2FA" className="h-44 w-44 rounded-2xl border border-line bg-paper p-3" />
+              <img src={qrCode} alt="QR код за 2FA" className="h-40 w-40 rounded-2xl border border-line bg-paper p-3" />
             )}
             <div className="min-w-0">
-              <div className="font-medium text-ink">Сканирай QR кода</div>
-              <p className="mt-2 text-sm leading-6 text-muted">
-                Сканирай QR кода с Google Authenticator, Microsoft Authenticator, Authy, 1Password или друго приложение.
-              </p>
+              <div className="flex items-center gap-2 font-medium text-ink">
+                <KeyRound size={17} />
+                Сканирай и въведи код
+              </div>
               {secret && (
                 <div className="mt-3 rounded-2xl border border-line bg-paper px-3 py-3">
-                  <div className="text-xs uppercase tracking-[0.14em] text-muted">Ръчен ключ</div>
+                  <div className="text-xs uppercase tracking-[0.14em] text-muted">Ръчно</div>
                   <code className="mt-1 block break-all text-sm text-ink">{secret}</code>
                 </div>
               )}
-              <label className="mt-4 block text-sm font-medium text-ink">
-                6-цифрен код
-                <input
-                  value={code}
-                  onChange={(event) => setCode(normalizeTotpCode(event.target.value))}
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="123456"
-                  className="mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-center text-xl tracking-[0.2em] outline-none transition focus:border-ink"
-                />
-              </label>
+              <input
+                value={code}
+                onChange={(event) => setCode(normalizeTotpCode(event.target.value))}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="123456"
+                className="mt-4 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-center text-xl tracking-[0.2em] outline-none transition focus:border-ink"
+              />
               <div className="mt-4 flex flex-wrap gap-2">
                 <button type="submit" disabled={status === 'saving'} className="btn btn-primary disabled:opacity-50">
                   {status === 'saving' ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
-                  Потвърди и включи
+                  Потвърди
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEnrollment(null)
-                    setCode('')
-                    setMessage('')
-                    setStatus('ready')
-                  }}
-                  className="btn btn-ghost"
-                >
+                <button type="button" onClick={cancelEnrollment} className="btn btn-ghost">
                   Отказ
                 </button>
               </div>
@@ -327,10 +348,6 @@ export default function TotpMfaManager({ className = '' }) {
           </div>
         </form>
       )}
-
-      <div className="mt-5 rounded-2xl border border-line bg-soft px-4 py-4 text-sm leading-6 text-muted">
-        Ако загубиш достъп до authenticator приложението, ще трябва да използваш възстановяване на акаунта или поддръжка. Препоръчително е да добавиш 2FA на устройство, до което имаш постоянен достъп.
-      </div>
 
       {message && (
         <div className={`mt-4 rounded-2xl px-4 py-3 text-sm ${status === 'error' ? 'border border-amber-200 bg-amber-50 text-amber-800' : 'border border-line bg-soft text-muted'}`}>
@@ -345,23 +362,23 @@ export default function TotpMfaManager({ className = '' }) {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 font-medium text-ink">
                   <KeyRound size={17} />
-                  {factor.friendly_name || 'Authenticator приложение'}
+                  {factor.friendly_name || 'Authenticator'}
                 </div>
                 <div className="mt-1 text-xs text-muted">Добавен: {formatFactorDate(factor.created_at)}</div>
               </div>
               <button type="button" onClick={() => removeFactor(factor.id)} disabled={busyId === factor.id} className="btn btn-ghost !py-2 text-sm">
                 {busyId === factor.id ? <Loader2 size={17} className="animate-spin" /> : <Trash2 size={17} />}
-                {busyId === factor.id ? 'Премахване…' : 'Премахни 2FA'}
+                {busyId === factor.id ? 'Премахване…' : 'Премахни'}
               </button>
             </div>
           ))}
         </div>
       )}
 
-      {!hasVerifiedFactor && status !== 'loading' && (
+      {!hasVerifiedFactor && !enrollment && status !== 'loading' && !message && (
         <div className="mt-5 flex items-center gap-2 rounded-2xl border border-dashed border-line bg-soft px-4 py-4 text-sm text-muted">
           <ShieldOff size={18} />
-          2FA не е включена за този акаунт.
+          2FA е изключена
         </div>
       )}
     </section>

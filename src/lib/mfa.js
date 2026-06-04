@@ -1,6 +1,45 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 
+export function mfaEnrollmentStorageKey(userId) {
+  return `totsan.mfa.enrollment.${userId || 'anonymous'}`
+}
+
+export function savePendingMfaEnrollment(userId, enrollment) {
+  if (typeof window === 'undefined' || !userId || !enrollment?.id) return
+
+  const payload = {
+    id: enrollment.id,
+    friendly_name: enrollment.friendly_name || '',
+    totp: {
+      qr_code: enrollment?.totp?.qr_code || '',
+      secret: enrollment?.totp?.secret || '',
+      uri: enrollment?.totp?.uri || '',
+    },
+  }
+
+  window.localStorage.setItem(mfaEnrollmentStorageKey(userId), JSON.stringify(payload))
+}
+
+export function loadPendingMfaEnrollment(userId) {
+  if (typeof window === 'undefined' || !userId) return null
+
+  const raw = window.localStorage.getItem(mfaEnrollmentStorageKey(userId))
+  if (!raw) return null
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    window.localStorage.removeItem(mfaEnrollmentStorageKey(userId))
+    return null
+  }
+}
+
+export function clearPendingMfaEnrollment(userId) {
+  if (typeof window === 'undefined' || !userId) return
+  window.localStorage.removeItem(mfaEnrollmentStorageKey(userId))
+}
+
 export function normalizeMfaError(error, fallback = 'Не успяхме да завършим проверката. Опитай отново.') {
   const raw = String(error?.message || error?.name || '').trim()
   const lower = raw.toLowerCase()

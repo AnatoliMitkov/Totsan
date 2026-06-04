@@ -289,7 +289,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
         {activeTab === 'security' && (
           <div className="space-y-5">
             <PasskeyManager userId={userId} session={session} />
-            <TotpMfaManager />
+            <TotpMfaManager session={session} />
           </div>
         )}
       </div>
