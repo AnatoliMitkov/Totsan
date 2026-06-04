@@ -49,6 +49,7 @@ export function TotpMfaChallengeGate({ factor, onVerified, className = '' }) {
   const [code, setCode] = useState('')
   const [status, setStatus] = useState('idle')
   const [message, setMessage] = useState('')
+  const [showHelp, setShowHelp] = useState(false)
 
   async function submit(event) {
     event.preventDefault()
@@ -119,7 +120,30 @@ export function TotpMfaChallengeGate({ factor, onVerified, className = '' }) {
         </div>
       </form>
 
-      <div className="mt-4 text-sm text-muted">Нямаш код? <Link to="/contact" className="font-medium text-accent hover:underline">Помощ</Link></div>
+      <div className="mt-4">
+        <button type="button" onClick={() => setShowHelp(v => !v)} className="text-sm font-medium text-accent hover:underline">
+          {showHelp ? 'Скрий помощта' : 'Нямаш достъп до кода?'}
+        </button>
+      </div>
+
+      {showHelp && (
+        <div className="mt-4 rounded-2xl border border-line bg-soft p-4 space-y-4 text-sm">
+          <div>
+            <div className="font-medium text-ink">1. Пробвай резервен Authenticator</div>
+            <p className="mt-1 text-muted">Ако си добавил 2FA на друго устройство или приложение, използвай неговия 6-цифрен код.</p>
+          </div>
+          <div>
+            <div className="font-medium text-ink">2. Възстанови достъпа</div>
+            <p className="mt-1 text-muted">Ако нямаш достъп до нито един код, започни възстановяване на акаунта.</p>
+            <Link to="/login#type=recovery" className="mt-1 inline-block font-medium text-accent hover:underline">Възстанови парола и достъп</Link>
+          </div>
+          <div>
+            <div className="font-medium text-ink">3. Свържи се с нас</div>
+            <p className="mt-1 text-muted">Използвай това само ако нямаш достъп до нито един метод.</p>
+            <Link to="/contact" className="mt-1 inline-block font-medium text-accent hover:underline">Пиши на поддръжката</Link>
+          </div>
+        </div>
+      )}
 
       {message && (
         <div className={`mt-4 rounded-2xl px-4 py-3 text-sm ${status === 'error' ? 'border border-amber-200 bg-amber-50 text-amber-800' : 'border border-line bg-soft text-muted'}`}>
@@ -256,6 +280,14 @@ export default function TotpMfaManager({ session, className = '' }) {
   }
 
   async function removeFactor(factorId) {
+    const isLast = factors.length === 1
+    const confirmed = window.confirm(
+      isLast 
+        ? 'Сигурен ли си, че искаш да изключиш 2FA? Профилът ти ще остане без допълнителна защита.' 
+        : 'Сигурен ли си, че искаш да премахнеш този резервен Authenticator?'
+    )
+    if (!confirmed) return
+
     setBusyId(factorId)
     setMessage('')
 
@@ -272,7 +304,7 @@ export default function TotpMfaManager({ session, className = '' }) {
 
       setFactors((current) => current.filter((factor) => factor.id !== factorId))
       setStatus('ready')
-      setMessage('2FA е премахната.')
+      setMessage(isLast ? '2FA е изключена.' : 'Резервният Authenticator е премахнат.')
     } catch (error) {
       setStatus('error')
       setMessage(normalizeMfaError(error, 'Не успяхме да премахнем 2FA. Опитай отново.'))
@@ -364,12 +396,12 @@ export default function TotpMfaManager({ session, className = '' }) {
 
       {hasVerifiedFactor && (
         <div className="mt-5 space-y-3">
-          {factors.map((factor) => (
+          {factors.map((factor, index) => (
             <div key={factor.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-soft px-4 py-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 font-medium text-ink">
                   <KeyRound size={17} />
-                  {factor.friendly_name || 'Authenticator'}
+                  {factor.friendly_name || `Authenticator ${index + 1}`}
                 </div>
                 <div className="mt-1 text-xs text-muted">Добавен: {formatFactorDate(factor.created_at)}</div>
               </div>
@@ -379,6 +411,17 @@ export default function TotpMfaManager({ session, className = '' }) {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {hasVerifiedFactor && !enrollment && factors.length < 5 && (
+        <div className="mt-5 rounded-2xl border border-line bg-soft p-4">
+          <div className="font-medium text-ink">Резервен Authenticator</div>
+          <p className="mt-1 text-sm text-muted">Добави второ приложение или устройство, ако загубиш основното.</p>
+          <button type="button" onClick={startEnrollment} disabled={status === 'saving'} className="mt-4 btn btn-primary transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 disabled:opacity-50">
+            {status === 'saving' ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
+            Добави резервен Authenticator
+          </button>
         </div>
       )}
 

@@ -81,11 +81,11 @@ export default function Admin() {
     setPasskeyVerified(sessionPasskeyVerified)
   }, [session?.user?.id, session?.user?.last_sign_in_at, sessionPasskeyVerified])
 
-  if (loading) return <div className="flex h-screen items-center justify-center bg-soft"><div className="text-muted">Р—Р°СЂРµР¶РґР°РЅРµвЂ¦</div></div>
+  if (loading) return <div className="flex h-screen items-center justify-center bg-soft"><div className="text-muted">Зареждане…</div></div>
   if (!session) return <LoginPanel />
 
   if (mfaGate.loading) {
-    return <div className="flex h-screen items-center justify-center bg-soft"><div className="text-muted">РџСЂРѕРІРµСЂСЏРІР°РјРµ 2FA СЃС‚Р°С‚СѓСЃР°вЂ¦</div></div>
+    return <div className="flex h-screen items-center justify-center bg-soft"><div className="text-muted">Проверяваме достъпа…</div></div>
   }
 
   if (mfaGate.needsMfa) {
