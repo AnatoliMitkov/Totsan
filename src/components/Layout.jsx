@@ -3,8 +3,9 @@ import { LAYERS } from '../data/layers.js'
 import { useEffect, useRef, useState } from 'react'
 import { Menu, MessageCircle, X } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
-import { getAccountDisplayName, getAccountInitial, useAccount } from '../lib/account.js'
+import { getAccountDisplayName, getAccountInitial, getAccountAvatar, useAccount } from '../lib/account.js'
 import { loadUnreadConversationCount, subscribeToConversationList } from '../lib/chat.js'
+import Avatar from './Avatar.jsx'
 
 export default function Layout() {
   const { pathname, search, hash } = useLocation()
@@ -341,7 +342,7 @@ function UserMenu({ session, account, isAdmin }) {
   const ref = useRef(null)
   const email = session.user.email || ''
   const displayName = getAccountDisplayName(account, session, email)
-  const initial = getAccountInitial(account, session)
+  const avatarUrl = getAccountAvatar(account, session)
 
   useEffect(() => {
     function onClick(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
@@ -352,7 +353,7 @@ function UserMenu({ session, account, isAdmin }) {
   return (
     <div ref={ref} className="relative hidden sm:block">
       <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 rounded-full border border-line bg-paper px-2 py-1.5 text-sm hover:border-ink/40 transition">
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-ink text-paper text-xs font-medium">{initial}</span>
+        <Avatar src={avatarUrl} name={displayName} size={28} />
         <span className="hidden max-w-[10rem] truncate text-muted xl:inline">{displayName}</span>
       </button>
       {open && (

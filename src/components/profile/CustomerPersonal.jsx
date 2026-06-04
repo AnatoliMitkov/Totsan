@@ -1,7 +1,11 @@
-import { useEffect, useState } from 'react'
-import { ImagePlus, Save } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Pencil, Save } from 'lucide-react'
+import ImageCropperModal from './ImageCropperModal.jsx'
+import Avatar from '../Avatar.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
+const MAX_AVATAR_BYTES = 10 * 1024 * 1024
+const AVATAR_SAVE_ERROR = 'Не успяхме да запазим снимката. Опитай отново.'
 
 function makeDraft(account, session) {
   const metadata = session?.user?.user_metadata || {}
@@ -19,38 +23,136 @@ function makeDraft(account, session) {
   }
 }
 
+function validateAvatarFile(file) {
+  if (!file) return 'Липсва файл.'
+  if (!file.type.startsWith('image/')) return 'Моля, избери изображение.'
+  if (file.size > MAX_AVATAR_BYTES) return 'Снимката трябва да е до 10 MB.'
+  return ''
+}
+
+function withCacheBust(url) {
+  if (!url) return ''
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}v=${Date.now()}`
+}
+
+function stripAvatarCacheBust(url) {
+  if (!url) return ''
+
+  try {
+    const parsed = new URL(url)
+    parsed.searchParams.delete('v')
+    return parsed.toString()
+  } catch {
+    return url.replace(/([?&])v=\d+(&?)/, (_, prefix, suffix) => {
+      if (prefix === '?' && suffix) return '?'
+      return suffix ? prefix : ''
+    }).replace(/[?&]$/, '')
+  }
+}
+
 export default function CustomerPersonal({ account, session, onSave, onUploadAvatar }) {
   const [draft, setDraft] = useState(() => makeDraft(account, session))
   const [status, setStatus] = useState({ type: 'idle', message: '' })
+  const [avatarEditor, setAvatarEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'avatar.jpg' })
+  const fileInputRef = useRef(null)
+  const draftRef = useRef(draft)
 
   useEffect(() => {
-    setDraft(makeDraft(account, session))
+    const nextDraft = makeDraft(account, session)
+    setDraft(nextDraft)
+    draftRef.current = nextDraft
   }, [account, session])
 
   function update(key, value) {
-    setDraft(current => ({ ...current, [key]: value }))
+    setDraft(current => {
+      const nextDraft = { ...current, [key]: value }
+      draftRef.current = nextDraft
+      return nextDraft
+    })
+  }
+
+  function openAvatarEditor() {
+    if (draft.avatarUrl) {
+      setAvatarEditor({
+        open: true,
+        file: null,
+        imageUrl: draft.avatarUrl,
+        fileName: draft.displayName ? `${draft.displayName}-avatar.jpg` : 'avatar.jpg',
+      })
+      return
+    }
+
+    fileInputRef.current?.click()
+  }
+
+  function closeAvatarEditor() {
+    setAvatarEditor(current => ({ ...current, open: false }))
+  }
+
+  function handleAvatarFile(file) {
+    const error = validateAvatarFile(file)
+    if (error) {
+      setStatus({ type: 'error', message: error })
+      return
+    }
+
+    setAvatarEditor({
+      open: true,
+      file,
+      imageUrl: '',
+      fileName: file.name || 'avatar.jpg',
+    })
   }
 
   async function submit(event) {
     event.preventDefault()
     setStatus({ type: 'saving', message: 'Запазваме личните данни…' })
     try {
-      await onSave(draft)
+      const payload = {
+        ...draftRef.current,
+        avatarUrl: stripAvatarCacheBust(draftRef.current.avatarUrl),
+      }
+      const savedAccount = await onSave(payload)
+      const nextDraft = makeDraft(savedAccount, session)
+      setDraft(nextDraft)
+      draftRef.current = nextDraft
       setStatus({ type: 'saved', message: 'Личните данни са запазени.' })
     } catch (error) {
       setStatus({ type: 'error', message: error.message || 'Записът не успя.' })
     }
   }
 
-  async function uploadAvatar(file) {
-    if (!file) return
-    setStatus({ type: 'uploading', message: 'Качваме аватара…' })
+  async function saveAvatar(croppedFile) {
+    setStatus({ type: 'uploading', message: 'Запазваме снимката…' })
+
     try {
-      const url = await onUploadAvatar(file)
-      update('avatarUrl', url)
-      setStatus({ type: 'uploaded', message: 'Аватарът е готов. Натисни „Запази“.' })
+      const avatarUrl = await onUploadAvatar(croppedFile)
+      const displayAvatarUrl = withCacheBust(avatarUrl)
+      const nextDraft = {
+        ...draftRef.current,
+        avatarUrl: displayAvatarUrl,
+      }
+
+      setDraft(nextDraft)
+      draftRef.current = nextDraft
+
+      const savedAccount = await onSave({
+        ...nextDraft,
+        avatarUrl,
+      })
+
+      const syncedDraft = {
+        ...makeDraft(savedAccount, session),
+        avatarUrl: displayAvatarUrl,
+      }
+
+      setDraft(syncedDraft)
+      draftRef.current = syncedDraft
+      setStatus({ type: 'saved', message: 'Снимката е запазена.' })
     } catch (error) {
-      setStatus({ type: 'error', message: error.message || 'Качването не успя.' })
+      setStatus({ type: 'error', message: AVATAR_SAVE_ERROR })
+      throw error
     }
   }
 
@@ -83,7 +185,7 @@ export default function CustomerPersonal({ account, session, onSave, onUploadAva
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
           <div className={`text-sm ${status.type === 'error' ? 'text-red-700' : 'text-muted'}`}>{status.message || 'Промените се пазят само след запазване.'}</div>
-          <button className="btn btn-primary" disabled={status.type === 'saving'}>
+          <button className="btn btn-primary" disabled={status.type === 'saving' || status.type === 'uploading'}>
             <Save size={18} />
             {status.type === 'saving' ? 'Запазва се…' : 'Запази'}
           </button>
@@ -93,16 +195,58 @@ export default function CustomerPersonal({ account, session, onSave, onUploadAva
       <aside className="lg:col-span-4">
         <div className="rounded-3xl border border-line bg-paper p-5 md:p-6 lg:sticky lg:top-24">
           <div className="eyebrow">Аватар</div>
-          <div className="mt-5 aspect-square overflow-hidden rounded-3xl border border-line bg-soft">
-            {draft.avatarUrl ? <img src={draft.avatarUrl} alt={draft.displayName || draft.fullName} className="img-cover" /> : <div className="flex h-full w-full items-center justify-center text-muted">Няма снимка</div>}
+          <div className="group relative mt-5 flex justify-center">
+            <button type="button" onClick={openAvatarEditor} className="relative rounded-full transition hover:ring-2 hover:ring-ink focus:outline-none focus:ring-2 focus:ring-ink" aria-label="Смени снимката">
+              <Avatar src={draft.avatarUrl} name={draft.displayName || draft.fullName} size={200} />
+              <div className="absolute inset-0 hidden items-center justify-center rounded-full bg-ink/40 text-paper opacity-0 transition md:flex md:group-hover:opacity-100">
+                <Pencil size={32} />
+              </div>
+            </button>
           </div>
-          <label className="btn btn-ghost mt-4 w-full cursor-pointer justify-center">
-            <ImagePlus size={18} />
-            Качи аватар
-            <input type="file" accept="image/*" className="sr-only" onChange={async (event) => { await uploadAvatar(event.target.files?.[0]); event.target.value = '' }} />
-          </label>
+
+          <button type="button" onClick={openAvatarEditor} className="btn btn-ghost mt-4 w-full justify-center md:hidden">
+            <Pencil size={18} />
+            {draft.avatarUrl ? 'Редактирай снимка' : 'Качи снимка'}
+          </button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(event) => {
+              const file = event.target.files?.[0]
+              event.target.value = ''
+              if (file) handleAvatarFile(file)
+            }}
+          />
         </div>
       </aside>
+
+      {avatarEditor.open && (
+        <ImageCropperModal
+          file={avatarEditor.file}
+          imageUrl={avatarEditor.imageUrl}
+          initialFileName={avatarEditor.fileName}
+          onClose={closeAvatarEditor}
+          onSelectFile={async (file) => {
+            const error = validateAvatarFile(file)
+            if (error) {
+              setStatus({ type: 'error', message: error })
+              return
+            }
+
+            setStatus(current => current.type === 'error' ? { type: 'idle', message: '' } : current)
+            setAvatarEditor({
+              open: true,
+              file,
+              imageUrl: '',
+              fileName: file.name || 'avatar.jpg',
+            })
+          }}
+          onCropSave={saveAvatar}
+        />
+      )}
     </form>
   )
 }

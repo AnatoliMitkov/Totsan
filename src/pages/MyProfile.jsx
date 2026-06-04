@@ -32,6 +32,12 @@ import {
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 
+function withCacheBust(url) {
+  if (!url) return ''
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}v=${Date.now()}`
+}
+
 export default function MyProfile() {
   const { session, account, loading, refresh, requirePasskeyVerification } = useAccount()
   const [searchParams] = useSearchParams()
@@ -56,23 +62,6 @@ export default function MyProfile() {
             {fromQuiz ? 'Резултатът от quiz-а е подготвен за проект-паспорт. Влез в акаунта си, за да го прегледаш и запазиш.' : 'За да видиш профила си, трябва първо да влезеш в акаунта си.'}
           </p>
           <Link to="/login" className="btn btn-primary mt-6 inline-flex">Вход</Link>
-        </div>
-      </section>
-    )
-  }
-
-  if (mfaGate.loading) {
-    return <div className="section"><div className="container-page text-muted">Проверяваме 2FA статуса…</div></div>
-  }
-
-  if (mfaGate.needsMfa) {
-    return (
-      <section className="section bg-soft min-h-screen">
-        <div className="container-page max-w-3xl">
-          <TotpMfaChallengeGate
-            factor={mfaGate.factor}
-            onVerified={mfaGate.refresh}
-          />
         </div>
       </section>
     )
@@ -153,8 +142,11 @@ function CustomerProfile({ session, account, refreshAccount }) {
 
   async function savePersonal(values) {
     const savedAccount = await saveCustomerAccountProfile(values)
-    setLocalAccount(savedAccount)
+    const nextAccount = savedAccount?.avatar_url
+      ? { ...savedAccount, avatar_url: withCacheBust(savedAccount.avatar_url) }
+      : savedAccount
     await refreshAccount?.()
+    setLocalAccount(nextAccount)
     return savedAccount
   }
 

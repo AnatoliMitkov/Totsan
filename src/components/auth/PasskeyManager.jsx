@@ -249,6 +249,21 @@ export default function PasskeyManager({ userId, session, className = '' }) {
     setMessage('Входът е премахнат.')
   }
 
+  async function handleRegister() {
+    setStatus('saving')
+    setMessage('')
+
+    const { error } = await supabase.auth.passkey.register()
+
+    setStatus('ready')
+    if (error) {
+      setMessage(normalizePasskeyError(error, 'Не успяхме да добавим passkey.'))
+    } else {
+      setMessage('Бързият вход е добавен успешно.')
+      reload()
+    }
+  }
+
   return (
     <section className={`rounded-3xl border border-line bg-paper p-5 md:p-6 ${className}`.trim()}>
       <div className="flex flex-wrap items-start justify-between gap-3">

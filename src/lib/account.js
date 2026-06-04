@@ -16,6 +16,10 @@ export function getAccountInitial(account, session) {
   return (getAccountDisplayName(account, session, '?')[0] || '?').toUpperCase()
 }
 
+export function getAccountAvatar(account, session) {
+  return account?.avatar_url || session?.user?.user_metadata?.avatar_url || session?.user?.user_metadata?.picture || ''
+}
+
 // Единен hook: следи Supabase сесията + чете акаунта (роля + статус) от accounts таблицата.
 export function useAccount() {
   const [session, setSession] = useState(null)
