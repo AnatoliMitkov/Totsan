@@ -1,18 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Ban, CheckCircle2, KeyRound, MailCheck, RefreshCcw, Search, ShieldCheck, Trash2 } from 'lucide-react'
+import { Ban, CheckCircle2, RefreshCcw, Search, ShieldCheck } from 'lucide-react'
 import {
   ACCOUNT_ROLE_LABELS,
   ADMIN_INPUT_CLASS,
   ADMIN_SELECT_CLASS,
   SPECIALIST_STATUS_LABELS,
-  deleteUserPasskey,
   formatAdminDate,
-  listUserPasskeys,
   loadAccounts,
   matchesSearch,
   paginateRows,
-  resetUserPasskeys,
-  sendUserRecoveryEmail,
   updateAccount,
 } from '../../lib/admin.js'
 
@@ -27,7 +23,6 @@ export default function UsersManager({ globalQuery = '', account }) {
   const [statusFilter, setStatusFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [actionState, setActionState] = useState({ id: '', message: '' })
-  const [authTools, setAuthTools] = useState({ id: '', status: 'idle', passkeys: [], message: '' })
 
   const canManageAdmins = hasAdminRoleManagerAccess(account)
 
@@ -72,61 +67,6 @@ export default function UsersManager({ globalQuery = '', account }) {
       setActionState({ id: row.id, message })
     } catch (actionError) {
       setActionState({ id: row.id, message: actionError.message || 'Действието не успя.' })
-    }
-  }
-
-  async function openAuthTools(row) {
-    if (authTools.id === row.id && authTools.status === 'ready') {
-      setAuthTools({ id: '', status: 'idle', passkeys: [], message: '' })
-      return
-    }
-
-    setAuthTools({ id: row.id, status: 'loading', passkeys: [], message: '' })
-    try {
-      const result = await listUserPasskeys(row.id)
-      setAuthTools({ id: row.id, status: 'ready', passkeys: result.passkeys || [], message: '' })
-    } catch (toolError) {
-      setAuthTools({ id: row.id, status: 'error', passkeys: [], message: toolError.message || 'Не успяхме да заредим входовете.' })
-    }
-  }
-
-  async function refreshAuthTools(row, message = '') {
-    setAuthTools((current) => ({ ...current, id: row.id, status: 'loading', message }))
-    try {
-      const result = await listUserPasskeys(row.id)
-      setAuthTools({ id: row.id, status: 'ready', passkeys: result.passkeys || [], message })
-    } catch (toolError) {
-      setAuthTools({ id: row.id, status: 'error', passkeys: [], message: toolError.message || 'Не успяхме да обновим входовете.' })
-    }
-  }
-
-  async function removeUserPasskey(row, passkeyId) {
-    setAuthTools((current) => ({ ...current, id: row.id, status: 'saving', message: 'Премахваме входа…' }))
-    try {
-      await deleteUserPasskey(row.id, passkeyId)
-      await refreshAuthTools(row, 'Входът е премахнат.')
-    } catch (toolError) {
-      setAuthTools((current) => ({ ...current, id: row.id, status: 'error', message: toolError.message || 'Не успяхме да премахнем входа.' }))
-    }
-  }
-
-  async function resetAuthForUser(row) {
-    setAuthTools((current) => ({ ...current, id: row.id, status: 'saving', message: 'Ресетваме бързия вход…' }))
-    try {
-      const result = await resetUserPasskeys(row.id)
-      await refreshAuthTools(row, `Премахнати входове: ${result.deletedCount || 0}.`)
-    } catch (toolError) {
-      setAuthTools((current) => ({ ...current, id: row.id, status: 'error', message: toolError.message || 'Не успяхме да ресетнем входовете.' }))
-    }
-  }
-
-  async function sendRecoveryEmail(row) {
-    setAuthTools((current) => ({ ...current, id: row.id, status: 'saving', message: 'Изпращаме email…' }))
-    try {
-      await sendUserRecoveryEmail(row.id)
-      setAuthTools((current) => ({ ...current, id: row.id, status: 'ready', message: 'Изпратен е email за нов вход/парола.' }))
-    } catch (toolError) {
-      setAuthTools((current) => ({ ...current, id: row.id, status: 'error', message: toolError.message || 'Не успяхме да изпратим email.' }))
     }
   }
 
@@ -233,25 +173,8 @@ export default function UsersManager({ globalQuery = '', account }) {
                     {row.account_status === 'banned' ? <ShieldCheck size={17} /> : <Ban size={17} />}
                     {row.account_status === 'banned' ? ' Активирай' : ' Блокирай'}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => openAuthTools(row)}
-                    className="btn btn-ghost !py-2 text-sm"
-                  >
-                    <KeyRound size={17} /> Вход
-                  </button>
                 </div>
               </div>
-              {authTools.id === row.id && (
-                <UserAuthTools
-                  row={row}
-                  state={authTools}
-                  onRefresh={() => refreshAuthTools(row)}
-                  onDelete={(passkeyId) => removeUserPasskey(row, passkeyId)}
-                  onReset={() => resetAuthForUser(row)}
-                  onSendRecovery={() => sendRecoveryEmail(row)}
-                />
-              )}
               {busy && actionState.message && <div className="mt-3 text-sm text-muted">{actionState.message}</div>}
             </article>
           )
@@ -266,65 +189,6 @@ export default function UsersManager({ globalQuery = '', account }) {
 
 function displayName(row) {
   return row.full_name || row.display_name || row.email?.split('@')[0] || 'Потребител'
-}
-
-function UserAuthTools({ row, state, onRefresh, onDelete, onReset, onSendRecovery }) {
-  const busy = state.status === 'loading' || state.status === 'saving'
-
-  return (
-    <div className="mt-4 rounded-2xl border border-line bg-soft p-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <div className="flex items-center gap-2 font-medium text-ink">
-            <KeyRound size={18} /> Вход и възстановяване
-          </div>
-          <p className="mt-1 text-sm text-muted">{row.email || 'Акаунт без имейл'}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={onRefresh} disabled={busy} className="btn btn-ghost !py-2 text-sm disabled:opacity-50">
-            <RefreshCcw size={16} /> Обнови
-          </button>
-          <button type="button" onClick={onSendRecovery} disabled={busy || !row.email} className="btn btn-ghost !py-2 text-sm disabled:opacity-50">
-            <MailCheck size={16} /> Reset email
-          </button>
-          <button type="button" onClick={onReset} disabled={busy || state.passkeys.length === 0} className="btn btn-ghost !py-2 text-sm disabled:opacity-50">
-            <Trash2 size={16} /> Reset passkeys
-          </button>
-        </div>
-      </div>
-
-      {state.message && (
-        <div className={`mt-3 rounded-2xl px-3 py-2 text-sm ${state.status === 'error' ? 'bg-red-50 text-red-700' : 'bg-paper text-muted'}`}>
-          {state.message}
-        </div>
-      )}
-
-      {state.status === 'loading' && <div className="mt-3 text-sm text-muted">Зареждаме входовете…</div>}
-
-      {state.status !== 'loading' && state.passkeys.length === 0 && (
-        <div className="mt-3 rounded-2xl border border-dashed border-line bg-paper px-4 py-3 text-sm text-muted">
-          Няма активни passkeys за този потребител.
-        </div>
-      )}
-
-      {state.passkeys.length > 0 && (
-        <div className="mt-3 grid gap-2">
-          {state.passkeys.map((passkey) => (
-            <div key={passkey.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-paper px-4 py-3">
-              <div className="min-w-0 text-sm">
-                <div className="font-medium text-ink">{passkey.friendly_name || 'Бърз вход'}</div>
-                <div className="mt-1 text-xs text-muted">Добавен: {formatAdminDate(passkey.created_at)}</div>
-                <div className="mt-1 text-xs text-muted">Последно ползване: {passkey.last_used_at ? formatAdminDate(passkey.last_used_at) : 'няма'}</div>
-              </div>
-              <button type="button" onClick={() => onDelete(passkey.id)} disabled={busy} className="btn btn-ghost !py-2 text-sm disabled:opacity-50">
-                <Trash2 size={16} /> Премахни
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
 }
 
 function hasAdminRoleManagerAccess(account) {
