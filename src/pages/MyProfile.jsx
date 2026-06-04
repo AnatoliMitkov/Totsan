@@ -10,7 +10,7 @@ import CustomerPersonal from '../components/profile/CustomerPersonal.jsx'
 import CustomerProject from '../components/profile/CustomerProject.jsx'
 import CompletenessBar from '../components/profile/CompletenessBar.jsx'
 import PartnerProfileWorkspace from '../components/profile/PartnerProfileWorkspace.jsx'
-import PasskeyManager from '../components/auth/PasskeyManager.jsx'
+import PasskeyManager, { PasskeySetupPrompt } from '../components/auth/PasskeyManager.jsx'
 import {
   calculateClientProfileCompleteness,
   deleteClientProjectMedia,
@@ -184,6 +184,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
     <section className="section bg-soft min-h-screen">
       <div className="container-page space-y-5">
         <CustomerHeader account={localAccount} displayName={displayName} completeness={completeness} onSignOut={() => supabase.auth.signOut()} />
+        <PasskeySetupPrompt userId={userId} />
 
         <div className="flex flex-wrap items-center gap-2 rounded-3xl border border-line bg-paper p-2">
           {[
@@ -191,6 +192,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
             ['personal', 'Лични данни'],
             ['project', 'Моят проект'],
             ['activity', 'Активност'],
+            ['security', 'Сигурност'],
           ].map(([tab, label]) => (
             <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`rounded-full px-4 py-2 text-sm transition ${activeTab === tab ? 'bg-ink text-paper' : 'text-muted hover:bg-soft hover:text-ink'}`}>
               {label}
@@ -243,6 +245,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
         )}
 
         {activeTab === 'activity' && <CustomerActivity account={localAccount} completeness={completeness} />}
+        {activeTab === 'security' && <PasskeyManager userId={userId} />}
       </div>
     </section>
   )
@@ -261,10 +264,7 @@ function CustomerActivity({ account, completeness }) {
         </div>
       </div>
       <aside className="lg:col-span-4">
-        <div className="space-y-5">
-          <CompletenessBar completeness={completeness} />
-          <PasskeyManager mode="manage" />
-        </div>
+        <CompletenessBar completeness={completeness} />
       </aside>
     </div>
   )

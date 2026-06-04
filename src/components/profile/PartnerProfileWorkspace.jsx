@@ -5,7 +5,7 @@ import { LAYERS } from '../../data/layers.js'
 import { uploadProfileMedia } from '../../lib/profile-media-upload-client.js'
 import { getProfileImage, getProfileImageStyle, normalizeProfile, PROFILE_SELECT_COLUMNS } from '../../lib/profiles.js'
 import { supabase } from '../../lib/supabase.js'
-import PasskeyManager from '../auth/PasskeyManager.jsx'
+import PasskeyManager, { PasskeySetupPrompt } from '../auth/PasskeyManager.jsx'
 import {
   DEFAULT_PORTFOLIO_ITEM,
   appendPortfolioMedia,
@@ -31,6 +31,7 @@ const TABS = [
   ['orders', 'Поръчки'],
   ['inquiries', 'Запитвания'],
   ['contact', 'Контакт'],
+  ['security', 'Сигурност'],
 ]
 
 function csv(value) {
@@ -336,6 +337,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
   return (
     <section className="section bg-soft min-h-screen">
       <div className="container-page space-y-5">
+        <PasskeySetupPrompt userId={userId} />
         <div className="rounded-3xl border border-line bg-paper p-5 md:p-7">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
@@ -384,7 +386,6 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
                 <div className="mt-2 font-display text-3xl text-ink">{portfolio.length}</div>
                 <p className="mt-2 text-sm text-muted">Добави поне 10 проекта за силен профил.</p>
               </div>
-              <PasskeyManager mode="manage" />
             </aside>
           </div>
         )}
@@ -424,6 +425,10 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
 
         {activeTab === 'inquiries' && (
           <PartnerInquiries profileSlug={currentProfile.slug} partnerId={userId} />
+        )}
+
+        {activeTab === 'security' && (
+          <PasskeyManager userId={userId} />
         )}
 
         {activeTab === 'contact' && (
