@@ -142,6 +142,8 @@ export function normalizeProject(row) {
     ideaDescription: row.idea_description || '',
     quizAnswers: row.quiz_answers || {},
     isActive: row.is_active !== false,
+    publicShareId: row.public_share_id || '',
+    isShareable: row.is_shareable || false,
     createdAt: row.created_at || '',
     updatedAt: row.updated_at || '',
   }
@@ -248,6 +250,11 @@ export async function saveCustomerAccountProfile(values) {
     p_bio: values.bio || '',
     p_locale: values.locale || 'bg',
     p_marketing_opt_in: Boolean(values.marketingOptIn),
+    p_interests: Array.isArray(values.interests) ? values.interests : [],
+    p_style_preferences: Array.isArray(values.stylePreferences) ? values.stylePreferences : [],
+    p_preferred_contact_method: values.preferredContactMethod || '',
+    p_age_group: values.ageGroup || '',
+    p_gender: values.gender || '',
   })
 
   if (error) throw error
@@ -263,6 +270,32 @@ export async function saveActiveClientProject(userId, projectDraft, existingProj
   const { data, error } = await query.select('*').single()
   if (error) throw error
   return normalizeProject(data)
+}
+
+export async function toggleClientProjectShare(userId, projectId, isShareable) {
+  const { data, error } = await supabase
+    .from('client_projects')
+    .update({ is_shareable: isShareable })
+    .eq('id', projectId)
+    .eq('user_id', userId)
+    .select('id, public_share_id, is_shareable')
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function loadSharedClientProject(shareId) {
+  if (!shareId) return null
+  const { data, error } = await supabase.rpc('get_shared_client_project', { p_share_id: shareId })
+  if (error) throw error
+  if (!data || !data.project) return null
+
+  return {
+    project: normalizeProject(data.project),
+    account: data.account,
+    media: await withSignedMediaUrls(Array.isArray(data.media) ? data.media.filter(Boolean) : []),
+  }
 }
 
 export function projectDraftFromPendingBrief(pendingBrief, baseProject = null) {

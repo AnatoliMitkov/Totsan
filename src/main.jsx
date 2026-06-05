@@ -32,6 +32,7 @@ import Kitchens from './pages/Kitchens.jsx'
 import BedroomAndLiving from './pages/BedroomAndLiving.jsx'
 import Bathroom from './pages/Bathroom.jsx'
 import LightingAndTextiles from './pages/LightingAndTextiles.jsx'
+import SharedProject from './pages/SharedProject.jsx'
 function AppRoutes() {
   const location = useLocation()
 
@@ -74,6 +75,7 @@ function AppRoutes() {
           <Route path="/checkout/success" element={<Checkout />} />
           <Route path="/checkout/:type/:id" element={<Checkout />} />
           <Route path="/order/:orderId" element={<Order />} />
+          <Route path="/proekt/:shareId" element={<SharedProject />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

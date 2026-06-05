@@ -479,7 +479,12 @@ alter table public.accounts
   add column if not exists country text not null default 'BG',
   add column if not exists bio text,
   add column if not exists locale text not null default 'bg',
-  add column if not exists marketing_opt_in boolean not null default false;
+  add column if not exists marketing_opt_in boolean not null default false,
+  add column if not exists interests text[] not null default array[]::text[],
+  add column if not exists style_preferences text[] not null default array[]::text[],
+  add column if not exists preferred_contact_method text,
+  add column if not exists age_group text,
+  add column if not exists gender text;
 
 create or replace function public.update_own_account_profile(
   p_full_name text default null,
@@ -524,6 +529,128 @@ $$;
 revoke execute on function public.update_own_account_profile(text, text, text, text, text, text, text, text, boolean) from public, anon;
 grant execute on function public.update_own_account_profile(text, text, text, text, text, text, text, text, boolean) to authenticated;
 
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'accounts_preferred_contact_method_check'
+      and conrelid = 'public.accounts'::regclass
+  ) then
+    execute $constraint$
+    alter table public.accounts
+      add constraint accounts_preferred_contact_method_check
+      check (
+        preferred_contact_method is null
+        or preferred_contact_method in ('Чат', 'Телефон', 'Имейл', 'Нямам предпочитание')
+      ) not valid
+    $constraint$;
+  end if;
+end;
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'accounts_age_group_check'
+      and conrelid = 'public.accounts'::regclass
+  ) then
+    execute $constraint$
+    alter table public.accounts
+      add constraint accounts_age_group_check
+      check (
+        age_group is null
+        or age_group in ('18–24', '25–34', '35–44', '45–54', '55+', 'Предпочитам да не казвам')
+      ) not valid
+    $constraint$;
+  end if;
+end;
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'accounts_gender_check'
+      and conrelid = 'public.accounts'::regclass
+  ) then
+    execute $constraint$
+    alter table public.accounts
+      add constraint accounts_gender_check
+      check (
+        gender is null
+        or gender in ('Жена', 'Мъж', 'Друго', 'Предпочитам да не казвам')
+      ) not valid
+    $constraint$;
+  end if;
+end;
+$$;
+
+drop function if exists public.update_own_account_profile(
+  text, text, text, text, text, text, text, text, boolean, text[], text[], text, text, text
+);
+
+create or replace function public.update_own_account_profile(
+  p_full_name text,
+  p_display_name text,
+  p_phone text,
+  p_avatar_url text,
+  p_city text,
+  p_country text,
+  p_bio text,
+  p_locale text,
+  p_marketing_opt_in boolean,
+  p_interests text[],
+  p_style_preferences text[],
+  p_preferred_contact_method text,
+  p_age_group text,
+  p_gender text
+)
+returns public.accounts
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  updated_account public.accounts;
+begin
+  update public.accounts
+  set full_name = nullif(btrim(coalesce(p_full_name, '')), ''),
+      display_name = nullif(btrim(coalesce(p_display_name, p_full_name, '')), ''),
+      phone = nullif(btrim(coalesce(p_phone, '')), ''),
+      avatar_url = nullif(btrim(coalesce(p_avatar_url, '')), ''),
+      city = nullif(btrim(coalesce(p_city, '')), ''),
+      country = coalesce(nullif(upper(btrim(coalesce(p_country, ''))), ''), 'BG'),
+      bio = nullif(btrim(coalesce(p_bio, '')), ''),
+      locale = coalesce(nullif(lower(btrim(coalesce(p_locale, ''))), ''), 'bg'),
+      marketing_opt_in = coalesce(p_marketing_opt_in, false),
+      interests = coalesce(p_interests, array[]::text[]),
+      style_preferences = coalesce(p_style_preferences, array[]::text[]),
+      preferred_contact_method = nullif(btrim(coalesce(p_preferred_contact_method, '')), ''),
+      age_group = nullif(btrim(coalesce(p_age_group, '')), ''),
+      gender = nullif(btrim(coalesce(p_gender, '')), '')
+  where id = auth.uid()
+  returning * into updated_account;
+
+  if updated_account.id is null then
+    raise exception 'Account not found for current user.';
+  end if;
+
+  return updated_account;
+end;
+$$;
+
+revoke execute on function public.update_own_account_profile(
+  text, text, text, text, text, text, text, text, boolean, text[], text[], text, text, text
+) from public, anon;
+
+grant execute on function public.update_own_account_profile(
+  text, text, text, text, text, text, text, text, boolean, text[], text[], text, text, text
+) to authenticated;
+
 create table if not exists public.client_projects (
   id                 uuid primary key default gen_random_uuid(),
   user_id            uuid not null references auth.users(id) on delete cascade,
@@ -541,6 +668,8 @@ create table if not exists public.client_projects (
   idea_description   text,
   quiz_answers       jsonb not null default '{}'::jsonb,
   is_active          boolean not null default true,
+  public_share_id    uuid not null unique default gen_random_uuid(),
+  is_shareable       boolean not null default false,
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now()
 );
@@ -662,6 +791,38 @@ create policy "users can read own project media objects"
     bucket_id = 'project-media'
     and (storage.foldername(name))[1] = 'projects'
     and (storage.foldername(name))[2] = auth.uid()::text
+  );
+
+create or replace function public.is_shared_project_media_object(
+  p_bucket_id text,
+  p_name text
+)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.client_project_media m
+    join public.client_projects p on p.id = m.project_id
+    where m.bucket = p_bucket_id
+      and m.path = p_name
+      and p.is_shareable = true
+      and p.is_active = true
+  );
+$$;
+
+revoke execute on function public.is_shared_project_media_object(text, text) from public, anon, authenticated;
+grant execute on function public.is_shared_project_media_object(text, text) to anon, authenticated;
+
+drop policy if exists "public can read shared project media objects" on storage.objects;
+create policy "public can read shared project media objects"
+  on storage.objects for select
+  to anon, authenticated
+  using (
+    bucket_id = 'project-media'
+    and public.is_shared_project_media_object(bucket_id, name)
   );
 
 -- ============================================================================
@@ -1871,3 +2032,89 @@ create policy "participants can insert conversations"
   on public.conversations for insert
   to authenticated
   with check (auth.uid() in (client_id, partner_id));
+
+
+-- ============================================================================
+-- RPC: Вземане на споделен проект и публичните данни за клиента
+-- ============================================================================
+create or replace function public.get_shared_client_project(p_share_id uuid)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_project public.client_projects;
+  v_account public.accounts;
+  v_media json;
+begin
+  select * into v_project
+  from public.client_projects
+  where public_share_id = p_share_id
+    and is_shareable = true
+    and is_active = true
+  limit 1;
+
+  if v_project.id is null then
+    return null;
+  end if;
+
+  select * into v_account
+  from public.accounts
+  where id = v_project.user_id;
+
+  select json_agg(
+    json_build_object(
+      'id', m.id,
+      'project_id', m.project_id,
+      'bucket', m.bucket,
+      'path', m.path,
+      'public_url', m.public_url,
+      'kind', m.kind,
+      'caption', m.caption,
+      'order_index', m.order_index,
+      'created_at', m.created_at
+    )
+    order by m.order_index, m.created_at
+  ) into v_media
+  from public.client_project_media m
+  where m.project_id = v_project.id;
+
+  return json_build_object(
+    'project', json_build_object(
+      'id', v_project.id,
+      'title', v_project.title,
+      'property_type', v_project.property_type,
+      'area_sqm', v_project.area_sqm,
+      'rooms_count', v_project.rooms_count,
+      'address_city', v_project.address_city,
+      'address_region', v_project.address_region,
+      'current_layer_slug', v_project.current_layer_slug,
+      'desired_start_date', v_project.desired_start_date,
+      'budget_min', v_project.budget_min,
+      'budget_max', v_project.budget_max,
+      'budget_currency', v_project.budget_currency,
+      'idea_description', v_project.idea_description,
+      'quiz_answers', v_project.quiz_answers,
+      'is_active', v_project.is_active,
+      'public_share_id', v_project.public_share_id,
+      'is_shareable', v_project.is_shareable,
+      'created_at', v_project.created_at,
+      'updated_at', v_project.updated_at
+    ),
+    'account', json_build_object(
+      'full_name', v_account.full_name,
+      'display_name', v_account.display_name,
+      'avatar_url', v_account.avatar_url,
+      'city', v_account.city,
+      'bio', v_account.bio,
+      'interests', v_account.interests,
+      'style_preferences', v_account.style_preferences
+    ),
+    'media', coalesce(v_media, '[]'::json)
+  );
+end;
+$$;
+
+revoke execute on function public.get_shared_client_project(uuid) from public, anon, authenticated;
+grant execute on function public.get_shared_client_project(uuid) to anon, authenticated;

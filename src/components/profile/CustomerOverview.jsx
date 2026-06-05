@@ -1,16 +1,31 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { ArrowRight, Camera, Home, MessageCircle, Sparkles } from 'lucide-react'
+import { ArrowRight, Camera, Home, MessageCircle, Sparkles, Share2, Link as LinkIcon, CheckCircle2 } from 'lucide-react'
 import CompletenessBar from './CompletenessBar.jsx'
 import { LAYERS } from '../../data/layers.js'
 import { loadConversations } from '../../lib/chat.js'
 import { formatProjectBudget, formatProjectLocation, getProjectLayerLabel, getProjectProfileItems } from '../../lib/projects.js'
 
-export default function CustomerOverview({ account, project, media, completeness, isAdmin, onSelectTab }) {
+export default function CustomerOverview({ account, project, media, completeness, isAdmin, onSelectTab, onToggleShare }) {
   const activeLayer = LAYERS.find(layer => layer.slug === project?.currentLayerSlug) || LAYERS[0]
   const projectProfileItems = getProjectProfileItems(project, LAYERS)
   const nextChecks = completeness?.nextChecks || []
   const [conversationCount, setConversationCount] = useState(null)
+  const [copied, setCopied] = useState(false)
+
+  async function copyShareLink() {
+    if (!project?.publicShareId) return
+    const url = `${window.location.origin}/proekt/${project.publicShareId}`
+    await navigator.clipboard.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  async function handleToggleShare() {
+    if (onToggleShare) {
+      await onToggleShare(!project?.isShareable)
+    }
+  }
 
   useEffect(() => {
     if (!account?.id) return undefined
@@ -107,6 +122,25 @@ export default function CustomerOverview({ account, project, media, completeness
             )}
           </div>
           {isAdmin && <Link to="/admin" className="btn btn-ghost mt-5 w-full justify-center">Админ панел</Link>}
+        </div>
+
+        <div className="rounded-2xl border border-line bg-paper p-5">
+          <div className="flex items-center gap-2">
+            <Share2 size={18} className="text-accent" />
+            <div className="eyebrow">Сподели проекта</div>
+          </div>
+          <p className="mt-3 text-sm text-muted">Създай публичен линк към проекта, за да го изпратиш на приятели или специалисти.</p>
+          <div className="mt-4 space-y-3">
+            <button type="button" onClick={handleToggleShare} className="btn w-full justify-center bg-soft text-ink border-line hover:border-ink">
+              {project?.isShareable ? 'Изключи споделянето' : 'Включи споделянето'}
+            </button>
+            {project?.isShareable && project?.publicShareId && (
+              <button type="button" onClick={copyShareLink} className="btn btn-primary w-full justify-center">
+                {copied ? <CheckCircle2 size={18} /> : <LinkIcon size={18} />}
+                {copied ? 'Копирано!' : 'Копирай линка'}
+              </button>
+            )}
+          </div>
         </div>
       </aside>
     </div>

@@ -7,6 +7,7 @@ import { LAYERS } from '../data/layers.js'
 import CustomerHeader from '../components/profile/CustomerHeader.jsx'
 import CustomerOverview from '../components/profile/CustomerOverview.jsx'
 import CustomerPersonal from '../components/profile/CustomerPersonal.jsx'
+import CustomerPreferences from '../components/profile/CustomerPreferences.jsx'
 import CustomerProject from '../components/profile/CustomerProject.jsx'
 import CompletenessBar from '../components/profile/CompletenessBar.jsx'
 import PartnerProfileWorkspace from '../components/profile/PartnerProfileWorkspace.jsx'
@@ -197,6 +198,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
           {[
             ['overview', 'Преглед'],
             ['personal', 'Лични данни'],
+            ['preferences', 'Предпочитания'],
             ['project', 'Моят проект'],
             ['activity', 'Активност'],
           ].map(([tab, label]) => (
@@ -225,6 +227,17 @@ function CustomerProfile({ session, account, refreshAccount }) {
             completeness={completeness}
             isAdmin={isAdmin}
             onSelectTab={setActiveTab}
+            onToggleShare={async (isShareable) => {
+              if (!project?.id) return
+              try {
+                const { toggleClientProjectShare } = await import('../lib/projects.js')
+                const data = await toggleClientProjectShare(session.user.id, project.id, isShareable)
+                setProject(prev => ({ ...prev, isShareable: data.is_shareable, publicShareId: data.public_share_id }))
+              } catch (e) {
+                console.error(e)
+                alert('Грешка при споделяне на профила.')
+              }
+            }}
           />
         )}
 
@@ -234,6 +247,14 @@ function CustomerProfile({ session, account, refreshAccount }) {
             session={session}
             onSave={savePersonal}
             onUploadAvatar={uploadAvatar}
+          />
+        )}
+
+        {activeTab === 'preferences' && (
+          <CustomerPreferences
+            account={localAccount}
+            session={session}
+            onSave={savePersonal}
           />
         )}
 

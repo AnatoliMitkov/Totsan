@@ -31,7 +31,7 @@ export function useAccount() {
       }
       const { data, error } = await supabase
         .from('accounts')
-        .select('id, email, full_name, display_name, role, specialist_status, account_status, phone, avatar_url, city, country, bio, locale, marketing_opt_in, stripe_account_id, created_at')
+        .select('id, email, full_name, display_name, role, specialist_status, account_status, phone, avatar_url, city, country, bio, locale, marketing_opt_in, interests, style_preferences, preferred_contact_method, age_group, gender, stripe_account_id, created_at')
         .eq('id', currentSession.user.id)
         .maybeSingle()
       if (!active) return
@@ -74,7 +74,7 @@ export function useAccount() {
       if (data.session?.user) {
         const { data: row } = await supabase
           .from('accounts')
-          .select('id, email, full_name, display_name, role, specialist_status, account_status, phone, avatar_url, city, country, bio, locale, marketing_opt_in, stripe_account_id, created_at')
+          .select('id, email, full_name, display_name, role, specialist_status, account_status, phone, avatar_url, city, country, bio, locale, marketing_opt_in, interests, style_preferences, preferred_contact_method, age_group, gender, stripe_account_id, created_at')
           .eq('id', data.session.user.id)
           .maybeSingle()
         setAccount(row || null)
