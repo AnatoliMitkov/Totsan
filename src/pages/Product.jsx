@@ -1,18 +1,56 @@
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { productImageFor, SHOWCASE_IMAGES } from '../data/images.js'
-import ProfessionalCard from '../components/ProfessionalCard.jsx'
-import { slugify, useProfileDirectory } from '../lib/profiles.js'
+import { getProfileImage, getProfileImageStyle, slugify, useProfileDirectory } from '../lib/profiles.js'
 import { formatMoneyText } from '../lib/money.js'
+import {
+  buildProductPartnerRecommendations,
+  loadPublicMaterialCapabilitiesForProduct,
+} from '../lib/partner-materials.js'
+import { findStaticProductBySlug, normalizeProductItem } from '../lib/product-metadata.js'
 
 export default function Product() {
   const { state } = useLocation()
   const { slug } = useParams()
   const { catalog, layers } = useProfileDirectory()
-  const item = useMemo(() => state?.item || catalog.find(c => c.kind === 'product' && slugify(c.name) === slug), [catalog, state, slug])
+  const [capabilities, setCapabilities] = useState([])
 
-  if (!item) return <NotFound />
-  const layer = layers.find(l => l.slug === item.layer)
+  const item = useMemo(() => {
+    if (state?.item?.kind === 'product') return normalizeProductItem(state.item)
+    return findStaticProductBySlug(slug) || normalizeProductItem(catalog.find(c => c.kind === 'product' && (c.slug === slug || slugify(c.name) === slug)) || {})
+  }, [catalog, state, slug])
+
+  const hasProduct = Boolean(item?.name)
+  const layer = layers.find(l => l.slug === (item.layerSlug || item.layer))
+  const recommendations = useMemo(() => {
+    if (!hasProduct || !layer) return []
+    return buildProductPartnerRecommendations({
+      product: item,
+      capabilities,
+      fallbackProfessionals: layer.professionals || [],
+      limit: 3,
+    })
+  }, [capabilities, hasProduct, item, layer])
+
+  useEffect(() => {
+    if (!hasProduct) return undefined
+    let active = true
+    async function loadCapabilities() {
+      try {
+        const rows = await loadPublicMaterialCapabilitiesForProduct(item)
+        if (!active) return
+        setCapabilities(rows)
+      } catch {
+        if (!active) return
+        setCapabilities([])
+      }
+    }
+    loadCapabilities()
+    return () => { active = false }
+  }, [hasProduct, item])
+
+  if (!hasProduct || !layer) return <NotFound />
+  const layerSlug = item.layerSlug || item.layer
 
   return (
     <>
@@ -27,12 +65,12 @@ export default function Product() {
           <div className="lg:col-span-7 reveal">
             <div className="rounded-3xl overflow-hidden border border-line img-zoom-host">
               <div className="media-frame aspect-[4/3] no-shade">
-                <img src={productImageFor(item.name, item.layer)} alt={item.name} className="img-cover img-zoom" />
+                <img src={productImageFor(item.name, layerSlug)} alt={item.name} className="img-cover img-zoom" />
                 <span className="absolute top-4 left-4 text-xs px-2.5 py-1 rounded-full bg-paper/90 text-ink backdrop-blur">{item.tag}</span>
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3 mt-3">
-              {(SHOWCASE_IMAGES[item.layer] || []).slice(0,3).map((img,i) => (
+              {(SHOWCASE_IMAGES[layerSlug] || []).slice(0,3).map((img,i) => (
                 <div key={i} className="aspect-square rounded-xl overflow-hidden border border-line">
                   <img src={img} alt="" loading="lazy" className="img-cover" />
                 </div>
@@ -65,29 +103,66 @@ export default function Product() {
             <div className="mt-8 border-t border-line pt-6">
               <div className="eyebrow mb-3">За продукта</div>
               <p className="text-sm text-muted">
-                {item.name} е част от {item.sub.toLowerCase()} с маркер „{item.tag}“. Подбран е от екипа на Totsan заради съчетанието между качество, цена и наличност на пазара.
+                {item.name} е част от {item.categoryLabel || String(item.sub || 'продукт').toLowerCase()} с маркер „{item.tag}“. Подбран е от екипа на Totsan заради съчетанието между качество, цена и наличност на пазара.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="section !pt-0">
-        <div className="container-page">
-          <div className="eyebrow reveal">Майстори, които работят с този продукт</div>
-          <div className="mt-6 grid gap-5 md:grid-cols-3">
-            {layer.professionals.slice(0,3).map((p,i) => (
-              <ProfessionalCard
-                key={i}
-                to={`/profil/${p.slug || slugify(p.name)}`}
-                state={{ item: { kind: 'pro', slug: p.slug, layer: layer.slug, layerNumber: layer.number, layerTitle: layer.title, sub: p.tag, ...p } }}
-                person={p}
-              />
-            ))}
+      {recommendations.length > 0 && (
+        <section className="section !pt-0">
+          <div className="container-page">
+            <div className="eyebrow reveal">Специалисти за този тип материал</div>
+            <div className="mt-6 grid gap-5 md:grid-cols-3">
+              {recommendations.map((recommendation) => (
+                <ProductPartnerCard key={recommendation.person.id || recommendation.person.slug || recommendation.person.name} recommendation={recommendation} product={item} layer={layer} />
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
     </>
+  )
+}
+
+function ProductPartnerCard({ recommendation, product, layer }) {
+  const { person, relationshipLabel, relationLabels, note } = recommendation
+  const profilePath = `/profil/${person.slug || slugify(person.name)}`
+  const state = { item: { kind: 'pro', slug: person.slug, layer: layer.slug, layerNumber: layer.number, layerTitle: layer.title, sub: person.tag, ...person } }
+
+  return (
+    <article className="card reveal flex h-full flex-col bg-paper p-5">
+      <div className="flex items-start gap-4">
+        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border border-line bg-soft">
+          <img src={getProfileImage(person)} alt={person.name} className="img-cover" loading="lazy" decoding="async" style={getProfileImageStyle(person)} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="rounded-full bg-soft px-3 py-1 text-xs text-muted">{relationshipLabel}</div>
+          <h2 className="mt-3 font-display text-2xl leading-tight text-ink">{person.name}</h2>
+          <p className="mt-1 text-sm text-muted">{person.tag}{person.city ? ` · ${person.city}` : ''}</p>
+        </div>
+      </div>
+
+      {relationLabels.length > 0 && (
+        <div className="mt-5 flex flex-wrap gap-2">
+          {relationLabels.slice(0, 3).map(label => <span key={label} className="rounded-full border border-line bg-soft px-3 py-1 text-xs text-muted">{label}</span>)}
+        </div>
+      )}
+
+      {note && <p className="mt-4 line-clamp-3 text-sm text-muted">{note}</p>}
+
+      <div className="mt-auto flex flex-wrap gap-2 pt-5">
+        <Link
+          to="/contact"
+          state={{ subject: `Запитване към ${person.name} за ${product.name}` }}
+          className="btn btn-primary flex-1 justify-center"
+        >
+          Запитай специалист
+        </Link>
+        <Link to={profilePath} state={state} className="btn btn-ghost flex-1 justify-center">Виж профила</Link>
+      </div>
+    </article>
   )
 }
 

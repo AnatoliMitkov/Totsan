@@ -423,6 +423,17 @@ function ProEditor({ session, account }) {
     )
   }
 
+  if (!profile?.id) {
+    return (
+      <section className="section">
+        <div className="container-page max-w-xl">
+          <h1 className="h-section">My Profile</h1>
+          <p className="text-muted mt-3">Loading your partner profile...</p>
+        </div>
+      </section>
+    )
+  }
+
   return <PartnerProfileWorkspace profile={profile} userId={userId} account={account} session={session} onSaved={load} />
 }
 

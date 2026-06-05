@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { BriefcaseBusiness, CheckCircle2, MapPin, PackageSearch, Search, SlidersHorizontal, UserRound, X } from 'lucide-react'
+import { ArrowRight, BriefcaseBusiness, CheckCircle2, MapPin, PackageSearch, Search, SlidersHorizontal, UserRound, X } from 'lucide-react'
 import { useProfileDirectory } from '../lib/profiles.js'
 import { loadPublicPartnerServices, packagePriceLabel } from '../lib/partner-services.js'
 import { productImageFor } from '../data/images.js'
+import { productSlugFor } from '../lib/product-metadata.js'
 import FallbackImage from '../components/FallbackImage.jsx'
 import ProfessionalCard from '../components/ProfessionalCard.jsx'
 import { formatMoneyText } from '../lib/money.js'
@@ -22,6 +23,12 @@ const KIND_COPY = {
   pro: { label: 'Специалисти', resultLabel: 'специалисти' },
   service: { label: 'Услуги', resultLabel: 'услуги' },
   product: { label: 'Продукти', resultLabel: 'продукти' },
+}
+
+const SECTION_LIMITS = {
+  pro: 4,
+  service: 3,
+  product: 6,
 }
 
 function normalizeKind(value) {
@@ -136,21 +143,25 @@ export default function Catalog() {
     }
   }, [availableCities, city])
 
+  const baseFiltered = useMemo(() => all.filter(item => itemMatchesFilters(item, { layer, city, query: q })), [all, city, layer, q])
+
+  const professionals = useMemo(() => baseFiltered.filter(item => item.kind === 'pro'), [baseFiltered])
+  const serviceResults = useMemo(() => baseFiltered.filter(item => item.kind === 'service'), [baseFiltered])
+  const productResults = useMemo(() => baseFiltered.filter(item => item.kind === 'product'), [baseFiltered])
+
   const kindCounts = useMemo(() => {
     const counts = { all: 0, pro: 0, service: 0, product: 0 }
-    all.forEach((item) => {
-      if (!itemMatchesFilters(item, { layer, city, query: q })) return
+    baseFiltered.forEach((item) => {
       counts.all += 1
       if (counts[item.kind] !== undefined) counts[item.kind] += 1
     })
     return counts
-  }, [all, city, layer, q])
+  }, [baseFiltered])
 
-  const filtered = useMemo(() => all.filter((item) => {
-    if (!itemMatchesFilters(item, { layer, city, query: q })) return false
-    if (kind !== 'all' && item.kind !== kind) return false
-    return true
-  }), [all, city, kind, layer, q])
+  const filtered = useMemo(() => {
+    if (kind === 'all') return baseFiltered
+    return baseFiltered.filter(item => item.kind === kind)
+  }, [baseFiltered, kind])
 
   const selectedKind = KIND_COPY[kind] || KIND_COPY.all
   const hasActiveFilters = q.trim() || layer !== 'all' || kind !== 'all' || city !== 'all'
@@ -253,17 +264,20 @@ export default function Catalog() {
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm text-muted reveal">
             <span>{filtered.length} {selectedKind.resultLabel}</span>
-            <span>{kind === 'all' ? 'Профил, пакет или продукт според нуждата' : (KIND_TABS.find(tab => tab.value === kind)?.helper || '')}</span>
+            <span>{kind === 'all' ? 'Разделено по типове за по-лесен избор' : (KIND_TABS.find(tab => tab.value === kind)?.helper || '')}</span>
           </div>
 
-          <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((item) => (
-              <CatalogCard key={`${item.kind}-${item.slug || item.name}`} it={item} />
-            ))}
-            {filtered.length === 0 && (
-              <EmptyCatalogState resetFilters={resetFilters} />
-            )}
-          </div>
+          {kind === 'all' ? (
+            <MarketplaceSections
+              professionals={professionals}
+              services={serviceResults}
+              products={productResults}
+              onSelectKind={setKind}
+              resetFilters={resetFilters}
+            />
+          ) : (
+            <CatalogGrid items={filtered} resetFilters={resetFilters} />
+          )}
         </div>
       </section>
     </>
@@ -307,33 +321,132 @@ function EmptyCatalogState({ resetFilters }) {
   )
 }
 
+function MarketplaceSections({ professionals, services, products, onSelectKind, resetFilters }) {
+  const hasAnyResults = professionals.length || services.length || products.length
+  if (!hasAnyResults) {
+    return (
+      <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <EmptyCatalogState resetFilters={resetFilters} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-8 space-y-12">
+      {professionals.length > 0 && (
+        <MarketplaceSection
+          eyebrow="Профили"
+          title="Избрани специалисти"
+          count={`${professionals.length} специалисти`}
+          actionLabel="Виж всички специалисти"
+          onAction={() => onSelectKind('pro')}
+        >
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            {professionals.slice(0, SECTION_LIMITS.pro).map((item) => (
+              <CatalogCard key={`featured-${item.kind}-${item.slug || item.name}`} it={item} />
+            ))}
+          </div>
+        </MarketplaceSection>
+      )}
+
+      {services.length > 0 && (
+        <MarketplaceSection
+          eyebrow="Пакети"
+          title="Услуги и пакети"
+          count={`${services.length} услуги`}
+          actionLabel="Виж всички услуги"
+          onAction={() => onSelectKind('service')}
+        >
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {services.slice(0, SECTION_LIMITS.service).map((item) => (
+              <CatalogCard key={`featured-${item.kind}-${item.slug || item.name}`} it={item} />
+            ))}
+          </div>
+        </MarketplaceSection>
+      )}
+
+      {products.length > 0 && (
+        <MarketplaceSection
+          eyebrow="Материали"
+          title="Продукти и материали"
+          count={`${products.length} продукти`}
+          actionLabel="Виж всички продукти"
+          onAction={() => onSelectKind('product')}
+        >
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {products.slice(0, SECTION_LIMITS.product).map((item) => (
+              <CatalogCard key={`featured-${item.kind}-${item.slug || item.name}`} it={item} />
+            ))}
+          </div>
+        </MarketplaceSection>
+      )}
+    </div>
+  )
+}
+
+function MarketplaceSection({ eyebrow, title, count, actionLabel, onAction, children }) {
+  return (
+    <section className="reveal">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b border-line pb-4">
+        <div>
+          <div className="eyebrow">{eyebrow}</div>
+          <h2 className="font-display text-3xl text-ink md:text-4xl">{title}</h2>
+          <p className="mt-2 text-sm text-muted">{count}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onAction}
+          className="inline-flex items-center gap-2 rounded-full border border-line bg-paper px-4 py-2 text-sm font-medium text-ink transition hover:border-ink"
+        >
+          {actionLabel}
+          <ArrowRight size={16} />
+        </button>
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function CatalogGrid({ items, resetFilters }) {
+  return (
+    <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+      {items.map((item) => (
+        <CatalogCard key={`${item.kind}-${item.slug || item.name}`} it={item} />
+      ))}
+      {items.length === 0 && (
+        <EmptyCatalogState resetFilters={resetFilters} />
+      )}
+    </div>
+  )
+}
+
 function CatalogCard({ it }) {
   const isPro = it.kind === 'pro'
   const isService = it.kind === 'service'
-  const to = isPro ? `/profil/${it.slug || slugify(it.name)}` : `/produkt/${slugify(it.name)}`
+  const to = isPro ? `/profil/${it.slug || slugify(it.name)}` : `/produkt/${it.slug || productSlugFor(it.name)}`
   if (isService) return <ServiceCatalogCard it={it} />
   const img = productImageFor(it.name, it.layer)
   if (isPro) {
     return (
       <ProfessionalCard
-        person={{ slug: it.slug, name: it.name, tag: it.sub, city: it.city, rating: it.rating, projects: it.projects, since: it.since, bio: it.bio, imageUrl: it.imageUrl, imageZoom: it.imageZoom, imageX: it.imageX, imageY: it.imageY }}
+        person={{ slug: it.slug, layer: it.layer, layerSlug: it.layer, layerTitle: it.layerTitle, name: it.name, tag: it.sub, city: it.city, rating: it.rating, projects: it.projects, since: it.since, bio: it.bio, responseTimeHours: it.responseTimeHours, imageUrl: it.imageUrl, imageZoom: it.imageZoom, imageX: it.imageX, imageY: it.imageY }}
         to={to}
         state={{ item: it }}
         layerLabel={`Слой ${it.layerNumber} · ${it.layerTitle}`}
-        cta="Виж профил"
+        cta="Виж профила"
       />
     )
   }
 
   return (
-    <Link to={to} state={{ item: it }} className="card reveal img-zoom-host block overflow-hidden bg-paper p-0">
+    <Link to={to} state={{ item: it }} className="card reveal img-zoom-host flex h-full min-h-[28rem] flex-col overflow-hidden bg-paper p-0">
       <div className="media-frame aspect-[16/10]">
         <img src={img} alt={it.name} loading="lazy" decoding="async" className="img-cover img-zoom" />
         <span className="absolute top-3 right-3 rounded-full bg-ink/90 px-2.5 py-1 text-xs text-paper backdrop-blur">
           Продукт
         </span>
       </div>
-      <div className="p-6">
+      <div className="flex flex-1 flex-col p-6">
         <span className="text-xs text-muted">Слой {it.layerNumber} · {it.layerTitle}</span>
         <div className="mt-2 font-display text-xl text-ink">{it.name}</div>
         <div className="text-sm text-muted">{it.sub}{it.city ? ` · ${it.city}` : ''}</div>
@@ -341,7 +454,9 @@ function CatalogCard({ it }) {
           <span className="font-medium">{formatMoneyText(it.price)}</span>
           <span className="truncate text-muted">{it.tag}</span>
         </div>
-        <span className="btn btn-ghost mt-5 w-full justify-center">Виж продукт</span>
+        <div className="mt-auto pt-5">
+          <span className="btn btn-ghost w-full justify-center">Виж продукт</span>
+        </div>
       </div>
     </Link>
   )
@@ -351,14 +466,14 @@ function ServiceCatalogCard({ it }) {
   const service = it.service
   const coverCandidates = getPartnerServiceCoverCandidates(service, service.profile)
   return (
-    <Link to={`/uslugi/${service.slug}`} className="card reveal img-zoom-host block overflow-hidden bg-paper p-0">
+    <Link to={`/uslugi/${service.slug}`} className="card reveal img-zoom-host flex h-full min-h-[28rem] flex-col overflow-hidden bg-paper p-0">
       <div className="media-frame aspect-[16/10] bg-soft">
         <FallbackImage sources={coverCandidates} alt={service.title} loading="lazy" decoding="async" className="img-cover img-zoom" />
         <span className="absolute top-3 right-3 rounded-full bg-ink/90 px-2.5 py-1 text-xs text-paper backdrop-blur">
           Услуга
         </span>
       </div>
-      <div className="p-6">
+      <div className="flex flex-1 flex-col p-6">
         <span className="text-xs text-muted">Слой {it.layerNumber} · {it.layerTitle}</span>
         <div className="mt-2 font-display text-xl text-ink">{service.title}</div>
         <div className="text-sm text-muted">{service.subtitle || service.profile?.name}</div>
@@ -369,7 +484,9 @@ function ServiceCatalogCard({ it }) {
         <div className="mt-3 flex items-center gap-1 text-xs text-muted">
           <MapPin size={14} /> {it.city || it.deliveryAreas?.[0] || 'По запитване'}
         </div>
-        <span className="btn btn-ghost mt-5 w-full justify-center">Виж пакет</span>
+        <div className="mt-auto pt-5">
+          <span className="btn btn-ghost w-full justify-center">Виж пакет</span>
+        </div>
       </div>
     </Link>
   )
