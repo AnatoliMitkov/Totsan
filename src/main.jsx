@@ -40,6 +40,7 @@ import { signOutAndRedirect } from './lib/account.js'
 import { loadMfaStatus } from './lib/mfa.js'
 
 let mfaNextPath = ''
+const GA_MEASUREMENT_ID = 'G-39RQFR7N0G'
 
 function normalizeNextPath(value = '') {
   const raw = String(value || '').trim()
@@ -182,6 +183,23 @@ function MfaAppGate({ children }) {
 
 function AppRoutes() {
   const location = useLocation()
+  const hasMountedRef = useRef(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.gtag !== 'function') return
+
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true
+      return
+    }
+
+    const pagePath = `${location.pathname}${location.search}${location.hash}`
+    window.gtag('config', GA_MEASUREMENT_ID, {
+      page_path: pagePath,
+      page_location: window.location.href,
+      page_title: document.title,
+    })
+  }, [location.pathname, location.search, location.hash])
 
   return (
     <MfaAppGate>
