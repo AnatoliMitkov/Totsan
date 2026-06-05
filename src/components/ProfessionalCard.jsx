@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom'
+import FallbackImage from './FallbackImage.jsx'
 import { LAYER_HEROS } from '../data/images.js'
-import { getProfileImage, getProfileImageStyle } from '../lib/profiles.js'
+import { getProfileImage, getProfileImageCandidates, getProfileImageStyle } from '../lib/profiles.js'
 
 export default function ProfessionalCard({ person, to, state, layerLabel, cta = 'Виж профила' }) {
   const profileImage = person?.imageUrl || person?.image_url || ''
   const layerSlug = person?.layer || person?.layerSlug || person?.layer_slug || ''
   const coverUrl = person?.coverUrl || person?.portfolioCoverUrl || profileImage || LAYER_HEROS[layerSlug] || getProfileImage(person)
-  const avatarUrl = getProfileImage(person)
   const responseLabel = formatResponseTime(person?.responseTimeHours ?? person?.response_time_hours)
   const hasProjects = Number.isFinite(Number(person?.projects))
   const hasRating = Number.isFinite(Number(person?.rating))
@@ -38,7 +38,7 @@ export default function ProfessionalCard({ person, to, state, layerLabel, cta = 
       <div className="flex flex-1 flex-col p-6 pt-0">
         <div className="-mt-8 flex items-end justify-between gap-4">
           <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border-4 border-paper bg-soft shadow-sm">
-            <img src={avatarUrl} alt={person.name} loading="lazy" decoding="async" className="img-cover" style={getProfileImageStyle(person)} />
+            <FallbackImage sources={getProfileImageCandidates(person)} alt={person.name} loading="lazy" decoding="async" className="img-cover" style={getProfileImageStyle(person)} />
           </div>
           {person.city && (
             <span className="mb-1 max-w-[60%] truncate rounded-full border border-line bg-paper px-3 py-1 text-xs text-muted">

@@ -4,8 +4,39 @@ import { ArrowRight, BarChart3, ClipboardList, CreditCard, FileClock, FolderKanb
 import { brand, supabase } from '../lib/supabase.js'
 import { HERO_COLLAGE, HOME_PROJECTS } from '../data/images.js'
 import { getAccountDisplayName, useAccount } from '../lib/account.js'
+import { PasskeySignInButton } from '../components/auth/PasskeyManager.jsx'
+import { isPasskeyVerifiedSession, clearPasskeyVerifiedSession } from '../lib/passkeys.js'
 
 const INPUT_CLASS = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
+const PRODUCTION_APP_ORIGIN = 'https://totsan.com'
+
+function normalizeOrigin(value = '') {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+
+  try {
+    return new URL(raw).origin
+  } catch {
+    return ''
+  }
+}
+
+function isLocalOrigin(origin = '') {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)
+}
+
+function getAuthRedirectOrigin() {
+  if (typeof window === 'undefined') return PRODUCTION_APP_ORIGIN
+
+  const currentOrigin = window.location.origin
+  if (isLocalOrigin(currentOrigin)) return currentOrigin
+
+  const configuredOrigin = normalizeOrigin(import.meta.env.VITE_APP_URL || import.meta.env.VITE_SITE_URL || import.meta.env.VITE_PUBLIC_APP_URL)
+  if (configuredOrigin) return configuredOrigin
+
+  if (import.meta.env.DEV) return currentOrigin
+  return currentOrigin
+}
 
 const STATUS_LABELS = {
   new: 'Ново',
@@ -38,13 +69,20 @@ const ADMIN_SECTIONS = [
 ]
 
 export default function Admin() {
-  const { session, account, loading } = useAccount()
+  const { session, account, loading, mfaRequired } = useAccount()
   const location = useLocation()
+  const [passkeyVerified, setPasskeyVerified] = useState(false)
+  const sessionPasskeyVerified = isPasskeyVerifiedSession(session?.user?.id)
 
-  if (loading) return <div className="flex h-screen items-center justify-center bg-soft"><div className="text-muted">Зареждане…</div></div>
+  useEffect(() => {
+    setPasskeyVerified(sessionPasskeyVerified)
+  }, [session?.user?.id, session?.user?.last_sign_in_at, sessionPasskeyVerified])
+
+  if (loading) return <div className="flex h-screen items-center justify-center bg-soft"><div className="text-muted">Проверяваме достъпа…</div></div>
   if (!session) return <LoginPanel />
 
   if (location.pathname === '/login') {
+    if (mfaRequired) return null
     return <Navigate to={resolvePostLoginTarget(location, account)} replace />
   }
 
@@ -81,6 +119,14 @@ function normalizeNextPath(value = '') {
   return raw
 }
 
+async function signOutToHome(userId = '') {
+  clearPasskeyVerifiedSession(userId)
+  await supabase.auth.signOut()
+  if (typeof window !== 'undefined') {
+    window.location.assign('/')
+  }
+}
+
 function AdminShell({ children, session, account }) {
   const title = 'Админ контролен панел.'
   const subtitle = `Добре дошъл обратно, ${getAccountDisplayName(account, session, 'admin')}.`
@@ -99,7 +145,12 @@ function AdminShell({ children, session, account }) {
             <h1 className="h-section mt-2 text-[clamp(2rem,1.8rem+1vw,3rem)]">{title}</h1>
             <p className="mt-3 max-w-2xl text-sm text-muted">{subtitle}</p>
           </div>
-          <button className="btn btn-ghost self-start md:self-auto" onClick={() => supabase.auth.signOut()}>Изход</button>
+          <button
+            className="btn btn-ghost self-start md:self-auto transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
+            onClick={() => signOutToHome(session?.user?.id)}
+          >
+            Изход
+          </button>
         </div>
         {children}
       </div>
@@ -188,13 +239,23 @@ function LoginPanel() {
   const location = useLocation()
   const params = new URLSearchParams(location.search)
   const isSignup = params.get('signup') === 'true'
+  const isResetRequested = params.get('reset') === 'true'
   const requestedSignupRole = params.get('role') === 'pro' ? 'pro' : 'customer'
   const nextPath = normalizeNextPath(params.get('next') || '')
   const [isLogin, setIsLogin] = useState(!isSignup)
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false)
+  const actionButtonClass = 'btn btn-primary w-full justify-center !py-3.5 text-base mt-2 transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20 disabled:opacity-50'
+  const subtleButtonClass = 'font-medium text-accent transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 rounded-full'
 
   useEffect(() => {
     setIsLogin(!isSignup)
   }, [isSignup])
+
+  useEffect(() => {
+    if (!isResetRequested) return
+    setIsLogin(true)
+    setIsRecoveryMode(true)
+  }, [isResetRequested])
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -224,11 +285,45 @@ function LoginPanel() {
     if (isSignup) setSignupRole(requestedSignupRole)
   }, [isSignup, requestedSignupRole])
 
+  useEffect(() => {
+    function syncRecoveryState() {
+      if (typeof window === 'undefined') return
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+      const isRecovery = hash.get('type') === 'recovery'
+      setIsRecoveryMode(Boolean(isRecovery || isResetRequested))
+      if (isRecovery) setIsLogin(true)
+    }
+
+    syncRecoveryState()
+
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsLogin(true)
+        setIsRecoveryMode(true)
+        setStatus('idle')
+        setMessage('')
+      }
+    })
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('hashchange', syncRecoveryState)
+    }
+
+    return () => {
+      data.subscription.unsubscribe()
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('hashchange', syncRecoveryState)
+      }
+    }
+  }, [isResetRequested])
+
   async function signInWithProvider(provider) {
+    if (isRecoveryMode) return
+
     if (!isLogin && signupRole === 'pro') {
       setStatus('error')
       setPendingAction('')
-      setMessage('За Pro кандидатура използвай регистрация с имейл и парола, за да запазим ролята и данните за специалист.')
+      setMessage('За specialist профил използвай регистрация с имейл и парола.')
       return
     }
 
@@ -236,7 +331,7 @@ function LoginPanel() {
     setPendingAction(provider)
     setMessage('')
 
-    const loginRedirect = new URL('/login', window.location.origin)
+    const loginRedirect = new URL('/login', getAuthRedirectOrigin())
     if (nextPath) loginRedirect.searchParams.set('next', nextPath)
     const options = { redirectTo: loginRedirect.toString() }
 
@@ -257,8 +352,79 @@ function LoginPanel() {
     setMessage('Пренасочваме към Google…')
   }
 
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      setStatus('error')
+      setPendingAction('')
+      setMessage('Въведи имейл.')
+      return
+    }
+
+    setStatus('sending')
+    setPendingAction('reset')
+    setMessage('')
+
+    const resetRedirect = new URL('/login', getAuthRedirectOrigin())
+    resetRedirect.searchParams.set('reset', 'true')
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: resetRedirect.toString(),
+    })
+
+    if (error) {
+      setStatus('error')
+      setPendingAction('')
+      setMessage(error.message)
+      return
+    }
+
+    setStatus('sent')
+    setPendingAction('')
+    setMessage('Изпратихме имейл за смяна на парола.')
+  }
+
   async function submit(e) {
     e.preventDefault()
+
+    if (isRecoveryMode) {
+      if (!pwdValid) {
+        setStatus('error')
+        setPendingAction('')
+        setMessage('Използвай по-сигурна парола.')
+        return
+      }
+
+      if (password !== confirmPassword) {
+        setStatus('error')
+        setPendingAction('')
+        setMessage('Паролите не съвпадат.')
+        return
+      }
+
+      setStatus('sending')
+      setPendingAction('password')
+      setMessage('')
+
+      const { error } = await supabase.auth.updateUser({ password })
+
+      if (error) {
+        setStatus('error')
+        setPendingAction('')
+        setMessage(error.message)
+        return
+      }
+
+      setStatus('sent')
+      setPendingAction('')
+      setMessage('Паролата е сменена.')
+      setIsRecoveryMode(false)
+      setPassword('')
+      setConfirmPassword('')
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', nextPath ? `/login?next=${encodeURIComponent(nextPath)}` : '/login')
+      }
+      return
+    }
 
     if (isLogin) {
       if (!email.trim() || !password.trim()) {
@@ -269,22 +435,22 @@ function LoginPanel() {
     } else {
       if (!fullName.trim() || !displayName.trim()) {
         setStatus('error')
-        setMessage('Моля, попълнете и двете имена.')
+        setMessage('Попълни и двете имена.')
         return
       }
       if (!email.trim()) {
         setStatus('error')
-        setMessage('Моля, въведете имейл адрес.')
+        setMessage('Въведи имейл.')
         return
       }
       if (!pwdValid) {
         setStatus('error')
-        setMessage('Моля, покрийте всички изисквания за паролата.')
+        setMessage('Покрий изискванията за парола.')
         return
       }
       if (password !== confirmPassword) {
         setStatus('error')
-        setMessage('Паролите не съвпадат. Опитайте отново.')
+        setMessage('Паролите не съвпадат.')
         return
       }
     }
@@ -327,31 +493,31 @@ function LoginPanel() {
       isLogin
         ? 'Входът е успешен.'
         : signupRole === 'pro'
-          ? 'Регистрацията е приета. Ако е нужно потвърждение на имейл, провери пощата си. След вход отивай в „Моят профил“.'
-          : 'Регистрацията е успешна!'
+          ? 'Регистрацията е приета. Провери имейла си, ако е нужно потвърждение.'
+          : 'Регистрацията е успешна.'
     )
   }
 
   return (
     <div className="grid h-full overflow-hidden lg:grid-cols-2">
-      <div className={`flex flex-col px-6 sm:px-12 lg:px-20 xl:px-24 ${isLogin ? 'justify-center overflow-y-auto py-8 lg:py-10' : 'justify-start overflow-y-auto py-5 lg:py-6'}`}>
+      <div className={`flex flex-col px-6 sm:px-12 lg:px-20 xl:px-24 ${(isLogin || isRecoveryMode) ? 'justify-center overflow-y-auto py-8 lg:py-10' : 'justify-start overflow-y-auto py-5 lg:py-6'}`}>
         <div className="mx-auto w-full max-w-[400px]">
           <h2 className="font-display text-[clamp(2.5rem,2rem+2vw,3.5rem)] leading-none text-ink">
-            {isLogin ? 'Добре дошли' : 'Започни сега'}
+            {isRecoveryMode ? 'Нова парола' : isLogin ? 'Добре дошли' : 'Започни сега'}
           </h2>
           <p className="mt-3 text-sm text-muted">
-            {isLogin ? 'Влез с имейл и парола или продължи с Google.' : 'Създай профил с имейл и парола или продължи с Google.'}
+            {isRecoveryMode ? 'Въведи нова парола.' : isLogin ? 'Влез с имейл и парола или продължи с Google.' : 'Създай профил с имейл и парола или продължи с Google.'}
           </p>
 
-          <form onSubmit={submit} className={`${isLogin ? 'mt-10 space-y-5' : 'mt-7 space-y-4'}`}>
-            {!isLogin && (
+          <form onSubmit={submit} className={`${(isLogin || isRecoveryMode) ? 'mt-10 space-y-5' : 'mt-7 space-y-4'}`}>
+            {!isLogin && !isRecoveryMode && (
               <div>
                 <div className="text-sm font-medium text-ink mb-2">Аз съм</div>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setSignupRole('customer')}
-                    className={`rounded-2xl border px-4 py-3 text-sm transition ${signupRole === 'customer' ? 'border-ink bg-soft text-ink' : 'border-line text-muted hover:border-ink/40'}`}
+                    className={`rounded-2xl border px-4 py-3 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 active:scale-[0.99] ${signupRole === 'customer' ? 'border-ink bg-soft text-ink' : 'border-line text-muted hover:border-ink/40'}`}
                   >
                     <div className="font-medium">Клиент</div>
                     <div className="text-xs text-muted mt-0.5">Търся специалисти</div>
@@ -359,7 +525,7 @@ function LoginPanel() {
                   <button
                     type="button"
                     onClick={() => setSignupRole('pro')}
-                    className={`rounded-2xl border px-4 py-3 text-sm transition ${signupRole === 'pro' ? 'border-ink bg-soft text-ink' : 'border-line text-muted hover:border-ink/40'}`}
+                    className={`rounded-2xl border px-4 py-3 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 active:scale-[0.99] ${signupRole === 'pro' ? 'border-ink bg-soft text-ink' : 'border-line text-muted hover:border-ink/40'}`}
                   >
                     <div className="font-medium">Специалист</div>
                     <div className="text-xs text-muted mt-0.5">Предлагам услуги</div>
@@ -368,7 +534,7 @@ function LoginPanel() {
               </div>
             )}
 
-            {!isLogin && (
+            {!isLogin && !isRecoveryMode && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm font-medium text-ink">
                   Име и фамилия
@@ -393,8 +559,9 @@ function LoginPanel() {
               </div>
             )}
             
+            {!isRecoveryMode && (
             <label className="block text-sm font-medium text-ink">
-              Имейл адрес
+              Имейл
               <input
                 value={email}
                 onChange={e => setEmail(e.target.value)}
@@ -404,19 +571,20 @@ function LoginPanel() {
                 className={INPUT_CLASS}
               />
             </label>
+            )}
 
             <label className="block text-sm font-medium text-ink">
               <div className="flex justify-between">
                 <span>Парола</span>
-                {isLogin && <button type="button" className="text-accent hover:underline">Забравена парола?</button>}
+                {isLogin && !isRecoveryMode && <button type="button" onClick={handleForgotPassword} className={subtleButtonClass}>Забравена парола?</button>}
               </div>
               <div className="relative mt-2">
                 <input
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   type={showPassword ? 'text' : 'password'}
-                  autoComplete={isLogin ? 'current-password' : 'new-password'}
-                  placeholder="••••••••"
+                  autoComplete={isRecoveryMode ? 'new-password' : isLogin ? 'current-password' : 'new-password'}
+                  placeholder="Въведи парола"
                   className={`${INPUT_CLASS} mt-0 pr-12`}
                 />
                 <button
@@ -434,18 +602,18 @@ function LoginPanel() {
               </div>
             </label>
 
-            {!isLogin && password && (
+            {!isLogin && !isRecoveryMode && password && (
               <div className="text-xs space-y-1.5 mt-2">
                 <div className="text-muted mb-2">Изисквания за паролата:</div>
                 <RuleItem isValid={pwdRules.length} text="Минимум 8 знака" />
                 <RuleItem isValid={pwdRules.uppercase} text="Поне една главна буква" />
                 <RuleItem isValid={pwdRules.lowercase} text="Поне една малка буква" />
                 <RuleItem isValid={pwdRules.number} text="Поне едно число" />
-                <RuleItem isValid={pwdRules.special} text="Специален символ (напр. !@#$%^&*)" />
+                <RuleItem isValid={pwdRules.special} text="Специален символ" />
               </div>
             )}
 
-            {!isLogin && (
+            {(!isLogin || isRecoveryMode) && (
               <label className="block text-sm font-medium text-ink mt-4">
                 Потвърди паролата
                 <div className="relative mt-2">
@@ -454,13 +622,13 @@ function LoginPanel() {
                     onChange={e => setConfirmPassword(e.target.value)}
                     type={showConfirmPassword ? 'text' : 'password'}
                     autoComplete="new-password"
-                    placeholder="••••••••"
+                    placeholder="Въведи парола"
                     className={`${INPUT_CLASS} mt-0 pr-12`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(value => !value)}
-                    aria-label={showConfirmPassword ? 'Скрий потвърждението за паролата' : 'Покажи потвърждението за паролата'}
+                    aria-label={showConfirmPassword ? 'Скрий потвърждението' : 'Покажи потвърждението'}
                     aria-pressed={showConfirmPassword}
                     className="group absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted transition-all duration-300 hover:scale-110 hover:bg-soft hover:text-accent active:scale-95 active:rotate-6"
                   >
@@ -473,10 +641,10 @@ function LoginPanel() {
               </label>
             )}
 
-            {!isLogin && signupRole === 'pro' && (
+            {!isLogin && !isRecoveryMode && signupRole === 'pro' && (
               <div className="grid gap-3">
                 <label className="block text-sm font-medium text-ink">
-                  Телефон (опционално)
+                  Телефон (по желание)
                   <input
                     value={proPhone}
                     onChange={e => setProPhone(e.target.value)}
@@ -498,7 +666,7 @@ function LoginPanel() {
               </div>
             )}
 
-            {isLogin ? (
+            {isLogin && !isRecoveryMode && (
               <div className="rounded-2xl border border-line bg-soft px-3 py-2.5">
                 <button
                   type="button"
@@ -513,15 +681,15 @@ function LoginPanel() {
                   </span>
                 </button>
               </div>
-            ) : (
+            )}
+            {!isLogin && !isRecoveryMode && (
               <label className="flex items-center gap-2 text-sm text-muted">
                 <input type="checkbox" required className="rounded border-line text-accent focus:ring-accent" />
                 Съгласявам се с общите условия и политиката за поверителност
               </label>
             )}
-
-            <button disabled={status === 'sending'} className="btn btn-primary w-full justify-center !py-3.5 text-base mt-2 disabled:opacity-50">
-              {status === 'sending' ? 'Обработка…' : isLogin ? 'Вход' : 'Регистрация'}
+            <button disabled={status === 'sending'} className={actionButtonClass}>
+              {status === 'sending' ? 'Обработка…' : isRecoveryMode ? 'Запази' : isLogin ? 'Вход' : 'Регистрация'}
             </button>
           </form>
 
@@ -531,34 +699,40 @@ function LoginPanel() {
             </div>
           )}
 
-          <div className={`${isLogin ? 'my-8' : 'my-6'} flex items-center gap-4 text-[11px] uppercase tracking-[0.2em] text-muted/60`}>
-            <span className="h-px flex-1 bg-line"></span>
-            <span>или</span>
-            <span className="h-px flex-1 bg-line"></span>
-          </div>
+          {!isRecoveryMode && (
+            <>
+              <div className={`${isLogin ? 'my-8' : 'my-6'} flex items-center gap-4 text-[11px] uppercase tracking-[0.2em] text-muted/60`}>
+                <span className="h-px flex-1 bg-line"></span>
+                <span>или</span>
+                <span className="h-px flex-1 bg-line"></span>
+              </div>
 
-          <div className="grid gap-3">
-            <OAuthButton
-              label={isLogin ? 'Продължи с Google' : 'Регистрация с Google'}
-              disabled={status === 'sending' && pendingAction !== ''}
-              onClick={() => signInWithProvider('google')}
-              icon={<GoogleIcon />}
-            />
-          </div>
+              <div className="grid gap-3">
+                <OAuthButton
+                  label={isLogin ? 'Продължи с Google' : 'Регистрация с Google'}
+                  disabled={status === 'sending' && pendingAction !== ''}
+                  onClick={() => signInWithProvider('google')}
+                  icon={<GoogleIcon />}
+                />
+              </div>
 
-          <div className={`${isLogin ? 'mt-10' : 'mt-7'} text-center text-sm text-muted`}>
-            {isLogin ? 'Нямаш акаунт? ' : 'Вече имаш акаунт? '}
-            <button
-              onClick={() => {
-                setIsLogin(!isLogin)
-                setMessage('')
-                setStatus('idle')
-              }}
-              className="font-medium text-accent hover:underline"
-            >
-              {isLogin ? 'Създай нов' : 'Влез тук'}
-            </button>
-          </div>
+              {isLogin && <PasskeySignInButton className="mt-5" />}
+
+              <div className={`${isLogin ? 'mt-10' : 'mt-7'} text-center text-sm text-muted`}>
+                {isLogin ? 'Нямаш акаунт? ' : 'Вече имаш акаунт? '}
+                <button
+                  onClick={() => {
+                    setIsLogin(!isLogin)
+                    setMessage('')
+                    setStatus('idle')
+                  }}
+                  className={subtleButtonClass}
+                >
+                  {isLogin ? 'Създай профил' : 'Вход'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -582,7 +756,12 @@ function NoAccessPanel({ session, account }) {
       </p>
       <div className="mt-6 flex flex-wrap gap-3">
         <Link to="/moy-profil" className="btn btn-primary">Към моя профил</Link>
-        <button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Изход</button>
+        <button
+          className="btn btn-ghost transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
+          onClick={() => signOutToHome(session?.user?.id)}
+        >
+          Изход
+        </button>
       </div>
     </div>
   )
@@ -840,7 +1019,7 @@ function OAuthButton({ label, icon, disabled, onClick }) {
       type="button"
       disabled={isBusy}
       onClick={onClick}
-      className="inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-line bg-paper px-4 py-3 text-sm font-medium text-ink transition hover:border-ink disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-line bg-paper px-4 py-3 text-sm font-medium text-ink transition duration-200 hover:border-ink hover:bg-soft active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 disabled:cursor-not-allowed disabled:opacity-60"
     >
       <span className="inline-flex h-5 w-5 items-center justify-center">{icon}</span>
       {label}

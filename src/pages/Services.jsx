@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, BriefcaseBusiness, CheckCircle2, MapPin, Search, ShieldCheck, SlidersHorizontal, UserRound, X } from 'lucide-react'
+import FallbackImage from '../components/FallbackImage.jsx'
 import { useProfileDirectory } from '../lib/profiles.js'
 import { loadPublicPartnerServices, packagePriceLabel } from '../lib/partner-services.js'
+import { getPartnerServiceCoverCandidates } from '../lib/service-media.js'
 
 function serviceAreas(service) {
   return [service.profile?.city, ...(service.deliveryAreas || [])]
@@ -214,7 +216,7 @@ function FilterChip({ label, onClear }) {
 
 function ServiceCard({ service, layers }) {
   const layerInfo = layers.find(item => item.slug === service.layerSlug)
-  const cover = service.coverUrl || service.media?.[0]?.url || service.profile?.image_url || ''
+  const coverCandidates = getPartnerServiceCoverCandidates(service, service.profile)
   const partnerName = service.profile?.name || 'Партньор в Totsan'
   const city = service.profile?.city || service.deliveryAreas[0] || ''
   const avatarUrl = service.profile?.image_url || ''
@@ -224,7 +226,7 @@ function ServiceCard({ service, layers }) {
     <article className="card reveal overflow-hidden bg-paper p-0">
       <Link to={`/uslugi/${service.slug}`} className="group block">
         <div className="media-frame aspect-[16/10] bg-soft">
-          {cover ? <img src={cover} alt={service.title} loading="lazy" decoding="async" className="img-cover img-zoom" /> : null}
+          <FallbackImage sources={coverCandidates} alt={service.title} loading="lazy" decoding="async" className="img-cover img-zoom" />
           <span className="absolute left-3 top-3 rounded-full bg-paper/90 px-3 py-1 text-xs text-ink backdrop-blur">
             {layerInfo ? `Слой ${layerInfo.number}` : 'Услуга'}
           </span>

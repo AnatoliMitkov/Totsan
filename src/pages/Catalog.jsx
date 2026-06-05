@@ -5,8 +5,10 @@ import { useProfileDirectory } from '../lib/profiles.js'
 import { loadPublicPartnerServices, packagePriceLabel } from '../lib/partner-services.js'
 import { productImageFor } from '../data/images.js'
 import { productSlugFor } from '../lib/product-metadata.js'
+import FallbackImage from '../components/FallbackImage.jsx'
 import ProfessionalCard from '../components/ProfessionalCard.jsx'
 import { formatMoneyText } from '../lib/money.js'
+import { getPartnerServiceCoverCandidates } from '../lib/service-media.js'
 
 const VALID_KINDS = new Set(['all', 'pro', 'service', 'product'])
 const KIND_TABS = [
@@ -462,11 +464,11 @@ function CatalogCard({ it }) {
 
 function ServiceCatalogCard({ it }) {
   const service = it.service
-  const img = service.coverUrl || service.media?.[0]?.url || service.profile?.image_url || ''
+  const coverCandidates = getPartnerServiceCoverCandidates(service, service.profile)
   return (
     <Link to={`/uslugi/${service.slug}`} className="card reveal img-zoom-host flex h-full min-h-[28rem] flex-col overflow-hidden bg-paper p-0">
       <div className="media-frame aspect-[16/10] bg-soft">
-        {img ? <img src={img} alt={service.title} loading="lazy" decoding="async" className="img-cover img-zoom" /> : null}
+        <FallbackImage sources={coverCandidates} alt={service.title} loading="lazy" decoding="async" className="img-cover img-zoom" />
         <span className="absolute top-3 right-3 rounded-full bg-ink/90 px-2.5 py-1 text-xs text-paper backdrop-blur">
           Услуга
         </span>

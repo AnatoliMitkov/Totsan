@@ -27,9 +27,37 @@ function replaceExtension(fileName, nextExtension) {
   return `${baseName}.${nextExtension}`
 }
 
+function isValidWebP(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes.length < 12) return false
+  return (
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  )
+}
+
 function functionUrl() {
   if (!supabaseUrl) throw new Error('Липсва VITE_SUPABASE_URL за upload endpoint-а.')
   return `${supabaseUrl}/functions/v1/profile-media-upload`
+}
+
+async function verifyStoredUpload(url) {
+  const response = await fetch(url, { cache: 'no-store' })
+  if (!response.ok) {
+    throw new Error('Uploaded file could not be read after storage write.')
+  }
+
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  if (!isValidWebP(bytes)) {
+    throw new Error('Uploaded file is corrupted after optimization.')
+  }
+
+  return bytes.length
 }
 
 async function loadRasterSource(file) {
@@ -167,11 +195,18 @@ export async function uploadMediaViaEdge({ file, target = '', purpose = 'profile
     throw new Error(payload.error || 'Качването не успя.')
   }
 
+  const verificationUrl = payload.publicUrl || payload.signedUrl || ''
+  let storedBytes = null
+  if (verificationUrl) {
+    storedBytes = await verifyStoredUpload(verificationUrl)
+  }
+
   return {
     ...payload,
     precompressed: preparedUpload.precompressed,
     originalBytes: preparedUpload.originalBytes,
     uploadBytes: preparedUpload.uploadBytes,
+    storedBytes,
   }
 }
 

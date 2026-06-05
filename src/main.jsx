@@ -1,9 +1,10 @@
-import React from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
 import './index.css'
 import Layout from './components/Layout.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import { supabase } from './lib/supabase.js'
 import Home from './pages/Home.jsx'
 import Start from './pages/Start.jsx'
 import Layer from './pages/Layer.jsx'
@@ -33,53 +34,201 @@ import BedroomAndLiving from './pages/BedroomAndLiving.jsx'
 import Bathroom from './pages/Bathroom.jsx'
 import LightingAndTextiles from './pages/LightingAndTextiles.jsx'
 import SharedProject from './pages/SharedProject.jsx'
+import ProtectedRoute from './components/auth/ProtectedRoute.jsx'
+import MfaSessionLock from './components/auth/MfaSessionLock.jsx'
+import { signOutAndRedirect } from './lib/account.js'
+import { loadMfaStatus } from './lib/mfa.js'
+
+let mfaNextPath = ''
+
+function normalizeNextPath(value = '') {
+  const raw = String(value || '').trim()
+  if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return ''
+  if (raw.startsWith('/login')) return ''
+  return raw
+}
+
+function nextPathFromLocation(location) {
+  if (location.pathname === '/login') {
+    const params = new URLSearchParams(location.search || '')
+    return normalizeNextPath(params.get('next') || '')
+  }
+
+  return normalizeNextPath(`${location.pathname}${location.search || ''}${location.hash || ''}`)
+}
+
+function readStoredMfaNext() {
+  return normalizeNextPath(mfaNextPath)
+}
+
+function storeMfaNext(value) {
+  const next = normalizeNextPath(value)
+  if (next) mfaNextPath = next
+}
+
+function clearMfaNext() {
+  mfaNextPath = ''
+}
+
+function MfaAppGate({ children }) {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const locationRef = useRef(location)
+  const [state, setState] = useState({
+    loading: true,
+    session: null,
+    locked: false,
+    factor: null,
+    error: '',
+  })
+
+  useEffect(() => {
+    locationRef.current = location
+  }, [location])
+
+  const syncMfaState = useCallback(async (nextSession) => {
+    if (!nextSession?.user) {
+      clearMfaNext()
+      setState({ loading: false, session: null, locked: false, factor: null, error: '' })
+      return { locked: false }
+    }
+
+    setState((current) => ({
+      ...current,
+      loading: true,
+      session: nextSession,
+      error: '',
+    }))
+
+    try {
+      const status = await loadMfaStatus()
+      const locked = status.nextLevel === 'aal2' && status.currentLevel !== 'aal2'
+
+      if (locked) {
+        const intended = nextPathFromLocation(locationRef.current)
+        storeMfaNext(intended || readStoredMfaNext() || '/moy-profil')
+      }
+
+      setState({
+        loading: false,
+        session: nextSession,
+        locked,
+        factor: status.primaryFactor,
+        error: '',
+      })
+
+      return { locked }
+    } catch (error) {
+      setState({
+        loading: false,
+        session: nextSession,
+        locked: false,
+        factor: null,
+        error: error?.message || '',
+      })
+      return { locked: false }
+    }
+  }, [])
+
+  useEffect(() => {
+    let active = true
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return
+      syncMfaState(data.session)
+    })
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!active) return
+      syncMfaState(nextSession)
+    })
+
+    return () => {
+      active = false
+      sub.subscription.unsubscribe()
+    }
+  }, [syncMfaState])
+
+  async function handleVerified() {
+    const { data } = await supabase.auth.getSession()
+    const result = await syncMfaState(data.session)
+    if (result.locked) return
+
+    const next = readStoredMfaNext() || '/moy-profil'
+    clearMfaNext()
+    navigate(next, { replace: true })
+  }
+
+  if (state.loading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-soft px-4">
+        <div className="text-sm text-muted">Проверяваме достъпа…</div>
+      </main>
+    )
+  }
+
+  if (state.session && state.locked) {
+    return (
+      <MfaSessionLock
+        factor={state.factor}
+        onLogout={() => signOutAndRedirect(state.session?.user?.id)}
+        onVerified={handleVerified}
+      />
+    )
+  }
+
+  return children
+}
+
 function AppRoutes() {
   const location = useLocation()
 
   return (
-    <ErrorBoundary key={location.pathname}>
-      <Routes>
-        <Route element={<Layout />}>
-          <Route path="/" element={<Home />} />
-          <Route path="/start" element={<Start />} />
-          <Route path="/landing" element={<Home />} />
-          <Route path="/sloy/:slug" element={<Layer />} />
-          <Route path="/uslugi" element={<Services />} />
-          <Route path="/uslugi/:slug" element={<PartnerService />} />
-          <Route path="/usluga/:slug" element={<Service />} />
-          <Route path="/katalog" element={<Catalog />} />
-          <Route path="/profil/:slug" element={<Pro />} />
-          <Route path="/pro" element={<TotsanPro />} />
-          <Route path="/totsan-pro" element={<TotsanPro />} />
-          <Route path="/produkt/:slug" element={<Product />} />
-          <Route path="/kak-raboti" element={<HowItWorks />} />
-          <Route path="/za-nas" element={<About />} />
-          <Route path="/kontakt" element={<Contact />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/vizualizacia" element={<Vizualizacia />} />
-          <Route path="/gradina-i-dvor" element={<GardenAndYard />} />
-          <Route path="/tapeti-i-cvetove" element={<WallpapersAndColors />} />
-          <Route path="/dekorativni-akcenti" element={<DecorativeAccents />} />
-          <Route path="/terasi-i-vunshni-zoni" element={<TerracesAndOutdoor />} />
-          <Route path="/tapeti-i-cvetove" element={<WallpapersAndColors />} />
-          <Route path="/kuhni" element={<Kitchens />} />
-          <Route path="/spalnya-i-dnevna" element={<BedroomAndLiving />} />
-          <Route path="/banya" element={<Bathroom />} />
-          <Route path="/osvetlenie-i-tekstil" element={<LightingAndTextiles />} />
-          <Route path="/login" element={<Admin />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/moy-profil" element={<MyProfile />} />
-          <Route path="/porachki" element={<MyOrders />} />
-          <Route path="/inbox" element={<Inbox />} />
-          <Route path="/inbox/:conversationId" element={<Inbox />} />
-          <Route path="/checkout/success" element={<Checkout />} />
-          <Route path="/checkout/:type/:id" element={<Checkout />} />
-          <Route path="/order/:orderId" element={<Order />} />
-          <Route path="/proekt/:shareId" element={<SharedProject />} />
-          <Route path="*" element={<NotFound />} />
-        </Route>
-      </Routes>
-    </ErrorBoundary>
+    <MfaAppGate>
+      <ErrorBoundary key={location.pathname}>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/" element={<Home />} />
+            <Route path="/start" element={<Start />} />
+            <Route path="/landing" element={<Home />} />
+            <Route path="/sloy/:slug" element={<Layer />} />
+            <Route path="/uslugi" element={<Services />} />
+            <Route path="/uslugi/:slug" element={<PartnerService />} />
+            <Route path="/usluga/:slug" element={<Service />} />
+            <Route path="/katalog" element={<Catalog />} />
+            <Route path="/profil/:slug" element={<Pro />} />
+            <Route path="/pro" element={<TotsanPro />} />
+            <Route path="/totsan-pro" element={<TotsanPro />} />
+            <Route path="/produkt/:slug" element={<Product />} />
+            <Route path="/kak-raboti" element={<HowItWorks />} />
+            <Route path="/za-nas" element={<About />} />
+            <Route path="/kontakt" element={<Contact />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/vizualizacia" element={<Vizualizacia />} />
+            <Route path="/gradina-i-dvor" element={<GardenAndYard />} />
+            <Route path="/tapeti-i-cvetove" element={<WallpapersAndColors />} />
+            <Route path="/dekorativni-akcenti" element={<DecorativeAccents />} />
+            <Route path="/terasi-i-vunshni-zoni" element={<TerracesAndOutdoor />} />
+            <Route path="/tapeti-i-cvetove" element={<WallpapersAndColors />} />
+            <Route path="/kuhni" element={<Kitchens />} />
+            <Route path="/spalnya-i-dnevna" element={<BedroomAndLiving />} />
+            <Route path="/banya" element={<Bathroom />} />
+            <Route path="/osvetlenie-i-tekstil" element={<LightingAndTextiles />} />
+            <Route path="/login" element={<Admin />} />
+            <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
+            <Route path="/moy-profil" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
+            <Route path="/porachki" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />
+            <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
+            <Route path="/inbox/:conversationId" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
+            <Route path="/checkout/success" element={<Checkout />} />
+            <Route path="/checkout/:type/:id" element={<Checkout />} />
+            <Route path="/order/:orderId" element={<ProtectedRoute><Order /></ProtectedRoute>} />
+            <Route path="/proekt/:shareId" element={<SharedProject />} />
+            <Route path="*" element={<NotFound />} />
+          </Route>
+        </Routes>
+      </ErrorBoundary>
+    </MfaAppGate>
   )
 }
 

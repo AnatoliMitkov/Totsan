@@ -6,6 +6,7 @@ const SPECIALIST_STATUSES = new Set(['pending', 'approved', 'rejected'])
 const ACCOUNT_STATUSES = new Set(['active', 'banned'])
 const ORDER_STATUSES = new Set(['pending_payment', 'paid', 'in_progress', 'delivered', 'completed', 'disputed', 'refunded', 'cancelled'])
 const ADMIN_ROLE_MANAGER_EMAILS = new Set(['a.mitkov@totsan.com'])
+const AUTH_REDIRECT_ORIGINS = new Set(['https://totsan.com', 'https://www.totsan.com', 'http://localhost:3000', 'http://127.0.0.1:3000'])
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -64,6 +65,11 @@ function canManageAdminRoles(email: string) {
   return ADMIN_ROLE_MANAGER_EMAILS.has(String(email || '').trim().toLowerCase())
 }
 
+function authRedirectTo(origin: string | null) {
+  const safeOrigin = AUTH_REDIRECT_ORIGINS.has(String(origin || '')) ? String(origin) : 'https://totsan.com'
+  return `${safeOrigin}/login`
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return jsonResponse(405, { error: 'Only POST is supported.' })
@@ -80,7 +86,13 @@ Deno.serve(async (req) => {
   const userClient = createClient(supabaseUrl, supabaseAnonKey, {
     global: { headers: { Authorization: authorization } },
   })
-  const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey)
+  const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      experimental: {
+        passkey: true,
+      },
+    },
+  })
 
   const { data: authData } = await userClient.auth.getUser()
   const token = authorization.replace(/^Bearer\s+/i, '')
@@ -251,6 +263,94 @@ Deno.serve(async (req) => {
         },
       })
       return jsonResponse(200, { ok: true, row: data })
+    }
+
+    if (action === 'list_user_passkeys') {
+      const id = assertUuid(payload.id, 'Account id')
+      const { data: targetAccount, error: targetAccountError } = await adminClient
+        .from('accounts')
+        .select('id, email, full_name, display_name')
+        .eq('id', id)
+        .single()
+
+      if (targetAccountError) throw targetAccountError
+
+      const { data, error } = await adminClient.auth.admin.passkey.list({ userId: id })
+      if (error) throw error
+
+      return jsonResponse(200, { ok: true, passkeys: data || [], target: targetAccount })
+    }
+
+    if (action === 'delete_user_passkey') {
+      const id = assertUuid(payload.id, 'Account id')
+      const passkeyId = assertUuid(payload.passkeyId, 'Passkey id')
+      const { data: targetAccount, error: targetAccountError } = await adminClient
+        .from('accounts')
+        .select('id, email, full_name, display_name')
+        .eq('id', id)
+        .single()
+
+      if (targetAccountError) throw targetAccountError
+
+      const { error } = await adminClient.auth.admin.passkey.delete({ userId: id, passkeyId })
+      if (error) throw error
+
+      await writeAudit(adminClient, user.id, action, 'account', id, {
+        passkey_id: passkeyId,
+        actor_email: actorEmail,
+        target: targetAccount,
+      })
+      return jsonResponse(200, { ok: true })
+    }
+
+    if (action === 'reset_user_passkeys') {
+      const id = assertUuid(payload.id, 'Account id')
+      const { data: targetAccount, error: targetAccountError } = await adminClient
+        .from('accounts')
+        .select('id, email, full_name, display_name')
+        .eq('id', id)
+        .single()
+
+      if (targetAccountError) throw targetAccountError
+
+      const { data: passkeys, error: listError } = await adminClient.auth.admin.passkey.list({ userId: id })
+      if (listError) throw listError
+
+      const deleteResults = await Promise.all((passkeys || []).map((passkey) =>
+        adminClient.auth.admin.passkey.delete({ userId: id, passkeyId: passkey.id })
+      ))
+      const failed = deleteResults.find((result) => result.error)
+      if (failed?.error) throw failed.error
+
+      await writeAudit(adminClient, user.id, action, 'account', id, {
+        deleted_count: passkeys?.length || 0,
+        actor_email: actorEmail,
+        target: targetAccount,
+      })
+      return jsonResponse(200, { ok: true, deletedCount: passkeys?.length || 0 })
+    }
+
+    if (action === 'send_user_recovery_email') {
+      const id = assertUuid(payload.id, 'Account id')
+      const { data: targetAccount, error: targetAccountError } = await adminClient
+        .from('accounts')
+        .select('id, email, full_name, display_name')
+        .eq('id', id)
+        .single()
+
+      if (targetAccountError) throw targetAccountError
+      if (!targetAccount.email) throw new Error('Account has no email address.')
+
+      const redirectTo = authRedirectTo(req.headers.get('Origin'))
+      const { error } = await adminClient.auth.resetPasswordForEmail(targetAccount.email, { redirectTo })
+      if (error) throw error
+
+      await writeAudit(adminClient, user.id, action, 'account', id, {
+        redirect_to: redirectTo,
+        actor_email: actorEmail,
+        target: targetAccount,
+      })
+      return jsonResponse(200, { ok: true })
     }
 
     if (action === 'approve_partner_service') {

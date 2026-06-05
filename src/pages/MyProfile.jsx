@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
-import { getAccountDisplayName, useAccount } from '../lib/account.js'
+import { getAccountDisplayName, useAccount, signOutAndRedirect } from '../lib/account.js'
 import { uploadProfileMedia } from '../lib/profile-media-upload-client.js'
 import { LAYERS } from '../data/layers.js'
 import CustomerHeader from '../components/profile/CustomerHeader.jsx'
@@ -11,6 +11,9 @@ import CustomerPreferences from '../components/profile/CustomerPreferences.jsx'
 import CustomerProject from '../components/profile/CustomerProject.jsx'
 import CompletenessBar from '../components/profile/CompletenessBar.jsx'
 import PartnerProfileWorkspace from '../components/profile/PartnerProfileWorkspace.jsx'
+import PasskeyManager, { PasskeySetupPrompt } from '../components/auth/PasskeyManager.jsx'
+import TotpMfaManager from '../components/auth/TotpMfa.jsx'
+import { isPasskeyVerifiedSession } from '../lib/passkeys.js'
 import {
   calculateClientProfileCompleteness,
   deactivateClientProject,
@@ -31,9 +34,21 @@ import {
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 
+function withCacheBust(url) {
+  if (!url) return ''
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}v=${Date.now()}`
+}
+
 export default function MyProfile() {
-  const { session, account, loading, refresh } = useAccount()
+  const { session, account, loading, refresh, requirePasskeyVerification } = useAccount()
   const [searchParams] = useSearchParams()
+  const [passkeyVerified, setPasskeyVerified] = useState(false)
+  const sessionPasskeyVerified = isPasskeyVerifiedSession(session?.user?.id)
+
+  useEffect(() => {
+    setPasskeyVerified(sessionPasskeyVerified)
+  }, [session?.user?.id, session?.user?.last_sign_in_at, sessionPasskeyVerified])
 
   if (loading) {
     return <div className="section"><div className="container-page text-muted">Зареждане…</div></div>
@@ -53,6 +68,8 @@ export default function MyProfile() {
       </section>
     )
   }
+
+
 
   if (account?.role === 'specialist') {
     return <ProEditor session={session} account={account} />
@@ -127,8 +144,11 @@ function CustomerProfile({ session, account, refreshAccount }) {
 
   async function savePersonal(values) {
     const savedAccount = await saveCustomerAccountProfile(values)
-    setLocalAccount(savedAccount)
+    const nextAccount = savedAccount?.avatar_url
+      ? { ...savedAccount, avatar_url: withCacheBust(savedAccount.avatar_url) }
+      : savedAccount
     await refreshAccount?.()
+    setLocalAccount(nextAccount)
     return savedAccount
   }
 
@@ -192,7 +212,8 @@ function CustomerProfile({ session, account, refreshAccount }) {
   return (
     <section className="section bg-soft min-h-screen">
       <div className="container-page space-y-5">
-        <CustomerHeader account={localAccount} displayName={displayName} completeness={completeness} onSignOut={() => supabase.auth.signOut()} />
+        <CustomerHeader account={localAccount} displayName={displayName} completeness={completeness} onSignOut={() => signOutAndRedirect(session?.user?.id)} />
+        <PasskeySetupPrompt userId={userId} />
 
         <div className="flex flex-wrap items-center gap-2 rounded-3xl border border-line bg-paper p-2">
           {[
@@ -201,6 +222,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
             ['preferences', 'Предпочитания'],
             ['project', 'Моят проект'],
             ['activity', 'Активност'],
+            ['security', 'Сигурност'],
           ].map(([tab, label]) => (
             <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`rounded-full px-4 py-2 text-sm transition ${activeTab === tab ? 'bg-ink text-paper' : 'text-muted hover:bg-soft hover:text-ink'}`}>
               {label}
@@ -272,6 +294,12 @@ function CustomerProfile({ session, account, refreshAccount }) {
         )}
 
         {activeTab === 'activity' && <CustomerActivity account={localAccount} completeness={completeness} />}
+        {activeTab === 'security' && (
+          <div className="space-y-5">
+            <PasskeyManager userId={userId} session={session} />
+            <TotpMfaManager session={session} />
+          </div>
+        )}
       </div>
     </section>
   )
@@ -377,7 +405,7 @@ function ProEditor({ session, account }) {
         <p className="text-muted mt-3">Получихме регистрацията ти{application?.created_at ? ` на ${new Date(application.created_at).toLocaleDateString('bg-BG')}` : ''}. Ще те уведомим веднага щом профилът е активиран.</p>
         <div className="mt-6 flex gap-2">
           <Link to="/" className="btn btn-ghost">Към сайта</Link>
-          <button className="btn btn-primary" onClick={() => supabase.auth.signOut()}>Изход</button>
+          <button className="btn btn-primary" onClick={() => signOutAndRedirect(session?.user?.id)}>Изход</button>
         </div>
       </CenteredCard>
     )
@@ -389,7 +417,7 @@ function ProEditor({ session, account }) {
         <p className="text-muted mt-3">За съжаление в момента не можем да активираме профил за този акаунт.{application?.decision_note ? ` Бележка: ${application.decision_note}` : ''}</p>
         <div className="mt-6 flex gap-2">
           <Link to="/contact" className="btn btn-ghost">Свържи се с нас</Link>
-          <button className="btn btn-primary" onClick={() => supabase.auth.signOut()}>Изход</button>
+          <button className="btn btn-primary" onClick={() => signOutAndRedirect(session?.user?.id)}>Изход</button>
         </div>
       </CenteredCard>
     )
@@ -406,7 +434,7 @@ function ProEditor({ session, account }) {
     )
   }
 
-  return <PartnerProfileWorkspace profile={profile} userId={userId} account={account} onSaved={load} />
+  return <PartnerProfileWorkspace profile={profile} userId={userId} account={account} session={session} onSaved={load} />
 }
 
 function CenteredCard({ title, children }) {
@@ -533,7 +561,7 @@ function ProForm({ profile, userId, onSaved }) {
               {profile.slug && profile.isPublished && <> Линк: <Link to={`/profil/${profile.slug}`} className="text-accent hover:underline">/profil/{profile.slug}</Link></>}
             </p>
           </div>
-          <button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Изход</button>
+          <button className="btn btn-ghost" onClick={() => signOutAndRedirect(session?.user?.id)}>Изход</button>
         </div>
 
         <form onSubmit={submit} className="grid gap-6 lg:grid-cols-12">

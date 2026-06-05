@@ -38,6 +38,10 @@ const wasmBytes = await Deno.readFile(
 )
 await initializeImageMagick(wasmBytes)
 
+function copyBytes(bytes: Uint8Array) {
+  return Uint8Array.from(bytes)
+}
+
 function jsonResponse(status: number, payload: Record<string, unknown>) {
   return new Response(JSON.stringify(payload), {
     status,
@@ -98,6 +102,31 @@ function constrainSize(width: number, height: number, maxEdge: number) {
   }
 }
 
+function isValidWebP(bytes: Uint8Array) {
+  if (bytes.byteLength < 12) return false
+  return (
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  )
+}
+
+function inspectWebP(bytes: Uint8Array) {
+  if (!isValidWebP(bytes)) {
+    throw new Error('Optimized output is not a valid WebP file.')
+  }
+
+  return ImageMagick.read(copyBytes(bytes), (image) => ({
+    width: image.width,
+    height: image.height,
+  }))
+}
+
 function optimizeProfileImage(bytes: Uint8Array) {
   return ImageMagick.read(bytes, (image): Uint8Array => {
     const nextSize = constrainSize(image.width, image.height, PROFILE_MAX_EDGE)
@@ -105,7 +134,7 @@ function optimizeProfileImage(bytes: Uint8Array) {
       image.resize(nextSize.width, nextSize.height)
     }
     image.quality = PROFILE_IMAGE_QUALITY
-    return image.write(MagickFormat.WebP, (data) => data)
+    return image.write(MagickFormat.WebP, (data) => copyBytes(data))
   })
 }
 
@@ -178,8 +207,10 @@ Deno.serve(async (req) => {
   const bytes = new Uint8Array(await upload.arrayBuffer())
 
   let optimized: Uint8Array
+  let optimizedMeta: { width: number; height: number }
   try {
-    optimized = optimizeProfileImage(bytes)
+    optimized = optimizeProfileImage(copyBytes(bytes))
+    optimizedMeta = inspectWebP(optimized)
   } catch (error) {
     console.error('profile-media-upload optimize error', error)
     return jsonResponse(422, { error: 'Image processing failed.' })
@@ -222,14 +253,14 @@ Deno.serve(async (req) => {
       path: storagePath,
       fingerprint,
       reused: true,
-      width: null,
-      height: null,
+      width: optimizedMeta.width,
+      height: optimizedMeta.height,
     })
   }
 
   const { error: uploadError } = await adminClient.storage
     .from(bucket)
-    .upload(storagePath, optimized, {
+    .upload(storagePath, copyBytes(optimized), {
       contentType: 'image/webp',
       cacheControl: '31536000',
       upsert: false,
@@ -260,5 +291,7 @@ Deno.serve(async (req) => {
     fingerprint,
     reused: false,
     bytes: optimized.byteLength,
+    width: optimizedMeta.width,
+    height: optimizedMeta.height,
   })
 })
