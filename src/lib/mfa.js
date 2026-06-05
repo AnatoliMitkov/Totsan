@@ -1,21 +1,36 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 
+const pendingEnrollments = new Map()
+
 export function mfaEnrollmentStorageKey(userId) {
   return `totsan.mfa.enrollment.${userId || 'anonymous'}`
 }
 
 export function savePendingMfaEnrollment(userId, enrollment) {
   if (!userId || !enrollment?.id) return
+
+  const payload = {
+    id: enrollment.id,
+    friendly_name: enrollment.friendly_name || '',
+    totp: {
+      qr_code: enrollment?.totp?.qr_code || '',
+      secret: enrollment?.totp?.secret || '',
+      uri: enrollment?.totp?.uri || '',
+    },
+  }
+
+  pendingEnrollments.set(mfaEnrollmentStorageKey(userId), payload)
 }
 
 export function loadPendingMfaEnrollment(userId) {
   if (!userId) return null
-  return null
+  return pendingEnrollments.get(mfaEnrollmentStorageKey(userId)) || null
 }
 
 export function clearPendingMfaEnrollment(userId) {
   if (!userId) return
+  pendingEnrollments.delete(mfaEnrollmentStorageKey(userId))
 }
 
 export function normalizeMfaError(error, fallback = 'Не успяхме да завършим проверката. Опитай отново.') {
