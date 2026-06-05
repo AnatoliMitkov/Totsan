@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 
+// Keep enrollment payload only in-memory to avoid persisting MFA secrets in browser storage.
 const pendingEnrollments = new Map()
 
 export function mfaEnrollmentStorageKey(userId) {
