@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+﻿import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Check,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { gsap } from 'gsap'
 import { LAYER_HEROS, WHAT_YOU_FIND_IMAGES, SHOWCASE_IMAGES } from '../data/images.js'
+import { formatDualCurrency, formatDualCurrencyRange } from '../lib/money.js'
 
 // ─────────── Unsplash helper ────────────────────────────────────────────────
 const U = (id, w = 1200) =>
@@ -37,8 +38,6 @@ const IMG = {
 
 // ─────────── Currency helpers ─────────────────────────────────────────────────
 // Официален фиксиран курс: 1 EUR = 1.95583 лв.
-const EUR_RATE = 1.95583
-const fmtEur = (lv) => Math.round(lv / EUR_RATE)
 
 // ─────────── Budget planner data ─────────────────────────────────────────────
 const SPACES = [
@@ -282,7 +281,7 @@ function TerracePlanner() {
               <div className="mb-3 flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold text-ink">Базов бюджет</span>
                 <span className="text-sm font-semibold text-trustGreen">
-                  {fmtEur(baseBudget).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}€ / {baseBudget.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} лв.
+                  {formatDualCurrency(baseBudget)}
                 </span>
               </div>
               <input
@@ -323,7 +322,7 @@ function TerracePlanner() {
                         <span className="min-w-0">
                           <span className="block text-sm font-medium text-ink">{extra.label}</span>
                           <span className="block text-xs text-muted">
-                            {fmtEur(extra.min).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} – {fmtEur(extra.max).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}€ &nbsp;·&nbsp; {extra.min.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} – {extra.max.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} лв.
+                            {formatDualCurrencyRange(extra.min, extra.max)}
                           </span>
                         </span>
                       </span>
@@ -348,10 +347,7 @@ function TerracePlanner() {
                 ОРИЕНТИРОВЪЧЕН БЮДЖЕТ
               </div>
               <div className="mt-4 font-display text-4xl leading-tight">
-                {fmtEur(estimate.min).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} – {fmtEur(estimate.max).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}€
-              </div>
-              <div className="mt-1 text-base text-paper/55">
-                {estimate.min.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} – {estimate.max.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} лв.
+                {formatDualCurrencyRange(estimate.min, estimate.max)}
               </div>
               <p className="mt-3 text-sm text-paper/75">
                 За {space.label.toLowerCase()} в стил „{style.label.toLowerCase()}" с избраните

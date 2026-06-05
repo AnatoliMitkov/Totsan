@@ -5,6 +5,7 @@ import { useProfileDirectory } from '../lib/profiles.js'
 import { loadPublicPartnerServices, packagePriceLabel } from '../lib/partner-services.js'
 import { productImageFor } from '../data/images.js'
 import ProfessionalCard from '../components/ProfessionalCard.jsx'
+import { formatMoneyText } from '../lib/money.js'
 
 const VALID_KINDS = new Set(['all', 'pro', 'service', 'product'])
 const KIND_TABS = [
@@ -335,7 +336,7 @@ function CatalogCard({ it }) {
         <div className="mt-2 font-display text-xl text-ink">{it.name}</div>
         <div className="text-sm text-muted">{it.sub}{it.city ? ` · ${it.city}` : ''}</div>
         <div className="mt-4 flex items-center justify-between gap-3 text-sm">
-          <span className="font-medium">{it.price}</span>
+          <span className="font-medium">{formatMoneyText(it.price)}</span>
           <span className="truncate text-muted">{it.tag}</span>
         </div>
         <span className="btn btn-ghost mt-5 w-full justify-center">Виж продукт</span>
@@ -360,7 +361,7 @@ function ServiceCatalogCard({ it }) {
         <div className="mt-2 font-display text-xl text-ink">{service.title}</div>
         <div className="text-sm text-muted">{service.subtitle || service.profile?.name}</div>
         <div className="mt-4 flex items-center justify-between gap-3 text-sm">
-          <span className="font-medium">{it.price}</span>
+          <span className="font-medium">{formatMoneyText(it.price)}</span>
           <span className="truncate text-muted">{service.profile?.name}</span>
         </div>
         <div className="mt-3 flex items-center gap-1 text-xs text-muted">

@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import { productImageFor, SHOWCASE_IMAGES } from '../data/images.js'
 import ProfessionalCard from '../components/ProfessionalCard.jsx'
 import { slugify, useProfileDirectory } from '../lib/profiles.js'
+import { formatMoneyText } from '../lib/money.js'
 
 export default function Product() {
   const { state } = useLocation()
@@ -45,7 +46,7 @@ export default function Product() {
             <div className="text-muted mt-2">{item.sub}</div>
 
             <div className="mt-6 flex items-baseline gap-3">
-              <span className="font-display text-3xl text-ink">{item.price}</span>
+              <span className="font-display text-3xl text-ink">{formatMoneyText(item.price)}</span>
               <span className="text-sm text-muted">вкл. ДДС</span>
             </div>
 

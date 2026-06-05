@@ -5,6 +5,7 @@ import { formatAdminDate } from '../../lib/admin.js'
 import { createConversationWithClient } from '../../lib/chat.js'
 import { useNavigate } from 'react-router-dom'
 import { LAYERS } from '../../data/layers.js'
+import { formatMoneyRange } from '../../lib/money.js'
 
 export default function PartnerInquiries({ profileSlug, partnerId }) {
   const navigate = useNavigate()
@@ -173,7 +174,7 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
                         {project.budget_min && (
                           <div>
                             <div className="text-muted text-xs uppercase tracking-wider mb-1">Бюджет</div>
-                            <div className="font-medium text-ink">{project.budget_min} - {project.budget_max} {project.budget_currency}</div>
+                            <div className="font-medium text-ink">{formatMoneyRange(project.budget_min, project.budget_max, project.budget_currency)}</div>
                           </div>
                         )}
                         {project.address_city && (

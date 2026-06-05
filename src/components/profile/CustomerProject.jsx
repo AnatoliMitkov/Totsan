@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Camera, CheckCircle2, ImagePlus, Play, Save, Trash2, UploadCloud } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
-import { DEFAULT_PROJECT, PROJECT_MEDIA_KINDS, PROPERTY_TYPES, mergeQuizAnswer } from '../../lib/projects.js'
+import { DEFAULT_PROJECT, PROJECT_MEDIA_KINDS, PROPERTY_TYPES, mergeQuizAnswer, isMeaningfulProject } from '../../lib/projects.js'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 
@@ -38,9 +38,36 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
     setDraft(makeDraft(project))
   }, [project?.id, project?.updatedAt])
 
+  const [conflictModal, setConflictModal] = useState(false)
+  const handledBriefRef = useRef(null)
+
   useEffect(() => {
     if (!pendingBrief) return
+    const briefKey = JSON.stringify(pendingBrief)
+    if (handledBriefRef.current === briefKey) return
 
+    const pendingBriefId = pendingBrief.quizAnswers?.start?.briefId
+    const currentBriefId = project?.quizAnswers?.start?.briefId
+    const hasSameBriefId = pendingBriefId && currentBriefId && pendingBriefId === currentBriefId
+
+    if (!isMeaningfulProject(project, media) || hasSameBriefId) {
+      handledBriefRef.current = briefKey
+      setDraft(current => ({
+        ...current,
+        title: current.title || pendingBrief.title || '',
+        currentLayerSlug: pendingBrief.currentLayerSlug || current.currentLayerSlug,
+        ideaDescription: current.ideaDescription ? `${current.ideaDescription}\n\n${pendingBrief.ideaDescription || ''}` : pendingBrief.ideaDescription || current.ideaDescription,
+        quizAnswers: { ...(current.quizAnswers || {}), ...(pendingBrief.quizAnswers || {}) },
+      }))
+      setSaveStatus({ type: 'idle', message: 'Импортирахме резултата от началния quiz. Прегледай и запази проекта.' })
+      onImportPendingBrief?.()
+    } else {
+      handledBriefRef.current = briefKey
+      setConflictModal(true)
+    }
+  }, [pendingBrief, project, media, onImportPendingBrief])
+
+  const handleUpdateCurrent = () => {
     setDraft(current => ({
       ...current,
       title: current.title || pendingBrief.title || '',
@@ -48,9 +75,33 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
       ideaDescription: current.ideaDescription ? `${current.ideaDescription}\n\n${pendingBrief.ideaDescription || ''}` : pendingBrief.ideaDescription || current.ideaDescription,
       quizAnswers: { ...(current.quizAnswers || {}), ...(pendingBrief.quizAnswers || {}) },
     }))
-    setSaveStatus({ type: 'idle', message: 'Импортирахме резултата от началния quiz. Прегледай и запази проекта.' })
+    setConflictModal(false)
+    setSaveStatus({ type: 'idle', message: 'Брифът е добавен към текущия проект. Запази, за да потвърдиш.' })
     onImportPendingBrief?.()
-  }, [pendingBrief, onImportPendingBrief])
+  }
+
+  const handleCreateNew = async () => {
+    setConflictModal(false)
+    setSaveStatus({ type: 'saving', message: 'Създаваме нов проект...' })
+    const nextDraft = {
+      ...DEFAULT_PROJECT,
+      title: pendingBrief.title || '',
+      currentLayerSlug: pendingBrief.currentLayerSlug || DEFAULT_PROJECT.currentLayerSlug,
+      ideaDescription: pendingBrief.ideaDescription || '',
+      quizAnswers: pendingBrief.quizAnswers || {},
+    }
+    try {
+      await onSave(nextDraft, { createNew: true })
+      setSaveStatus({ type: 'saved', message: 'Новият проект е създаден.' })
+      onImportPendingBrief?.()
+    } catch (error) {
+      setSaveStatus({ type: 'error', message: error.message || 'Създаването не успя.' })
+    }
+  }
+
+  const handleCancelConflict = () => {
+    setConflictModal(false)
+  }
 
   useEffect(() => {
     draftRef.current = draft
@@ -174,6 +225,19 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
 
   return (
     <div className="grid gap-5 lg:grid-cols-12">
+      {conflictModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-3xl bg-paper p-6 md:p-8 shadow-2xl">
+            <h2 className="font-display text-2xl text-ink">Имаш съществуващ проект</h2>
+            <p className="mt-3 text-muted">Искаш ли този бриф да стане нов проект или да обнови текущия?</p>
+            <div className="mt-8 flex flex-col gap-3">
+              <button type="button" onClick={handleCreateNew} className="btn btn-primary justify-center">Създай нов проект</button>
+              <button type="button" onClick={handleUpdateCurrent} className="btn border border-line bg-soft text-ink hover:border-ink justify-center">Обнови текущия</button>
+              <button type="button" onClick={handleCancelConflict} className="btn btn-ghost justify-center text-muted">Отказ</button>
+            </div>
+          </div>
+        </div>
+      )}
       <form onSubmit={submit} className="lg:col-span-8 rounded-3xl border border-line bg-paper p-5 md:p-7 space-y-6">
         <div>
           <div className="eyebrow">Моят проект</div>

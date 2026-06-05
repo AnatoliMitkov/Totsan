@@ -12,6 +12,7 @@ import CompletenessBar from '../components/profile/CompletenessBar.jsx'
 import PartnerProfileWorkspace from '../components/profile/PartnerProfileWorkspace.jsx'
 import {
   calculateClientProfileCompleteness,
+  deactivateClientProject,
   deleteClientProjectMedia,
   loadActiveClientProject,
   saveActiveClientProject,
@@ -135,8 +136,16 @@ function CustomerProfile({ session, account, refreshAccount }) {
     return result.publicUrl
   }
 
-  async function saveProject(projectDraft) {
-    const savedProject = await saveActiveClientProject(userId, projectDraft, projectDraft.id || project?.id || '')
+  async function saveProject(projectDraft, options = {}) {
+    let existingId = projectDraft.id || project?.id || ''
+    if (options.createNew) {
+      if (existingId) {
+        await deactivateClientProject(existingId, userId)
+      }
+      existingId = ''
+      projectDraft = { ...projectDraft, id: '' }
+    }
+    const savedProject = await saveActiveClientProject(userId, projectDraft, existingId)
     setProject(savedProject)
     return savedProject
   }

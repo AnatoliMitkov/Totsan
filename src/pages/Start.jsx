@@ -78,6 +78,17 @@ export default function Start() {
   const saveResultAsProjectBrief = () => {
     if (!result?.layer || typeof window === 'undefined') return
 
+    let briefId = crypto.randomUUID()
+    const existingRaw = window.localStorage.getItem('totsan.pendingProjectBrief')
+    if (existingRaw) {
+      try {
+        const parsed = JSON.parse(existingRaw)
+        if (parsed.quizAnswers?.start?.briefId) {
+          briefId = parsed.quizAnswers.start.briefId
+        }
+      } catch (e) {}
+    }
+
     window.localStorage.setItem('totsan.pendingProjectBrief', JSON.stringify({
       title: `Проект: ${result.layer.title}`,
       currentLayerSlug: result.layer.slug,
@@ -90,6 +101,7 @@ export default function Start() {
       quizAnswers: {
         start: {
           title: 'Guided Project Brief',
+          briefId,
           answers,
           recommendation: {
             layerSlug: result.layer.slug,

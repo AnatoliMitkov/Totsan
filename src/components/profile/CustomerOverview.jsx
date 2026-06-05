@@ -4,9 +4,11 @@ import { ArrowRight, Camera, Home, MessageCircle, Sparkles } from 'lucide-react'
 import CompletenessBar from './CompletenessBar.jsx'
 import { LAYERS } from '../../data/layers.js'
 import { loadConversations } from '../../lib/chat.js'
+import { formatProjectBudget, formatProjectLocation, getProjectLayerLabel, getProjectProfileItems } from '../../lib/projects.js'
 
 export default function CustomerOverview({ account, project, media, completeness, isAdmin, onSelectTab }) {
   const activeLayer = LAYERS.find(layer => layer.slug === project?.currentLayerSlug) || LAYERS[0]
+  const projectProfileItems = getProjectProfileItems(project, LAYERS)
   const nextChecks = completeness?.nextChecks || []
   const [conversationCount, setConversationCount] = useState(null)
 
@@ -61,10 +63,23 @@ export default function CustomerOverview({ account, project, media, completeness
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <InfoTile label="Слой" value={`Слой ${activeLayer.number} · ${activeLayer.title}`} />
-            <InfoTile label="Локация" value={[project?.addressCity, project?.addressRegion].filter(Boolean).join(', ') || 'Не е посочена'} />
+            <InfoTile label="Слой" value={getProjectLayerLabel(project, LAYERS) || `Слой ${activeLayer.number} · ${activeLayer.title}`} />
+            <InfoTile label="Локация" value={formatProjectLocation(project) || 'Не е посочена'} />
             <InfoTile label="Бюджет" value={formatBudget(project)} />
           </div>
+          {projectProfileItems.length > 0 && (
+            <div className="mt-5 rounded-2xl border border-line bg-soft p-4">
+              <div className="text-xs uppercase tracking-[0.14em] text-muted">Проектен профил</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {projectProfileItems.map((item) => (
+                  <span key={item.key} className="inline-flex items-center gap-2 rounded-full border border-line bg-paper px-3 py-1.5 text-sm text-ink">
+                    <span className="text-muted">{item.label}:</span>
+                    <span className="font-medium">{item.value}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="rounded-2xl border border-line bg-paper p-5 md:p-6">
@@ -109,8 +124,5 @@ function InfoTile({ label, value }) {
 
 function formatBudget(project) {
   if (!project?.budgetMin && !project?.budgetMax) return 'Не е посочен'
-  const currency = project.budgetCurrency || 'EUR'
-  if (project.budgetMin && project.budgetMax) return `${project.budgetMin} - ${project.budgetMax} ${currency}`
-  if (project.budgetMin) return `от ${project.budgetMin} ${currency}`
-  return `до ${project.budgetMax} ${currency}`
+  return formatProjectBudget(project)
 }

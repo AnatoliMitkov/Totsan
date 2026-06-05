@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js'
 import { uploadProjectMedia } from './project-media-upload-client.js'
+import { formatMoneyRange } from './money.js'
 
 export const PROPERTY_TYPES = [
   { value: 'apartment', label: 'Апартамент' },
@@ -35,15 +36,90 @@ export const DEFAULT_PROJECT = {
   isActive: true,
 }
 
+export const PENDING_PROJECT_BRIEF_KEY = 'totsan.pendingProjectBrief'
+
+const PROJECT_SCOPE_LABELS = {
+  house: 'Нова къща',
+  apartment: 'Цяло жилище',
+  room: 'Отделно помещение',
+  cosmetic: 'Декорация / двор',
+}
+
+const PROJECT_STAGE_LABELS = {
+  idea: 'Идея',
+  plans: 'Планиране',
+  materials: 'Избор на материали',
+  finish: 'Завършване',
+}
+
+const PROJECT_PRIORITY_LABELS = {
+  quality: 'Качество',
+  speed: 'Срок',
+  price: 'Бюджет',
+  support: 'Пълна подкрепа',
+}
+
+const PROPERTY_TYPE_LABELS = Object.fromEntries(PROPERTY_TYPES.map((item) => [item.value, item.label]))
+
 function cleanText(value) {
   const next = String(value ?? '').trim()
   return next || null
+}
+
+function hasText(value) {
+  return String(value || '').trim().length > 0
+}
+
+function isRecord(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function labelFromMap(value, labels) {
+  if (!hasText(value)) return ''
+  return labels[value] || ''
+}
+
+function findGuidedBriefAnswers(project) {
+  const quizAnswers = isRecord(project?.quizAnswers) ? project.quizAnswers : isRecord(project) ? project : {}
+  const candidates = []
+
+  if (hasText(quizAnswers.scope) || hasText(quizAnswers.stage) || hasText(quizAnswers.priority)) {
+    candidates.push(quizAnswers)
+  }
+
+  for (const key of ['start', 'home']) {
+    if (isRecord(quizAnswers[key])) candidates.push(quizAnswers[key])
+  }
+
+  for (const entry of Object.values(quizAnswers)) {
+    if (isRecord(entry)) candidates.push(entry)
+  }
+
+  for (const candidate of candidates) {
+    const answers = isRecord(candidate.answers) ? candidate.answers : candidate
+    if (hasText(answers.scope) || hasText(answers.stage) || hasText(answers.priority)) {
+      return answers
+    }
+  }
+
+  return {}
 }
 
 function numberOrNull(value) {
   if (value === '' || value === null || value === undefined) return null
   const next = Number(value)
   return Number.isFinite(next) ? next : null
+}
+
+function mergeIdeaDescription(currentValue, pendingValue) {
+  const currentText = String(currentValue || '').trim()
+  const pendingText = String(pendingValue || '').trim()
+
+  if (!pendingText) return currentText
+  if (!currentText) return pendingText
+  if (currentText.includes(pendingText)) return currentText
+
+  return `${currentText}\n\n${pendingText}`
 }
 
 export function normalizeProject(row) {
@@ -124,10 +200,10 @@ async function withSignedMediaUrls(rows = []) {
   }))
 }
 
-export async function loadActiveClientProject(userId) {
-  if (!userId) return { project: null, media: [] }
+async function loadActiveClientProjectRow(userId) {
+  if (!userId) return null
 
-  const { data: projectRow, error: projectError } = await supabase
+  const { data, error } = await supabase
     .from('client_projects')
     .select('*')
     .eq('user_id', userId)
@@ -136,7 +212,14 @@ export async function loadActiveClientProject(userId) {
     .limit(1)
     .maybeSingle()
 
-  if (projectError && projectError.code !== 'PGRST116') throw projectError
+  if (error && error.code !== 'PGRST116') throw error
+  return data || null
+}
+
+export async function loadActiveClientProject(userId) {
+  if (!userId) return { project: null, media: [] }
+
+  const projectRow = await loadActiveClientProjectRow(userId)
   if (!projectRow) return { project: null, media: [] }
 
   const { data: mediaRows, error: mediaError } = await supabase
@@ -180,6 +263,32 @@ export async function saveActiveClientProject(userId, projectDraft, existingProj
   const { data, error } = await query.select('*').single()
   if (error) throw error
   return normalizeProject(data)
+}
+
+export function projectDraftFromPendingBrief(pendingBrief, baseProject = null) {
+  const currentProject = { ...DEFAULT_PROJECT, ...(baseProject || {}) }
+
+  return {
+    ...currentProject,
+    title: currentProject.title || String(pendingBrief?.title || '').trim(),
+    currentLayerSlug: String(pendingBrief?.currentLayerSlug || '').trim() || currentProject.currentLayerSlug,
+    ideaDescription: mergeIdeaDescription(currentProject.ideaDescription, pendingBrief?.ideaDescription),
+    quizAnswers: {
+      ...(currentProject.quizAnswers && typeof currentProject.quizAnswers === 'object' ? currentProject.quizAnswers : {}),
+      ...(pendingBrief?.quizAnswers && typeof pendingBrief.quizAnswers === 'object' ? pendingBrief.quizAnswers : {}),
+    },
+  }
+}
+
+export async function persistPendingProjectBrief(userId, pendingBrief) {
+  if (!userId) throw new Error('Missing user for project save.')
+  if (!pendingBrief || typeof pendingBrief !== 'object') throw new Error('Missing pending project brief.')
+
+  const existingProjectRow = await loadActiveClientProjectRow(userId)
+  const existingProject = normalizeProject(existingProjectRow)
+  const nextDraft = projectDraftFromPendingBrief(pendingBrief, existingProject)
+
+  return saveActiveClientProject(userId, nextDraft, existingProject?.id || '')
 }
 
 export async function uploadClientProjectMedia({ file, userId, projectId, kind = 'photo', caption = '', orderIndex = 0 }) {
@@ -228,13 +337,68 @@ export async function deleteClientProjectMedia(mediaId) {
   if (error) throw error
 }
 
-function hasText(value) {
-  return String(value || '').trim().length > 0
-}
-
 function hasQuizAnswers(project) {
   const answers = project?.quizAnswers || {}
   return Object.keys(answers).length > 0
+}
+
+export function getProjectPropertyTypeLabel(project) {
+  return labelFromMap(project?.propertyType, PROPERTY_TYPE_LABELS)
+}
+
+export function getProjectLayerLabel(project, layers = []) {
+  const layerSlug = cleanText(project?.currentLayerSlug)
+  if (!layerSlug) return ''
+  const layer = layers.find((item) => item.slug === layerSlug)
+  return layer ? `Слой ${layer.number} · ${layer.title}` : layerSlug
+}
+
+export function formatProjectBudget(project) {
+  if (!project?.budgetMin && !project?.budgetMax) return ''
+  return formatMoneyRange(project.budgetMin, project.budgetMax, project?.budgetCurrency || 'EUR')
+}
+
+export function formatProjectLocation(project) {
+  return [project?.addressCity, project?.addressRegion].filter(hasText).join(', ')
+}
+
+export function getProjectScopeLabel(project) {
+  const guidedAnswers = findGuidedBriefAnswers(project)
+  return labelFromMap(guidedAnswers.scope, PROJECT_SCOPE_LABELS)
+}
+
+export function getProjectStageLabel(project) {
+  const guidedAnswers = findGuidedBriefAnswers(project)
+  return labelFromMap(guidedAnswers.stage, PROJECT_STAGE_LABELS)
+}
+
+export function getProjectPriorityLabel(project) {
+  const guidedAnswers = findGuidedBriefAnswers(project)
+  return labelFromMap(guidedAnswers.priority, PROJECT_PRIORITY_LABELS)
+}
+
+export function getProjectSignals(project, layers = []) {
+  return {
+    scope: getProjectScopeLabel(project),
+    stage: getProjectStageLabel(project),
+    priority: getProjectPriorityLabel(project),
+    propertyType: getProjectPropertyTypeLabel(project),
+    layer: getProjectLayerLabel(project, layers),
+    budget: formatProjectBudget(project),
+    location: formatProjectLocation(project),
+  }
+}
+
+export function getProjectProfileItems(project, layers = []) {
+  const signals = getProjectSignals(project, layers)
+  return [
+    { key: 'stage', label: 'Етап', value: signals.stage },
+    { key: 'scope', label: 'Обхват', value: signals.scope },
+    { key: 'priority', label: 'Приоритет', value: signals.priority },
+    { key: 'layer', label: 'Слой', value: signals.layer },
+    { key: 'budget', label: 'Бюджет', value: signals.budget },
+    { key: 'location', label: 'Локация', value: signals.location },
+  ].filter((item) => hasText(item.value))
 }
 
 export function calculateClientProfileCompleteness({ account, session, project, media = [] }) {
@@ -267,6 +431,7 @@ export function calculateClientProfileCompleteness({ account, session, project, 
     checks,
     completedChecks: checks.filter(check => check.complete),
     nextChecks: checks.filter(check => !check.complete).slice(0, 4),
+
   }
 }
 
@@ -281,4 +446,25 @@ export function mergeQuizAnswer(project, quizSlug, payload) {
       },
     },
   }
+}
+
+export function isMeaningfulProject(project, media = []) {
+  if (!project) return false
+
+  if (project.title && !project.title.startsWith('Проект: Слой')) return true
+  if (project.ideaDescription && !project.ideaDescription.includes('Начален резултат от Totsan quiz:')) return true
+  if (project.propertyType || project.areaSqm || project.roomsCount || project.budgetMin || project.budgetMax || project.addressCity || project.addressRegion || project.desiredStartDate) return true
+  if (media && media.length > 0) return true
+  
+  const quizAnswers = project.quizAnswers || {}
+  const quizKeys = Object.keys(quizAnswers)
+  if (quizKeys.some(key => key !== 'start')) return true
+  
+  return false
+}
+
+export async function deactivateClientProject(projectId, userId) {
+  if (!projectId || !userId) return
+  const { error } = await supabase.from('client_projects').update({ is_active: false }).eq('id', projectId).eq('user_id', userId)
+  if (error) throw error
 }

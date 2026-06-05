@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowRight,
@@ -18,8 +18,6 @@ import { LAYER_HEROS, SHOWCASE_IMAGES, WHAT_YOU_FIND_IMAGES } from '../data/imag
 const U = (id, w = 1200) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&q=80&w=${w}`
 
 // Официален фиксиран курс: 1 EUR = 1.95583 лв.
-const EUR_RATE = 1.95583
-const fmtEur = (lv) => Math.round(lv / EUR_RATE)
 
 const DECOR_IMAGES = {
   hero: LAYER_HEROS.dekoraciya,
@@ -256,7 +254,7 @@ function DecorPlanner() {
               <div className="mb-3 flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold text-ink">Базов бюджет</span>
                 <span className="text-sm font-semibold text-trustPurple">
-                  {fmtEur(baseBudget).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}€ / {baseBudget.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} лв.
+                  {formatDualCurrency(baseBudget)}
                 </span>
               </div>
               <input
@@ -294,7 +292,7 @@ function DecorPlanner() {
                         <span className="min-w-0">
                           <span className="block text-sm font-medium text-ink">{feature.label}</span>
                           <span className="block text-xs text-muted">
-                            {fmtEur(feature.min).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} – {fmtEur(feature.max).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}€ &nbsp;·&nbsp; {feature.min.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} – {feature.max.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} лв.
+                            {formatDualCurrencyRange(feature.min, feature.max)}
                           </span>
                         </span>
                       </span>
@@ -312,10 +310,7 @@ function DecorPlanner() {
             <div className="rounded-3xl bg-gradient-to-br from-ink via-graphite to-ink p-8 text-paper shadow-lg">
               <div className="text-xs font-semibold tracking-[0.16em] text-accentSoft">ОРИЕНТИРОВЪЧЕН БЮДЖЕТ</div>
               <div className="mt-4 font-display text-4xl leading-tight">
-                {fmtEur(estimate.min).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} – {fmtEur(estimate.max).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}€
-              </div>
-              <div className="mt-1 text-base text-paper/55">
-                {estimate.min.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} – {estimate.max.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})} лв.
+                {formatDualCurrencyRange(estimate.min, estimate.max)}
               </div>
               <p className="mt-3 text-sm text-paper/75">
                 За {selectedRoom.label.toLowerCase()} в стил „{selectedMood.label.toLowerCase()}“ с избраните елементи.
