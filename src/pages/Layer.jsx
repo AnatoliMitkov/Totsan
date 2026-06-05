@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from 'react'
 import { LAYER_HEROS, WHAT_YOU_FIND_IMAGES, SHOWCASE_IMAGES, productImageFor } from '../data/images.js'
 import ProfessionalCard from '../components/ProfessionalCard.jsx'
 import { useProfileDirectory } from '../lib/profiles.js'
+import { formatMoneyText } from '../lib/money.js'
 
 export default function Layer({ slug }) {
   const { slug: routeSlug } = useParams()
@@ -316,7 +317,7 @@ function Products({ layer }) {
                 <div className="text-xs text-muted">{p.cat}</div>
                 <div className="font-display text-xl mt-1">{p.name}</div>
                 <div className="mt-3 flex items-center justify-between">
-                  <span className="font-medium">{p.price}</span>
+                  <span className="font-medium">{formatMoneyText(p.price)}</span>
                   <span className="link-arrow text-sm">Виж →</span>
                 </div>
               </div>

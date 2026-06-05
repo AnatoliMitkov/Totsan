@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js'
+import { formatMoney } from './money.js'
 
 export const ORDER_STATUS_LABELS = {
   pending_payment: 'Очаква плащане',
@@ -20,7 +21,7 @@ export const ORDER_ACTION_LABELS = {
 }
 
 export function formatOrderMoney(amount, currency = 'EUR') {
-  return new Intl.NumberFormat('bg-BG', { style: 'currency', currency }).format(Number(amount || 0))
+  return formatMoney(amount, currency)
 }
 
 export function formatOrderDate(value) {

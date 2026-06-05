@@ -33,12 +33,13 @@ import Kitchens from './pages/Kitchens.jsx'
 import BedroomAndLiving from './pages/BedroomAndLiving.jsx'
 import Bathroom from './pages/Bathroom.jsx'
 import LightingAndTextiles from './pages/LightingAndTextiles.jsx'
+import SharedProject from './pages/SharedProject.jsx'
 import ProtectedRoute from './components/auth/ProtectedRoute.jsx'
 import MfaSessionLock from './components/auth/MfaSessionLock.jsx'
 import { signOutAndRedirect } from './lib/account.js'
 import { loadMfaStatus } from './lib/mfa.js'
 
-const MFA_NEXT_KEY = 'totsan.mfa.next'
+let mfaNextPath = ''
 
 function normalizeNextPath(value = '') {
   const raw = String(value || '').trim()
@@ -57,19 +58,16 @@ function nextPathFromLocation(location) {
 }
 
 function readStoredMfaNext() {
-  if (typeof window === 'undefined') return ''
-  return normalizeNextPath(window.sessionStorage.getItem(MFA_NEXT_KEY) || '')
+  return normalizeNextPath(mfaNextPath)
 }
 
 function storeMfaNext(value) {
-  if (typeof window === 'undefined') return
   const next = normalizeNextPath(value)
-  if (next) window.sessionStorage.setItem(MFA_NEXT_KEY, next)
+  if (next) mfaNextPath = next
 }
 
 function clearMfaNext() {
-  if (typeof window === 'undefined') return
-  window.sessionStorage.removeItem(MFA_NEXT_KEY)
+  mfaNextPath = ''
 }
 
 function MfaAppGate({ children }) {
@@ -225,6 +223,7 @@ function AppRoutes() {
             <Route path="/checkout/success" element={<Checkout />} />
             <Route path="/checkout/:type/:id" element={<Checkout />} />
             <Route path="/order/:orderId" element={<ProtectedRoute><Order /></ProtectedRoute>} />
+            <Route path="/proekt/:shareId" element={<SharedProject />} />
             <Route path="*" element={<NotFound />} />
           </Route>
         </Routes>

@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase.js'
 
+// Keep enrollment payload only in-memory to avoid persisting MFA secrets in browser storage.
+const pendingEnrollments = new Map()
+
 export function mfaEnrollmentStorageKey(userId) {
   return `totsan.mfa.enrollment.${userId || 'anonymous'}`
 }
 
 export function savePendingMfaEnrollment(userId, enrollment) {
-  if (typeof window === 'undefined' || !userId || !enrollment?.id) return
+  if (!userId || !enrollment?.id) return
 
   const payload = {
     id: enrollment.id,
@@ -18,26 +21,17 @@ export function savePendingMfaEnrollment(userId, enrollment) {
     },
   }
 
-  window.localStorage.setItem(mfaEnrollmentStorageKey(userId), JSON.stringify(payload))
+  pendingEnrollments.set(mfaEnrollmentStorageKey(userId), payload)
 }
 
 export function loadPendingMfaEnrollment(userId) {
-  if (typeof window === 'undefined' || !userId) return null
-
-  const raw = window.localStorage.getItem(mfaEnrollmentStorageKey(userId))
-  if (!raw) return null
-
-  try {
-    return JSON.parse(raw)
-  } catch {
-    window.localStorage.removeItem(mfaEnrollmentStorageKey(userId))
-    return null
-  }
+  if (!userId) return null
+  return pendingEnrollments.get(mfaEnrollmentStorageKey(userId)) || null
 }
 
 export function clearPendingMfaEnrollment(userId) {
-  if (typeof window === 'undefined' || !userId) return
-  window.localStorage.removeItem(mfaEnrollmentStorageKey(userId))
+  if (!userId) return
+  pendingEnrollments.delete(mfaEnrollmentStorageKey(userId))
 }
 
 export function normalizeMfaError(error, fallback = 'Не успяхме да завършим проверката. Опитай отново.') {

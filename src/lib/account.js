@@ -3,7 +3,7 @@ import { supabase } from './supabase.js'
 import { clearPasskeyVerifiedSession, getPasskeySecurityState } from './passkeys.js'
 import { loadMfaStatus } from './mfa.js'
 
-const ACCOUNT_COLUMNS = 'id, email, full_name, display_name, role, specialist_status, account_status, phone, avatar_url, city, country, bio, locale, marketing_opt_in, stripe_account_id, created_at'
+const ACCOUNT_COLUMNS = 'id, email, full_name, display_name, role, specialist_status, account_status, phone, avatar_url, city, country, bio, locale, marketing_opt_in, interests, style_preferences, preferred_contact_method, age_group, gender, stripe_account_id, created_at'
 
 function emptyMfaState() {
   return { loading: false, needsMfa: false, verified: false, factor: null }

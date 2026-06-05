@@ -1,5 +1,6 @@
 import { CheckCircle2, Clock, CreditCard, RotateCcw, XCircle } from 'lucide-react'
 import { conversationRole } from '../../lib/chat.js'
+import { formatMoney } from '../../lib/money.js'
 
 export default function OfferCard({ offer, conversation, userId, onAction, compact = false }) {
   const role = conversationRole(conversation, userId)
@@ -24,7 +25,7 @@ export default function OfferCard({ offer, conversation, userId, onAction, compa
       )}
 
       <div className="mt-4 grid gap-2 sm:grid-cols-3">
-        <Info icon={CreditCard} label="Цена" value={offer.price_amount ? `${offer.price_amount} ${offer.currency || 'EUR'}` : 'По уговорка'} />
+        <Info icon={CreditCard} label="Цена" value={offer.price_amount ? formatMoney(offer.price_amount, offer.currency || 'EUR') : 'По уговорка'} />
         <Info icon={Clock} label="Срок" value={offer.delivery_days ? `${offer.delivery_days} дни` : 'По уговорка'} />
         <Info icon={RotateCcw} label="Ревизии" value={offer.revisions ?? '—'} />
       </div>

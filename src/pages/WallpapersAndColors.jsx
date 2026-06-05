@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+﻿import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { 
   Palette, 
@@ -15,8 +15,6 @@ import { gsap } from 'gsap'
 const U = (id, w = 1200) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&q=80&w=${w}`
 
 // Официален фиксиран курс: 1 EUR = 1.95583 лв.
-const EUR_RATE = 1.95583
-const fmtEur = (lv) => Math.round(lv / EUR_RATE)
 
 export default function WallpapersAndColors() {
   const pageRef = useRef(null)
@@ -265,10 +263,9 @@ function WallBudgetCalculator() {
                 <div className="text-xs uppercase tracking-wider text-accentSoft font-bold">ОРИЕНТИРОВЪЧЕН БЮДЖЕТ</div>
                 
                 <div className="font-display text-4xl lg:text-5xl font-bold mt-4 tracking-tight">
-                  {fmtEur(totals.min).toLocaleString('bg-BG')} – {fmtEur(totals.max).toLocaleString('bg-BG')} €
+                  {formatDualCurrencyRange(totals.min, totals.max)}
                 </div>
                 <div className="text-lg text-white/55 mt-1">
-                  ({totals.min.toLocaleString('bg-BG')} – {totals.max.toLocaleString('bg-BG')} лв.)
                 </div>
                 
                 <p className="text-white/70 text-xs mt-3 leading-relaxed max-w-sm mx-auto">

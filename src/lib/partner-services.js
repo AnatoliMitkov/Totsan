@@ -1,6 +1,7 @@
 import { uploadServiceMedia } from './profile-media-upload-client.js'
 import { slugify } from './profiles.js'
 import { supabase } from './supabase.js'
+import { formatMoney } from './money.js'
 
 export const SERVICE_STATUS_LABELS = {
   draft: 'Чернова',
@@ -444,11 +445,11 @@ export function appendPartnerServiceMedia(draft, upload, caption = '') {
 
 export function packagePriceLabel(service) {
   if (!service?.lowestPrice) return 'Цена по оферта'
-  return `${new Intl.NumberFormat('bg-BG').format(Number(service.lowestPrice))} €`
+  return formatMoney(service.lowestPrice, service.lowestCurrency || 'EUR')
 }
 
 export function formatServicePrice(amount) {
   const value = Number(amount || 0)
   if (!Number.isFinite(value) || value <= 0) return 'Цена по оферта'
-  return `${new Intl.NumberFormat('bg-BG').format(value)} €`
+  return formatMoney(value, 'EUR')
 }

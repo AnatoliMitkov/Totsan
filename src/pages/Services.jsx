@@ -219,6 +219,8 @@ function ServiceCard({ service, layers }) {
   const coverCandidates = getPartnerServiceCoverCandidates(service, service.profile)
   const partnerName = service.profile?.name || 'Партньор в Totsan'
   const city = service.profile?.city || service.deliveryAreas[0] || ''
+  const avatarUrl = service.profile?.image_url || ''
+  const initial = (partnerName?.[0] || '?').toUpperCase()
 
   return (
     <article className="card reveal overflow-hidden bg-paper p-0">
@@ -253,9 +255,17 @@ function ServiceCard({ service, layers }) {
       </Link>
       <div className="border-t border-line px-5 py-4">
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-          <div className="min-w-0">
-            <div className="truncate font-medium text-ink">{partnerName}</div>
-            {city && <div className="mt-1 inline-flex items-center gap-1 text-muted"><MapPin size={14} /> {city}</div>}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-[2.6rem] w-[2.6rem] shrink-0 overflow-hidden rounded-full border border-line bg-soft">
+              {avatarUrl
+                ? <img src={avatarUrl} alt={partnerName} className="h-full w-full object-cover" />
+                : <div className="flex h-full w-full items-center justify-center text-sm font-medium text-muted">{initial}</div>
+              }
+            </div>
+            <div className="min-w-0">
+              <div className="truncate font-medium text-ink">{partnerName}</div>
+              {city && <div className="mt-0.5 inline-flex items-center gap-1 text-muted"><MapPin size={13} /> {city}</div>}
+            </div>
           </div>
           {service.profile?.slug && (
             <Link to={`/profil/${service.profile.slug}`} className="font-medium text-ink underline underline-offset-4">
