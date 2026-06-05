@@ -39,7 +39,7 @@ import MfaSessionLock from './components/auth/MfaSessionLock.jsx'
 import { signOutAndRedirect } from './lib/account.js'
 import { loadMfaStatus } from './lib/mfa.js'
 
-const MFA_NEXT_KEY = 'totsan.mfa.next'
+let mfaNextPath = ''
 
 function normalizeNextPath(value = '') {
   const raw = String(value || '').trim()
@@ -58,19 +58,16 @@ function nextPathFromLocation(location) {
 }
 
 function readStoredMfaNext() {
-  if (typeof window === 'undefined') return ''
-  return normalizeNextPath(window.sessionStorage.getItem(MFA_NEXT_KEY) || '')
+  return normalizeNextPath(mfaNextPath)
 }
 
 function storeMfaNext(value) {
-  if (typeof window === 'undefined') return
   const next = normalizeNextPath(value)
-  if (next) window.sessionStorage.setItem(MFA_NEXT_KEY, next)
+  if (next) mfaNextPath = next
 }
 
 function clearMfaNext() {
-  if (typeof window === 'undefined') return
-  window.sessionStorage.removeItem(MFA_NEXT_KEY)
+  mfaNextPath = ''
 }
 
 function MfaAppGate({ children }) {
