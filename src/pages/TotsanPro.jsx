@@ -14,6 +14,8 @@ import {
   X,
   Check,
 } from 'lucide-react'
+import { trackEvent } from '../lib/analytics.js'
+import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
 
 const comparison = [
   {
@@ -112,6 +114,20 @@ const plans = [
 ]
 
 export default function TotsanPro() {
+  useSeo({
+    canonicalPath: '/pro',
+    jsonLd: [
+      buildBreadcrumbSchema([
+        { name: 'Начало', path: '/' },
+        { name: 'Totsan Pro', path: '/pro' },
+      ]),
+    ],
+  })
+
+  const trackPartnerApplicationStart = (source) => {
+    trackEvent('partner_application_start', { source })
+  }
+
   return (
     <>
       {/* ── Hero ── */}
@@ -131,7 +147,7 @@ export default function TotsanPro() {
               Профил, услуги, заявки и чат — всичко на едно място. Безплатен вход за пилотния кръг.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link to={PRO_SIGNUP_URL} className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">
+              <Link to={PRO_SIGNUP_URL} onClick={() => trackPartnerApplicationStart('totsan_pro_hero')} className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">
                 Кандидатствай безплатно <ArrowRight size={18} />
               </Link>
               <a href="#pro-plans" className="btn btn-ghost !border-paper/25 !bg-paper/10 !text-paper hover:!border-paper/50">
@@ -228,7 +244,7 @@ export default function TotsanPro() {
           </div>
 
           <div className="reveal mt-8 flex justify-center">
-            <Link to={PRO_SIGNUP_URL} className="btn btn-primary">
+            <Link to={PRO_SIGNUP_URL} onClick={() => trackPartnerApplicationStart('totsan_pro_comparison')} className="btn btn-primary">
               Кандидатствай безплатно <ArrowRight size={18} />
             </Link>
           </div>
@@ -273,7 +289,10 @@ export default function TotsanPro() {
                 </ul>
 
                 <Link
-                  to={plan.name === 'Studio / Brand' ? '/contact' : PRO_SIGNUP_URL}
+                  to={plan.name === 'Studio / Brand' ? '/kontakt' : PRO_SIGNUP_URL}
+                  onClick={() => {
+                    if (plan.name !== 'Studio / Brand') trackPartnerApplicationStart(`totsan_pro_plan_${plan.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`)
+                  }}
                   className={`mt-7 btn justify-center ${plan.highlighted ? 'btn-primary' : 'btn-ghost !border-paper/25 !bg-paper/10 !text-paper hover:!border-paper/45'}`}
                 >
                   {plan.cta} <ArrowRight size={16} />
@@ -378,10 +397,10 @@ export default function TotsanPro() {
               Майстори, дизайнери, архитекти, фирми и марки с реално качество — кандидатствайте за пилотния кръг.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <Link to={PRO_SIGNUP_URL} className="btn btn-primary">
+              <Link to={PRO_SIGNUP_URL} onClick={() => trackPartnerApplicationStart('totsan_pro_cta')} className="btn btn-primary">
                 Кандидатствай безплатно <ArrowRight size={18} />
               </Link>
-              <Link to="/contact" className="btn btn-ghost">
+              <Link to="/kontakt" className="btn btn-ghost">
                 Говори с екипа
               </Link>
             </div>

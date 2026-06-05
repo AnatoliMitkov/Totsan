@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, MessageSquare, ShieldCheck, Star } from 'lucide-react'
 import FallbackImage from '../components/FallbackImage.jsx'
@@ -8,6 +8,8 @@ import { formatServicePrice, loadPartnerServiceBySlug, packagePriceLabel } from 
 import { getPartnerServiceCoverCandidates } from '../lib/service-media.js'
 import { useAccount } from '../lib/account.js'
 import ReviewsList from '../components/reviews/ReviewsList.jsx'
+import { getPageLocation, trackEvent, trackPageView } from '../lib/analytics.js'
+import { buildBreadcrumbSchema, buildFaqSchema, buildServiceSchema, useSeo } from '../lib/seo.js'
 
 export default function PartnerService() {
   const { slug } = useParams()
@@ -17,6 +19,8 @@ export default function PartnerService() {
   const [status, setStatus] = useState('loading')
   const [message, setMessage] = useState('')
   const [chatState, setChatState] = useState({ status: 'idle', message: '' })
+  const trackedServiceSlugRef = useRef('')
+  const servicePath = slug ? `/uslugi/${slug}` : '/uslugi'
 
   useEffect(() => {
     let active = true
@@ -60,9 +64,62 @@ export default function PartnerService() {
   const activePackage = packages[0]
   const coverCandidates = useMemo(() => getPartnerServiceCoverCandidates(service, profile), [profile, service])
   const profileImageCandidates = useMemo(() => getProfileImageCandidates(profile), [profile])
+  const seoConfig = useMemo(() => {
+    if (!slug) return null
+    if (status === 'ready' && service && profile) {
+      const description = service.subtitle || service.descriptionMd || `${service.title} е публикувана партньорска услуга в Totsan.`
+      return {
+        title: `${service.title} | Totsan`,
+        description,
+        canonicalPath: servicePath,
+        jsonLd: [
+          buildBreadcrumbSchema([
+            { name: 'Начало', path: '/' },
+            { name: 'Услуги', path: '/uslugi' },
+            { name: service.title, path: servicePath },
+          ]),
+          buildServiceSchema(service, profile, servicePath),
+          service.faq.length > 0 ? buildFaqSchema(service.faq.map((item) => ({ question: item.question, answer: item.answer }))) : null,
+        ].filter(Boolean),
+      }
+    }
+
+    if (status === 'loading') return null
+
+    return {
+      title: 'Услугата не е налична | Totsan',
+      description: 'Тази услуга още не е одобрена или вече не е публична.',
+      canonicalPath: servicePath,
+      robots: 'noindex, nofollow',
+    }
+  }, [profile, service, servicePath, slug, status])
+
+  useSeo(seoConfig)
+
+  useEffect(() => {
+    if (status !== 'ready' || !service || !profile || !seoConfig?.title) return
+    if (!service.slug || trackedServiceSlugRef.current === service.slug) return
+
+    trackedServiceSlugRef.current = service.slug
+    trackPageView({
+      pagePath: servicePath,
+      pageTitle: seoConfig.title,
+      pageLocation: getPageLocation(servicePath),
+    })
+    trackEvent('view_service', {
+      service_slug: service.slug,
+      layer: service.layerSlug || undefined,
+      profile_slug: profile.slug || undefined,
+    })
+  }, [profile, seoConfig?.title, service, servicePath, status])
 
   async function startChat() {
     if (!service || !profile) return
+    trackEvent('start_chat', {
+      source: 'service_page',
+      service_slug: service.slug || undefined,
+      layer: service.layerSlug || undefined,
+    })
     if (!session) {
       navigate('/login')
       return
@@ -74,6 +131,17 @@ export default function PartnerService() {
     } catch (error) {
       setChatState({ status: 'error', message: error.message || 'Чатът не се отвори.' })
     }
+  }
+
+  function handleBeginCheckout() {
+    if (!service) return
+
+    if (!session) {
+      navigate('/login')
+      return
+    }
+
+    if (activePackage?.id) navigate(`/checkout/service/${activePackage.id}`)
   }
 
   if (status === 'loading') {
@@ -178,13 +246,7 @@ export default function PartnerService() {
               ) : <p className="mt-5 text-sm text-muted">Няма активна оферта.</p>}
 
               <div className="mt-6 grid gap-3">
-                <button type="button" className="btn btn-primary w-full justify-center" disabled={!activePackage} onClick={() => {
-                  if (!session) {
-                    navigate('/login')
-                    return
-                  }
-                  if (activePackage?.id) navigate(`/checkout/service/${activePackage.id}`)
-                }}>Поръчай пакета</button>
+                <button type="button" className="btn btn-primary w-full justify-center" disabled={!activePackage} onClick={handleBeginCheckout}>Поръчай пакета</button>
                 <p className="text-xs text-muted">Директно към checkout, ако условията и цената са ясни.</p>
                 <button type="button" className="btn btn-ghost w-full justify-center" onClick={startChat} disabled={chatState.status === 'opening'}><MessageSquare size={18} /> {chatState.status === 'opening' ? 'Отваряме…' : 'Питай първо'}</button>
                 <p className="text-xs text-muted">Използвай чат, ако искаш уточнение преди поръчка.</p>

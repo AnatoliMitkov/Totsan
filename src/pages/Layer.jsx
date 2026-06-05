@@ -1,16 +1,44 @@
 import { Link, useParams } from 'react-router-dom'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { LAYER_HEROS, WHAT_YOU_FIND_IMAGES, SHOWCASE_IMAGES, productImageFor } from '../data/images.js'
 import ProfessionalCard from '../components/ProfessionalCard.jsx'
 import { useProfileDirectory } from '../lib/profiles.js'
 import { formatMoneyText } from '../lib/money.js'
 import { getStaticProductsForLayer } from '../lib/product-metadata.js'
+import { buildBreadcrumbSchema, buildFaqSchema, useSeo } from '../lib/seo.js'
 
 export default function Layer({ slug }) {
   const { slug: routeSlug } = useParams()
   const currentSlug = slug || routeSlug
   const { layers } = useProfileDirectory()
   const layer = layers.find(l => l.slug === currentSlug)
+
+  const seoConfig = useMemo(() => {
+    if (!currentSlug) return null
+    if (!layer) {
+      return {
+        title: 'Слоят не е намерен | Totsan',
+        description: 'Този слой не е наличен или линкът е невалиден.',
+        canonicalPath: `/sloy/${currentSlug}`,
+        robots: 'noindex, nofollow',
+      }
+    }
+
+    return {
+      title: `Слой ${layer.number} · ${layer.title} | Totsan`,
+      description: layer.long,
+      canonicalPath: `/sloy/${layer.slug}`,
+      jsonLd: [
+        buildBreadcrumbSchema([
+          { name: 'Начало', path: '/' },
+          { name: layer.title, path: `/sloy/${layer.slug}` },
+        ]),
+        buildFaqSchema(layer.faq.map((item) => ({ question: item.q, answer: item.a }))),
+      ],
+    }
+  }, [currentSlug, layer])
+
+  useSeo(seoConfig)
 
   if (!layer) return <LayerNotFound />
 

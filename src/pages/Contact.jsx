@@ -3,8 +3,20 @@ import { useLocation } from 'react-router-dom'
 import { CheckCircle2 } from 'lucide-react'
 import { LAYERS } from '../data/layers.js'
 import { supabase, brand } from '../lib/supabase.js'
+import { trackEvent } from '../lib/analytics.js'
+import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
 
 export default function Contact() {
+  useSeo({
+    canonicalPath: '/kontakt',
+    jsonLd: [
+      buildBreadcrumbSchema([
+        { name: 'Начало', path: '/' },
+        { name: 'Контакт', path: '/kontakt' },
+      ]),
+    ],
+  })
+
   const { state } = useLocation()
   const subject = state?.subject || ''
   const [form, setForm] = useState({ name: '', contact: '', layer: '', message: subject ? `${subject}\n\n` : '' })
@@ -38,6 +50,10 @@ export default function Contact() {
       return
     }
     setStatus('sent')
+    trackEvent('submit_inquiry', {
+      source: 'contact_form',
+      layer: form.layer || undefined,
+    })
     setForm({ name: '', contact: '', layer: '', message: '' })
   }
 

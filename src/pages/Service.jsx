@@ -1,5 +1,6 @@
-import { Navigate } from 'react-router-dom'
+import { Navigate, useParams } from 'react-router-dom'
 
 export default function Service() {
-  return <Navigate to="/uslugi" replace />
+  const { slug = '' } = useParams()
+  return <Navigate to={slug ? `/uslugi/${slug}` : '/uslugi'} replace />
 }

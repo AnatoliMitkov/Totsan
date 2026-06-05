@@ -5,7 +5,11 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/((?!assets/|Images/|Logos/|favicon.ico|robots.txt|sitemap.xml).*)",
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap.xml"
+    },
+    {
+      "source": "/((?!api/|assets/|Images/|Logos/|Videos/|Music/|logos.json|favicon.ico|robots.txt|sitemap.xml|google97ff590199fce10d.html).*)",
       "destination": "/index.html"
     }
   ]

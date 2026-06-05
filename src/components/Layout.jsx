@@ -230,7 +230,7 @@ function Header() {
                 <NavLink to="/pro" onClick={close} className={() => mobileNavClassName(isProActive)}><span>Totsan Pro</span><span className="mobile-nav-arrow">→</span></NavLink>
                 <NavLink to="/kak-raboti" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Как работи Totsan</span><span className="mobile-nav-arrow">→</span></NavLink>
                 <NavLink to="/za-nas" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>За нас</span><span className="mobile-nav-arrow">→</span></NavLink>
-                <NavLink to="/contact" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Контакт</span><span className="mobile-nav-arrow">→</span></NavLink>
+                <NavLink to="/kontakt" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Контакт</span><span className="mobile-nav-arrow">→</span></NavLink>
               </div>
             </div>
 
@@ -405,7 +405,7 @@ function Footer({ isAuthPage = false }) {
             <li><Link to="/za-nas" className="text-muted hover:text-ink">За нас</Link></li>
             <li><Link to="/uslugi" className="text-muted hover:text-ink">Услуги</Link></li>
             <li><Link to="/katalog" className="text-muted hover:text-ink">Каталог</Link></li>
-            <li><Link to="/contact" className="text-muted hover:text-ink">Контакт</Link></li>
+            <li><Link to="/kontakt" className="text-muted hover:text-ink">Контакт</Link></li>
           </ul>
         </div>
         <div>

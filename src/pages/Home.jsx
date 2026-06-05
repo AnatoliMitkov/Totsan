@@ -17,6 +17,8 @@ import { gsap } from 'gsap'
 import { LAYERS } from '../data/layers.js'
 import { HOME_PROJECTS, PARTNER_LOGOS, LAYER_HEROS } from '../data/images.js'
 import { supabase } from '../lib/supabase.js'
+import { trackEvent } from '../lib/analytics.js'
+import { buildFaqSchema, buildOrganizationSchema, buildWebsiteSchema, useSeo } from '../lib/seo.js'
 
 const HERO_POSTER_SRC = '/Videos/totsan-hero-video-building-layers.webp'
 const HERO_VIDEO_SOURCES = [
@@ -24,7 +26,35 @@ const HERO_VIDEO_SOURCES = [
   { src: '/Videos/totsan-hero-video-building-layers.mp4', type: 'video/mp4' },
 ]
 
+const HOME_FAQ_ITEMS = [
+  {
+    question: 'Колко струва да използвам Totsan?',
+    answer: 'За теб като клиент Totsan е безплатен — не взимаме такси от клиенти. Когато платиш услуга през платформата, парите се задържат защитено и се освобождават към специалиста едва след като потвърдиш, че работата е завършена.',
+  },
+  {
+    question: 'Как избирате кои хора влизат?',
+    answer: 'Всеки специалист минава през преглед от нашия екип — реално завършени проекти, отзиви от клиенти и проверка на документи. Ако не отговаря на стандартите, не влиза.',
+  },
+  {
+    question: 'Ами ако нещо се обърка по време на работа?',
+    answer: 'Имаш на кого да се обадиш. Ние посредничим и съдействаме за намиране на бързо решение, ако възникне спор, забавяне или недоразумение с изпълнител.',
+  },
+  {
+    question: 'Мога ли да започна, без да зная какво точно искам?',
+    answer: 'Точно за това е Слой 01. Кажи ни мечтата си в две изречения или използвай нашия бърз Интерактивен съветник — ние ще те насочим към правилната посока.',
+  },
+]
+
 export default function Home() {
+  useSeo({
+    canonicalPath: '/',
+    jsonLd: [
+      buildOrganizationSchema(),
+      buildWebsiteSchema(),
+      buildFaqSchema(HOME_FAQ_ITEMS),
+    ],
+  })
+
   return (
     <>
       <Hero />
@@ -51,6 +81,7 @@ function Hero() {
   const videoRef = useRef(null)
   const heroRef = useRef(null)
   const hideTimerRef = useRef(null)
+  const autoplayTrackedRef = useRef(false)
   const [videoReady, setVideoReady] = useState(false)
   const [isPlaying, setIsPlaying] = useState(true)
   const [duration, setDuration] = useState(0)
@@ -130,6 +161,10 @@ function Hero() {
         playPromise.then(() => {
           setVideoReady(true)
           setIsPlaying(true)
+          if (!autoplayTrackedRef.current) {
+            autoplayTrackedRef.current = true
+            trackEvent('pixel_stream_start', { source: 'home_hero', mode: 'autoplay' })
+          }
         }).catch((err) => {
           console.warn("Video autoplay prevented:", err)
           setIsPlaying(false)
@@ -182,6 +217,7 @@ function Hero() {
     if (video.paused) {
       try {
         await video.play()
+        trackEvent('pixel_stream_start', { source: 'home_hero', mode: 'manual' })
       } catch {
         setIsPlaying(false)
       }
@@ -189,6 +225,7 @@ function Hero() {
     }
 
     video.pause()
+    trackEvent('pixel_stream_stop', { source: 'home_hero', mode: 'manual' })
   }
 
   const handleSeek = (event) => {
@@ -331,7 +368,7 @@ function Hero() {
             От идея до завършен дом — на едно място. Отговаряш на няколко въпроса, а ние те насочваме към правилните проверени специалисти, материали и услуги. Безплатно за теб, със защитено плащане.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
-            <Link to="/start" className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep hero-animate-cta">
+            <Link to="/start" onClick={() => trackEvent('start_project', { source: 'home_hero' })} className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep hero-animate-cta">
               Започни оттук — безплатно →
             </Link>
             <a href="#layers-explorer" className="btn btn-ghost !border-paper/25 !bg-paper/10 !text-paper hover:!border-paper/50 hover:!bg-paper/15 hero-animate-cta">
@@ -1162,7 +1199,7 @@ function ProTeaser() {
             <Link to="/pro" className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">
               Виж Totsan Pro <ArrowRight size={18} />
             </Link>
-            <Link to="/login?signup=true&role=pro" className="btn btn-ghost !border-paper/25 !text-paper hover:!bg-paper/10">
+            <Link to="/login?signup=true&role=pro" onClick={() => trackEvent('partner_application_start', { source: 'home_pro_teaser' })} className="btn btn-ghost !border-paper/25 !text-paper hover:!bg-paper/10">
               Стани партньор
             </Link>
           </div>
@@ -1257,20 +1294,14 @@ function FAQItem({ question, answer }) {
 }
 
 function FAQ() {
-  const items = [
-    { q:'Колко струва да използвам Totsan?', a:'За теб като клиент Totsan е безплатен — не взимаме такси от клиенти. Когато платиш услуга през платформата, парите се задържат защитено и се освобождават към специалиста едва след като потвърдиш, че работата е завършена.' },
-    { q:'Как избирате кои хора влизат?', a:'Всеки специалист минава през преглед от нашия екип — реално завършени проекти, отзиви от клиенти и проверка на документи. Ако не отговаря на стандартите, не влиза.' },
-    { q:'Ами ако нещо се обърка по време на работа?', a:'Имаш на кого да се обадиш. Ние посредничим и съдействаме за намиране на бързо решение, ако възникне спор, забавяне или недоразумение с изпълнител.' },
-    { q:'Мога ли да започна, без да зная какво точно искам?', a:'Точно за това е Слой 01. Кажи ни мечтата си в две изречения или използвай нашия бърз Интерактивен съветник — ние ще те насочим към правилната посока.' }
-  ]
   return (
     <section className="section bg-paper">
       <div className="container-page max-w-4xl">
         <div className="eyebrow reveal">Често задавани въпроси</div>
         <h2 className="h-section mt-2 reveal">Кратко, ясно и прозрачно.</h2>
         <div className="mt-10 divide-y divide-line border-y border-line">
-          {items.map((it, i) => (
-            <FAQItem key={i} question={it.q} answer={it.a} />
+          {HOME_FAQ_ITEMS.map((item) => (
+            <FAQItem key={item.question} question={item.question} answer={item.answer} />
           ))}
         </div>
       </div>
@@ -1292,7 +1323,7 @@ function CTA() {
           </p>
         </div>
         <div className="md:col-span-4 flex md:justify-end gap-3 flex-wrap relative z-10">
-          <Link to="/contact" className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep shadow-md hover:shadow-lg">
+          <Link to="/kontakt" className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep shadow-md hover:shadow-lg">
             Заяви консултация
           </Link>
           <Link to="/sloy/ideya" className="btn btn-ghost !border-paper/30 !text-paper hover:!bg-paper/10">

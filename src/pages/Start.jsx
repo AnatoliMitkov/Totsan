@@ -4,6 +4,8 @@ import { CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react'
 import { gsap } from 'gsap'
 import { LAYERS } from '../data/layers.js'
 import { supabase } from '../lib/supabase.js'
+import { trackEvent } from '../lib/analytics.js'
+import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
 
 const SCOPE_OPTIONS = [
   { id: 'house', label: 'Строителство на нова къща' },
@@ -27,6 +29,16 @@ const PRIORITY_OPTIONS = [
 ]
 
 export default function Start() {
+  useSeo({
+    canonicalPath: '/start',
+    jsonLd: [
+      buildBreadcrumbSchema([
+        { name: 'Начало', path: '/' },
+        { name: 'Започни проект', path: '/start' },
+      ]),
+    ],
+  })
+
   const [step, setStep] = useState(1)
   const [answers, setAnswers] = useState({
     scope: '',
@@ -43,6 +55,7 @@ export default function Start() {
   const [leadError, setLeadError] = useState('')
 
   const briefRef = useRef(null)
+  const projectStartTrackedRef = useRef(false)
 
   const handleSelect = (field, value) => {
     setAnswers((prev) => ({ ...prev, [field]: value }))
@@ -54,6 +67,13 @@ export default function Start() {
 
   const nextStep = () => {
     if (step < 3) {
+      if (step === 1 && !projectStartTrackedRef.current) {
+        projectStartTrackedRef.current = true
+        trackEvent('start_project', {
+          source: 'guided_project_brief',
+          scope: answers.scope || undefined,
+        })
+      }
       setStep((prev) => prev + 1)
       gsap.fromTo(
         '.quiz-step-container',
@@ -172,6 +192,12 @@ export default function Start() {
       description: text,
       steps: stepsList,
     })
+    trackEvent('complete_project_brief', {
+      layer: layerObj?.slug || undefined,
+      scope: answers.scope || undefined,
+      stage: answers.stage || undefined,
+      priority: answers.priority || undefined,
+    })
     setLeadStatus('idle')
     setLeadError('')
 
@@ -231,6 +257,10 @@ export default function Start() {
     }
 
     setLeadStatus('sent')
+    trackEvent('submit_inquiry', {
+      source: 'start_brief',
+      layer: result.layer.slug,
+    })
     setLeadForm({ name: '', contact: '', details: '' })
   }
 

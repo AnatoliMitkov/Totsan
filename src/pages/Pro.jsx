@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, BriefcaseBusiness, CheckCircle2, Globe2, Languages, MapPin } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { LAYER_HEROS } from '../data/images.js'
@@ -11,6 +11,8 @@ import { createConversationFromProfile } from '../lib/chat.js'
 import PortfolioGallery from '../components/profile/PortfolioGallery.jsx'
 import PartnerStats from '../components/profile/PartnerStats.jsx'
 import ReviewsList from '../components/reviews/ReviewsList.jsx'
+import { getPageLocation, trackEvent, trackPageView } from '../lib/analytics.js'
+import { buildBreadcrumbSchema, buildPersonSchema, useSeo } from '../lib/seo.js'
 
 export default function Pro() {
   const { state } = useLocation()
@@ -22,6 +24,8 @@ export default function Pro() {
   const [stats, setStats] = useState(null)
   const [services, setServices] = useState([])
   const [chatState, setChatState] = useState({ status: 'idle', message: '' })
+  const trackedProfileSlugRef = useRef('')
+  const profilePath = slug ? `/profil/${slug}` : '/katalog'
   const item = useMemo(() => {
     const liveProfile = profiles.find((profile) => profile.slug === slug)
     if (liveProfile) return liveProfile
@@ -33,6 +37,43 @@ export default function Pro() {
     }
     return catalog.find((entry) => entry.kind === 'pro' && (entry.slug || slugify(entry.name)) === slug)
   }, [catalog, profiles, slug, state])
+  const layer = useMemo(() => {
+    if (!item) return layers[0] || null
+    return layers.find((current) => current.slug === (item.layerSlug || item.layer)) || layers[0] || null
+  }, [item, layers])
+
+  const seoConfig = useMemo(() => {
+    if (!slug) return null
+    if (item && layer) {
+      const title = `${item.name}${item.tag ? ` — ${item.tag}` : ''} | Totsan`
+      const description = item.descriptionLong || item.headline || `${item.name} е публичен профил в Totsan за ${item.tag || 'специалист'}${item.city ? ` в ${item.city}` : ''}.`
+
+      return {
+        title,
+        description,
+        canonicalPath: profilePath,
+        jsonLd: [
+          buildBreadcrumbSchema([
+            { name: 'Начало', path: '/' },
+            { name: 'Каталог', path: '/katalog' },
+            { name: item.name, path: profilePath },
+          ]),
+          buildPersonSchema(item, profilePath),
+        ],
+      }
+    }
+
+    if (status === 'loading') return null
+
+    return {
+      title: 'Специалистът не е намерен | Totsan',
+      description: 'Този публичен профил не е наличен или вече не се показва в Totsan.',
+      canonicalPath: profilePath,
+      robots: 'noindex, nofollow',
+    }
+  }, [item, layer, profilePath, slug, status])
+
+  useSeo(seoConfig)
 
   useEffect(() => {
     if (!item?.id || item.isStatic) {
@@ -67,9 +108,27 @@ export default function Pro() {
     return () => { active = false }
   }, [item?.id, item?.isStatic])
 
+  useEffect(() => {
+    if (!item || !layer || !seoConfig?.title) return
+    const profileSlug = item.slug || slug || ''
+    if (!profileSlug || trackedProfileSlugRef.current === profileSlug) return
+
+    trackedProfileSlugRef.current = profileSlug
+    trackPageView({
+      pagePath: profilePath,
+      pageTitle: seoConfig.title,
+      pageLocation: getPageLocation(profilePath),
+    })
+    trackEvent('view_professional', {
+      professional_slug: profileSlug,
+      professional_role: item.tag || undefined,
+      layer: layer.slug,
+      city: item.city || undefined,
+    })
+  }, [item, layer, profilePath, seoConfig?.title, slug])
+
   if (!item && status === 'loading') return <LoadingProfile />
   if (!item) return <NotFound type="специалист" />
-  const layer = layers.find((current) => current.slug === (item.layerSlug || item.layer)) || layers[0]
   const partnerUserId = item.userId || stats?.user_id || ''
 
   async function startChat() {
@@ -81,6 +140,11 @@ export default function Pro() {
       setChatState({ status: 'error', message: 'Този профил още не е свързан с чат.' })
       return
     }
+    trackEvent('start_chat', {
+      source: 'profile_page',
+      professional_slug: item.slug || slug || undefined,
+      layer: item.layerSlug || item.layer || undefined,
+    })
     setChatState({ status: 'loading', message: 'Отваряме защитен чат…' })
     try {
       const conversation = await createConversationFromProfile({ profileId: item.id, subject: `Разговор с ${item.name}` })
@@ -299,7 +363,14 @@ function InquiryBox({ proName, title, layerSlug, targetSlug, clientId }) {
       client_id: clientId || null,
     })
     setStatus(error ? 'error' : 'sent')
-    if (!error) setForm({ name: '', contact: '', message: '' })
+    if (!error) {
+      trackEvent('submit_inquiry', {
+        source: 'pro_profile',
+        target_slug: targetSlug || undefined,
+        layer: layerSlug || undefined,
+      })
+      setForm({ name: '', contact: '', message: '' })
+    }
   }
 
   return (

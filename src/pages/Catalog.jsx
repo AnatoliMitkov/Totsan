@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowRight, BriefcaseBusiness, CheckCircle2, MapPin, PackageSearch, Search, SlidersHorizontal, UserRound, X } from 'lucide-react'
 import { useProfileDirectory } from '../lib/profiles.js'
@@ -9,6 +9,8 @@ import FallbackImage from '../components/FallbackImage.jsx'
 import ProfessionalCard from '../components/ProfessionalCard.jsx'
 import { formatMoneyText } from '../lib/money.js'
 import { getPartnerServiceCoverCandidates } from '../lib/service-media.js'
+import { trackEvent } from '../lib/analytics.js'
+import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
 
 const VALID_KINDS = new Set(['all', 'pro', 'service', 'product'])
 const KIND_TABS = [
@@ -70,6 +72,7 @@ export default function Catalog() {
   const [layer, setLayer] = useState(() => searchParams.get('layer') || 'all')
   const [kind, setKind] = useState(() => normalizeKind(searchParams.get('kind')))
   const [city, setCity] = useState(() => searchParams.get('city') || 'all')
+  const filterTelemetryRef = useRef({ mounted: false, key: '' })
 
   useEffect(() => {
     let active = true
@@ -165,6 +168,46 @@ export default function Catalog() {
 
   const selectedKind = KIND_COPY[kind] || KIND_COPY.all
   const hasActiveFilters = q.trim() || layer !== 'all' || kind !== 'all' || city !== 'all'
+
+  useSeo({
+    title: selectedLayer
+      ? `Каталог за ${selectedLayer.title.toLowerCase()} | Totsan`
+      : kind !== 'all'
+        ? `${selectedKind.label} в каталога | Totsan`
+        : 'Каталог със специалисти, услуги и продукти | Totsan',
+    description: selectedLayer
+      ? `Разгледай публични профили, услуги и продукти за Слой ${selectedLayer.number} · ${selectedLayer.title}.`
+      : 'Каталогът на Totsan събира публични профили, партньорски услуги и продукти за петте слоя на проекта.',
+    canonicalPath: '/katalog',
+    jsonLd: [
+      buildBreadcrumbSchema([
+        { name: 'Начало', path: '/' },
+        { name: 'Каталог', path: '/katalog' },
+      ]),
+    ],
+  })
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      const nextKey = `${q.trim()}|${layer}|${city}`
+      if (!filterTelemetryRef.current.mounted) {
+        filterTelemetryRef.current = { mounted: true, key: nextKey }
+        return
+      }
+
+      if (filterTelemetryRef.current.key === nextKey) return
+      filterTelemetryRef.current.key = nextKey
+
+      trackEvent('apply_catalog_filter', {
+        layer: layer !== 'all' ? layer : undefined,
+        city: city !== 'all' ? city : undefined,
+        has_query: q.trim() ? 'yes' : 'no',
+      })
+    }, 500)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [city, layer, q])
+
   const resetFilters = () => {
     setQ('')
     setLayer('all')
@@ -225,7 +268,11 @@ export default function Catalog() {
                   <button
                     key={tab.value}
                     type="button"
-                    onClick={() => setKind(tab.value)}
+                    onClick={() => {
+                      if (kind === tab.value) return
+                      setKind(tab.value)
+                      trackEvent('select_catalog_tab', { tab: tab.value })
+                    }}
                     className={`whitespace-nowrap rounded-full px-4 py-2.5 text-left text-sm font-medium transition ${
                       isActive
                         ? 'bg-ink text-paper shadow-sm'

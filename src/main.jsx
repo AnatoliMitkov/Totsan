@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import './index.css'
 import Layout from './components/Layout.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
@@ -38,9 +38,11 @@ import ProtectedRoute from './components/auth/ProtectedRoute.jsx'
 import MfaSessionLock from './components/auth/MfaSessionLock.jsx'
 import { signOutAndRedirect } from './lib/account.js'
 import { loadMfaStatus } from './lib/mfa.js'
+import { trackPageView, canAutoTrackPath, getPageLocation } from './lib/analytics.js'
+import { applySeo, getDefaultSeo } from './lib/seo.js'
+import { getAnalyticsPath } from './lib/site-routes.js'
 
 let mfaNextPath = ''
-const GA_MEASUREMENT_ID = 'G-39RQFR7N0G'
 
 function normalizeNextPath(value = '') {
   const raw = String(value || '').trim()
@@ -69,6 +71,33 @@ function storeMfaNext(value) {
 
 function clearMfaNext() {
   mfaNextPath = ''
+}
+
+function RouteSeoManager() {
+  const location = useLocation()
+
+  useEffect(() => {
+    applySeo(getDefaultSeo(location.pathname))
+  }, [location.pathname])
+
+  return null
+}
+
+function RouteAnalyticsManager() {
+  const location = useLocation()
+
+  useEffect(() => {
+    if (!canAutoTrackPath(location.pathname)) return
+
+    const seo = getDefaultSeo(location.pathname)
+    trackPageView({
+      pagePath: getAnalyticsPath(location.pathname),
+      pageTitle: seo.title,
+      pageLocation: getPageLocation(location.pathname),
+    })
+  }, [location.pathname])
+
+  return null
 }
 
 function MfaAppGate({ children }) {
@@ -183,23 +212,6 @@ function MfaAppGate({ children }) {
 
 function AppRoutes() {
   const location = useLocation()
-  const hasMountedRef = useRef(false)
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.gtag !== 'function') return
-
-    if (!hasMountedRef.current) {
-      hasMountedRef.current = true
-      return
-    }
-
-    const pagePath = `${location.pathname}${location.search}${location.hash}`
-    window.gtag('config', GA_MEASUREMENT_ID, {
-      page_path: pagePath,
-      page_location: window.location.href,
-      page_title: document.title,
-    })
-  }, [location.pathname, location.search, location.hash])
 
   return (
     <MfaAppGate>
@@ -208,7 +220,7 @@ function AppRoutes() {
           <Route element={<Layout />}>
             <Route path="/" element={<Home />} />
             <Route path="/start" element={<Start />} />
-            <Route path="/landing" element={<Home />} />
+            <Route path="/landing" element={<Navigate to="/" replace />} />
             <Route path="/sloy/:slug" element={<Layer />} />
             <Route path="/uslugi" element={<Services />} />
             <Route path="/uslugi/:slug" element={<PartnerService />} />
@@ -216,18 +228,17 @@ function AppRoutes() {
             <Route path="/katalog" element={<Catalog />} />
             <Route path="/profil/:slug" element={<Pro />} />
             <Route path="/pro" element={<TotsanPro />} />
-            <Route path="/totsan-pro" element={<TotsanPro />} />
+            <Route path="/totsan-pro" element={<Navigate to="/pro" replace />} />
             <Route path="/produkt/:slug" element={<Product />} />
             <Route path="/kak-raboti" element={<HowItWorks />} />
             <Route path="/za-nas" element={<About />} />
             <Route path="/kontakt" element={<Contact />} />
-            <Route path="/contact" element={<Contact />} />
+            <Route path="/contact" element={<Navigate to="/kontakt" replace />} />
             <Route path="/vizualizacia" element={<Vizualizacia />} />
             <Route path="/gradina-i-dvor" element={<GardenAndYard />} />
             <Route path="/tapeti-i-cvetove" element={<WallpapersAndColors />} />
             <Route path="/dekorativni-akcenti" element={<DecorativeAccents />} />
             <Route path="/terasi-i-vunshni-zoni" element={<TerracesAndOutdoor />} />
-            <Route path="/tapeti-i-cvetove" element={<WallpapersAndColors />} />
             <Route path="/kuhni" element={<Kitchens />} />
             <Route path="/spalnya-i-dnevna" element={<BedroomAndLiving />} />
             <Route path="/banya" element={<Bathroom />} />
@@ -253,6 +264,8 @@ function AppRoutes() {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
+      <RouteSeoManager />
+      <RouteAnalyticsManager />
       <AppRoutes />
     </BrowserRouter>
   </React.StrictMode>

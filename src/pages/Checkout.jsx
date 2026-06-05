@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2, CreditCard, ShieldCheck } from 'lucide-react'
 import { useAccount } from '../lib/account.js'
 import { formatOrderMoney, loadCheckoutPreview } from '../lib/orders.js'
 import { startCheckout, syncStripeSession } from '../lib/payments.js'
+import { trackEvent } from '../lib/analytics.js'
 
 export default function Checkout() {
   const { type = '', id = '' } = useParams()
@@ -20,6 +21,7 @@ function CheckoutPayment({ type, id }) {
   const [preview, setPreview] = useState(null)
   const [status, setStatus] = useState('loading')
   const [message, setMessage] = useState('')
+  const beginCheckoutTrackedRef = useRef('')
 
   useEffect(() => {
     let active = true
@@ -48,6 +50,23 @@ function CheckoutPayment({ type, id }) {
     load()
     return () => { active = false }
   }, [type, id])
+
+  useEffect(() => {
+    if (!session || !preview || status !== 'ready') return
+
+    const trackingKey = `${type}:${id}`
+    if (beginCheckoutTrackedRef.current === trackingKey) return
+
+    beginCheckoutTrackedRef.current = trackingKey
+    trackEvent('begin_checkout', {
+      source: 'checkout_page',
+      item_type: preview.type || type || undefined,
+      item_id: id || undefined,
+      service_slug: preview.service?.slug || undefined,
+      currency: preview.currency || undefined,
+      value: preview.amountTotal || undefined,
+    })
+  }, [id, preview, session, status, type])
 
   async function pay(provider = 'stripe') {
     if (!preview?.isAvailable) return
@@ -148,6 +167,7 @@ function CheckoutPayment({ type, id }) {
 function CheckoutSuccess({ sessionId }) {
   const { session, loading } = useAccount()
   const [state, setState] = useState({ status: 'loading', message: '', order: null })
+  const purchaseTrackedRef = useRef('')
 
   useEffect(() => {
     let active = true
@@ -166,6 +186,23 @@ function CheckoutSuccess({ sessionId }) {
     sync()
     return () => { active = false }
   }, [session, sessionId])
+
+  useEffect(() => {
+    if (state.status !== 'paid' || !state.order?.id) return
+    if (purchaseTrackedRef.current === state.order.id) return
+
+    purchaseTrackedRef.current = state.order.id
+    trackEvent('purchase', {
+      transaction_id: state.order.id,
+      currency: state.order.currency || undefined,
+      value: state.order.amountTotal || undefined,
+      items: [{
+        item_id: state.order.id,
+        item_name: state.order.title || 'Totsan order',
+        item_category: state.order.type || 'order',
+      }],
+    })
+  }, [state.order, state.status])
 
   if (loading || state.status === 'loading') return <CheckoutShell><Panel title="Потвърждаваме плащането…" /></CheckoutShell>
   if (!session) return <CheckoutShell><Panel title="Влез, за да завършим плащането"><Link to="/login" className="btn btn-primary mt-5">Вход</Link></Panel></CheckoutShell>

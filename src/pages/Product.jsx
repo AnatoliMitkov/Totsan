@@ -1,5 +1,5 @@
 import { Link, useLocation, useParams } from 'react-router-dom'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { productImageFor, SHOWCASE_IMAGES } from '../data/images.js'
 import { getProfileImage, getProfileImageStyle, slugify, useProfileDirectory } from '../lib/profiles.js'
 import { formatMoneyText } from '../lib/money.js'
@@ -8,12 +8,16 @@ import {
   loadPublicMaterialCapabilitiesForProduct,
 } from '../lib/partner-materials.js'
 import { findStaticProductBySlug, normalizeProductItem } from '../lib/product-metadata.js'
+import { getPageLocation, trackEvent, trackPageView } from '../lib/analytics.js'
+import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
 
 export default function Product() {
   const { state } = useLocation()
   const { slug } = useParams()
   const { catalog, layers } = useProfileDirectory()
   const [capabilities, setCapabilities] = useState([])
+  const trackedProductSlugRef = useRef('')
+  const productPath = slug ? `/produkt/${slug}` : '/katalog'
 
   const item = useMemo(() => {
     if (state?.item?.kind === 'product') return normalizeProductItem(state.item)
@@ -48,6 +52,54 @@ export default function Product() {
     loadCapabilities()
     return () => { active = false }
   }, [hasProduct, item])
+
+  const seoConfig = useMemo(() => {
+    if (!slug) return null
+    if (hasProduct && layer) {
+      const description = item.sub
+        ? `${item.name} в категория ${item.sub}${layer ? ` за Слой ${layer.number} · ${layer.title}` : ''}.`
+        : `${item.name} е продуктова страница в Totsan.`
+
+      return {
+        title: `${item.name} | Totsan`,
+        description,
+        canonicalPath: productPath,
+        jsonLd: [
+          buildBreadcrumbSchema([
+            { name: 'Начало', path: '/' },
+            { name: 'Каталог', path: '/katalog' },
+            { name: item.name, path: productPath },
+          ]),
+        ],
+      }
+    }
+
+    return {
+      title: 'Продуктът не е намерен | Totsan',
+      description: 'Този продукт не е наличен или линкът е невалиден.',
+      canonicalPath: productPath,
+      robots: 'noindex, nofollow',
+    }
+  }, [hasProduct, item.name, item.sub, layer, productPath, slug])
+
+  useSeo(seoConfig)
+
+  useEffect(() => {
+    if (!hasProduct || !layer || !item.slug || !seoConfig?.title) return
+    if (trackedProductSlugRef.current === item.slug) return
+
+    trackedProductSlugRef.current = item.slug
+    trackPageView({
+      pagePath: productPath,
+      pageTitle: seoConfig.title,
+      pageLocation: getPageLocation(productPath),
+    })
+    trackEvent('view_product', {
+      product_slug: item.slug,
+      layer: layer.slug,
+      category: item.categorySlug || undefined,
+    })
+  }, [hasProduct, item.slug, layer, productPath, seoConfig?.title])
 
   if (!hasProduct || !layer) return <NotFound />
   const layerSlug = item.layerSlug || item.layer
@@ -89,7 +141,7 @@ export default function Product() {
             </div>
 
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link to="/contact" state={{ subject: `Оферта за: ${item.name}` }} className="btn btn-primary">Поискай оферта</Link>
+              <Link to="/kontakt" state={{ subject: `Оферта за: ${item.name}` }} className="btn btn-primary">Поискай оферта</Link>
               <Link to="/katalog" className="btn btn-ghost">Назад в каталога</Link>
             </div>
 
@@ -154,7 +206,7 @@ function ProductPartnerCard({ recommendation, product, layer }) {
 
       <div className="mt-auto flex flex-wrap gap-2 pt-5">
         <Link
-          to="/contact"
+          to="/kontakt"
           state={{ subject: `Запитване към ${person.name} за ${product.name}` }}
           className="btn btn-primary flex-1 justify-center"
         >

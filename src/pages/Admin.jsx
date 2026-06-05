@@ -6,6 +6,7 @@ import { HERO_COLLAGE, HOME_PROJECTS } from '../data/images.js'
 import { getAccountDisplayName, useAccount } from '../lib/account.js'
 import { PasskeySignInButton } from '../components/auth/PasskeyManager.jsx'
 import { isPasskeyVerifiedSession, clearPasskeyVerifiedSession } from '../lib/passkeys.js'
+import { trackEvent } from '../lib/analytics.js'
 
 const INPUT_CLASS = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const PRODUCTION_APP_ORIGIN = 'https://totsan.com'
@@ -489,6 +490,12 @@ function LoginPanel() {
 
     setStatus('sent')
     setPendingAction('')
+    if (!isLogin && signupRole === 'pro') {
+      trackEvent('partner_application_submit', {
+        method: 'email',
+        source: 'login_panel',
+      })
+    }
     setMessage(
       isLogin
         ? 'Входът е успешен.'
