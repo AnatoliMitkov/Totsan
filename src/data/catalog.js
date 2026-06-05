@@ -1,4 +1,5 @@
 import { LAYERS, SERVICES } from './layers.js'
+import { getStaticProductCatalog } from '../lib/product-metadata.js'
 
 // Богати данни за подкатегория услуги
 export const SERVICE_DETAILS = [
@@ -16,17 +17,12 @@ export const SERVICE_DETAILS = [
 export function buildCatalog() {
   const items = []
   LAYERS.forEach(l => {
-    l.professionals.forEach(p => items.push({
+    ;(l.professionals || []).forEach(p => items.push({
       kind: 'pro', layer: l.slug, layerNumber: l.number, layerTitle: l.title,
       name: p.name, sub: p.tag, city: p.city, rating: p.rating, projects: p.projects, since: p.since
     }))
-    if (l.products) {
-      l.products.forEach(p => items.push({
-        kind: 'product', layer: l.slug, layerNumber: l.number, layerTitle: l.title,
-        name: p.name, sub: p.cat, price: p.price, tag: p.tag
-      }))
-    }
   })
+  items.push(...getStaticProductCatalog())
   return items
 }
 

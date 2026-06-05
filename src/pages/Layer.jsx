@@ -4,6 +4,7 @@ import { LAYER_HEROS, WHAT_YOU_FIND_IMAGES, SHOWCASE_IMAGES, productImageFor } f
 import ProfessionalCard from '../components/ProfessionalCard.jsx'
 import { useProfileDirectory } from '../lib/profiles.js'
 import { formatMoneyText } from '../lib/money.js'
+import { getStaticProductsForLayer } from '../lib/product-metadata.js'
 
 export default function Layer({ slug }) {
   const { slug: routeSlug } = useParams()
@@ -288,7 +289,7 @@ function Professionals({ layer }) {
 }
 
 function Products({ layer }) {
-  const products = layer.products ?? []
+  const products = getStaticProductsForLayer(layer.slug)
 
   return (
     <section className="section">
@@ -305,8 +306,8 @@ function Products({ layer }) {
           {products.map((p,i) => (
             <Link
               key={i}
-              to={`/produkt/${slugify(p.name)}`}
-              state={{ item: { kind: 'product', layer: layer.slug, layerNumber: layer.number, layerTitle: layer.title, sub: p.cat, ...p } }}
+              to={`/produkt/${p.slug}`}
+              state={{ item: p }}
               className="card reveal img-zoom-host p-0 overflow-hidden bg-paper block"
             >
               <div className="media-frame aspect-[4/3]">

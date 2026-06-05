@@ -18,6 +18,7 @@ import { createConnectOnboarding, getConnectStatus } from '../../lib/payments.js
 import PortfolioGallery from './PortfolioGallery.jsx'
 import PartnerStats from './PartnerStats.jsx'
 import PartnerServiceEditor from './PartnerServiceEditor.jsx'
+import PartnerMaterialsEditor from './PartnerMaterialsEditor.jsx'
 import PartnerOrders from './PartnerOrders.jsx'
 import PartnerInquiries from './PartnerInquiries.jsx'
 
@@ -27,6 +28,7 @@ const TABS = [
   ['profile', 'Профил'],
   ['portfolio', 'Портфолио'],
   ['services', 'Услуги'],
+  ['materials', 'Материали и марки'],
   ['orders', 'Поръчки'],
   ['inquiries', 'Запитвания'],
   ['contact', 'Контакт'],
@@ -110,6 +112,8 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
   }, [profile?.id, profile?.updatedAt])
 
   useEffect(() => {
+    if (!profile?.id) return undefined
+
     let active = true
     async function load() {
       try {
@@ -128,7 +132,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
     }
     load()
     return () => { active = false }
-  }, [profile.id])
+  }, [profile?.id])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -332,6 +336,16 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
     }
   }
 
+  if (!profile?.id || !currentProfile?.id) {
+    return (
+      <section className="section bg-soft min-h-screen">
+        <div className="container-page">
+          <div className="rounded-3xl border border-line bg-paper p-5 text-sm text-muted">Loading partner profile...</div>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="section bg-soft min-h-screen">
       <div className="container-page space-y-5">
@@ -414,6 +428,10 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
 
         {activeTab === 'services' && (
           <PartnerServiceEditor profile={currentProfile} userId={userId} />
+        )}
+
+        {activeTab === 'materials' && (
+          <PartnerMaterialsEditor profile={currentProfile} />
         )}
 
         {activeTab === 'orders' && (

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { avatarFor } from '../data/images.js'
 import { LAYERS as BASE_LAYERS } from '../data/layers.js'
+import { getStaticProductsForLayer } from './product-metadata.js'
 import { supabase } from './supabase.js'
 
 export const LEGACY_PROFILE_IMAGE_BUCKET = 'profile-images'
@@ -179,6 +180,9 @@ export function buildProfileDirectory(rows = [], options = {}) {
 function toProfessionalCardPerson(profile) {
   return {
     slug: profile.slug,
+    layer: profile.layerSlug,
+    layerSlug: profile.layerSlug,
+    layerTitle: profile.layerTitle,
     name: profile.name,
     tag: profile.tag,
     city: profile.city,
@@ -186,6 +190,7 @@ function toProfessionalCardPerson(profile) {
     projects: profile.projects,
     since: profile.since,
     bio: profile.bio,
+    responseTimeHours: profile.responseTimeHours,
     imageUrl: profile.imageUrl,
     imageZoom: profile.imageZoom,
     imageX: profile.imageX,
@@ -254,14 +259,16 @@ export function buildCatalogWithProfiles(profiles) {
       })
     })
 
-    ;(layer.products || []).forEach((product) => {
+    getStaticProductsForLayer(layer.slug).forEach((product) => {
       items.push({
+        ...product,
         kind: 'product',
         layer: layer.slug,
+        layerSlug: layer.slug,
         layerNumber: layer.number,
         layerTitle: layer.title,
         name: product.name,
-        sub: product.cat,
+        sub: product.cat || product.sub,
         price: product.price,
         tag: product.tag,
       })

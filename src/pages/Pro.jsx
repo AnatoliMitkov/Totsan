@@ -92,99 +92,106 @@ export default function Pro() {
 
   return (
     <>
-      <section className="section relative overflow-hidden">
-        <div className="absolute inset-0">
-          <img src={LAYER_HEROS[layer.slug]} alt="" className="img-cover" />
-          <div className="hero-overlay"></div>
-        </div>
-        <div className="container-page grid lg:grid-cols-12 gap-10 items-center relative">
-          <div className="lg:col-span-8 reveal">
-            <Link to="/katalog" className="eyebrow !text-ink/70 hover:!text-ink">← Обратно в каталога</Link>
-            <div className="mt-4 flex items-center gap-3">
-              <span className="eyebrow">Слой {layer.number} · {layer.title}</span>
-            </div>
-            <div className="mt-3 flex items-center gap-5">
-              <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-paper shadow-lg shrink-0">
-                <img src={getProfileImage(item)} alt={item.name} className="img-cover" style={getProfileImageStyle(item)} />
-              </div>
-              <div>
-                <h1 className="h-display">{item.name}</h1>
-                <p className="mt-1 text-ink/75">{item.headline || item.sub} · {item.city} · от {item.since} г.</p>
-              </div>
-            </div>
-            <div className="mt-7 flex flex-wrap gap-3">
-              <button type="button" onClick={startChat} disabled={chatState.status === 'loading'} className="btn btn-primary disabled:opacity-50">{chatState.status === 'loading' ? 'Отваряме…' : 'Свържи се'}</button>
-              <Link to="/katalog" className="btn btn-ghost bg-paper/80 backdrop-blur">Други специалисти</Link>
-            </div>
-            {chatState.status === 'error' && <div className="mt-3 max-w-xl rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{chatState.message}</div>}
-          </div>
-          <div className="lg:col-span-4 reveal">
-            <PartnerStats profile={item} stats={stats} />
-          </div>
-        </div>
+      <section className="relative h-64 md:h-80 w-full overflow-hidden bg-ink">
+        <img src={LAYER_HEROS[layer.slug]} alt="" className="img-cover opacity-60 mix-blend-overlay" />
+        <div className="absolute inset-0 bg-gradient-to-t from-soft via-transparent to-transparent"></div>
       </section>
 
-      <section className="section">
-        <div className="container-page grid lg:grid-cols-12 gap-12">
-          <div className="lg:col-span-8 reveal">
-            <div className="eyebrow">За {item.name}</div>
-            <p className="mt-3" style={{fontSize:'var(--step-md)'}}>
-              {item.descriptionLong || item.bio}
-            </p>
-
-            <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <MetaTile icon={MapPin} label="Работи в" value={item.serviceAreas?.length ? item.serviceAreas.join(', ') : item.city} />
-              <MetaTile icon={Languages} label="Езици" value={item.languages?.length ? item.languages.join(', ') : 'bg'} />
-              <MetaTile icon={Globe2} label="Формат" value={item.acceptsRemote ? 'На място и дистанционно' : 'На място'} />
-              <MetaTile icon={CheckCircle2} label="Опит" value={`${item.yearsExperience || Math.max(0, new Date().getFullYear() - item.since)} г.`} />
-            </div>
-
-            {item.pricingNote && (
-              <div className="mt-8 rounded-2xl border border-line bg-soft p-5">
-                <div className="eyebrow">Цени</div>
-                <p className="mt-2 text-muted">{item.pricingNote}</p>
-              </div>
-            )}
-
-            <ProfileServicesSection services={services} profile={item} />
-
-            <div className="mt-10 eyebrow">Как работят</div>
-            <div className="mt-4 grid sm:grid-cols-2 gap-4">
-              {layer.process.map(p => (
-                <div key={p.n} className="border border-line rounded-xl p-5">
-                  <div className="font-display text-2xl text-accentDeep">{p.n}</div>
-                  <div className="font-display text-lg mt-1">{p.t}</div>
-                  <p className="text-sm text-muted mt-1">{p.d}</p>
+      <section className="section pt-0 relative z-10 bg-soft">
+        <div className="container-page">
+          <div className="grid lg:grid-cols-12 gap-10">
+            {/* LEFT SIDEBAR */}
+            <aside className="lg:col-span-4 reveal -mt-20 md:-mt-32">
+              <div className="lg:sticky lg:top-24 space-y-6">
+                
+                {/* Profile Card */}
+                <div className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-sm">
+                  <div className="flex flex-col items-center text-center">
+                    <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-paper shadow-md">
+                      <img src={getProfileImage(item)} alt={item.name} className="img-cover" style={getProfileImageStyle(item)} />
+                    </div>
+                    <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-accentDeep">
+                      Слой {layer.number}
+                    </div>
+                    <h1 className="mt-4 font-display text-3xl text-ink">{item.name}</h1>
+                    <p className="mt-2 text-sm text-ink/75">{item.headline || item.sub}</p>
+                    <p className="mt-1 text-sm text-muted">{item.city} · от {item.since} г.</p>
+                  </div>
+                  
+                  <div className="mt-6 border-t border-line pt-6">
+                    <PartnerStats profile={item} stats={stats} />
+                  </div>
                 </div>
-              ))}
-            </div>
 
-            <div className="mt-10">
-              <div className="eyebrow">Портфолио</div>
-              <h2 className="mt-2 font-display text-3xl text-ink">Реални проекти</h2>
-              <div className="mt-5">
-                <PortfolioGallery items={portfolio} emptyText="Този партньор още не е публикувал портфолио." />
+                {/* Contact Actions */}
+                <InquiryBox
+                  proName={item.name}
+                  title={item.name ? `Опиши проекта си на ${item.name}` : 'Опиши проекта си'}
+                  layerSlug={item.layerSlug || item.layer}
+                  targetSlug={item.slug}
+                  clientId={session?.user?.id}
+                />
+                <div className="flex items-center gap-3 text-xs uppercase tracking-[0.14em] text-muted">
+                  <span className="h-px flex-1 bg-line" />или чат след това<span className="h-px flex-1 bg-line" />
+                </div>
+                <ContactCard onStartChat={startChat} chatState={chatState} />
+
               </div>
-            </div>
+            </aside>
 
-            <ReviewsList partnerId={partnerUserId} title={`Отзиви за ${item.name}`} />
+            {/* RIGHT MAIN COLUMN */}
+            <div className="lg:col-span-8 reveal lg:pt-8 space-y-12">
+              
+              <div>
+                <Link to="/katalog" className="eyebrow !text-ink/70 hover:!text-ink mb-6 inline-block">← Обратно в каталога</Link>
+                
+                <div className="eyebrow">За {item.name}</div>
+                <p className="mt-3" style={{fontSize:'var(--step-md)'}}>
+                  {item.descriptionLong || item.bio}
+                </p>
+
+                <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <MetaTile icon={MapPin} label="Работи в" value={item.serviceAreas?.length ? item.serviceAreas.join(', ') : item.city} />
+                  <MetaTile icon={Languages} label="Езици" value={item.languages?.length ? item.languages.join(', ') : 'bg'} />
+                  <MetaTile icon={Globe2} label="Формат" value={item.acceptsRemote ? 'На място и дистанционно' : 'На място'} />
+                  <MetaTile icon={CheckCircle2} label="Опит" value={`${item.yearsExperience || Math.max(0, new Date().getFullYear() - item.since)} г.`} />
+                </div>
+
+                {item.pricingNote && (
+                  <div className="mt-8 rounded-2xl border border-line bg-soft p-5">
+                    <div className="eyebrow">Цени</div>
+                    <p className="mt-2 text-muted">{item.pricingNote}</p>
+                  </div>
+                )}
+              </div>
+
+              <ProfileServicesSection services={services} profile={item} />
+
+              <div>
+                <div className="eyebrow">Как работят</div>
+                <div className="mt-4 grid sm:grid-cols-2 gap-4">
+                  {layer.process.map(p => (
+                    <div key={p.n} className="border border-line bg-paper rounded-xl p-5">
+                      <div className="font-display text-2xl text-accentDeep">{p.n}</div>
+                      <div className="font-display text-lg mt-1">{p.t}</div>
+                      <p className="text-sm text-muted mt-1">{p.d}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="eyebrow">Портфолио</div>
+                <h2 className="mt-2 font-display text-3xl text-ink">Реални проекти</h2>
+                <div className="mt-5">
+                  <PortfolioGallery items={portfolio} emptyText="Този партньор още не е публикувал портфолио." />
+                </div>
+              </div>
+
+              <ReviewsList partnerId={partnerUserId} title={`Отзиви за ${item.name}`} />
+
+            </div>
           </div>
-
-          <aside id="zapitvane" className="lg:col-span-4 reveal">
-            <div className="lg:sticky lg:top-24 space-y-4">
-              <InquiryBox
-                proName={item.name}
-                title={item.name ? `Опиши проекта си на ${item.name}` : 'Опиши проекта си'}
-                layerSlug={item.layerSlug || item.layer}
-                targetSlug={item.slug}
-                clientId={session?.user?.id}
-              />
-              <div className="flex items-center gap-3 text-xs uppercase tracking-[0.14em] text-muted">
-                <span className="h-px flex-1 bg-line" />или чат след това<span className="h-px flex-1 bg-line" />
-              </div>
-              <ContactCard onStartChat={startChat} chatState={chatState} />
-            </div>
-          </aside>
         </div>
       </section>
     </>
