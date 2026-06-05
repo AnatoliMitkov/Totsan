@@ -275,6 +275,10 @@ export function getProfileImage(profile) {
   return profile?.imageUrl || profile?.image_url || avatarFor(profile?.name || '')
 }
 
+export function getProfileImageCandidates(profile) {
+  return [profile?.imageUrl, profile?.image_url, avatarFor(profile?.name || '')].filter(Boolean)
+}
+
 export function getProfileImageStyle(profile) {
   const imageX = clamp(profile?.imageX ?? profile?.image_x, 0, 100, 50)
   const imageY = clamp(profile?.imageY ?? profile?.image_y, 0, 100, 50)

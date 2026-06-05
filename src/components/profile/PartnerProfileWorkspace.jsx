@@ -5,6 +5,8 @@ import { LAYERS } from '../../data/layers.js'
 import { uploadProfileMedia } from '../../lib/profile-media-upload-client.js'
 import { getProfileImage, getProfileImageStyle, normalizeProfile, PROFILE_SELECT_COLUMNS } from '../../lib/profiles.js'
 import { supabase } from '../../lib/supabase.js'
+import PasskeyManager, { PasskeySetupPrompt } from '../auth/PasskeyManager.jsx'
+import TotpMfaManager from '../auth/TotpMfa.jsx'
 import {
   DEFAULT_PORTFOLIO_ITEM,
   appendPortfolioMedia,
@@ -16,6 +18,8 @@ import {
 } from '../../lib/portfolio.js'
 import { createConnectOnboarding, getConnectStatus } from '../../lib/payments.js'
 import PortfolioGallery from './PortfolioGallery.jsx'
+import ImageCropperModal from './ImageCropperModal.jsx'
+import Avatar from '../Avatar.jsx'
 import PartnerStats from './PartnerStats.jsx'
 import PartnerServiceEditor from './PartnerServiceEditor.jsx'
 import PartnerOrders from './PartnerOrders.jsx'
@@ -30,6 +34,7 @@ const TABS = [
   ['orders', 'Поръчки'],
   ['inquiries', 'Запитвания'],
   ['contact', 'Контакт'],
+  ['security', 'Сигурност'],
 ]
 
 function csv(value) {
@@ -93,7 +98,7 @@ function paymentMessageFromStripe(result) {
   }
 }
 
-export default function PartnerProfileWorkspace({ profile, userId, account, onSaved }) {
+export default function PartnerProfileWorkspace({ profile, userId, account, session, onSaved }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [currentProfile, setCurrentProfile] = useState(profile)
   const [profileDraft, setProfileDraft] = useState(() => makeProfileDraft(profile))
@@ -103,6 +108,41 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
   const [saveState, setSaveState] = useState({ status: 'idle', message: '' })
   const [portfolioState, setPortfolioState] = useState({ status: 'idle', message: '' })
   const [paymentState, setPaymentState] = useState({ status: 'idle', message: '' })
+  const [avatarEditor, setAvatarEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'avatar.jpg' })
+
+  function openAvatarEditor() {
+    if (profileDraft.imageUrl) {
+      setAvatarEditor({
+        open: true,
+        file: null,
+        imageUrl: profileDraft.imageUrl,
+        fileName: profileDraft.name ? `${profileDraft.name}-avatar.jpg` : 'avatar.jpg',
+      })
+      return
+    }
+    const input = document.getElementById('partner-avatar-upload')
+    if (input) input.click()
+  }
+
+  function closeAvatarEditor() {
+    setAvatarEditor(current => ({ ...current, open: false }))
+  }
+
+  function handleAvatarFile(file) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) return
+    setAvatarEditor({
+      open: true,
+      file,
+      imageUrl: '',
+      fileName: file.name || 'avatar.jpg',
+    })
+  }
+
+  async function saveAvatarAndProfile(croppedFile) {
+    closeAvatarEditor()
+    await uploadAvatar(croppedFile)
+  }
 
   useEffect(() => {
     setCurrentProfile(profile)
@@ -335,6 +375,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
   return (
     <section className="section bg-soft min-h-screen">
       <div className="container-page space-y-5">
+        <PasskeySetupPrompt userId={userId} />
         <div className="rounded-3xl border border-line bg-paper p-5 md:p-7">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
@@ -424,6 +465,13 @@ export default function PartnerProfileWorkspace({ profile, userId, account, onSa
           <PartnerInquiries profileSlug={currentProfile.slug} partnerId={userId} />
         )}
 
+        {activeTab === 'security' && (
+          <div className="space-y-5">
+            <PasskeyManager userId={userId} session={session} />
+            <TotpMfaManager session={session} />
+          </div>
+        )}
+
         {activeTab === 'contact' && (
           <ContactPreview profile={preview} onEdit={() => setActiveTab('profile')} />
         )}
@@ -490,18 +538,32 @@ function ProfileForm({ draft, saveState, preview, onChange, onSubmit, onUpload }
       <aside className="lg:col-span-4 space-y-5">
         <div className="rounded-3xl border border-line bg-paper p-5 md:p-6 lg:sticky lg:top-24">
           <div className="eyebrow">Снимка</div>
-          <div className="mt-4 aspect-square overflow-hidden rounded-3xl border border-line bg-soft">
-            <img src={getProfileImage(preview)} alt={preview.name} className="img-cover" style={getProfileImageStyle(preview)} />
+          <div className="group relative mt-4 flex justify-center">
+            <button type="button" onClick={openAvatarEditor} className="relative rounded-full transition hover:ring-2 hover:ring-ink focus:outline-none focus:ring-2 focus:ring-ink" aria-label="Смени снимката">
+              <Avatar src={getProfileImage(preview)} name={preview.name} size={200} imgStyle={getProfileImageStyle(preview)} />
+              <div className="absolute inset-0 hidden items-center justify-center rounded-full bg-ink/40 text-paper opacity-0 transition md:flex md:group-hover:opacity-100">
+                <Camera size={32} />
+              </div>
+            </button>
           </div>
-          <label className="btn btn-ghost mt-4 w-full cursor-pointer justify-center">
-            <Camera size={18} /> Качи снимка
-            <input type="file" accept="image/*" className="sr-only" onChange={async (event) => { await onUpload(event.target.files?.[0]); event.target.value = '' }} />
-          </label>
-          <div className="mt-5 grid gap-4">
-            <Range label="Zoom" value={draft.imageZoom} min={1} max={2.5} step={0.05} onChange={value => onChange('imageZoom', value)} />
-            <Range label="Ляво / дясно" value={draft.imageX} min={0} max={100} step={1} onChange={value => onChange('imageX', value)} />
-            <Range label="Горе / долу" value={draft.imageY} min={0} max={100} step={1} onChange={value => onChange('imageY', value)} />
-          </div>
+          <button type="button" onClick={openAvatarEditor} className="btn btn-ghost mt-4 w-full cursor-pointer justify-center">
+            <Camera size={18} /> Смени снимката
+          </button>
+          <input id="partner-avatar-upload" type="file" accept="image/*" className="sr-only" onChange={(event) => { 
+            handleAvatarFile(event.target.files?.[0]); 
+            event.target.value = '' 
+          }} />
+
+          {avatarEditor.open && (
+            <ImageCropperModal
+              open={avatarEditor.open}
+              file={avatarEditor.file}
+              imageUrl={avatarEditor.imageUrl}
+              fileName={avatarEditor.fileName}
+              onClose={closeAvatarEditor}
+              onSave={saveAvatarAndProfile}
+            />
+          )}
         </div>
       </aside>
     </form>

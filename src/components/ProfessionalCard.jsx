@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom'
-import { getProfileImage, getProfileImageStyle } from '../lib/profiles.js'
+import FallbackImage from './FallbackImage.jsx'
+import { getProfileImageCandidates, getProfileImageStyle } from '../lib/profiles.js'
 
 export default function ProfessionalCard({ person, to, state, layerLabel, cta = 'Виж профила' }) {
   return (
     <Link to={to} state={state} className="card reveal block h-full bg-paper p-6">
       <div className="flex items-start gap-4">
         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border border-line bg-soft">
-          <img src={getProfileImage(person)} alt={person.name} loading="lazy" decoding="async" className="img-cover" style={getProfileImageStyle(person)} />
+          <FallbackImage sources={getProfileImageCandidates(person)} alt={person.name} loading="lazy" decoding="async" className="img-cover" style={getProfileImageStyle(person)} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">

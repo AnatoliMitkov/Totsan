@@ -1,9 +1,10 @@
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, BriefcaseBusiness, CheckCircle2, Globe2, Languages, MapPin } from 'lucide-react'
+import FallbackImage from '../components/FallbackImage.jsx'
 import { supabase } from '../lib/supabase.js'
 import { LAYER_HEROS } from '../data/images.js'
-import { getProfileImage, getProfileImageStyle, slugify, useProfileDirectory } from '../lib/profiles.js'
+import { getProfileImageCandidates, getProfileImageStyle, slugify, useProfileDirectory } from '../lib/profiles.js'
 import { loadProfilePortfolio, loadProfileStats } from '../lib/portfolio.js'
 import { loadPublicPartnerServicesForProfile, packagePriceLabel } from '../lib/partner-services.js'
 import { useAccount } from '../lib/account.js'
@@ -105,7 +106,7 @@ export default function Pro() {
             </div>
             <div className="mt-3 flex items-center gap-5">
               <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-paper shadow-lg shrink-0">
-                <img src={getProfileImage(item)} alt={item.name} className="img-cover" style={getProfileImageStyle(item)} />
+                <FallbackImage sources={getProfileImageCandidates(item)} alt={item.name} className="img-cover" style={getProfileImageStyle(item)} />
               </div>
               <div>
                 <h1 className="h-display">{item.name}</h1>

@@ -4,15 +4,46 @@ import { ArrowRight, BarChart3, ClipboardList, CreditCard, FileClock, FolderKanb
 import { brand, supabase } from '../lib/supabase.js'
 import { HERO_COLLAGE, HOME_PROJECTS } from '../data/images.js'
 import { getAccountDisplayName, useAccount } from '../lib/account.js'
+import { PasskeySignInButton } from '../components/auth/PasskeyManager.jsx'
+import { isPasskeyVerifiedSession, clearPasskeyVerifiedSession } from '../lib/passkeys.js'
 
 const INPUT_CLASS = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
+const PRODUCTION_APP_ORIGIN = 'https://totsan.com'
+
+function normalizeOrigin(value = '') {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+
+  try {
+    return new URL(raw).origin
+  } catch {
+    return ''
+  }
+}
+
+function isLocalOrigin(origin = '') {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)
+}
+
+function getAuthRedirectOrigin() {
+  if (typeof window === 'undefined') return PRODUCTION_APP_ORIGIN
+
+  const currentOrigin = window.location.origin
+  if (isLocalOrigin(currentOrigin)) return currentOrigin
+
+  const configuredOrigin = normalizeOrigin(import.meta.env.VITE_APP_URL || import.meta.env.VITE_SITE_URL || import.meta.env.VITE_PUBLIC_APP_URL)
+  if (configuredOrigin) return configuredOrigin
+
+  if (import.meta.env.DEV) return currentOrigin
+  return currentOrigin
+}
 
 const STATUS_LABELS = {
-  new: 'Ново',
-  seen: 'Прегледано',
-  replied: 'Отговорено',
-  closed: 'Затворено',
-  pending: 'Чака',
+  new: 'РќРѕРІРѕ',
+  seen: 'РџСЂРµРіР»РµРґР°РЅРѕ',
+  replied: 'РћС‚РіРѕРІРѕСЂРµРЅРѕ',
+  closed: 'Р—Р°С‚РІРѕСЂРµРЅРѕ',
+  pending: 'Р§Р°РєР°',
 }
 
 const DashboardSection = lazy(() => import('../components/admin/Dashboard.jsx'))
@@ -26,25 +57,32 @@ const OrdersManagerSection = lazy(() => import('../components/admin/OrdersManage
 const ReviewsManagerSection = lazy(() => import('../components/admin/ReviewsManager.jsx'))
 
 const ADMIN_SECTIONS = [
-  { id: 'dashboard', label: 'Обзор', hint: 'KPI и последни събития', icon: BarChart3, Component: DashboardSection },
-  { id: 'users', label: 'Потребители', hint: 'Роли, статуси, ban', icon: Users, Component: UsersManagerSection },
-  { id: 'inquiries', label: 'Запитвания', hint: 'Форми, източници и статуси', icon: ClipboardList, Component: InquiriesManagerSection },
-  { id: 'applications', label: 'Кандидатури', hint: 'Одобрение на специалисти', icon: UserCog, Component: ApplicationsManagerSection },
-  { id: 'profiles', label: 'Профили', hint: 'Публичност и профилна модерация', icon: FolderKanban, Component: ProfileManagerSection },
-  { id: 'partner-services', label: 'Услуги', hint: 'Модерация на партньорски услуги', icon: PackageCheck, Component: PartnerServicesManagerSection },
-  { id: 'orders', label: 'Поръчки', hint: 'Плащания, статуси, спорове', icon: CreditCard, Component: OrdersManagerSection },
-  { id: 'reviews', label: 'Отзиви', hint: 'Verified отзиви и сигнали', icon: Star, Component: ReviewsManagerSection },
-  { id: 'audit', label: 'Audit log', hint: 'Админ действия', icon: ScrollText, Component: AuditLogSection },
+  { id: 'dashboard', label: 'РћР±Р·РѕСЂ', hint: 'KPI Рё РїРѕСЃР»РµРґРЅРё СЃСЉР±РёС‚РёСЏ', icon: BarChart3, Component: DashboardSection },
+  { id: 'users', label: 'РџРѕС‚СЂРµР±РёС‚РµР»Рё', hint: 'Р РѕР»Рё, СЃС‚Р°С‚СѓСЃРё, ban', icon: Users, Component: UsersManagerSection },
+  { id: 'inquiries', label: 'Р—Р°РїРёС‚РІР°РЅРёСЏ', hint: 'Р¤РѕСЂРјРё, РёР·С‚РѕС‡РЅРёС†Рё Рё СЃС‚Р°С‚СѓСЃРё', icon: ClipboardList, Component: InquiriesManagerSection },
+  { id: 'applications', label: 'РљР°РЅРґРёРґР°С‚СѓСЂРё', hint: 'РћРґРѕР±СЂРµРЅРёРµ РЅР° СЃРїРµС†РёР°Р»РёСЃС‚Рё', icon: UserCog, Component: ApplicationsManagerSection },
+  { id: 'profiles', label: 'РџСЂРѕС„РёР»Рё', hint: 'РџСѓР±Р»РёС‡РЅРѕСЃС‚ Рё РїСЂРѕС„РёР»РЅР° РјРѕРґРµСЂР°С†РёСЏ', icon: FolderKanban, Component: ProfileManagerSection },
+  { id: 'partner-services', label: 'РЈСЃР»СѓРіРё', hint: 'РњРѕРґРµСЂР°С†РёСЏ РЅР° РїР°СЂС‚РЅСЊРѕСЂСЃРєРё СѓСЃР»СѓРіРё', icon: PackageCheck, Component: PartnerServicesManagerSection },
+  { id: 'orders', label: 'РџРѕСЂСЉС‡РєРё', hint: 'РџР»Р°С‰Р°РЅРёСЏ, СЃС‚Р°С‚СѓСЃРё, СЃРїРѕСЂРѕРІРµ', icon: CreditCard, Component: OrdersManagerSection },
+  { id: 'reviews', label: 'РћС‚Р·РёРІРё', hint: 'Verified РѕС‚Р·РёРІРё Рё СЃРёРіРЅР°Р»Рё', icon: Star, Component: ReviewsManagerSection },
+  { id: 'audit', label: 'Audit log', hint: 'РђРґРјРёРЅ РґРµР№СЃС‚РІРёСЏ', icon: ScrollText, Component: AuditLogSection },
 ]
 
 export default function Admin() {
-  const { session, account, loading } = useAccount()
+  const { session, account, loading, mfaRequired } = useAccount()
   const location = useLocation()
+  const [passkeyVerified, setPasskeyVerified] = useState(false)
+  const sessionPasskeyVerified = isPasskeyVerifiedSession(session?.user?.id)
 
-  if (loading) return <div className="flex h-screen items-center justify-center bg-soft"><div className="text-muted">Зареждане…</div></div>
+  useEffect(() => {
+    setPasskeyVerified(sessionPasskeyVerified)
+  }, [session?.user?.id, session?.user?.last_sign_in_at, sessionPasskeyVerified])
+
+  if (loading) return <div className="flex h-screen items-center justify-center bg-soft"><div className="text-muted">Проверяваме достъпа…</div></div>
   if (!session) return <LoginPanel />
 
   if (location.pathname === '/login') {
+    if (mfaRequired) return null
     return <Navigate to={resolvePostLoginTarget(location, account)} replace />
   }
 
@@ -81,9 +119,17 @@ function normalizeNextPath(value = '') {
   return raw
 }
 
+async function signOutToHome(userId = '') {
+  clearPasskeyVerifiedSession(userId)
+  await supabase.auth.signOut()
+  if (typeof window !== 'undefined') {
+    window.location.assign('/')
+  }
+}
+
 function AdminShell({ children, session, account }) {
-  const title = 'Админ контролен панел.'
-  const subtitle = `Добре дошъл обратно, ${getAccountDisplayName(account, session, 'admin')}.`
+  const title = 'РђРґРјРёРЅ РєРѕРЅС‚СЂРѕР»РµРЅ РїР°РЅРµР».'
+  const subtitle = `Р”РѕР±СЂРµ РґРѕС€СЉР» РѕР±СЂР°С‚РЅРѕ, ${getAccountDisplayName(account, session, 'admin')}.`
 
   return (
     <section className="section !pt-12 md:!pt-16 bg-soft min-h-screen relative overflow-hidden">
@@ -99,7 +145,12 @@ function AdminShell({ children, session, account }) {
             <h1 className="h-section mt-2 text-[clamp(2rem,1.8rem+1vw,3rem)]">{title}</h1>
             <p className="mt-3 max-w-2xl text-sm text-muted">{subtitle}</p>
           </div>
-          <button className="btn btn-ghost self-start md:self-auto" onClick={() => supabase.auth.signOut()}>Изход</button>
+          <button
+            className="btn btn-ghost self-start md:self-auto transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
+            onClick={() => signOutToHome(session?.user?.id)}
+          >
+            Изход
+          </button>
         </div>
         {children}
       </div>
@@ -142,7 +193,7 @@ function AdminWorkspace({ session, account }) {
       {/* Mobile nav (visible only below lg) */}
       <div className="w-full lg:hidden rounded-[2rem] border border-line bg-paper p-3 mb-4">
          <div className="px-3 py-3 overflow-hidden whitespace-nowrap">
-             <div className="eyebrow">Навигация</div>
+             <div className="eyebrow">РќР°РІРёРіР°С†РёСЏ</div>
          </div>
          <nav className="mt-1 flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
             {ADMIN_SECTIONS.map((section) => {
@@ -167,7 +218,7 @@ function AdminWorkspace({ session, account }) {
             </div>
             <label className="relative block w-full xl:max-w-md">
               <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
-              <input value={globalQuery} onChange={(event) => setGlobalQuery(event.target.value)} className="w-full rounded-2xl border border-line bg-soft px-11 py-3 text-sm outline-none transition focus:border-ink" placeholder="Глобално търсене в текущата секция" />
+              <input value={globalQuery} onChange={(event) => setGlobalQuery(event.target.value)} className="w-full rounded-2xl border border-line bg-soft px-11 py-3 text-sm outline-none transition focus:border-ink" placeholder="Р“Р»РѕР±Р°Р»РЅРѕ С‚СЉСЂСЃРµРЅРµ РІ С‚РµРєСѓС‰Р°С‚Р° СЃРµРєС†РёСЏ" />
             </label>
           </div>
         </div>
@@ -181,20 +232,30 @@ function AdminWorkspace({ session, account }) {
 }
 
 function AdminSectionFallback() {
-  return <div className="rounded-3xl border border-line bg-paper p-6 text-sm text-muted">Зареждаме секцията…</div>
+  return <div className="rounded-3xl border border-line bg-paper p-6 text-sm text-muted">Р—Р°СЂРµР¶РґР°РјРµ СЃРµРєС†РёСЏС‚Р°вЂ¦</div>
 }
 
 function LoginPanel() {
   const location = useLocation()
   const params = new URLSearchParams(location.search)
   const isSignup = params.get('signup') === 'true'
+  const isResetRequested = params.get('reset') === 'true'
   const requestedSignupRole = params.get('role') === 'pro' ? 'pro' : 'customer'
   const nextPath = normalizeNextPath(params.get('next') || '')
   const [isLogin, setIsLogin] = useState(!isSignup)
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false)
+  const actionButtonClass = 'btn btn-primary w-full justify-center !py-3.5 text-base mt-2 transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/20 disabled:opacity-50'
+  const subtleButtonClass = 'font-medium text-accent transition hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 rounded-full'
 
   useEffect(() => {
     setIsLogin(!isSignup)
   }, [isSignup])
+
+  useEffect(() => {
+    if (!isResetRequested) return
+    setIsLogin(true)
+    setIsRecoveryMode(true)
+  }, [isResetRequested])
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -224,11 +285,45 @@ function LoginPanel() {
     if (isSignup) setSignupRole(requestedSignupRole)
   }, [isSignup, requestedSignupRole])
 
+  useEffect(() => {
+    function syncRecoveryState() {
+      if (typeof window === 'undefined') return
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+      const isRecovery = hash.get('type') === 'recovery'
+      setIsRecoveryMode(Boolean(isRecovery || isResetRequested))
+      if (isRecovery) setIsLogin(true)
+    }
+
+    syncRecoveryState()
+
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsLogin(true)
+        setIsRecoveryMode(true)
+        setStatus('idle')
+        setMessage('')
+      }
+    })
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('hashchange', syncRecoveryState)
+    }
+
+    return () => {
+      data.subscription.unsubscribe()
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('hashchange', syncRecoveryState)
+      }
+    }
+  }, [isResetRequested])
+
   async function signInWithProvider(provider) {
+    if (isRecoveryMode) return
+
     if (!isLogin && signupRole === 'pro') {
       setStatus('error')
       setPendingAction('')
-      setMessage('За Pro кандидатура използвай регистрация с имейл и парола, за да запазим ролята и данните за специалист.')
+      setMessage('За specialist профил използвай регистрация с имейл и парола.')
       return
     }
 
@@ -236,7 +331,7 @@ function LoginPanel() {
     setPendingAction(provider)
     setMessage('')
 
-    const loginRedirect = new URL('/login', window.location.origin)
+    const loginRedirect = new URL('/login', getAuthRedirectOrigin())
     if (nextPath) loginRedirect.searchParams.set('next', nextPath)
     const options = { redirectTo: loginRedirect.toString() }
 
@@ -257,8 +352,79 @@ function LoginPanel() {
     setMessage('Пренасочваме към Google…')
   }
 
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      setStatus('error')
+      setPendingAction('')
+      setMessage('Въведи имейл.')
+      return
+    }
+
+    setStatus('sending')
+    setPendingAction('reset')
+    setMessage('')
+
+    const resetRedirect = new URL('/login', getAuthRedirectOrigin())
+    resetRedirect.searchParams.set('reset', 'true')
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: resetRedirect.toString(),
+    })
+
+    if (error) {
+      setStatus('error')
+      setPendingAction('')
+      setMessage(error.message)
+      return
+    }
+
+    setStatus('sent')
+    setPendingAction('')
+    setMessage('Изпратихме имейл за смяна на парола.')
+  }
+
   async function submit(e) {
     e.preventDefault()
+
+    if (isRecoveryMode) {
+      if (!pwdValid) {
+        setStatus('error')
+        setPendingAction('')
+        setMessage('Използвай по-сигурна парола.')
+        return
+      }
+
+      if (password !== confirmPassword) {
+        setStatus('error')
+        setPendingAction('')
+        setMessage('Паролите не съвпадат.')
+        return
+      }
+
+      setStatus('sending')
+      setPendingAction('password')
+      setMessage('')
+
+      const { error } = await supabase.auth.updateUser({ password })
+
+      if (error) {
+        setStatus('error')
+        setPendingAction('')
+        setMessage(error.message)
+        return
+      }
+
+      setStatus('sent')
+      setPendingAction('')
+      setMessage('Паролата е сменена.')
+      setIsRecoveryMode(false)
+      setPassword('')
+      setConfirmPassword('')
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', nextPath ? `/login?next=${encodeURIComponent(nextPath)}` : '/login')
+      }
+      return
+    }
 
     if (isLogin) {
       if (!email.trim() || !password.trim()) {
@@ -269,22 +435,22 @@ function LoginPanel() {
     } else {
       if (!fullName.trim() || !displayName.trim()) {
         setStatus('error')
-        setMessage('Моля, попълнете и двете имена.')
+        setMessage('Попълни и двете имена.')
         return
       }
       if (!email.trim()) {
         setStatus('error')
-        setMessage('Моля, въведете имейл адрес.')
+        setMessage('Въведи имейл.')
         return
       }
       if (!pwdValid) {
         setStatus('error')
-        setMessage('Моля, покрийте всички изисквания за паролата.')
+        setMessage('Покрий изискванията за парола.')
         return
       }
       if (password !== confirmPassword) {
         setStatus('error')
-        setMessage('Паролите не съвпадат. Опитайте отново.')
+        setMessage('Паролите не съвпадат.')
         return
       }
     }
@@ -297,8 +463,8 @@ function LoginPanel() {
     if (isLogin) {
       result = await supabase.auth.signInWithPassword({ email: email.trim(), password })
     } else {
-      // Ролята отива в raw_user_meta_data → trigger handle_new_user я чете
-      // и създава ред в public.accounts с правилните role/specialist_status.
+      // Р РѕР»СЏС‚Р° РѕС‚РёРІР° РІ raw_user_meta_data в†’ trigger handle_new_user СЏ С‡РµС‚Рµ
+      // Рё СЃСЉР·РґР°РІР° СЂРµРґ РІ public.accounts СЃ РїСЂР°РІРёР»РЅРёС‚Рµ role/specialist_status.
       result = await supabase.auth.signUp({
         email: email.trim(),
         password,
@@ -327,31 +493,31 @@ function LoginPanel() {
       isLogin
         ? 'Входът е успешен.'
         : signupRole === 'pro'
-          ? 'Регистрацията е приета. Ако е нужно потвърждение на имейл, провери пощата си. След вход отивай в „Моят профил“.'
-          : 'Регистрацията е успешна!'
+          ? 'Регистрацията е приета. Провери имейла си, ако е нужно потвърждение.'
+          : 'Регистрацията е успешна.'
     )
   }
 
   return (
     <div className="grid h-full overflow-hidden lg:grid-cols-2">
-      <div className={`flex flex-col px-6 sm:px-12 lg:px-20 xl:px-24 ${isLogin ? 'justify-center overflow-y-auto py-8 lg:py-10' : 'justify-start overflow-y-auto py-5 lg:py-6'}`}>
+      <div className={`flex flex-col px-6 sm:px-12 lg:px-20 xl:px-24 ${(isLogin || isRecoveryMode) ? 'justify-center overflow-y-auto py-8 lg:py-10' : 'justify-start overflow-y-auto py-5 lg:py-6'}`}>
         <div className="mx-auto w-full max-w-[400px]">
           <h2 className="font-display text-[clamp(2.5rem,2rem+2vw,3.5rem)] leading-none text-ink">
-            {isLogin ? 'Добре дошли' : 'Започни сега'}
+            {isRecoveryMode ? 'Нова парола' : isLogin ? 'Добре дошли' : 'Започни сега'}
           </h2>
           <p className="mt-3 text-sm text-muted">
-            {isLogin ? 'Влез с имейл и парола или продължи с Google.' : 'Създай профил с имейл и парола или продължи с Google.'}
+            {isRecoveryMode ? 'Въведи нова парола.' : isLogin ? 'Влез с имейл и парола или продължи с Google.' : 'Създай профил с имейл и парола или продължи с Google.'}
           </p>
 
-          <form onSubmit={submit} className={`${isLogin ? 'mt-10 space-y-5' : 'mt-7 space-y-4'}`}>
-            {!isLogin && (
+          <form onSubmit={submit} className={`${(isLogin || isRecoveryMode) ? 'mt-10 space-y-5' : 'mt-7 space-y-4'}`}>
+            {!isLogin && !isRecoveryMode && (
               <div>
                 <div className="text-sm font-medium text-ink mb-2">Аз съм</div>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setSignupRole('customer')}
-                    className={`rounded-2xl border px-4 py-3 text-sm transition ${signupRole === 'customer' ? 'border-ink bg-soft text-ink' : 'border-line text-muted hover:border-ink/40'}`}
+                    className={`rounded-2xl border px-4 py-3 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 active:scale-[0.99] ${signupRole === 'customer' ? 'border-ink bg-soft text-ink' : 'border-line text-muted hover:border-ink/40'}`}
                   >
                     <div className="font-medium">Клиент</div>
                     <div className="text-xs text-muted mt-0.5">Търся специалисти</div>
@@ -359,7 +525,7 @@ function LoginPanel() {
                   <button
                     type="button"
                     onClick={() => setSignupRole('pro')}
-                    className={`rounded-2xl border px-4 py-3 text-sm transition ${signupRole === 'pro' ? 'border-ink bg-soft text-ink' : 'border-line text-muted hover:border-ink/40'}`}
+                    className={`rounded-2xl border px-4 py-3 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 active:scale-[0.99] ${signupRole === 'pro' ? 'border-ink bg-soft text-ink' : 'border-line text-muted hover:border-ink/40'}`}
                   >
                     <div className="font-medium">Специалист</div>
                     <div className="text-xs text-muted mt-0.5">Предлагам услуги</div>
@@ -368,7 +534,7 @@ function LoginPanel() {
               </div>
             )}
 
-            {!isLogin && (
+            {!isLogin && !isRecoveryMode && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm font-medium text-ink">
                   Име и фамилия
@@ -393,8 +559,9 @@ function LoginPanel() {
               </div>
             )}
             
+            {!isRecoveryMode && (
             <label className="block text-sm font-medium text-ink">
-              Имейл адрес
+              Имейл
               <input
                 value={email}
                 onChange={e => setEmail(e.target.value)}
@@ -404,19 +571,20 @@ function LoginPanel() {
                 className={INPUT_CLASS}
               />
             </label>
+            )}
 
             <label className="block text-sm font-medium text-ink">
               <div className="flex justify-between">
                 <span>Парола</span>
-                {isLogin && <button type="button" className="text-accent hover:underline">Забравена парола?</button>}
+                {isLogin && !isRecoveryMode && <button type="button" onClick={handleForgotPassword} className={subtleButtonClass}>Забравена парола?</button>}
               </div>
               <div className="relative mt-2">
                 <input
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   type={showPassword ? 'text' : 'password'}
-                  autoComplete={isLogin ? 'current-password' : 'new-password'}
-                  placeholder="••••••••"
+                  autoComplete={isRecoveryMode ? 'new-password' : isLogin ? 'current-password' : 'new-password'}
+                  placeholder="Въведи парола"
                   className={`${INPUT_CLASS} mt-0 pr-12`}
                 />
                 <button
@@ -434,18 +602,18 @@ function LoginPanel() {
               </div>
             </label>
 
-            {!isLogin && password && (
+            {!isLogin && !isRecoveryMode && password && (
               <div className="text-xs space-y-1.5 mt-2">
                 <div className="text-muted mb-2">Изисквания за паролата:</div>
                 <RuleItem isValid={pwdRules.length} text="Минимум 8 знака" />
                 <RuleItem isValid={pwdRules.uppercase} text="Поне една главна буква" />
                 <RuleItem isValid={pwdRules.lowercase} text="Поне една малка буква" />
                 <RuleItem isValid={pwdRules.number} text="Поне едно число" />
-                <RuleItem isValid={pwdRules.special} text="Специален символ (напр. !@#$%^&*)" />
+                <RuleItem isValid={pwdRules.special} text="Специален символ" />
               </div>
             )}
 
-            {!isLogin && (
+            {(!isLogin || isRecoveryMode) && (
               <label className="block text-sm font-medium text-ink mt-4">
                 Потвърди паролата
                 <div className="relative mt-2">
@@ -454,13 +622,13 @@ function LoginPanel() {
                     onChange={e => setConfirmPassword(e.target.value)}
                     type={showConfirmPassword ? 'text' : 'password'}
                     autoComplete="new-password"
-                    placeholder="••••••••"
+                    placeholder="Въведи парола"
                     className={`${INPUT_CLASS} mt-0 pr-12`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(value => !value)}
-                    aria-label={showConfirmPassword ? 'Скрий потвърждението за паролата' : 'Покажи потвърждението за паролата'}
+                    aria-label={showConfirmPassword ? 'Скрий потвърждението' : 'Покажи потвърждението'}
                     aria-pressed={showConfirmPassword}
                     className="group absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted transition-all duration-300 hover:scale-110 hover:bg-soft hover:text-accent active:scale-95 active:rotate-6"
                   >
@@ -473,10 +641,10 @@ function LoginPanel() {
               </label>
             )}
 
-            {!isLogin && signupRole === 'pro' && (
+            {!isLogin && !isRecoveryMode && signupRole === 'pro' && (
               <div className="grid gap-3">
                 <label className="block text-sm font-medium text-ink">
-                  Телефон (опционално)
+                  Телефон (по желание)
                   <input
                     value={proPhone}
                     onChange={e => setProPhone(e.target.value)}
@@ -498,7 +666,7 @@ function LoginPanel() {
               </div>
             )}
 
-            {isLogin ? (
+            {isLogin && !isRecoveryMode && (
               <div className="rounded-2xl border border-line bg-soft px-3 py-2.5">
                 <button
                   type="button"
@@ -513,15 +681,15 @@ function LoginPanel() {
                   </span>
                 </button>
               </div>
-            ) : (
+            )}
+            {!isLogin && !isRecoveryMode && (
               <label className="flex items-center gap-2 text-sm text-muted">
                 <input type="checkbox" required className="rounded border-line text-accent focus:ring-accent" />
                 Съгласявам се с общите условия и политиката за поверителност
               </label>
             )}
-
-            <button disabled={status === 'sending'} className="btn btn-primary w-full justify-center !py-3.5 text-base mt-2 disabled:opacity-50">
-              {status === 'sending' ? 'Обработка…' : isLogin ? 'Вход' : 'Регистрация'}
+            <button disabled={status === 'sending'} className={actionButtonClass}>
+              {status === 'sending' ? 'Обработка…' : isRecoveryMode ? 'Запази' : isLogin ? 'Вход' : 'Регистрация'}
             </button>
           </form>
 
@@ -531,34 +699,40 @@ function LoginPanel() {
             </div>
           )}
 
-          <div className={`${isLogin ? 'my-8' : 'my-6'} flex items-center gap-4 text-[11px] uppercase tracking-[0.2em] text-muted/60`}>
-            <span className="h-px flex-1 bg-line"></span>
-            <span>или</span>
-            <span className="h-px flex-1 bg-line"></span>
-          </div>
+          {!isRecoveryMode && (
+            <>
+              <div className={`${isLogin ? 'my-8' : 'my-6'} flex items-center gap-4 text-[11px] uppercase tracking-[0.2em] text-muted/60`}>
+                <span className="h-px flex-1 bg-line"></span>
+                <span>или</span>
+                <span className="h-px flex-1 bg-line"></span>
+              </div>
 
-          <div className="grid gap-3">
-            <OAuthButton
-              label={isLogin ? 'Продължи с Google' : 'Регистрация с Google'}
-              disabled={status === 'sending' && pendingAction !== ''}
-              onClick={() => signInWithProvider('google')}
-              icon={<GoogleIcon />}
-            />
-          </div>
+              <div className="grid gap-3">
+                <OAuthButton
+                  label={isLogin ? 'Продължи с Google' : 'Регистрация с Google'}
+                  disabled={status === 'sending' && pendingAction !== ''}
+                  onClick={() => signInWithProvider('google')}
+                  icon={<GoogleIcon />}
+                />
+              </div>
 
-          <div className={`${isLogin ? 'mt-10' : 'mt-7'} text-center text-sm text-muted`}>
-            {isLogin ? 'Нямаш акаунт? ' : 'Вече имаш акаунт? '}
-            <button
-              onClick={() => {
-                setIsLogin(!isLogin)
-                setMessage('')
-                setStatus('idle')
-              }}
-              className="font-medium text-accent hover:underline"
-            >
-              {isLogin ? 'Създай нов' : 'Влез тук'}
-            </button>
-          </div>
+              {isLogin && <PasskeySignInButton className="mt-5" />}
+
+              <div className={`${isLogin ? 'mt-10' : 'mt-7'} text-center text-sm text-muted`}>
+                {isLogin ? 'Нямаш акаунт? ' : 'Вече имаш акаунт? '}
+                <button
+                  onClick={() => {
+                    setIsLogin(!isLogin)
+                    setMessage('')
+                    setStatus('idle')
+                  }}
+                  className={subtleButtonClass}
+                >
+                  {isLogin ? 'Създай профил' : 'Вход'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -573,16 +747,21 @@ function NoAccessPanel({ session, account }) {
   const isPendingSpecialist = account?.role === 'specialist' && account?.specialist_status === 'pending'
   return (
     <div className="max-w-3xl rounded-[2rem] border border-line bg-paper p-8 shadow-[0_30px_70px_-50px_rgba(0,0,0,0.18)]">
-      <div className="eyebrow">Акаунтът ти е активен</div>
+      <div className="eyebrow">РђРєР°СѓРЅС‚СЉС‚ С‚Рё Рµ Р°РєС‚РёРІРµРЅ</div>
       <h2 className="mt-3 font-display text-[clamp(2.2rem,1.6rem+1vw,3.4rem)] leading-[0.98]">
-        {isPendingSpecialist ? 'Заявката ти се преглежда.' : 'Нямаш достъп до админ панела.'}
+        {isPendingSpecialist ? 'Р—Р°СЏРІРєР°С‚Р° С‚Рё СЃРµ РїСЂРµРіР»РµР¶РґР°.' : 'РќСЏРјР°С€ РґРѕСЃС‚СЉРї РґРѕ Р°РґРјРёРЅ РїР°РЅРµР»Р°.'}
       </h2>
       <p className="mt-4 max-w-2xl text-muted">
-        Влязъл си с {session?.user?.email}. {isPendingSpecialist ? 'Когато администратор одобри заявката, ще получиш достъп до „Моят профил“.' : 'Ако смяташ, че трябва да си админ, свържи се с екипа.'}
+        Р’Р»СЏР·СЉР» СЃРё СЃ {session?.user?.email}. {isPendingSpecialist ? 'РљРѕРіР°С‚Рѕ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂ РѕРґРѕР±СЂРё Р·Р°СЏРІРєР°С‚Р°, С‰Рµ РїРѕР»СѓС‡РёС€ РґРѕСЃС‚СЉРї РґРѕ вЂћРњРѕСЏС‚ РїСЂРѕС„РёР»вЂњ.' : 'РђРєРѕ СЃРјСЏС‚Р°С€, С‡Рµ С‚СЂСЏР±РІР° РґР° СЃРё Р°РґРјРёРЅ, СЃРІСЉСЂР¶Рё СЃРµ СЃ РµРєРёРїР°.'}
       </p>
       <div className="mt-6 flex flex-wrap gap-3">
-        <Link to="/moy-profil" className="btn btn-primary">Към моя профил</Link>
-        <button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Изход</button>
+        <Link to="/moy-profil" className="btn btn-primary">РљСЉРј РјРѕСЏ РїСЂРѕС„РёР»</Link>
+        <button
+          className="btn btn-ghost transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
+          onClick={() => signOutToHome(session?.user?.id)}
+        >
+          Изход
+        </button>
       </div>
     </div>
   )
@@ -613,7 +792,7 @@ function Dashboard() {
     ])
 
     if (inq.error || apps.error) {
-      setError(inq.error?.message || apps.error?.message || 'Грешка при зареждане')
+      setError(inq.error?.message || apps.error?.message || 'Р“СЂРµС€РєР° РїСЂРё Р·Р°СЂРµР¶РґР°РЅРµ')
       setStatus('error')
       return
     }
@@ -634,14 +813,14 @@ function Dashboard() {
 
   async function approveApplication(app) {
     if (!app.user_id) {
-      setError('Заявката няма свързан акаунт. Не може да се одобри автоматично.')
+      setError('Р—Р°СЏРІРєР°С‚Р° РЅСЏРјР° СЃРІСЉСЂР·Р°РЅ Р°РєР°СѓРЅС‚. РќРµ РјРѕР¶Рµ РґР° СЃРµ РѕРґРѕР±СЂРё Р°РІС‚РѕРјР°С‚РёС‡РЅРѕ.')
       return
     }
-    // 1) Създаваме скрит профил, свързан с user_id на заявителя.
+    // 1) РЎСЉР·РґР°РІР°РјРµ СЃРєСЂРёС‚ РїСЂРѕС„РёР», СЃРІСЉСЂР·Р°РЅ СЃ user_id РЅР° Р·Р°СЏРІРёС‚РµР»СЏ.
     const baseSlug = (app.name || app.email || 'profil')
       .toString()
       .toLowerCase()
-      .replace(/[^a-z0-9а-я]+/gi, '-')
+      .replace(/[^a-z0-9Р°-СЏ]+/gi, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 60)
     const slug = `${baseSlug || 'profil'}-${app.id.slice(0, 6)}`
@@ -649,9 +828,9 @@ function Dashboard() {
     const { error: profileError } = await supabase.from('profiles').insert({
       slug,
       layer_slug: app.layer_slug || 'postroyka',
-      name: app.name || 'Нов специалист',
-      tag: 'Специалист',
-      city: '—',
+      name: app.name || 'РќРѕРІ СЃРїРµС†РёР°Р»РёСЃС‚',
+      tag: 'РЎРїРµС†РёР°Р»РёСЃС‚',
+      city: 'вЂ”',
       since: new Date().getFullYear(),
       bio: app.about || '',
       user_id: app.user_id,
@@ -660,7 +839,7 @@ function Dashboard() {
     })
 
     if (profileError) {
-      setError('Профилът не се създаде: ' + profileError.message)
+      setError('РџСЂРѕС„РёР»СЉС‚ РЅРµ СЃРµ СЃСЉР·РґР°РґРµ: ' + profileError.message)
       return
     }
 
@@ -690,27 +869,27 @@ function Dashboard() {
   return (
     <>
       <div className="grid gap-4 md:grid-cols-4 mb-8">
-        <Stat label="Всички запитвания" value={stats.all} />
-        <Stat label="Нови" value={stats.fresh} />
-        <Stat label="Отговорени" value={stats.replied} />
-        <Stat label="Партньорски заявки" value={stats.partners} />
+        <Stat label="Р’СЃРёС‡РєРё Р·Р°РїРёС‚РІР°РЅРёСЏ" value={stats.all} />
+        <Stat label="РќРѕРІРё" value={stats.fresh} />
+        <Stat label="РћС‚РіРѕРІРѕСЂРµРЅРё" value={stats.replied} />
+        <Stat label="РџР°СЂС‚РЅСЊРѕСЂСЃРєРё Р·Р°СЏРІРєРё" value={stats.partners} />
       </div>
 
-      {status === 'loading' && <Panel title="Зареждаме запитванията…" />}
+      {status === 'loading' && <Panel title="Р—Р°СЂРµР¶РґР°РјРµ Р·Р°РїРёС‚РІР°РЅРёСЏС‚Р°вЂ¦" />}
       {status === 'error' && (
-        <Panel title="Данните не се заредиха">
+        <Panel title="Р”Р°РЅРЅРёС‚Рµ РЅРµ СЃРµ Р·Р°СЂРµРґРёС…Р°">
           <p className="text-red-700 text-sm">{error}</p>
-          <p className="text-muted text-sm mt-3">Най-често причината е, че новите admin SQL policies още не са пуснати в Supabase.</p>
-          <button className="btn btn-ghost mt-5" onClick={load}>Опитай пак</button>
+          <p className="text-muted text-sm mt-3">РќР°Р№-С‡РµСЃС‚Рѕ РїСЂРёС‡РёРЅР°С‚Р° Рµ, С‡Рµ РЅРѕРІРёС‚Рµ admin SQL policies РѕС‰Рµ РЅРµ СЃР° РїСѓСЃРЅР°С‚Рё РІ Supabase.</p>
+          <button className="btn btn-ghost mt-5" onClick={load}>РћРїРёС‚Р°Р№ РїР°Рє</button>
         </Panel>
       )}
       {status === 'ready' && (
         <>
           <div className="grid gap-6 lg:grid-cols-12">
             <div className="lg:col-span-8 space-y-4">
-              <div className="eyebrow">Запитвания</div>
+              <div className="eyebrow">Р—Р°РїРёС‚РІР°РЅРёСЏ</div>
               {inquiries.length === 0 ? (
-                <Panel title="Още няма запитвания"><p className="text-muted">Формите са готови. Първият запис ще се появи тук.</p></Panel>
+                <Panel title="РћС‰Рµ РЅСЏРјР° Р·Р°РїРёС‚РІР°РЅРёСЏ"><p className="text-muted">Р¤РѕСЂРјРёС‚Рµ СЃР° РіРѕС‚РѕРІРё. РџСЉСЂРІРёСЏС‚ Р·Р°РїРёСЃ С‰Рµ СЃРµ РїРѕСЏРІРё С‚СѓРє.</p></Panel>
               ) : inquiries.map(row => (
                 <article key={row.id} className="border border-line rounded-2xl bg-paper p-5">
                   <div className="flex flex-wrap gap-3 items-start justify-between">
@@ -725,25 +904,25 @@ function Dashboard() {
                   <p className="mt-4 text-sm text-ink/80 whitespace-pre-wrap">{row.message}</p>
                   <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted">
                     <span>{formatDate(row.created_at)}</span>
-                    <span>·</span>
+                    <span>В·</span>
                     <span>{row.source || 'contact_form'}</span>
-                    {row.layer_slug && <span>· слой: {row.layer_slug}</span>}
-                    {row.target_slug && <span>· към: {row.target_slug}</span>}
+                    {row.layer_slug && <span>В· СЃР»РѕР№: {row.layer_slug}</span>}
+                    {row.target_slug && <span>В· РєСЉРј: {row.target_slug}</span>}
                   </div>
                 </article>
               ))}
             </div>
 
             <aside className="lg:col-span-4 space-y-4">
-              <div className="eyebrow">Партньори</div>
+              <div className="eyebrow">РџР°СЂС‚РЅСЊРѕСЂРё</div>
               {applications.length === 0 ? (
-                <Panel title="Няма партньорски заявки"><p className="text-muted text-sm">Когато добавим публичната форма за партньори, заявките ще се показват тук.</p></Panel>
+                <Panel title="РќСЏРјР° РїР°СЂС‚РЅСЊРѕСЂСЃРєРё Р·Р°СЏРІРєРё"><p className="text-muted text-sm">РљРѕРіР°С‚Рѕ РґРѕР±Р°РІРёРј РїСѓР±Р»РёС‡РЅР°С‚Р° С„РѕСЂРјР° Р·Р° РїР°СЂС‚РЅСЊРѕСЂРё, Р·Р°СЏРІРєРёС‚Рµ С‰Рµ СЃРµ РїРѕРєР°Р·РІР°С‚ С‚СѓРє.</p></Panel>
               ) : applications.map(app => (
                 <article key={app.id} className="border border-line rounded-2xl bg-paper p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="font-display text-xl">{app.name}</div>
-                      <div className="text-sm text-muted">{app.company || 'Без фирма'} · {app.email}</div>
+                      <div className="text-sm text-muted">{app.company || 'Р‘РµР· С„РёСЂРјР°'} В· {app.email}</div>
                       {app.phone && <div className="text-sm text-muted">{app.phone}</div>}
                     </div>
                     <span className={`shrink-0 rounded-full px-3 py-1 text-xs ${
@@ -751,18 +930,18 @@ function Dashboard() {
                       : app.status === 'rejected' ? 'bg-red-100 text-red-800'
                       : 'bg-amber-100 text-amber-900'
                     }`}>
-                      {app.status === 'approved' ? 'Одобрен' : app.status === 'rejected' ? 'Отхвърлен' : 'Чака'}
+                      {app.status === 'approved' ? 'РћРґРѕР±СЂРµРЅ' : app.status === 'rejected' ? 'РћС‚С…РІСЉСЂР»РµРЅ' : 'Р§Р°РєР°'}
                     </span>
                   </div>
                   {app.about && <p className="text-sm mt-3 whitespace-pre-wrap">{app.about}</p>}
                   <div className="mt-3 text-xs text-muted">
                     {formatDate(app.created_at)}
-                    {!app.user_id && <span className="ml-2 text-amber-700">· без свързан акаунт</span>}
+                    {!app.user_id && <span className="ml-2 text-amber-700">В· Р±РµР· СЃРІСЉСЂР·Р°РЅ Р°РєР°СѓРЅС‚</span>}
                   </div>
                   {app.status === 'pending' && (
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <button onClick={() => approveApplication(app)} className="btn btn-primary text-sm !py-2">Одобри</button>
-                      <button onClick={() => rejectApplication(app)} className="btn btn-ghost text-sm !py-2">Отхвърли</button>
+                      <button onClick={() => approveApplication(app)} className="btn btn-primary text-sm !py-2">РћРґРѕР±СЂРё</button>
+                      <button onClick={() => rejectApplication(app)} className="btn btn-ghost text-sm !py-2">РћС‚С…РІСЉСЂР»Рё</button>
                     </div>
                   )}
                 </article>
@@ -829,7 +1008,7 @@ function getSessionLabel(session) {
   if (fullName) return fullName
 
   const email = getSessionEmails(session)[0]
-  if (!email) return 'екип'
+  if (!email) return 'РµРєРёРї'
   return email.split('@')[0]
 }
 
@@ -840,7 +1019,7 @@ function OAuthButton({ label, icon, disabled, onClick }) {
       type="button"
       disabled={isBusy}
       onClick={onClick}
-      className="inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-line bg-paper px-4 py-3 text-sm font-medium text-ink transition hover:border-ink disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-line bg-paper px-4 py-3 text-sm font-medium text-ink transition duration-200 hover:border-ink hover:bg-soft active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 disabled:cursor-not-allowed disabled:opacity-60"
     >
       <span className="inline-flex h-5 w-5 items-center justify-center">{icon}</span>
       {label}

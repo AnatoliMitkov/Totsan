@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import MessageBubble from './MessageBubble.jsx'
+import Avatar from '../Avatar.jsx'
+import { conversationRole } from '../../lib/chat.js'
 
 export default function ChatThread({ conversation, messages, userId, onOfferAction }) {
   const threadBodyRef = useRef(null)
@@ -33,15 +35,27 @@ export default function ChatThread({ conversation, messages, userId, onOfferActi
     )
   }
 
+  const role = conversationRole(conversation, userId)
+  const otherParticipant = role === 'client' ? conversation.partner : conversation.client
+  const avatarUrl = otherParticipant?.avatar_url || ''
+  const participantName = otherParticipant?.display_name || otherParticipant?.full_name || ''
+  const fallbackName = role === 'client' ? 'Партньор' : 'Клиент'
+  const displayName = participantName || fallbackName
+
   return (
     <div className="flex min-h-[24rem] flex-col rounded-3xl border border-line bg-paper md:min-h-[32rem]">
-      <div className="border-b border-line p-5">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <div className="eyebrow">Активен чат</div>
-            <h1 className="mt-2 font-display text-2xl leading-tight text-ink md:text-3xl">{conversation.subject || 'Разговор в Totsan'}</h1>
+      <div className="border-b border-line p-4 md:p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Avatar src={avatarUrl} name={displayName} size={48} />
+            <div>
+              <h1 className="font-display text-xl text-ink leading-tight md:text-2xl">{displayName}</h1>
+              <div className="text-sm text-muted">{conversation.subject || 'Разговор в Totsan'}</div>
+            </div>
           </div>
-          <span className="rounded-full border border-line bg-soft px-3 py-1 text-xs text-muted">{conversation.status === 'open' ? 'Отворен' : conversation.status}</span>
+          <span className="shrink-0 rounded-full border border-line bg-soft px-3 py-1 text-xs text-muted">
+            {conversation.status === 'open' ? 'Отворен' : conversation.status}
+          </span>
         </div>
         <div className="mt-4 flex gap-3 rounded-2xl border border-line bg-soft p-4 text-sm text-muted">
           <ShieldCheck size={18} className="mt-0.5 shrink-0 text-accentDeep" />
