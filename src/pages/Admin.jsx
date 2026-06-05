@@ -39,11 +39,11 @@ function getAuthRedirectOrigin() {
 }
 
 const STATUS_LABELS = {
-  new: 'РќРѕРІРѕ',
-  seen: 'РџСЂРµРіР»РµРґР°РЅРѕ',
-  replied: 'РћС‚РіРѕРІРѕСЂРµРЅРѕ',
-  closed: 'Р—Р°С‚РІРѕСЂРµРЅРѕ',
-  pending: 'Р§Р°РєР°',
+  new: 'Ново',
+  seen: 'Прегледано',
+  replied: 'Отговорено',
+  closed: 'Затворено',
+  pending: 'Чака',
 }
 
 const DashboardSection = lazy(() => import('../components/admin/Dashboard.jsx'))
@@ -57,15 +57,15 @@ const OrdersManagerSection = lazy(() => import('../components/admin/OrdersManage
 const ReviewsManagerSection = lazy(() => import('../components/admin/ReviewsManager.jsx'))
 
 const ADMIN_SECTIONS = [
-  { id: 'dashboard', label: 'РћР±Р·РѕСЂ', hint: 'KPI Рё РїРѕСЃР»РµРґРЅРё СЃСЉР±РёС‚РёСЏ', icon: BarChart3, Component: DashboardSection },
-  { id: 'users', label: 'РџРѕС‚СЂРµР±РёС‚РµР»Рё', hint: 'Р РѕР»Рё, СЃС‚Р°С‚СѓСЃРё, ban', icon: Users, Component: UsersManagerSection },
-  { id: 'inquiries', label: 'Р—Р°РїРёС‚РІР°РЅРёСЏ', hint: 'Р¤РѕСЂРјРё, РёР·С‚РѕС‡РЅРёС†Рё Рё СЃС‚Р°С‚СѓСЃРё', icon: ClipboardList, Component: InquiriesManagerSection },
-  { id: 'applications', label: 'РљР°РЅРґРёРґР°С‚СѓСЂРё', hint: 'РћРґРѕР±СЂРµРЅРёРµ РЅР° СЃРїРµС†РёР°Р»РёСЃС‚Рё', icon: UserCog, Component: ApplicationsManagerSection },
-  { id: 'profiles', label: 'РџСЂРѕС„РёР»Рё', hint: 'РџСѓР±Р»РёС‡РЅРѕСЃС‚ Рё РїСЂРѕС„РёР»РЅР° РјРѕРґРµСЂР°С†РёСЏ', icon: FolderKanban, Component: ProfileManagerSection },
-  { id: 'partner-services', label: 'РЈСЃР»СѓРіРё', hint: 'РњРѕРґРµСЂР°С†РёСЏ РЅР° РїР°СЂС‚РЅСЊРѕСЂСЃРєРё СѓСЃР»СѓРіРё', icon: PackageCheck, Component: PartnerServicesManagerSection },
-  { id: 'orders', label: 'РџРѕСЂСЉС‡РєРё', hint: 'РџР»Р°С‰Р°РЅРёСЏ, СЃС‚Р°С‚СѓСЃРё, СЃРїРѕСЂРѕРІРµ', icon: CreditCard, Component: OrdersManagerSection },
-  { id: 'reviews', label: 'РћС‚Р·РёРІРё', hint: 'Verified РѕС‚Р·РёРІРё Рё СЃРёРіРЅР°Р»Рё', icon: Star, Component: ReviewsManagerSection },
-  { id: 'audit', label: 'Audit log', hint: 'РђРґРјРёРЅ РґРµР№СЃС‚РІРёСЏ', icon: ScrollText, Component: AuditLogSection },
+  { id: 'dashboard', label: 'Обзор', hint: 'KPI и последни събития', icon: BarChart3, Component: DashboardSection },
+  { id: 'users', label: 'Потребители', hint: 'Роли, статуси, ban', icon: Users, Component: UsersManagerSection },
+  { id: 'inquiries', label: 'Запитвания', hint: 'Форми, източници и статуси', icon: ClipboardList, Component: InquiriesManagerSection },
+  { id: 'applications', label: 'Кандидатури', hint: 'Одобрение на специалисти', icon: UserCog, Component: ApplicationsManagerSection },
+  { id: 'profiles', label: 'Профили', hint: 'Публичност и профилна модерация', icon: FolderKanban, Component: ProfileManagerSection },
+  { id: 'partner-services', label: 'Услуги', hint: 'Модерация на партньорски услуги', icon: PackageCheck, Component: PartnerServicesManagerSection },
+  { id: 'orders', label: 'Поръчки', hint: 'Плащания, статуси, спорове', icon: CreditCard, Component: OrdersManagerSection },
+  { id: 'reviews', label: 'Отзиви', hint: 'Verified отзиви и сигнали', icon: Star, Component: ReviewsManagerSection },
+  { id: 'audit', label: 'Audit log', hint: 'Админ действия', icon: ScrollText, Component: AuditLogSection },
 ]
 
 export default function Admin() {
@@ -128,8 +128,8 @@ async function signOutToHome(userId = '') {
 }
 
 function AdminShell({ children, session, account }) {
-  const title = 'РђРґРјРёРЅ РєРѕРЅС‚СЂРѕР»РµРЅ РїР°РЅРµР».'
-  const subtitle = `Р”РѕР±СЂРµ РґРѕС€СЉР» РѕР±СЂР°С‚РЅРѕ, ${getAccountDisplayName(account, session, 'admin')}.`
+  const title = 'Админ контролен панел.'
+  const subtitle = `Добре дошъл обратно, ${getAccountDisplayName(account, session, 'admin')}.`
 
   return (
     <section className="section !pt-12 md:!pt-16 bg-soft min-h-screen relative overflow-hidden">
@@ -193,7 +193,7 @@ function AdminWorkspace({ session, account }) {
       {/* Mobile nav (visible only below lg) */}
       <div className="w-full lg:hidden rounded-[2rem] border border-line bg-paper p-3 mb-4">
          <div className="px-3 py-3 overflow-hidden whitespace-nowrap">
-             <div className="eyebrow">РќР°РІРёРіР°С†РёСЏ</div>
+             <div className="eyebrow">Навигация</div>
          </div>
          <nav className="mt-1 flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
             {ADMIN_SECTIONS.map((section) => {
@@ -218,7 +218,7 @@ function AdminWorkspace({ session, account }) {
             </div>
             <label className="relative block w-full xl:max-w-md">
               <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
-              <input value={globalQuery} onChange={(event) => setGlobalQuery(event.target.value)} className="w-full rounded-2xl border border-line bg-soft px-11 py-3 text-sm outline-none transition focus:border-ink" placeholder="Р“Р»РѕР±Р°Р»РЅРѕ С‚СЉСЂСЃРµРЅРµ РІ С‚РµРєСѓС‰Р°С‚Р° СЃРµРєС†РёСЏ" />
+              <input value={globalQuery} onChange={(event) => setGlobalQuery(event.target.value)} className="w-full rounded-2xl border border-line bg-soft px-11 py-3 text-sm outline-none transition focus:border-ink" placeholder="Глобално търсене в текущата секция" />
             </label>
           </div>
         </div>
@@ -232,7 +232,7 @@ function AdminWorkspace({ session, account }) {
 }
 
 function AdminSectionFallback() {
-  return <div className="rounded-3xl border border-line bg-paper p-6 text-sm text-muted">Р—Р°СЂРµР¶РґР°РјРµ СЃРµРєС†РёСЏС‚Р°вЂ¦</div>
+  return <div className="rounded-3xl border border-line bg-paper p-6 text-sm text-muted">Зареждаме секцията…</div>
 }
 
 function LoginPanel() {
@@ -463,8 +463,8 @@ function LoginPanel() {
     if (isLogin) {
       result = await supabase.auth.signInWithPassword({ email: email.trim(), password })
     } else {
-      // Р РѕР»СЏС‚Р° РѕС‚РёРІР° РІ raw_user_meta_data в†’ trigger handle_new_user СЏ С‡РµС‚Рµ
-      // Рё СЃСЉР·РґР°РІР° СЂРµРґ РІ public.accounts СЃ РїСЂР°РІРёР»РЅРёС‚Рµ role/specialist_status.
+      // Ролята отива в raw_user_meta_data → trigger handle_new_user я чете
+      // и създава ред в public.accounts с правилните role/specialist_status.
       result = await supabase.auth.signUp({
         email: email.trim(),
         password,
@@ -747,15 +747,15 @@ function NoAccessPanel({ session, account }) {
   const isPendingSpecialist = account?.role === 'specialist' && account?.specialist_status === 'pending'
   return (
     <div className="max-w-3xl rounded-[2rem] border border-line bg-paper p-8 shadow-[0_30px_70px_-50px_rgba(0,0,0,0.18)]">
-      <div className="eyebrow">РђРєР°СѓРЅС‚СЉС‚ С‚Рё Рµ Р°РєС‚РёРІРµРЅ</div>
+      <div className="eyebrow">Акаунтът ти е активен</div>
       <h2 className="mt-3 font-display text-[clamp(2.2rem,1.6rem+1vw,3.4rem)] leading-[0.98]">
-        {isPendingSpecialist ? 'Р—Р°СЏРІРєР°С‚Р° С‚Рё СЃРµ РїСЂРµРіР»РµР¶РґР°.' : 'РќСЏРјР°С€ РґРѕСЃС‚СЉРї РґРѕ Р°РґРјРёРЅ РїР°РЅРµР»Р°.'}
+        {isPendingSpecialist ? 'Заявката ти се преглежда.' : 'Нямаш достъп до админ панела.'}
       </h2>
       <p className="mt-4 max-w-2xl text-muted">
-        Р’Р»СЏР·СЉР» СЃРё СЃ {session?.user?.email}. {isPendingSpecialist ? 'РљРѕРіР°С‚Рѕ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂ РѕРґРѕР±СЂРё Р·Р°СЏРІРєР°С‚Р°, С‰Рµ РїРѕР»СѓС‡РёС€ РґРѕСЃС‚СЉРї РґРѕ вЂћРњРѕСЏС‚ РїСЂРѕС„РёР»вЂњ.' : 'РђРєРѕ СЃРјСЏС‚Р°С€, С‡Рµ С‚СЂСЏР±РІР° РґР° СЃРё Р°РґРјРёРЅ, СЃРІСЉСЂР¶Рё СЃРµ СЃ РµРєРёРїР°.'}
+        Влязъл си с {session?.user?.email}. {isPendingSpecialist ? 'Когато администратор одобри заявката, ще получиш достъп до „Моят профил“.' : 'Ако смяташ, че трябва да си админ, свържи се с екипа.'}
       </p>
       <div className="mt-6 flex flex-wrap gap-3">
-        <Link to="/moy-profil" className="btn btn-primary">РљСЉРј РјРѕСЏ РїСЂРѕС„РёР»</Link>
+        <Link to="/moy-profil" className="btn btn-primary">Към моя профил</Link>
         <button
           className="btn btn-ghost transition-transform duration-200 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15"
           onClick={() => signOutToHome(session?.user?.id)}
@@ -792,7 +792,7 @@ function Dashboard() {
     ])
 
     if (inq.error || apps.error) {
-      setError(inq.error?.message || apps.error?.message || 'Р“СЂРµС€РєР° РїСЂРё Р·Р°СЂРµР¶РґР°РЅРµ')
+      setError(inq.error?.message || apps.error?.message || 'Грешка при зареждане')
       setStatus('error')
       return
     }
@@ -813,14 +813,14 @@ function Dashboard() {
 
   async function approveApplication(app) {
     if (!app.user_id) {
-      setError('Р—Р°СЏРІРєР°С‚Р° РЅСЏРјР° СЃРІСЉСЂР·Р°РЅ Р°РєР°СѓРЅС‚. РќРµ РјРѕР¶Рµ РґР° СЃРµ РѕРґРѕР±СЂРё Р°РІС‚РѕРјР°С‚РёС‡РЅРѕ.')
+      setError('Заявката няма свързан акаунт. Не може да се одобри автоматично.')
       return
     }
-    // 1) РЎСЉР·РґР°РІР°РјРµ СЃРєСЂРёС‚ РїСЂРѕС„РёР», СЃРІСЉСЂР·Р°РЅ СЃ user_id РЅР° Р·Р°СЏРІРёС‚РµР»СЏ.
+    // 1) Създаваме скрит профил, свързан с user_id на заявителя.
     const baseSlug = (app.name || app.email || 'profil')
       .toString()
       .toLowerCase()
-      .replace(/[^a-z0-9Р°-СЏ]+/gi, '-')
+      .replace(/[^a-z0-9а-я]+/gi, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 60)
     const slug = `${baseSlug || 'profil'}-${app.id.slice(0, 6)}`
@@ -828,9 +828,9 @@ function Dashboard() {
     const { error: profileError } = await supabase.from('profiles').insert({
       slug,
       layer_slug: app.layer_slug || 'postroyka',
-      name: app.name || 'РќРѕРІ СЃРїРµС†РёР°Р»РёСЃС‚',
-      tag: 'РЎРїРµС†РёР°Р»РёСЃС‚',
-      city: 'вЂ”',
+      name: app.name || 'Нов специалист',
+      tag: 'Специалист',
+      city: '—',
       since: new Date().getFullYear(),
       bio: app.about || '',
       user_id: app.user_id,
@@ -839,7 +839,7 @@ function Dashboard() {
     })
 
     if (profileError) {
-      setError('РџСЂРѕС„РёР»СЉС‚ РЅРµ СЃРµ СЃСЉР·РґР°РґРµ: ' + profileError.message)
+      setError('Профилът не се създаде: ' + profileError.message)
       return
     }
 
@@ -869,27 +869,27 @@ function Dashboard() {
   return (
     <>
       <div className="grid gap-4 md:grid-cols-4 mb-8">
-        <Stat label="Р’СЃРёС‡РєРё Р·Р°РїРёС‚РІР°РЅРёСЏ" value={stats.all} />
-        <Stat label="РќРѕРІРё" value={stats.fresh} />
-        <Stat label="РћС‚РіРѕРІРѕСЂРµРЅРё" value={stats.replied} />
-        <Stat label="РџР°СЂС‚РЅСЊРѕСЂСЃРєРё Р·Р°СЏРІРєРё" value={stats.partners} />
+        <Stat label="Всички запитвания" value={stats.all} />
+        <Stat label="Нови" value={stats.fresh} />
+        <Stat label="Отговорени" value={stats.replied} />
+        <Stat label="Партньорски заявки" value={stats.partners} />
       </div>
 
-      {status === 'loading' && <Panel title="Р—Р°СЂРµР¶РґР°РјРµ Р·Р°РїРёС‚РІР°РЅРёСЏС‚Р°вЂ¦" />}
+      {status === 'loading' && <Panel title="Зареждаме запитванията…" />}
       {status === 'error' && (
-        <Panel title="Р”Р°РЅРЅРёС‚Рµ РЅРµ СЃРµ Р·Р°СЂРµРґРёС…Р°">
+        <Panel title="Данните не се заредиха">
           <p className="text-red-700 text-sm">{error}</p>
-          <p className="text-muted text-sm mt-3">РќР°Р№-С‡РµСЃС‚Рѕ РїСЂРёС‡РёРЅР°С‚Р° Рµ, С‡Рµ РЅРѕРІРёС‚Рµ admin SQL policies РѕС‰Рµ РЅРµ СЃР° РїСѓСЃРЅР°С‚Рё РІ Supabase.</p>
-          <button className="btn btn-ghost mt-5" onClick={load}>РћРїРёС‚Р°Р№ РїР°Рє</button>
+          <p className="text-muted text-sm mt-3">Най-често причината е, че новите admin SQL policies още не са пуснати в Supabase.</p>
+          <button className="btn btn-ghost mt-5" onClick={load}>Опитай пак</button>
         </Panel>
       )}
       {status === 'ready' && (
         <>
           <div className="grid gap-6 lg:grid-cols-12">
             <div className="lg:col-span-8 space-y-4">
-              <div className="eyebrow">Р—Р°РїРёС‚РІР°РЅРёСЏ</div>
+              <div className="eyebrow">Запитвания</div>
               {inquiries.length === 0 ? (
-                <Panel title="РћС‰Рµ РЅСЏРјР° Р·Р°РїРёС‚РІР°РЅРёСЏ"><p className="text-muted">Р¤РѕСЂРјРёС‚Рµ СЃР° РіРѕС‚РѕРІРё. РџСЉСЂРІРёСЏС‚ Р·Р°РїРёСЃ С‰Рµ СЃРµ РїРѕСЏРІРё С‚СѓРє.</p></Panel>
+                <Panel title="Още няма запитвания"><p className="text-muted">Формите са готови. Първият запис ще се появи тук.</p></Panel>
               ) : inquiries.map(row => (
                 <article key={row.id} className="border border-line rounded-2xl bg-paper p-5">
                   <div className="flex flex-wrap gap-3 items-start justify-between">
@@ -904,25 +904,25 @@ function Dashboard() {
                   <p className="mt-4 text-sm text-ink/80 whitespace-pre-wrap">{row.message}</p>
                   <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted">
                     <span>{formatDate(row.created_at)}</span>
-                    <span>В·</span>
+                    <span>·</span>
                     <span>{row.source || 'contact_form'}</span>
-                    {row.layer_slug && <span>В· СЃР»РѕР№: {row.layer_slug}</span>}
-                    {row.target_slug && <span>В· РєСЉРј: {row.target_slug}</span>}
+                    {row.layer_slug && <span>· слой: {row.layer_slug}</span>}
+                    {row.target_slug && <span>· към: {row.target_slug}</span>}
                   </div>
                 </article>
               ))}
             </div>
 
             <aside className="lg:col-span-4 space-y-4">
-              <div className="eyebrow">РџР°СЂС‚РЅСЊРѕСЂРё</div>
+              <div className="eyebrow">Партньори</div>
               {applications.length === 0 ? (
-                <Panel title="РќСЏРјР° РїР°СЂС‚РЅСЊРѕСЂСЃРєРё Р·Р°СЏРІРєРё"><p className="text-muted text-sm">РљРѕРіР°С‚Рѕ РґРѕР±Р°РІРёРј РїСѓР±Р»РёС‡РЅР°С‚Р° С„РѕСЂРјР° Р·Р° РїР°СЂС‚РЅСЊРѕСЂРё, Р·Р°СЏРІРєРёС‚Рµ С‰Рµ СЃРµ РїРѕРєР°Р·РІР°С‚ С‚СѓРє.</p></Panel>
+                <Panel title="Няма партньорски заявки"><p className="text-muted text-sm">Когато добавим публичната форма за партньори, заявките ще се показват тук.</p></Panel>
               ) : applications.map(app => (
                 <article key={app.id} className="border border-line rounded-2xl bg-paper p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="font-display text-xl">{app.name}</div>
-                      <div className="text-sm text-muted">{app.company || 'Р‘РµР· С„РёСЂРјР°'} В· {app.email}</div>
+                      <div className="text-sm text-muted">{app.company || 'Без фирма'} · {app.email}</div>
                       {app.phone && <div className="text-sm text-muted">{app.phone}</div>}
                     </div>
                     <span className={`shrink-0 rounded-full px-3 py-1 text-xs ${
@@ -930,18 +930,18 @@ function Dashboard() {
                       : app.status === 'rejected' ? 'bg-red-100 text-red-800'
                       : 'bg-amber-100 text-amber-900'
                     }`}>
-                      {app.status === 'approved' ? 'РћРґРѕР±СЂРµРЅ' : app.status === 'rejected' ? 'РћС‚С…РІСЉСЂР»РµРЅ' : 'Р§Р°РєР°'}
+                      {app.status === 'approved' ? 'Одобрен' : app.status === 'rejected' ? 'Отхвърлен' : 'Чака'}
                     </span>
                   </div>
                   {app.about && <p className="text-sm mt-3 whitespace-pre-wrap">{app.about}</p>}
                   <div className="mt-3 text-xs text-muted">
                     {formatDate(app.created_at)}
-                    {!app.user_id && <span className="ml-2 text-amber-700">В· Р±РµР· СЃРІСЉСЂР·Р°РЅ Р°РєР°СѓРЅС‚</span>}
+                    {!app.user_id && <span className="ml-2 text-amber-700">· без свързан акаунт</span>}
                   </div>
                   {app.status === 'pending' && (
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <button onClick={() => approveApplication(app)} className="btn btn-primary text-sm !py-2">РћРґРѕР±СЂРё</button>
-                      <button onClick={() => rejectApplication(app)} className="btn btn-ghost text-sm !py-2">РћС‚С…РІСЉСЂР»Рё</button>
+                      <button onClick={() => approveApplication(app)} className="btn btn-primary text-sm !py-2">Одобри</button>
+                      <button onClick={() => rejectApplication(app)} className="btn btn-ghost text-sm !py-2">Отхвърли</button>
                     </div>
                   )}
                 </article>
@@ -1008,7 +1008,7 @@ function getSessionLabel(session) {
   if (fullName) return fullName
 
   const email = getSessionEmails(session)[0]
-  if (!email) return 'РµРєРёРї'
+  if (!email) return 'екип'
   return email.split('@')[0]
 }
 
