@@ -173,12 +173,12 @@ function AdminWorkspace({ session, account }) {
     <div className="flex flex-col lg:flex-row gap-6 items-start">
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex group lg:sticky lg:top-24 z-20 w-[4.5rem] hover:w-[16rem] transition-all duration-300 overflow-hidden rounded-[2rem] border border-line bg-paper p-2 shadow-[0_20px_60px_-50px_rgba(0,0,0,0.15)] h-[calc(100vh-8rem)] flex-col shrink-0">
-        <nav className="grid gap-1 flex-1 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar">
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden pr-1 custom-scrollbar">
           {ADMIN_SECTIONS.map((section) => {
             const Icon = section.icon
             const isActive = section.id === activeSection
             return (
-              <button key={section.id} type="button" onClick={() => openSection(section.id)} title={section.label} className={`flex w-full items-center gap-4 rounded-2xl p-3 text-left transition whitespace-nowrap overflow-hidden ${isActive ? 'bg-soft text-ink' : 'text-muted hover:bg-soft/70 hover:text-ink'}`}>
+              <button key={section.id} type="button" onClick={() => openSection(section.id)} title={section.label} className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition whitespace-nowrap overflow-hidden ${isActive ? 'bg-soft text-ink' : 'text-muted hover:bg-soft/70 hover:text-ink'}`}>
                 <Icon size={20} className="shrink-0" />
                 <span className="min-w-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-75">
                   <span className="block text-sm font-medium">{section.label}</span>

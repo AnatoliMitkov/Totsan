@@ -7,8 +7,9 @@ import { loadUnreadConversationCount, subscribeToConversationList } from '../lib
 import Avatar from './Avatar.jsx'
 
 export default function Layout() {
-  const { pathname, search, hash } = useLocation()
+  const { pathname } = useLocation()
   const isAuthPage = pathname === '/login'
+  const isHomePage = pathname === '/'
 
   // На всяка смяна на страница: скрол нагоре + ново наблюдение за reveal анимациите
   useEffect(() => {
@@ -64,7 +65,11 @@ export default function Layout() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="flex-1 min-h-0" style={{ paddingTop: 'var(--header-h, 64px)' }}><Outlet /></main>
+      <main
+        className={`flex-1 min-h-0 ${isHomePage ? 'homepage-main' : ''}`}
+        style={{ paddingTop: isHomePage ? '0px' : 'var(--header-h, 64px)' }}>
+        <Outlet />
+      </main>
       <Footer isAuthPage={isAuthPage} />
     </div>
   )
@@ -85,10 +90,7 @@ function Header() {
   const isProActive = pathname === '/pro' || pathname === '/totsan-pro'
   const isVisualizationActive = pathname === '/vizualizacia'
   const isHomeHeroMode = isHomePage && !isScrolled && !open
-  const shouldShowScrolledShadow = isScrolled && !open
-  const headerSurfaceClass = isHomeHeroMode
-    ? 'border-transparent bg-transparent shadow-[0_4px_24px_-6px_rgba(13,35,64,0.18)]'
-    : `border-line bg-paper/90 backdrop-blur-xl shadow-[0_4px_24px_-6px_rgba(13,35,64,0.22)]`
+  const headerSurfaceClass = isHomeHeroMode ? 'site-header--hero' : 'site-header--solid'
   const loginHref = `/login?next=${encodeURIComponent(`${pathname}${search}${hash}`)}`
 
   useEffect(() => {
@@ -138,7 +140,7 @@ function Header() {
 
   return (
     <>
-      <header className={`fixed inset-x-0 top-0 z-40 border-b transition-[background-color,border-color,box-shadow,backdrop-filter] duration-300 ${headerSurfaceClass}`}>
+      <header className={`site-header fixed inset-x-0 top-0 z-40 border-b ${headerSurfaceClass}`}>
         <div className="container-page grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 py-4 px-[var(--pad-x)] xl:gap-8">
           <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 ${isHomeHeroMode ? 'text-paper [text-shadow:0_10px_28px_rgba(0,0,0,0.48)]' : 'text-ink'}`} onClick={close}>Totsan</Link>
 
