@@ -505,7 +505,7 @@ function TrustPromise() {
     publishedServices: 0,
     completedProjects: 0,
     verifiedSpecialists: 0,
-    activeLayers: 0,
+    coveredCities: 0,
   })
 
   useEffect(() => {
@@ -514,7 +514,7 @@ function TrustPromise() {
     async function loadStats() {
       try {
         const [servicesResult, profilesResult] = await Promise.all([
-          supabase.from('partner_services').select('layer_slug', { count: 'exact' }),
+          supabase.from('partner_services').select('delivery_areas, profile:profiles(city)', { count: 'exact' }),
           supabase.from('profiles').select('projects', { count: 'exact' }),
         ])
 
@@ -524,14 +524,19 @@ function TrustPromise() {
         const services = servicesResult.data || []
         const profiles = profilesResult.data || []
         const completedProjects = profiles.reduce((sum, row) => sum + Number(row.projects || 0), 0)
-        const activeLayers = new Set(services.map((row) => row.layer_slug).filter(Boolean)).size
+        const coveredCities = new Set(
+          services.flatMap((row) => [
+            row.profile?.city,
+            ...(Array.isArray(row.delivery_areas) ? row.delivery_areas : []),
+          ]).map((value) => String(value || '').trim()).filter(Boolean)
+        ).size
 
         if (!active) return
         setStats({
           publishedServices: servicesResult.count || 0,
           completedProjects,
           verifiedSpecialists: profilesResult.count || 0,
-          activeLayers,
+          coveredCities,
         })
       } catch (error) {
         console.error('Failed to load homepage stats:', error)
@@ -554,7 +559,7 @@ function TrustPromise() {
           <AnimatedStatCounter key="published-services" end={stats.publishedServices} label="Публични услуги" suffix="+" />
           <AnimatedStatCounter key="completed-projects" end={stats.completedProjects} label="Завършени обекта" suffix="+" />
           <AnimatedStatCounter key="verified-specialists" end={stats.verifiedSpecialists} label="Проверени майстори" suffix="+" />
-          <AnimatedStatCounter key="active-layers" end={stats.activeLayers} label="Активни слоеве" suffix="" />
+          <AnimatedStatCounter key="covered-cities" end={stats.coveredCities} label="Покрити градове" suffix="" />
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
           {staticStats.map((stat, index) => (
