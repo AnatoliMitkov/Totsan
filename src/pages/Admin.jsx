@@ -52,17 +52,15 @@ const UsersManagerSection = lazy(() => import('../components/admin/UsersManager.
 const InquiriesManagerSection = lazy(() => import('../components/admin/InquiriesManager.jsx'))
 const ApplicationsManagerSection = lazy(() => import('../components/admin/ApplicationsManager.jsx'))
 const AuditLogSection = lazy(() => import('../components/admin/AuditLog.jsx'))
-const ProfileManagerSection = lazy(() => import('../components/admin/ProfileManager.jsx'))
 const PartnerServicesManagerSection = lazy(() => import('../components/admin/PartnerServicesManager.jsx'))
 const OrdersManagerSection = lazy(() => import('../components/admin/OrdersManager.jsx'))
 const ReviewsManagerSection = lazy(() => import('../components/admin/ReviewsManager.jsx'))
 
 const ADMIN_SECTIONS = [
   { id: 'dashboard', label: 'Обзор', hint: 'KPI и последни събития', icon: BarChart3, Component: DashboardSection },
-  { id: 'users', label: 'Потребители', hint: 'Роли, статуси, ban', icon: Users, Component: UsersManagerSection },
+  { id: 'users', label: 'Потребители и Профили', hint: 'Акаунти, роли и публични визитки', icon: Users, Component: UsersManagerSection },
   { id: 'inquiries', label: 'Запитвания', hint: 'Форми, източници и статуси', icon: ClipboardList, Component: InquiriesManagerSection },
   { id: 'applications', label: 'Кандидатури', hint: 'Одобрение на специалисти', icon: UserCog, Component: ApplicationsManagerSection },
-  { id: 'profiles', label: 'Профили', hint: 'Публичност и профилна модерация', icon: FolderKanban, Component: ProfileManagerSection },
   { id: 'partner-services', label: 'Услуги', hint: 'Модерация на партньорски услуги', icon: PackageCheck, Component: PartnerServicesManagerSection },
   { id: 'orders', label: 'Поръчки', hint: 'Плащания, статуси, спорове', icon: CreditCard, Component: OrdersManagerSection },
   { id: 'reviews', label: 'Отзиви', hint: 'Verified отзиви и сигнали', icon: Star, Component: ReviewsManagerSection },

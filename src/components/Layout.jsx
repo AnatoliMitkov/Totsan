@@ -64,7 +64,7 @@ export default function Layout() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="flex-1 min-h-0"><Outlet /></main>
+      <main className="flex-1 min-h-0" style={{ paddingTop: 'var(--header-h, 64px)' }}><Outlet /></main>
       <Footer isAuthPage={isAuthPage} />
     </div>
   )
@@ -87,8 +87,8 @@ function Header() {
   const isHomeHeroMode = isHomePage && !isScrolled && !open
   const shouldShowScrolledShadow = isScrolled && !open
   const headerSurfaceClass = isHomeHeroMode
-    ? 'border-transparent bg-transparent shadow-none'
-    : `border-line bg-paper/90 backdrop-blur-xl ${open ? 'shadow-[0_10px_18px_-18px_rgba(13,35,64,0.38)]' : shouldShowScrolledShadow ? 'shadow-[0_10px_22px_-18px_rgba(13,35,64,0.4)]' : 'shadow-none'}`
+    ? 'border-transparent bg-transparent shadow-[0_4px_24px_-6px_rgba(13,35,64,0.18)]'
+    : `border-line bg-paper/90 backdrop-blur-xl shadow-[0_4px_24px_-6px_rgba(13,35,64,0.22)]`
   const loginHref = `/login?next=${encodeURIComponent(`${pathname}${search}${hash}`)}`
 
   useEffect(() => {
@@ -138,7 +138,7 @@ function Header() {
 
   return (
     <>
-      <header className={`${isHomePage ? 'fixed inset-x-0 top-0' : 'sticky top-0'} z-40 border-b transition-[background-color,border-color,box-shadow,backdrop-filter] duration-300 ${headerSurfaceClass}`}>
+      <header className={`fixed inset-x-0 top-0 z-40 border-b transition-[background-color,border-color,box-shadow,backdrop-filter] duration-300 ${headerSurfaceClass}`}>
         <div className="container-page grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 py-4 px-[var(--pad-x)] xl:gap-8">
           <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 ${isHomeHeroMode ? 'text-paper [text-shadow:0_10px_28px_rgba(0,0,0,0.48)]' : 'text-ink'}`} onClick={close}>Totsan</Link>
 
