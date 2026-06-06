@@ -7,8 +7,9 @@ import { loadUnreadConversationCount, subscribeToConversationList } from '../lib
 import Avatar from './Avatar.jsx'
 
 export default function Layout() {
-  const { pathname, search, hash } = useLocation()
+  const { pathname } = useLocation()
   const isAuthPage = pathname === '/login'
+  const isHomePage = pathname === '/'
 
   // На всяка смяна на страница: скрол нагоре + ново наблюдение за reveal анимациите
   useEffect(() => {
@@ -64,7 +65,11 @@ export default function Layout() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="flex-1 min-h-0" style={{ paddingTop: 'var(--header-h, 64px)' }}><Outlet /></main>
+      <main
+        className={`flex-1 min-h-0 ${isHomePage ? 'homepage-main' : ''}`}
+        style={{ paddingTop: isHomePage ? '0px' : 'var(--header-h, 64px)' }}>
+        <Outlet />
+      </main>
       <Footer isAuthPage={isAuthPage} />
     </div>
   )
@@ -85,10 +90,7 @@ function Header() {
   const isProActive = pathname === '/pro' || pathname === '/totsan-pro'
   const isVisualizationActive = pathname === '/vizualizacia'
   const isHomeHeroMode = isHomePage && !isScrolled && !open
-  const shouldShowScrolledShadow = isScrolled && !open
-  const headerSurfaceClass = isHomeHeroMode
-    ? 'border-transparent bg-transparent shadow-[0_4px_24px_-6px_rgba(13,35,64,0.18)]'
-    : `border-line bg-paper/90 backdrop-blur-xl shadow-[0_4px_24px_-6px_rgba(13,35,64,0.22)]`
+  const headerSurfaceClass = isHomeHeroMode ? 'site-header--hero' : 'site-header--solid'
   const loginHref = `/login?next=${encodeURIComponent(`${pathname}${search}${hash}`)}`
 
   useEffect(() => {
@@ -138,15 +140,15 @@ function Header() {
 
   return (
     <>
-      <header className={`fixed inset-x-0 top-0 z-40 border-b transition-[background-color,border-color,box-shadow,backdrop-filter] duration-300 ${headerSurfaceClass}`}>
+      <header className={`site-header fixed inset-x-0 top-0 z-40 border-b ${headerSurfaceClass}`}>
         <div className="container-page grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 py-4 px-[var(--pad-x)] xl:gap-8">
-          <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 ${isHomeHeroMode ? 'text-paper [text-shadow:0_10px_28px_rgba(0,0,0,0.48)]' : 'text-ink'}`} onClick={close}>Totsan</Link>
+          <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 text-ink`} onClick={close}>Totsan</Link>
 
         <div className="min-w-0">
           <nav aria-label="Основна навигация" className="hidden min-w-0 xl:flex xl:flex-wrap xl:items-center xl:gap-2 2xl:flex-nowrap">
             {LAYERS.map(l => (
               <NavLink key={l.slug} to={`/sloy/${l.slug}`}
-                className={({isActive}) => desktopNavClassName(isActive, isHomeHeroMode)}>
+                className={({isActive}) => desktopNavClassName(isActive, false)}>
                 {l.number} · {l.title.split(' ')[0]}
               </NavLink>
             ))}
@@ -157,14 +159,14 @@ function Header() {
           <DesktopMoreMenu
             isOpen={isMoreOpen}
             setIsOpen={setIsMoreOpen}
-            isHomeHeroMode={isHomeHeroMode}
+            isHomeHeroMode={false}
             isServicesActive={isServicesActive}
             isCatalogActive={isCatalogActive}
             isProActive={isProActive}
             isVisualizationActive={isVisualizationActive}
           />
           {loading ? null : canShowPrivateHeader ? (
-            <Link to="/inbox" className={desktopUtilityLinkClassName(isHomeHeroMode)}>
+            <Link to="/inbox" className={desktopUtilityLinkClassName(false)}>
               <MessageCircle size={17} />
               <span className="hidden xl:inline">Съобщения</span>
               {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accentDeep px-1.5 text-[11px] font-medium text-paper">{unreadCount}</span>}
@@ -179,8 +181,8 @@ function Header() {
             <UserMenu session={session} account={account} isAdmin={isAdmin} />
           ) : (
             <>
-              <Link to={loginHref} className={`mobile-header-auth xl:hidden ${isHomeHeroMode ? 'mobile-header-auth-on-dark' : ''}`}>Вход</Link>
-              <Link to={loginHref} className={`desktop-header-auth ${isHomeHeroMode ? 'desktop-header-auth-on-dark' : ''}`}>Вход</Link>
+              <Link to={loginHref} className={`mobile-header-auth xl:hidden`}>Вход</Link>
+              <Link to={loginHref} className={`desktop-header-auth`}>Вход</Link>
             </>
           )}
           <button
@@ -188,7 +190,7 @@ function Header() {
             onClick={() => setOpen(o => !o)}
             aria-expanded={open}
             aria-controls="mobile-navigation"
-            className={`mobile-menu-toggle xl:hidden ${open ? 'is-open' : ''} ${isHomeHeroMode ? 'mobile-menu-toggle-on-dark' : ''}`}>
+            className={`mobile-menu-toggle xl:hidden ${open ? 'is-open' : ''}`}>
             <span className="mobile-menu-toggle__icon mobile-menu-toggle__icon--menu" aria-hidden="true"><Menu size={18}/></span>
             <span className="mobile-menu-toggle__icon mobile-menu-toggle__icon--close" aria-hidden="true"><X size={18}/></span>
           </button>
