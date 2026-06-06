@@ -449,7 +449,11 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
             preview={preview}
             onChange={updateProfile}
             onSubmit={saveProfile}
-            onUpload={uploadAvatar}
+            avatarEditor={avatarEditor}
+            onOpenAvatarEditor={openAvatarEditor}
+            onAvatarFile={handleAvatarFile}
+            onCloseAvatarEditor={closeAvatarEditor}
+            onSaveAvatar={saveAvatarAndProfile}
           />
         )}
 
@@ -498,7 +502,18 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
   )
 }
 
-function ProfileForm({ draft, saveState, preview, onChange, onSubmit, onUpload }) {
+function ProfileForm({
+  draft,
+  saveState,
+  preview,
+  avatarEditor,
+  onChange,
+  onSubmit,
+  onOpenAvatarEditor,
+  onAvatarFile,
+  onCloseAvatarEditor,
+  onSaveAvatar,
+}) {
   return (
     <form onSubmit={onSubmit} className="grid gap-5 lg:grid-cols-12">
       <div className="lg:col-span-8 rounded-3xl border border-line bg-paper p-5 md:p-7 space-y-5">
@@ -557,18 +572,18 @@ function ProfileForm({ draft, saveState, preview, onChange, onSubmit, onUpload }
         <div className="rounded-3xl border border-line bg-paper p-5 md:p-6 lg:sticky lg:top-24">
           <div className="eyebrow">Снимка</div>
           <div className="group relative mt-4 flex justify-center">
-            <button type="button" onClick={openAvatarEditor} className="relative rounded-full transition hover:ring-2 hover:ring-ink focus:outline-none focus:ring-2 focus:ring-ink" aria-label="Смени снимката">
+            <button type="button" onClick={onOpenAvatarEditor} className="relative rounded-full transition hover:ring-2 hover:ring-ink focus:outline-none focus:ring-2 focus:ring-ink" aria-label="Смени снимката">
               <Avatar src={getProfileImage(preview)} name={preview.name} size={200} imgStyle={getProfileImageStyle(preview)} />
               <div className="absolute inset-0 hidden items-center justify-center rounded-full bg-ink/40 text-paper opacity-0 transition md:flex md:group-hover:opacity-100">
                 <Camera size={32} />
               </div>
             </button>
           </div>
-          <button type="button" onClick={openAvatarEditor} className="btn btn-ghost mt-4 w-full cursor-pointer justify-center">
+          <button type="button" onClick={onOpenAvatarEditor} className="btn btn-ghost mt-4 w-full cursor-pointer justify-center">
             <Camera size={18} /> Смени снимката
           </button>
           <input id="partner-avatar-upload" type="file" accept="image/*" className="sr-only" onChange={(event) => { 
-            handleAvatarFile(event.target.files?.[0]); 
+            onAvatarFile(event.target.files?.[0]);
             event.target.value = '' 
           }} />
 
@@ -578,8 +593,8 @@ function ProfileForm({ draft, saveState, preview, onChange, onSubmit, onUpload }
               file={avatarEditor.file}
               imageUrl={avatarEditor.imageUrl}
               fileName={avatarEditor.fileName}
-              onClose={closeAvatarEditor}
-              onSave={saveAvatarAndProfile}
+              onClose={onCloseAvatarEditor}
+              onSave={onSaveAvatar}
             />
           )}
         </div>
