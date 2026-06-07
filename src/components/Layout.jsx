@@ -140,7 +140,7 @@ function Header() {
 
   return (
     <>
-      <header className={`site-header fixed inset-x-0 top-0 z-40 border-b ${headerSurfaceClass}`}>
+      <header className={`site-header fixed inset-x-0 top-0 z-40 border-b ${headerSurfaceClass} ${open ? 'site-header--menu-open' : ''}`}>
         <div className="container-page grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 py-4 px-[var(--pad-x)] xl:gap-8">
           <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 ${isHomeHeroMode ? 'text-paper [text-shadow:0_10px_28px_rgba(0,0,0,0.48)]' : 'text-ink'}`} onClick={close}>Totsan</Link>
 
@@ -200,7 +200,9 @@ function Header() {
 
       {open && (
         <div id="mobile-navigation" className="mobile-nav-shell xl:hidden">
-          <div className="container-page mobile-nav-panel px-[var(--pad-x)] pb-8 text-sm">
+          <div className="mobile-nav-backdrop" aria-hidden="true" />
+          <div className="mobile-nav-panel">
+            <div className="container-page mobile-nav-scroll px-[var(--pad-x)] pb-8 text-sm">
             <div className="mobile-nav-group">
               <div className="grid gap-3 mb-3">
                 <NavLink to="/start" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}>
@@ -250,6 +252,7 @@ function Header() {
                 </div>
               </div>
             ) : null}
+            </div>
           </div>
         </div>
       )}
