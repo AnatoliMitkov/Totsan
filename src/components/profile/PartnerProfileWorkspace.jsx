@@ -1,9 +1,28 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Camera, CreditCard, Eye, Globe2, ImagePlus, Plus, Save, Trash2 } from 'lucide-react'
+import {
+  BriefcaseBusiness,
+  Camera,
+  Compass,
+  CreditCard,
+  Eye,
+  FolderKanban,
+  Globe2,
+  Home,
+  ImagePlus,
+  Lock,
+  LogOut,
+  Mail,
+  MessagesSquare,
+  Plus,
+  Save,
+  Tags,
+  Trash2,
+  UserRound,
+} from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
 import { uploadProfileMedia } from '../../lib/profile-media-upload-client.js'
-import { getProfileImage, getProfileImageStyle, normalizeProfile, PROFILE_SELECT_COLUMNS } from '../../lib/profiles.js'
+import { getProfileImage, getProfileImageStyle, isMissingLayer01MetaColumn, normalizeProfile, PROFILE_SELECT_COLUMNS, PROFILE_SELECT_COLUMNS_BASE } from '../../lib/profiles.js'
 import { supabase } from '../../lib/supabase.js'
 import PasskeyManager, { PasskeySetupPrompt } from '../auth/PasskeyManager.jsx'
 import TotpMfaManager from '../auth/TotpMfa.jsx'
@@ -25,18 +44,20 @@ import PartnerServiceEditor from './PartnerServiceEditor.jsx'
 import PartnerMaterialsEditor from './PartnerMaterialsEditor.jsx'
 import PartnerOrders from './PartnerOrders.jsx'
 import PartnerInquiries from './PartnerInquiries.jsx'
+import Layer01SpecEditor, { cleanLayer01Draft, makeLayer01Draft } from './Layer01SpecEditor.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const TABS = [
-  ['overview', 'Преглед'],
-  ['profile', 'Профил'],
-  ['portfolio', 'Портфолио'],
-  ['services', 'Услуги'],
-  ['materials', 'Материали и марки'],
-  ['orders', 'Поръчки'],
-  ['inquiries', 'Запитвания'],
-  ['contact', 'Контакт'],
-  ['security', 'Сигурност'],
+  { id: 'overview', label: 'Преглед', icon: Home },
+  { id: 'profile', label: 'Профил', icon: UserRound },
+  { id: 'layer01', label: 'Идея и посока', icon: Compass, layerSlug: 'ideya' },
+  { id: 'portfolio', label: 'Портфолио', icon: FolderKanban },
+  { id: 'services', label: 'Услуги', icon: BriefcaseBusiness },
+  { id: 'materials', label: 'Материали и марки', icon: Tags },
+  { id: 'orders', label: 'Поръчки', icon: CreditCard },
+  { id: 'inquiries', label: 'Запитвания', icon: MessagesSquare },
+  { id: 'contact', label: 'Контакт', icon: Mail },
+  { id: 'security', label: 'Сигурност', icon: Lock },
 ]
 
 function csv(value) {
@@ -74,6 +95,7 @@ function makeProfileDraft(profile) {
     responseTimeHours: profile.responseTimeHours || '',
     acceptsRemote: Boolean(profile.acceptsRemote),
     pricingNote: profile.pricingNote || '',
+    layer01Meta: makeLayer01Draft(profile.layer01Meta || {}),
   }
 }
 
@@ -88,9 +110,9 @@ function makePortfolioDraft(item = null, profile) {
 }
 
 function paymentMessageFromStripe(result) {
-  switch (result?.status) {
+    switch (result?.status) {
     case 'active':
-      return 'Stripe профилът е активен. Оттук нататък бутонът ще те води към управлението на плащанията.'
+      return 'Stripe профилът е активен.'
     case 'pending_review':
       return 'Данните са изпратени към Stripe. Профилът чака преглед и може да отнеме малко време, преди плащанията да станат активни.'
     case 'needs_information':
@@ -247,8 +269,31 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     pricing_note: profileDraft.pricingNote,
   }), [currentProfile, profileDraft])
 
+  const availableTabs = useMemo(() => (
+    TABS.filter((tab) => !tab.layerSlug || profileDraft.layerSlug === tab.layerSlug)
+  ), [profileDraft.layerSlug])
+  const profileCompletion = useMemo(() => (
+    getProfileCompletion(preview, portfolio, profileDraft.layerSlug === 'ideya' ? profileDraft.layer01Meta : null)
+  ), [portfolio, preview, profileDraft.layer01Meta, profileDraft.layerSlug])
+
+  useEffect(() => {
+    if (!availableTabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab('profile')
+    }
+  }, [activeTab, availableTabs])
+
   function updateProfile(key, value) {
     setProfileDraft(current => ({ ...current, [key]: value }))
+  }
+
+  function updateLayer01(key, value) {
+    setProfileDraft(current => ({
+      ...current,
+      layer01Meta: {
+        ...makeLayer01Draft(current.layer01Meta),
+        [key]: value,
+      },
+    }))
   }
 
   function updatePortfolio(key, value) {
@@ -271,39 +316,50 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     event?.preventDefault()
     setSaveState({ status: 'saving', message: 'Запазваме профила…' })
 
+    const savesLayer01 = profileDraft.layerSlug === 'ideya'
+    const profilePayload = {
+      name: profileDraft.name.trim(),
+      tag: profileDraft.tag.trim(),
+      headline: profileDraft.headline.trim() || null,
+      city: profileDraft.city.trim(),
+      layer_slug: profileDraft.layerSlug,
+      since: Number(profileDraft.since),
+      years_experience: profileDraft.yearsExperience === '' ? null : Number(profileDraft.yearsExperience),
+      projects: Number(profileDraft.projects) || 0,
+      bio: profileDraft.bio.trim(),
+      description_long: profileDraft.descriptionLong.trim() || null,
+      image_url: profileDraft.imageUrl.trim(),
+      image_zoom: Number(profileDraft.imageZoom),
+      image_x: Number(profileDraft.imageX),
+      image_y: Number(profileDraft.imageY),
+      phone: profileDraft.phone.trim() || null,
+      email_public: profileDraft.emailPublic.trim() || null,
+      website: profileDraft.website.trim() || null,
+      instagram: profileDraft.instagram.trim() || null,
+      facebook: profileDraft.facebook.trim() || null,
+      languages: fromCsv(profileDraft.languagesText, ['bg']),
+      service_areas: fromCsv(profileDraft.serviceAreasText, []),
+      response_time_hours: profileDraft.responseTimeHours === '' ? null : Number(profileDraft.responseTimeHours),
+      accepts_remote: Boolean(profileDraft.acceptsRemote),
+      pricing_note: profileDraft.pricingNote.trim() || null,
+    }
+
+    if (savesLayer01) {
+      profilePayload.layer01_meta = cleanLayer01Draft(profileDraft.layer01Meta)
+    }
+
     const { data, error } = await supabase
       .from('profiles')
-      .update({
-        name: profileDraft.name.trim(),
-        tag: profileDraft.tag.trim(),
-        headline: profileDraft.headline.trim() || null,
-        city: profileDraft.city.trim(),
-        layer_slug: profileDraft.layerSlug,
-        since: Number(profileDraft.since),
-        years_experience: profileDraft.yearsExperience === '' ? null : Number(profileDraft.yearsExperience),
-        projects: Number(profileDraft.projects) || 0,
-        bio: profileDraft.bio.trim(),
-        description_long: profileDraft.descriptionLong.trim() || null,
-        image_url: profileDraft.imageUrl.trim(),
-        image_zoom: Number(profileDraft.imageZoom),
-        image_x: Number(profileDraft.imageX),
-        image_y: Number(profileDraft.imageY),
-        phone: profileDraft.phone.trim() || null,
-        email_public: profileDraft.emailPublic.trim() || null,
-        website: profileDraft.website.trim() || null,
-        instagram: profileDraft.instagram.trim() || null,
-        facebook: profileDraft.facebook.trim() || null,
-        languages: fromCsv(profileDraft.languagesText, ['bg']),
-        service_areas: fromCsv(profileDraft.serviceAreasText, []),
-        response_time_hours: profileDraft.responseTimeHours === '' ? null : Number(profileDraft.responseTimeHours),
-        accepts_remote: Boolean(profileDraft.acceptsRemote),
-        pricing_note: profileDraft.pricingNote.trim() || null,
-      })
+      .update(profilePayload)
       .eq('id', currentProfile.id)
-      .select(PROFILE_SELECT_COLUMNS)
+      .select(savesLayer01 ? PROFILE_SELECT_COLUMNS : PROFILE_SELECT_COLUMNS_BASE)
       .single()
 
     if (error) {
+      if (isMissingLayer01MetaColumn(error)) {
+        setSaveState({ status: 'error', message: 'Липсва Supabase migration за layer01_meta. Пусни migration-а и опитай отново.' })
+        return
+      }
       setSaveState({ status: 'error', message: error.message })
       return
     }
@@ -390,115 +446,289 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     <section className="section bg-soft min-h-screen">
       <div className="container-page space-y-5">
         <PasskeySetupPrompt userId={userId} />
-        <div className="rounded-3xl border border-line bg-paper p-5 md:p-7">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="h-24 w-24 overflow-hidden rounded-full border border-line bg-soft">
+        <div className="overflow-hidden rounded-3xl border border-line bg-paper shadow-sm">
+          <div className="relative h-32 overflow-hidden bg-ink md:h-40">
+            {preview.imageUrl && (
+              <div
+                className="absolute inset-0 scale-105 bg-cover bg-center opacity-25 blur-md"
+                style={{ backgroundImage: `url(${preview.imageUrl})` }}
+              />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-r from-ink via-graphite to-accentDeep/80" />
+          </div>
+
+          <div className="relative flex flex-col gap-6 p-5 pt-0 md:p-7 md:pt-0 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+              <div className="-mt-12 h-28 w-28 shrink-0 overflow-hidden rounded-full border-4 border-paper bg-soft shadow-md md:-mt-14">
                 <img src={getProfileImage(preview)} alt={preview.name} className="img-cover" style={getProfileImageStyle(preview)} />
               </div>
-              <div>
+              <div className="pb-1">
                 <div className="eyebrow">Партньорски профил</div>
                 <h1 className="mt-1 font-display text-4xl leading-none text-ink md:text-5xl">{preview.name}</h1>
                 <p className="mt-2 text-sm text-muted">{preview.headline || preview.tag} · {preview.city}</p>
+                <div className="mt-3 inline-flex rounded-full border border-line bg-soft px-3 py-1 text-xs font-medium text-muted">
+                  Слой {preview.layerNumber} · {preview.layerTitle}
+                </div>
               </div>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3 pb-1">
               {preview.isPublished && <Link to={`/profil/${preview.slug}`} className="btn btn-primary"><Eye size={18} /> Виж публично</Link>}
               <button type="button" onClick={startPaymentOnboarding} disabled={paymentState.status === 'opening'} className="btn btn-ghost"><CreditCard size={18} /> {account?.stripe_account_id ? 'Плащания' : 'Активирай плащания'}</button>
-              <button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Изход</button>
+              <button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}><LogOut size={18} /> Изход</button>
             </div>
           </div>
-          {paymentState.message && <div className={`mt-4 rounded-2xl p-3 text-sm ${paymentState.status === 'error' ? 'bg-red-50 text-red-700' : 'bg-soft text-muted'}`}>{paymentState.message}</div>}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 rounded-3xl border border-line bg-paper p-2">
-          {TABS.map(([tab, label]) => (
-            <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`rounded-full px-4 py-2 text-sm transition ${activeTab === tab ? 'bg-ink text-paper' : 'text-muted hover:bg-soft hover:text-ink'}`}>
-              {label}
-            </button>
-          ))}
+        <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
+          <WorkspaceSidebar
+            tabs={availableTabs}
+            activeTab={activeTab}
+            profile={preview}
+            completion={profileCompletion}
+            portfolioCount={portfolio.length}
+            onTabChange={setActiveTab}
+          />
+
+          <main className="min-w-0 space-y-5">
+            {activeTab === 'overview' && (
+              <OverviewDashboard
+                preview={preview}
+                stats={stats}
+                portfolio={portfolio}
+                completion={profileCompletion}
+                onTabChange={setActiveTab}
+              />
+            )}
+
+            {activeTab === 'profile' && (
+              <ProfileForm
+                draft={profileDraft}
+                saveState={saveState}
+                preview={preview}
+                onChange={updateProfile}
+                onSubmit={saveProfile}
+                avatarEditor={avatarEditor}
+                onOpenAvatarEditor={openAvatarEditor}
+                onAvatarFile={handleAvatarFile}
+                onCloseAvatarEditor={closeAvatarEditor}
+                onSaveAvatar={saveAvatarAndProfile}
+              />
+            )}
+
+            {activeTab === 'layer01' && profileDraft.layerSlug === 'ideya' && (
+              <form onSubmit={saveProfile} className="space-y-5">
+                <Layer01SpecEditor draft={profileDraft.layer01Meta} onChange={updateLayer01} />
+                <SavePanel
+                  state={saveState}
+                  idleMessage="Промените в Слой 01 се пазят след запис на профила."
+                  savingLabel="Запазва се…"
+                  saveLabel="Запази профила"
+                />
+              </form>
+            )}
+
+            {activeTab === 'portfolio' && (
+              <PortfolioEditor
+                items={portfolio}
+                draft={portfolioDraft}
+                state={portfolioState}
+                onSelect={(item) => setPortfolioDraft(makePortfolioDraft(item, currentProfile))}
+                onNew={() => setPortfolioDraft(makePortfolioDraft(null, currentProfile))}
+                onChange={updatePortfolio}
+                onSubmit={savePortfolio}
+                onUpload={uploadPortfolioFile}
+                onDelete={removePortfolioItem}
+              />
+            )}
+
+            {activeTab === 'services' && (
+              <PartnerServiceEditor profile={currentProfile} userId={userId} />
+            )}
+
+            {activeTab === 'materials' && (
+              <PartnerMaterialsEditor profile={currentProfile} />
+            )}
+
+            {activeTab === 'orders' && (
+              <PartnerOrders userId={userId} />
+            )}
+
+            {activeTab === 'inquiries' && (
+              <PartnerInquiries profileSlug={currentProfile.slug} partnerId={userId} />
+            )}
+
+            {activeTab === 'security' && (
+              <div className="space-y-5">
+                <PasskeyManager userId={userId} session={session} />
+                <TotpMfaManager session={session} />
+              </div>
+            )}
+
+            {activeTab === 'contact' && (
+              <ContactPreview profile={preview} onEdit={() => setActiveTab('profile')} />
+            )}
+          </main>
         </div>
-
-        {activeTab === 'overview' && (
-          <div className="grid gap-5 lg:grid-cols-12">
-            <div className="lg:col-span-8 rounded-3xl border border-line bg-paper p-5 md:p-7">
-              <div className="eyebrow">Преглед</div>
-              <h2 className="mt-2 font-display text-3xl text-ink">Как изглежда профилът ти</h2>
-              <p className="mt-3 max-w-3xl text-muted">{preview.descriptionLong || preview.bio}</p>
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                <InfoTile label="Езици" value={preview.languages.join(', ') || 'bg'} />
-                <InfoTile label="Райони" value={preview.serviceAreas.join(', ') || preview.city} />
-                <InfoTile label="Цени" value={preview.pricingNote || 'Не е посочено'} />
-              </div>
-            </div>
-            <aside className="lg:col-span-4 space-y-5">
-              <PartnerStats profile={preview} stats={stats} />
-              <div className="rounded-3xl border border-line bg-paper p-5">
-                <div className="eyebrow">Портфолио</div>
-                <div className="mt-2 font-display text-3xl text-ink">{portfolio.length}</div>
-                <p className="mt-2 text-sm text-muted">Добави поне 10 проекта за силен профил.</p>
-              </div>
-            </aside>
-          </div>
-        )}
-
-        {activeTab === 'profile' && (
-          <ProfileForm
-            draft={profileDraft}
-            saveState={saveState}
-            preview={preview}
-            onChange={updateProfile}
-            onSubmit={saveProfile}
-            avatarEditor={avatarEditor}
-            onOpenAvatarEditor={openAvatarEditor}
-            onAvatarFile={handleAvatarFile}
-            onCloseAvatarEditor={closeAvatarEditor}
-            onSaveAvatar={saveAvatarAndProfile}
-          />
-        )}
-
-        {activeTab === 'portfolio' && (
-          <PortfolioEditor
-            items={portfolio}
-            draft={portfolioDraft}
-            state={portfolioState}
-            onSelect={(item) => setPortfolioDraft(makePortfolioDraft(item, currentProfile))}
-            onNew={() => setPortfolioDraft(makePortfolioDraft(null, currentProfile))}
-            onChange={updatePortfolio}
-            onSubmit={savePortfolio}
-            onUpload={uploadPortfolioFile}
-            onDelete={removePortfolioItem}
-          />
-        )}
-
-        {activeTab === 'services' && (
-          <PartnerServiceEditor profile={currentProfile} userId={userId} />
-        )}
-
-        {activeTab === 'materials' && (
-          <PartnerMaterialsEditor profile={currentProfile} />
-        )}
-
-        {activeTab === 'orders' && (
-          <PartnerOrders userId={userId} />
-        )}
-
-        {activeTab === 'inquiries' && (
-          <PartnerInquiries profileSlug={currentProfile.slug} partnerId={userId} />
-        )}
-
-        {activeTab === 'security' && (
-          <div className="space-y-5">
-            <PasskeyManager userId={userId} session={session} />
-            <TotpMfaManager session={session} />
-          </div>
-        )}
-
-        {activeTab === 'contact' && (
-          <ContactPreview profile={preview} onEdit={() => setActiveTab('profile')} />
-        )}
       </div>
     </section>
+  )
+}
+
+function getProfileCompletion(profile, portfolio, layer01Meta) {
+  const checks = [
+    { done: Boolean(profile.name), label: 'Име' },
+    { done: Boolean(profile.headline || profile.tag), label: 'Позициониране' },
+    { done: Boolean(profile.descriptionLong || profile.bio), label: 'Описание' },
+    { done: Boolean(profile.city), label: 'Град' },
+    { done: Boolean(profile.imageUrl), label: 'Снимка' },
+    { done: Boolean(profile.phone || profile.emailPublic || profile.website), label: 'Контакт' },
+    { done: Boolean(profile.serviceAreas?.length), label: 'Райони' },
+    { done: Boolean(profile.pricingNote), label: 'Цени' },
+    { done: portfolio.length > 0, label: 'Портфолио' },
+  ]
+
+  if (layer01Meta) {
+    checks.push({
+      done: Boolean(layer01Meta.specialist_type || layer01Meta.specific_services?.length || layer01Meta.process_steps?.length),
+      label: 'Слой 01',
+    })
+  }
+
+  const done = checks.filter((item) => item.done).length
+  const total = checks.length || 1
+  return {
+    done,
+    total,
+    percent: Math.round((done / total) * 100),
+    missing: checks.filter((item) => !item.done).map((item) => item.label),
+  }
+}
+
+function WorkspaceSidebar({ tabs, activeTab, profile, completion, portfolioCount, onTabChange }) {
+  return (
+    <aside className="min-w-0 max-w-full overflow-hidden rounded-3xl border border-line bg-paper p-3 shadow-sm lg:sticky lg:top-24 lg:overflow-visible">
+      <nav className="flex w-full min-w-0 max-w-full gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
+        {tabs.map((tab) => {
+          const Icon = tab.icon
+          const isActive = activeTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onTabChange(tab.id)}
+              className={`inline-flex min-h-11 shrink-0 items-center gap-3 rounded-2xl px-4 py-2.5 text-left text-sm font-medium transition lg:w-full ${isActive ? 'bg-ink text-paper shadow-sm' : 'text-muted hover:bg-soft hover:text-ink'}`}
+            >
+              <Icon size={18} />
+              <span>{tab.label}</span>
+            </button>
+          )
+        })}
+      </nav>
+
+      <div className="mt-3 hidden border-t border-line pt-4 lg:block">
+        <div className="px-2">
+          <div className="text-xs uppercase tracking-[0.14em] text-muted">Готовност</div>
+          <div className="mt-2 flex items-end justify-between gap-3">
+            <div className="font-display text-4xl leading-none text-ink">{completion.percent}%</div>
+            <div className="pb-1 text-xs text-muted">{completion.done}/{completion.total}</div>
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-soft">
+            <div className="h-full rounded-full bg-accentDeep" style={{ width: `${completion.percent}%` }} />
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-2">
+          <InfoTile label="Статус" value={profile.isPublished ? 'Публичен' : 'Скрит'} />
+          <InfoTile label="Слой" value={`${profile.layerNumber} · ${profile.layerTitle}`} />
+          <InfoTile label="Проекти" value={portfolioCount} />
+        </div>
+      </div>
+    </aside>
+  )
+}
+
+function OverviewDashboard({ preview, stats, portfolio, completion, onTabChange }) {
+  const missing = completion.missing.slice(0, 4)
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-3xl border border-line bg-paper p-5 md:p-7">
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+          <div className="max-w-3xl">
+            <div className="eyebrow">Преглед</div>
+            <h2 className="mt-2 font-display text-3xl text-ink">Работно табло</h2>
+            <p className="mt-3 text-muted">{preview.descriptionLong || preview.bio || 'Добави кратко описание, за да е по-ясно как помагаш на клиентите.'}</p>
+          </div>
+          <div className="w-full rounded-2xl border border-line bg-soft p-4 xl:w-72">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <div className="text-xs uppercase tracking-[0.14em] text-muted">Готовност</div>
+                <div className="mt-2 font-display text-4xl leading-none text-ink">{completion.percent}%</div>
+              </div>
+              <div className="pb-1 text-sm text-muted">{completion.done}/{completion.total}</div>
+            </div>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-paper">
+              <div className="h-full rounded-full bg-accentDeep" style={{ width: `${completion.percent}%` }} />
+            </div>
+            {missing.length > 0 && <p className="mt-3 text-xs text-muted">Липсва: {missing.join(', ')}</p>}
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <InfoTile label="Езици" value={preview.languages.join(', ') || 'bg'} />
+          <InfoTile label="Райони" value={preview.serviceAreas.join(', ') || preview.city || 'Не е посочено'} />
+          <InfoTile label="Цени" value={preview.pricingNote || 'Не е посочено'} />
+          <InfoTile label="Портфолио" value={`${portfolio.length} проекта`} />
+        </div>
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          <button type="button" onClick={() => onTabChange('profile')} className="btn btn-primary">
+            <UserRound size={18} />
+            Редактирай профила
+          </button>
+          <button type="button" onClick={() => onTabChange('portfolio')} className="btn btn-ghost">
+            <FolderKanban size={18} />
+            Портфолио
+          </button>
+          {preview.layerSlug === 'ideya' && (
+            <button type="button" onClick={() => onTabChange('layer01')} className="btn btn-ghost">
+              <Compass size={18} />
+              Идея и посока
+            </button>
+          )}
+        </div>
+      </section>
+
+      <div className="grid gap-5 lg:grid-cols-12">
+        <div className="lg:col-span-5">
+          <PartnerStats profile={preview} stats={stats} />
+        </div>
+        <section className="rounded-3xl border border-line bg-paper p-5 md:p-7 lg:col-span-7">
+          <div className="eyebrow">Публичен профил</div>
+          <h3 className="mt-2 font-display text-3xl text-ink">{preview.name}</h3>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <InfoTile label="Позициониране" value={preview.headline || preview.tag || 'Не е посочено'} />
+            <InfoTile label="Формат" value={preview.acceptsRemote ? 'На място и дистанционно' : 'На място'} />
+            <InfoTile label="Опит" value={`${preview.yearsExperience || Math.max(0, new Date().getFullYear() - preview.since)} г.`} />
+            <InfoTile label="Статус" value={preview.isPublished ? 'Публичен' : 'Скрит'} />
+          </div>
+        </section>
+      </div>
+    </div>
+  )
+}
+
+function SavePanel({ state, idleMessage, savingLabel = 'Запазва се…', saveLabel = 'Запази' }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-line bg-paper p-5 md:p-6">
+      <div className={`text-sm ${state.status === 'error' ? 'text-red-700' : 'text-muted'}`}>
+        {state.message || idleMessage}
+      </div>
+      <button className="btn btn-primary" disabled={state.status === 'saving'}>
+        <Save size={18} />
+        {state.status === 'saving' ? savingLabel : saveLabel}
+      </button>
+    </div>
   )
 }
 

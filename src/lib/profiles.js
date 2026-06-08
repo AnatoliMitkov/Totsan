@@ -6,7 +6,7 @@ import { supabase } from './supabase.js'
 
 export const LEGACY_PROFILE_IMAGE_BUCKET = 'profile-images'
 export const PROFILE_IMAGE_BUCKET = 'profile-images-optimized'
-export const PROFILE_SELECT_COLUMNS = `
+export const PROFILE_SELECT_COLUMNS_BASE = `
   id,
   created_at,
   updated_at,
@@ -39,6 +39,11 @@ export const PROFILE_SELECT_COLUMNS = `
   response_time_hours,
   accepts_remote,
   pricing_note
+`
+
+export const PROFILE_SELECT_COLUMNS = `
+  ${PROFILE_SELECT_COLUMNS_BASE},
+  layer01_meta
 `
 
 const LAYER_MAP = new Map(BASE_LAYERS.map((layer) => [layer.slug, layer]))
@@ -84,6 +89,24 @@ function toTextArray(value, fallback = []) {
   return fallback
 }
 
+function toPlainObject(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  return value
+}
+
+export function isMissingLayer01MetaColumn(error) {
+  const message = String(error?.message || error?.details || error?.hint || '').toLowerCase()
+  return message.includes('layer01_meta')
+}
+
+export async function runProfileSelectWithLayer01Fallback(buildQuery) {
+  const result = await buildQuery(PROFILE_SELECT_COLUMNS)
+  if (result.error && isMissingLayer01MetaColumn(result.error)) {
+    return buildQuery(PROFILE_SELECT_COLUMNS_BASE)
+  }
+  return result
+}
+
 export function normalizeProfile(input = {}, fallback = null) {
   const base = fallback || {}
   const layerSlug = input.layerSlug || input.layer_slug || base.layerSlug || base.layer_slug || DEFAULT_LAYER_SLUG
@@ -116,6 +139,7 @@ export function normalizeProfile(input = {}, fallback = null) {
   const pricingNote = String(input.pricingNote ?? input.pricing_note ?? base.pricingNote ?? base.pricing_note ?? '').trim()
   const userId = input.userId ?? input.user_id ?? base.userId ?? base.user_id ?? null
   const role = input.role ?? base.role ?? 'pro'
+  const layer01Meta = toPlainObject(input.layer01Meta ?? input.layer01_meta ?? base.layer01Meta ?? base.layer01_meta)
 
   return {
     id: input.id ?? base.id ?? (slug ? `static-${slug}` : ''),
@@ -154,6 +178,7 @@ export function normalizeProfile(input = {}, fallback = null) {
     isStatic: !(input.id ?? base.id),
     userId,
     role,
+    layer01Meta,
     createdAt: input.createdAt ?? input.created_at ?? base.createdAt ?? base.created_at ?? null,
     updatedAt: input.updatedAt ?? input.updated_at ?? base.updatedAt ?? base.updated_at ?? null,
   }
@@ -256,6 +281,7 @@ export function buildCatalogWithProfiles(profiles) {
         imageZoom: profile.imageZoom,
         imageX: profile.imageX,
         imageY: profile.imageY,
+        layer01Meta: profile.layer01Meta,
       })
     })
 
@@ -300,7 +326,9 @@ export function getProfileImageStyle(profile) {
 
 export async function fetchProfileRows() {
   try {
-    const { data, error } = await supabase.from('profiles').select(PROFILE_SELECT_COLUMNS).order('name')
+    const { data, error } = await runProfileSelectWithLayer01Fallback((columns) => (
+      supabase.from('profiles').select(columns).order('name')
+    ))
     return { data: data || [], error }
   } catch (error) {
     return { data: [], error }

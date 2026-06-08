@@ -11,7 +11,7 @@ import {
   updateAccount,
 } from '../../lib/admin.js'
 import { LAYERS } from '../../data/layers.js'
-import { PROFILE_SELECT_COLUMNS, getProfileImage, getProfileImageStyle, normalizeProfile } from '../../lib/profiles.js'
+import { getProfileImage, getProfileImageStyle, normalizeProfile, runProfileSelectWithLayer01Fallback } from '../../lib/profiles.js'
 import { supabase } from '../../lib/supabase.js'
 
 const ADMIN_ROLE_MANAGER_EMAILS = new Set(['a.mitkov@totsan.com', 'ivelinva2@gmail.com'])
@@ -61,7 +61,9 @@ export default function UsersManager({ globalQuery = '', account: currentAccount
     try {
       const [accs, { data: profs, error: profsError }] = await Promise.all([
         loadAccounts(),
-        supabase.from('profiles').select(PROFILE_SELECT_COLUMNS).order('name'),
+        runProfileSelectWithLayer01Fallback((columns) => (
+          supabase.from('profiles').select(columns).order('name')
+        )),
       ])
       if (profsError) throw profsError
 
@@ -159,12 +161,14 @@ export default function UsersManager({ globalQuery = '', account: currentAccount
       if (entity.profile) {
         const profileUpdates = buildProfileUpdates(entity.profile, draft)
         if (Object.keys(profileUpdates).length > 0) {
-          const { data, error: updateError } = await supabase
-            .from('profiles')
-            .update(profileUpdates)
-            .eq('id', entity.profile.id)
-            .select(PROFILE_SELECT_COLUMNS)
-            .single()
+          const { data, error: updateError } = await runProfileSelectWithLayer01Fallback((columns) => (
+            supabase
+              .from('profiles')
+              .update(profileUpdates)
+              .eq('id', entity.profile.id)
+              .select(columns)
+              .single()
+          ))
           if (updateError) throw updateError
 
           setProfiles((current) => current.map((profile) => profile.id === entity.profile.id ? data : profile))

@@ -194,11 +194,11 @@ export function serviceSlugFor(title, profile) {
   return base || `usluga-${Date.now().toString(36)}`
 }
 
-function servicePayload(profile, draft, status) {
+function servicePayload(profile, draft, status, slugOverride = '') {
   const nextStatus = status || draft.moderationStatus || 'draft'
   const isPublished = nextStatus === 'approved'
   return {
-    slug: cleanText(draft.slug) || serviceSlugFor(draft.title, profile),
+    slug: cleanText(slugOverride) || cleanText(draft.slug) || serviceSlugFor(draft.title, profile),
     profile_id: profile.id,
     partner_id: profile.userId,
     layer_slug: cleanText(draft.layerSlug) || profile.layerSlug,
@@ -213,6 +213,34 @@ function servicePayload(profile, draft, status) {
     moderation_status: nextStatus,
     moderation_note: null,
   }
+}
+
+function isDuplicateServiceSlugError(error) {
+  return error?.code === '23505' && String(error.message || '').includes('partner_services_slug_key')
+}
+
+async function uniqueServiceSlug(profile, draft) {
+  const requestedSlug = cleanText(draft.slug)
+  if (requestedSlug) return requestedSlug
+
+  const base = serviceSlugFor(draft.title, profile)
+  const { data, error } = await supabase
+    .from('partner_services')
+    .select('id, slug')
+    .ilike('slug', `${base}%`)
+
+  if (error) return base
+
+  const used = new Set((data || [])
+    .filter(row => !draft.id || row.id !== draft.id)
+    .map(row => row.slug)
+    .filter(Boolean))
+
+  if (!used.has(base)) return base
+
+  let suffix = 2
+  while (used.has(`${base}-${suffix}`)) suffix += 1
+  return `${base}-${suffix}`
 }
 
 function packagePayload(serviceId, item) {
@@ -373,12 +401,21 @@ export async function savePartnerService(profile, draft, { submit = false } = {}
   if (submit && !Number(primaryPackage.priceAmount)) throw new Error('Въведи цена в евро, за да създадеш услугата.')
 
   const status = submit ? 'pending' : 'draft'
-  const payload = servicePayload(profile, draft, status)
-  const request = draft.id
-    ? supabase.from('partner_services').update(payload).eq('id', draft.id).eq('profile_id', profile.id)
-    : supabase.from('partner_services').insert(payload)
+  const slug = await uniqueServiceSlug(profile, draft)
+  const payload = servicePayload(profile, draft, status, slug)
+  const makeRequest = (nextPayload) => (
+    draft.id
+      ? supabase.from('partner_services').update(nextPayload).eq('id', draft.id).eq('profile_id', profile.id)
+      : supabase.from('partner_services').insert(nextPayload)
+  )
 
-  const { data: serviceRow, error: serviceError } = await request.select(PARTNER_SERVICE_COLUMNS).single()
+  let { data: serviceRow, error: serviceError } = await makeRequest(payload).select(PARTNER_SERVICE_COLUMNS).single()
+
+  if (serviceError && !draft.id && isDuplicateServiceSlugError(serviceError)) {
+    const retryPayload = servicePayload(profile, draft, status, `${slug}-${Date.now().toString(36)}`)
+    ;({ data: serviceRow, error: serviceError } = await makeRequest(retryPayload).select(PARTNER_SERVICE_COLUMNS).single())
+  }
+
   if (serviceError) throw serviceError
 
   const packageRows = [packagePayload(serviceRow.id, primaryPackage)]

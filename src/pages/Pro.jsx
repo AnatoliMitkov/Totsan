@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, BriefcaseBusiness, CheckCircle2, Globe2, Languages, MapPin } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { LAYER_HEROS } from '../data/images.js'
+import { DELIVERABLES, SPECIALIST_TYPES, SPECIFIC_SERVICES, TARGET_OBJECTS } from '../data/layer01-meta.js'
 import { getProfileImage, getProfileImageStyle, slugify, useProfileDirectory } from '../lib/profiles.js'
 import { loadProfilePortfolio, loadProfileStats } from '../lib/portfolio.js'
 import { loadPublicPartnerServicesForProfile, packagePriceLabel } from '../lib/partner-services.js'
@@ -130,6 +131,11 @@ export default function Pro() {
   if (!item && status === 'loading') return <LoadingProfile />
   if (!item) return <NotFound type="специалист" />
   const partnerUserId = item.userId || stats?.user_id || ''
+  const layer01Meta = layer?.slug === 'ideya' ? item.layer01Meta || {} : {}
+  const layer01Process = Array.isArray(layer01Meta.process_steps)
+    ? layer01Meta.process_steps.filter((step) => step?.title || step?.description || step?.duration)
+    : []
+  const hasLayer01Details = Object.keys(layer01Meta).length > 0
 
   async function startChat() {
     if (!session) {
@@ -231,18 +237,50 @@ export default function Pro() {
 
               <ProfileServicesSection services={services} profile={item} />
 
+              {hasLayer01Details && <Layer01ProfileDetails meta={layer01Meta} />}
+
               <div>
                 <div className="eyebrow">Как работят</div>
-                <div className="mt-4 grid sm:grid-cols-2 gap-4">
-                  {layer.process.map(p => (
-                    <div key={p.n} className="border border-line bg-paper rounded-xl p-5">
-                      <div className="font-display text-2xl text-accentDeep">{p.n}</div>
-                      <div className="font-display text-lg mt-1">{p.t}</div>
-                      <p className="text-sm text-muted mt-1">{p.d}</p>
-                    </div>
-                  ))}
-                </div>
+                {layer01Process.length > 0 ? (
+                  <div className="mt-5 space-y-4 border-l-2 border-line pl-5">
+                    {layer01Process.map((step, index) => (
+                      <div key={`${step.title}-${index}`} className="relative rounded-2xl border border-line bg-paper p-5">
+                        <div className="absolute -left-[1.85rem] top-6 h-4 w-4 rounded-full border-2 border-accentDeep bg-paper" />
+                        <div className="flex flex-wrap items-baseline justify-between gap-3">
+                          <div className="font-display text-xl text-ink">{step.title || `Стъпка ${index + 1}`}</div>
+                          {step.duration && <div className="text-xs font-semibold uppercase tracking-[0.14em] text-accentDeep">{step.duration}</div>}
+                        </div>
+                        {step.description && <p className="mt-2 text-sm text-muted">{step.description}</p>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 grid sm:grid-cols-2 gap-4">
+                    {layer.process.map(p => (
+                      <div key={p.n} className="border border-line bg-paper rounded-xl p-5">
+                        <div className="font-display text-2xl text-accentDeep">{p.n}</div>
+                        <div className="font-display text-lg mt-1">{p.t}</div>
+                        <p className="text-sm text-muted mt-1">{p.d}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
+
+              {hasLayer01Details && Number.isFinite(Number(layer01Meta.consultation_fee)) && (
+                <div className="rounded-2xl border border-line bg-paper p-5">
+                  <div className="eyebrow">Консултация</div>
+                  <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
+                    <div>
+                      <div className="font-display text-2xl text-ink">Стартова среща</div>
+                      {layer01Meta.consultation_note && <p className="mt-1 text-sm text-muted">{layer01Meta.consultation_note}</p>}
+                    </div>
+                    <div className="font-display text-3xl text-accentDeep">
+                      {Number(layer01Meta.consultation_fee) === 0 ? 'Безплатна' : `${Number(layer01Meta.consultation_fee)} лв.`}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <div className="eyebrow">Портфолио</div>
@@ -270,6 +308,75 @@ function MetaTile({ icon: Icon, label, value }) {
       <div className="mt-1 text-sm font-medium text-ink">{value}</div>
     </div>
   )
+}
+
+function Layer01ProfileDetails({ meta }) {
+  const specialist = findLayer01Option(SPECIALIST_TYPES, meta.specialist_type)
+  const services = findLayer01Options(SPECIFIC_SERVICES, meta.specific_services)
+  const deliverables = findLayer01Options(DELIVERABLES, meta.deliverables)
+  const objects = findLayer01Options(TARGET_OBJECTS, meta.target_objects)
+  const hasLists = services.length > 0 || deliverables.length > 0 || objects.length > 0 || specialist
+
+  if (!hasLists) return null
+
+  return (
+    <div className="rounded-2xl border border-line bg-paper p-5">
+      <div className="eyebrow">Идея и посока</div>
+      <div className="mt-4 grid gap-6 md:grid-cols-2">
+        {specialist && (
+          <div>
+            <div className="text-xs uppercase tracking-[0.14em] text-muted">Профил</div>
+            <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-line bg-soft px-3 py-1.5 text-sm font-medium text-ink">
+              <span>{specialist.icon}</span>
+              {specialist.label}
+            </div>
+          </div>
+        )}
+
+        {objects.length > 0 && (
+          <div>
+            <div className="text-xs uppercase tracking-[0.14em] text-muted">Обекти</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {objects.map((item) => (
+                <span key={item.value} className="inline-flex items-center gap-2 rounded-full border border-line bg-soft px-3 py-1.5 text-sm text-ink">
+                  <span>{item.icon}</span>
+                  {item.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {services.length > 0 && <Layer01List title="Услуги" items={services} />}
+        {deliverables.length > 0 && <Layer01List title="Какво получавате" items={deliverables} />}
+      </div>
+    </div>
+  )
+}
+
+function Layer01List({ title, items }) {
+  return (
+    <div>
+      <div className="text-xs uppercase tracking-[0.14em] text-muted">{title}</div>
+      <ul className="mt-3 space-y-2">
+        {items.map((item) => (
+          <li key={item.value} className="flex items-start gap-2 text-sm text-ink">
+            <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-accentDeep" />
+            <span>{item.label}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function findLayer01Option(options, value) {
+  return options.find((item) => item.value === value) || null
+}
+
+function findLayer01Options(options, values) {
+  if (!Array.isArray(values)) return []
+  return values.map((value) => findLayer01Option(options, value)).filter(Boolean)
 }
 
 function ProfileServicesSection({ services, profile }) {

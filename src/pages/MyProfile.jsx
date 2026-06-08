@@ -25,10 +25,10 @@ import {
   uploadClientProjectMedia,
 } from '../lib/projects.js'
 import {
-  PROFILE_SELECT_COLUMNS,
   getProfileImage,
   getProfileImageStyle,
   normalizeProfile,
+  runProfileSelectWithLayer01Fallback,
   slugify,
 } from '../lib/profiles.js'
 
@@ -350,7 +350,9 @@ function ProEditor({ session, account }) {
     setError('')
 
     const [profRes, appRes] = await Promise.all([
-      supabase.from('profiles').select(PROFILE_SELECT_COLUMNS).eq('user_id', userId).maybeSingle(),
+      runProfileSelectWithLayer01Fallback((columns) => (
+        supabase.from('profiles').select(columns).eq('user_id', userId).maybeSingle()
+      )),
       supabase.from('partner_applications').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     ])
 

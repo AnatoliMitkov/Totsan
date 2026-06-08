@@ -149,6 +149,7 @@ export function getDefaultSeo(pathname = '/') {
 
 export function applySeo(config = {}) {
   if (typeof document === 'undefined') return
+  if (!config) return
 
   const canonicalPath = config.canonicalPath || (typeof window !== 'undefined' ? window.location.pathname : '/')
   const canonicalUrl = config.canonicalUrl || toAbsoluteUrl(canonicalPath)
@@ -184,6 +185,7 @@ export function useSeo(config) {
   const jsonLdKey = JSON.stringify(config?.jsonLd || null)
 
   useEffect(() => {
+    if (!config) return
     applySeo(config)
   }, [
     config?.canonicalPath,
