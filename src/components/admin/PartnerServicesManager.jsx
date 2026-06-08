@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CheckCircle2, Clock, Eye, RefreshCw, Search, XCircle, Trash2 } from 'lucide-react'
+import { CheckCircle2, Clock, Eye, LayoutGrid, List, RefreshCw, Search, XCircle, Trash2 } from 'lucide-react'
 import { ADMIN_INPUT_CLASS, formatAdminDate } from '../../lib/admin.js'
 import { SERVICE_STATUS_LABELS, loadAdminPartnerServices, packagePriceLabel, updateAdminPartnerServiceStatus } from '../../lib/partner-services.js'
+import { getPartnerServiceCoverCandidates } from '../../lib/service-media.js'
 import { supabase } from '../../lib/supabase.js'
+import FallbackImage from '../FallbackImage.jsx'
 
 const STATUS_FILTERS = [
   ['all', 'Всички'],
@@ -19,6 +21,7 @@ export default function PartnerServicesManager({ globalQuery }) {
   const [error, setError] = useState('')
   const [filter, setFilter] = useState('all')
   const [localQuery, setLocalQuery] = useState('')
+  const [viewMode, setViewMode] = useState('details')
   const [actionState, setActionState] = useState({ id: '', status: 'idle' })
 
   useEffect(() => { load() }, [])
@@ -88,7 +91,13 @@ export default function PartnerServicesManager({ globalQuery }) {
             <h2 className="mt-2 font-display text-3xl text-ink">Партньорски услуги</h2>
             <p className="mt-2 text-sm text-muted">Преглеждай изпратени услуги преди да станат публични в каталога, услугите и партньорските профили.</p>
           </div>
-          <button type="button" onClick={load} className="btn btn-ghost"><RefreshCw size={18} /> Обнови</button>
+          <div className="flex items-center gap-2 self-start">
+            <div className="inline-flex rounded-full border border-line bg-soft p-1" aria-label="Изглед">
+              <ViewModeButton icon={LayoutGrid} active={viewMode === 'grid'} label="Grid View" onClick={() => setViewMode('grid')} />
+              <ViewModeButton icon={List} active={viewMode === 'details'} label="Details View" onClick={() => setViewMode('details')} />
+            </div>
+            <button type="button" onClick={load} className="btn btn-ghost"><RefreshCw size={18} /> Обнови</button>
+          </div>
         </div>
         <div className="mt-5 flex flex-wrap gap-2">
           {STATUS_FILTERS.map(([value, label]) => (
@@ -102,43 +111,118 @@ export default function PartnerServicesManager({ globalQuery }) {
         {error && <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       </div>
 
-      <div className="grid gap-4">
+      <div className={viewMode === 'grid' ? 'grid gap-4 sm:grid-cols-2 2xl:grid-cols-3' : 'grid gap-4'}>
         {filtered.map(service => (
-          <article key={service.id} className="rounded-3xl border border-line bg-paper p-5 md:p-6">
-            <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_16rem]">
-              <div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-                  <span className="rounded-full bg-soft px-3 py-1">{SERVICE_STATUS_LABELS[service.moderationStatus] || service.moderationStatus}</span>
-                  <span className="inline-flex items-center gap-1"><Clock size={14} /> {formatAdminDate(service.createdAt)}</span>
-                  {service.isPublished && <span className="rounded-full bg-green-50 px-3 py-1 text-green-700">Публична</span>}
-                </div>
-                <h3 className="mt-3 font-display text-3xl text-ink">{service.title}</h3>
-                <p className="mt-2 text-sm text-muted">{service.subtitle || 'Без подзаглавие'}</p>
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <Info label="Партньор" value={service.profile?.name || '—'} />
-                  <Info label="Цена" value={packagePriceLabel(service)} />
-                  <Info label="Оферта" value={service.packages.some(item => item.isActive) ? 'Активна' : 'Липсва'} />
-                </div>
-                {service.moderationNote && <p className="mt-4 rounded-2xl bg-amber-50 p-3 text-sm text-amber-800">Последна бележка: {service.moderationNote}</p>}
-              </div>
-              <div className="space-y-3">
-                {service.moderationStatus === 'pending' && (
-                  <>
-                    <button type="button" onClick={() => updateServiceStatus(service, 'approved')} disabled={actionState.id === service.id} className="btn btn-primary w-full justify-center whitespace-nowrap !py-2 text-sm"><CheckCircle2 size={16} /> Одобри</button>
-                    <button type="button" onClick={() => updateServiceStatus(service, 'rejected')} disabled={actionState.id === service.id} className="btn btn-ghost w-full justify-center whitespace-nowrap !py-2 text-sm"><XCircle size={16} /> Върни</button>
-                  </>
-                )}
-                {service.isPublished && <Link to={`/uslugi/${service.slug}`} className="btn btn-ghost w-full justify-center whitespace-nowrap !py-2 text-sm"><Eye size={16} /> Публична страница</Link>}
-                {!service.isPublished && service.moderationStatus !== 'pending' && <div className="rounded-2xl border border-line bg-soft p-4 text-sm text-muted">Тази услуга не е публична за клиенти.</div>}
-                <button type="button" onClick={() => deleteService(service)} disabled={actionState.id === service.id} className="btn border border-red-200 text-red-600 hover:bg-red-50 w-full justify-center mt-2 whitespace-nowrap !py-2 text-sm"><Trash2 size={16} className="mr-1.5" /> Изтрий</button>
-              </div>
-            </div>
-          </article>
+          viewMode === 'grid'
+            ? <ServiceGridCard key={service.id} service={service} actionState={actionState} updateServiceStatus={updateServiceStatus} deleteService={deleteService} />
+            : <ServiceDetailsCard key={service.id} service={service} actionState={actionState} updateServiceStatus={updateServiceStatus} deleteService={deleteService} />
         ))}
         {filtered.length === 0 && <div className="rounded-3xl border border-dashed border-line bg-paper p-8 text-center text-sm text-muted">Няма услуги в този филтър.</div>}
       </div>
     </div>
   )
+}
+
+function ViewModeButton({ icon: Icon, active, label, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={`inline-flex h-10 w-10 items-center justify-center rounded-full transition ${active ? 'bg-ink text-paper shadow-sm' : 'text-muted hover:bg-paper hover:text-ink'}`}
+    >
+      <Icon size={18} />
+    </button>
+  )
+}
+
+function ServiceDetailsCard({ service, actionState, updateServiceStatus, deleteService }) {
+  return (
+    <article className="rounded-3xl border border-line bg-paper p-5 md:p-6">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_16rem]">
+        <div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+            <ServiceStatusPill service={service} />
+            <span className="inline-flex items-center gap-1"><Clock size={14} /> {formatAdminDate(service.createdAt)}</span>
+            {service.isPublished && <span className="rounded-full bg-green-50 px-3 py-1 text-green-700">Публична</span>}
+          </div>
+          <h3 className="mt-3 font-display text-3xl text-ink">{service.title}</h3>
+          <p className="mt-2 text-sm text-muted">{service.subtitle || 'Без подзаглавие'}</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <Info label="Партньор" value={service.profile?.name || '—'} />
+            <Info label="Цена" value={packagePriceLabel(service)} />
+            <Info label="Оферта" value={service.packages.some(item => item.isActive) ? 'Активна' : 'Липсва'} />
+          </div>
+          {service.moderationNote && <p className="mt-4 rounded-2xl bg-amber-50 p-3 text-sm text-amber-800">Последна бележка: {service.moderationNote}</p>}
+        </div>
+        <ServiceActions service={service} actionState={actionState} updateServiceStatus={updateServiceStatus} deleteService={deleteService} />
+      </div>
+    </article>
+  )
+}
+
+function ServiceGridCard({ service, actionState, updateServiceStatus, deleteService }) {
+  const coverCandidates = getPartnerServiceCoverCandidates(service, service.profile)
+
+  return (
+    <article className="flex h-full flex-col overflow-hidden rounded-3xl border border-line bg-paper transition hover:border-ink/20">
+      <div className="media-frame aspect-[16/10] bg-soft">
+        <FallbackImage sources={coverCandidates} alt={service.title} loading="lazy" decoding="async" className="img-cover img-zoom" />
+        <div className="absolute left-3 top-3 flex flex-wrap gap-2">
+          <ServiceStatusPill service={service} />
+          {service.isPublished && <span className="rounded-full bg-paper/95 px-3 py-1 text-xs font-medium text-green-700 backdrop-blur">Публична</span>}
+        </div>
+      </div>
+      <div className="flex flex-1 flex-col p-5">
+        <div className="flex items-center gap-1 text-xs text-muted"><Clock size={14} /> {formatAdminDate(service.createdAt)}</div>
+        <h3 className="mt-3 line-clamp-2 font-display text-2xl text-ink">{service.title}</h3>
+        <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted">{service.subtitle || 'Без подзаглавие'}</p>
+        <div className="mt-4 grid gap-2 text-sm">
+          <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
+            <span className="text-muted">Партньор</span>
+            <span className="truncate font-medium text-ink">{service.profile?.name || '—'}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
+            <span className="text-muted">Цена</span>
+            <span className="font-medium text-ink">{packagePriceLabel(service)}</span>
+          </div>
+        </div>
+        <div className="mt-auto pt-5">
+          <ServiceActions service={service} actionState={actionState} updateServiceStatus={updateServiceStatus} deleteService={deleteService} compact />
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function ServiceActions({ service, actionState, updateServiceStatus, deleteService, compact = false }) {
+  return (
+    <div className={compact ? 'space-y-2' : 'space-y-3'}>
+      {service.moderationStatus === 'pending' && (
+        <>
+          <button type="button" onClick={() => updateServiceStatus(service, 'approved')} disabled={actionState.id === service.id} className="btn btn-primary w-full justify-center whitespace-nowrap !py-2 text-sm"><CheckCircle2 size={16} /> Одобри</button>
+          <button type="button" onClick={() => updateServiceStatus(service, 'rejected')} disabled={actionState.id === service.id} className="btn btn-ghost w-full justify-center whitespace-nowrap !py-2 text-sm"><XCircle size={16} /> Върни</button>
+        </>
+      )}
+      {service.isPublished && <Link to={`/uslugi/${service.slug}`} className="btn btn-ghost w-full justify-center whitespace-nowrap !py-2 text-sm"><Eye size={16} /> Публична страница</Link>}
+      {!service.isPublished && service.moderationStatus !== 'pending' && !compact && <div className="rounded-2xl border border-line bg-soft p-4 text-sm text-muted">Тази услуга не е публична за клиенти.</div>}
+      <button type="button" onClick={() => deleteService(service)} disabled={actionState.id === service.id} className="btn border border-red-200 text-red-600 hover:bg-red-50 w-full justify-center whitespace-nowrap !py-2 text-sm"><Trash2 size={16} className="mr-1.5" /> Изтрий</button>
+    </div>
+  )
+}
+
+function ServiceStatusPill({ service }) {
+  const status = service.moderationStatus
+  const tone = status === 'approved'
+    ? 'bg-green-50 text-green-700'
+    : status === 'pending'
+      ? 'bg-amber-50 text-amber-800'
+      : status === 'rejected'
+        ? 'bg-red-50 text-red-700'
+        : 'bg-soft text-muted'
+
+  return <span className={`rounded-full px-3 py-1 text-xs font-medium ${tone}`}>{SERVICE_STATUS_LABELS[status] || status}</span>
 }
 
 function Info({ label, value }) {

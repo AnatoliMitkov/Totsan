@@ -160,14 +160,36 @@ function AdminShell({ children, session, account }) {
 function AdminWorkspace({ session, account }) {
   const initialSection = typeof window === 'undefined' ? 'dashboard' : window.location.hash.replace('#', '') || 'dashboard'
   const [activeSection, setActiveSection] = useState(ADMIN_SECTIONS.some((section) => section.id === initialSection) ? initialSection : 'dashboard')
+  const [sectionContext, setSectionContext] = useState({ inquiryStatusFilter: 'all' })
   const [globalQuery, setGlobalQuery] = useState('')
   const active = ADMIN_SECTIONS.find((section) => section.id === activeSection) || ADMIN_SECTIONS[0]
   const ActiveComponent = active.Component
 
-  function openSection(sectionId) {
+  function openSection(sectionId, context = {}) {
     setActiveSection(sectionId)
+    setSectionContext((current) => ({
+      ...current,
+      ...(sectionId === 'inquiries' ? { inquiryStatusFilter: context.inquiryStatusFilter || 'all' } : {}),
+    }))
     if (typeof window !== 'undefined') window.history.replaceState(null, '', `#${sectionId}`)
   }
+
+  useEffect(() => {
+    function syncHashSection() {
+      if (typeof window === 'undefined') return
+      const hashSection = window.location.hash.replace('#', '')
+      if (!ADMIN_SECTIONS.some((section) => section.id === hashSection)) return
+
+      setActiveSection(hashSection)
+      setSectionContext((current) => ({
+        ...current,
+        ...(hashSection === 'inquiries' ? { inquiryStatusFilter: 'all' } : {}),
+      }))
+    }
+
+    window.addEventListener('hashchange', syncHashSection)
+    return () => window.removeEventListener('hashchange', syncHashSection)
+  }, [])
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 items-start">
@@ -215,15 +237,17 @@ function AdminWorkspace({ session, account }) {
               <div className="eyebrow">{active.label}</div>
               <h2 className="mt-2 font-display text-3xl text-ink">{active.hint}</h2>
             </div>
-            <label className="relative block w-full xl:max-w-md">
-              <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
-              <input value={globalQuery} onChange={(event) => setGlobalQuery(event.target.value)} className="w-full rounded-2xl border border-line bg-soft px-11 py-3 text-sm outline-none transition focus:border-ink" placeholder="Глобално търсене в текущата секция" />
-            </label>
+            {activeSection !== 'users' && (
+              <label className="relative block w-full xl:max-w-md">
+                <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
+                <input value={globalQuery} onChange={(event) => setGlobalQuery(event.target.value)} className="w-full rounded-2xl border border-line bg-soft px-11 py-3 text-sm outline-none transition focus:border-ink" placeholder="Глобално търсене в текущата секция" />
+              </label>
+            )}
           </div>
         </div>
 
         <Suspense fallback={<AdminSectionFallback />}>
-          <ActiveComponent session={session} account={account} globalQuery={globalQuery} onOpenSection={openSection} />
+          <ActiveComponent session={session} account={account} globalQuery={globalQuery} onOpenSection={openSection} inquiryStatusShortcut={sectionContext.inquiryStatusFilter} />
         </Suspense>
       </main>
     </div>

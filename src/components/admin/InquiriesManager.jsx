@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Mail, RefreshCcw, Search } from 'lucide-react'
+import { CheckCircle2, Mail, RefreshCcw, Search } from 'lucide-react'
 import { ADMIN_INPUT_CLASS, ADMIN_SELECT_CLASS, INQUIRY_STATUS_LABELS, contactHref, formatAdminDate, loadInquiries, matchesSearch, paginateRows, updateInquiryStatus } from '../../lib/admin.js'
 import { supabase } from '../../lib/supabase.js'
+import { INQUIRY_STATUS_META, StatusSelect } from './AdminStatus.jsx'
 
 const SOURCE_LABELS = {
   project_brief: 'Проектен бриф',
@@ -18,7 +19,14 @@ const LAYER_LABELS = {
   dekoraciya: 'Слой 05 · Декорация',
 }
 
-export default function InquiriesManager({ globalQuery = '' }) {
+const OPEN_INQUIRY_STATUSES = new Set(['new', 'seen'])
+const STATUS_FILTER_OPTIONS = [
+  ['all', 'Всички'],
+  ['open', 'Без финал'],
+  ...Object.entries(INQUIRY_STATUS_LABELS),
+]
+
+export default function InquiriesManager({ globalQuery = '', inquiryStatusShortcut = 'all' }) {
   const [rows, setRows] = useState([])
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
@@ -29,6 +37,10 @@ export default function InquiriesManager({ globalQuery = '' }) {
   const [message, setMessage] = useState('')
 
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    setStatusFilter(inquiryStatusShortcut || 'all')
+  }, [inquiryStatusShortcut])
 
   async function load() {
     setStatus('loading')
@@ -43,7 +55,8 @@ export default function InquiriesManager({ globalQuery = '' }) {
   }
 
   const filtered = useMemo(() => rows.filter((row) => {
-    if (statusFilter !== 'all' && row.status !== statusFilter) return false
+    if (statusFilter === 'open' && !OPEN_INQUIRY_STATUSES.has(row.status)) return false
+    if (statusFilter !== 'all' && statusFilter !== 'open' && row.status !== statusFilter) return false
     if (!matchesSourceFilter(row, sourceFilter)) return false
     return matchesSearch(row, query || globalQuery, ['name', 'contact', 'message', 'source', 'target_slug', 'layer_slug'])
   }), [rows, query, globalQuery, statusFilter, sourceFilter])
@@ -87,7 +100,7 @@ export default function InquiriesManager({ globalQuery = '' }) {
         </div>
         <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_12rem_12rem]">
           <label className="relative block text-sm font-medium text-ink">Търсене<Search size={17} className="pointer-events-none absolute left-4 top-[2.35rem] text-muted" /><input value={query} onChange={(event) => setQuery(event.target.value)} className={`${ADMIN_INPUT_CLASS} pl-11`} placeholder="Име, контакт, съобщение…" /></label>
-          <label className="block text-sm font-medium text-ink">Статус<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={`${ADMIN_SELECT_CLASS} mt-2 w-full rounded-2xl`}><option value="all">Всички</option>{Object.entries(INQUIRY_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <label className="block text-sm font-medium text-ink">Статус<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={`${ADMIN_SELECT_CLASS} mt-2 w-full rounded-2xl`}>{STATUS_FILTER_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           <label className="block text-sm font-medium text-ink">Източник<select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className={`${ADMIN_SELECT_CLASS} mt-2 w-full rounded-2xl`}><option value="all">Всички източници</option><option value="project_brief">Проектен бриф</option><option value="contact_form">Контактна форма</option><option value="pro_inquiry">Към специалист</option><option value="other">Други</option></select></label>
         </div>
         {message && <div className="mt-4 text-sm text-muted">{message}</div>}
@@ -106,7 +119,23 @@ export default function InquiriesManager({ globalQuery = '' }) {
                 <div className="font-display text-2xl text-ink">{row.name}</div>
                 <a href={contactHref(row.contact)} className="mt-1 inline-flex items-center gap-2 text-sm text-muted hover:text-accent"><Mail size={16} /> {row.contact}</a>
               </div>
-              <select value={row.status} onChange={(event) => changeStatus(row, event.target.value)} className={ADMIN_SELECT_CLASS}>{Object.entries(INQUIRY_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+              <div className="flex w-full flex-col gap-2 md:w-auto md:items-end">
+                <StatusSelect
+                  value={row.status}
+                  onChange={(event) => changeStatus(row, event.target.value)}
+                  options={Object.entries(INQUIRY_STATUS_LABELS)}
+                  metaMap={INQUIRY_STATUS_META}
+                  ariaLabel="Статус на запитването"
+                />
+                <div className="flex flex-wrap gap-2 md:justify-end">
+                  <a href={contactHref(row.contact)} className="btn btn-ghost !py-2 text-sm"><Mail size={16} /> Свържи се</a>
+                  {OPEN_INQUIRY_STATUSES.has(row.status) && (
+                    <button type="button" onClick={() => changeStatus(row, 'replied')} className="btn btn-primary !py-2 text-sm">
+                      <CheckCircle2 size={16} /> Отговорено
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
             <p className="mt-4 whitespace-pre-wrap text-sm text-ink/80">{row.message}</p>
             <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted items-center justify-between">

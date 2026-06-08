@@ -53,6 +53,24 @@ export default function ReviewsManager({ globalQuery }) {
     })
   }, [filter, globalQuery, localQuery, openReportsByReview, reviews])
 
+  const stats = useMemo(() => {
+    const average = (key) => {
+      if (!reviews.length) return 0
+      return reviews.reduce((sum, review) => sum + Number(review[key] || 0), 0) / reviews.length
+    }
+
+    return {
+      count: reviews.length,
+      visible: reviews.filter(review => review.moderationStatus === 'visible').length,
+      hidden: reviews.filter(review => review.moderationStatus === 'hidden').length,
+      reported: reports.filter(report => report.status === 'open').length,
+      overall: average('ratingOverall'),
+      communication: average('ratingCommunication'),
+      quality: average('ratingQuality'),
+      value: average('ratingValue'),
+    }
+  }, [reports, reviews])
+
   async function changeVisibility(review, moderationStatus) {
     setActionState({ status: 'saving', message: 'Запазваме модерацията…' })
     try {
@@ -102,6 +120,16 @@ export default function ReviewsManager({ globalQuery }) {
           </div>
           <button type="button" onClick={load} className="btn btn-ghost"><RefreshCw size={18} /> Обнови</button>
         </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-8">
+          <ReviewStat label="Отзиви" value={stats.count} />
+          <ReviewStat label="Обща" value={stats.count ? stats.overall.toFixed(1) : '—'} icon />
+          <ReviewStat label="Комуникация" value={stats.count ? stats.communication.toFixed(1) : '—'} icon />
+          <ReviewStat label="Качество" value={stats.count ? stats.quality.toFixed(1) : '—'} icon />
+          <ReviewStat label="Стойност" value={stats.count ? stats.value.toFixed(1) : '—'} icon />
+          <ReviewStat label="Видими" value={stats.visible} />
+          <ReviewStat label="Скрити" value={stats.hidden} tone={stats.hidden ? 'danger' : 'neutral'} />
+          <ReviewStat label="Сигнали" value={stats.reported} tone={stats.reported ? 'warning' : 'neutral'} />
+        </div>
         <div className="mt-5 flex flex-wrap gap-2">
           {FILTERS.map(([value, label]) => <button key={value} type="button" onClick={() => setFilter(value)} className={`rounded-full px-4 py-2 text-sm transition ${filter === value ? 'bg-ink text-paper' : 'bg-soft text-muted hover:text-ink'}`}>{label}</button>)}
         </div>
@@ -124,8 +152,9 @@ export default function ReviewsManager({ globalQuery }) {
                     {openReports.length > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-xs text-amber-800"><Flag size={13} /> {openReports.length} сигнал</span>}
                     <span className="text-xs text-muted">{formatReviewDate(review.createdAt)}</span>
                   </div>
-                  <div className="mt-3 flex items-center gap-2 text-lg font-semibold text-ink"><Star size={19} className="text-accentDeep" fill="currentColor" /> {review.ratingOverall.toFixed(1)}</div>
+                  <div className="mt-3 flex items-center gap-2 text-lg font-semibold text-ink"><Stars value={review.ratingOverall} /> {review.ratingOverall.toFixed(1)}</div>
                   {review.body && <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-ink/80">{review.body}</p>}
+                  <RatingBreakdown review={review} />
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
                     <Info label="Клиент" value={shortId(review.clientId)} />
                     <Info label="Партньор" value={shortId(review.partnerId)} />
@@ -161,6 +190,55 @@ export default function ReviewsManager({ globalQuery }) {
         {filtered.length === 0 && <div className="rounded-3xl border border-dashed border-line bg-paper p-8 text-center text-sm text-muted">Няма отзиви в този филтър.</div>}
       </div>
     </div>
+  )
+}
+
+function ReviewStat({ label, value, icon = false, tone = 'neutral' }) {
+  const toneClass = tone === 'warning'
+    ? 'border-amber-200 bg-amber-50 text-amber-900'
+    : tone === 'danger'
+      ? 'border-red-200 bg-red-50 text-red-700'
+      : 'border-line bg-soft text-ink'
+
+  return (
+    <div className={`rounded-2xl border p-3 ${toneClass}`}>
+      <div className="flex items-center gap-1 text-lg font-semibold">
+        {icon && <Star size={16} className="text-accentDeep" fill="currentColor" />}
+        {value}
+      </div>
+      <div className="mt-1 text-[11px] uppercase tracking-[0.14em] text-muted">{label}</div>
+    </div>
+  )
+}
+
+function RatingBreakdown({ review }) {
+  const rows = [
+    ['Обща оценка', review.ratingOverall],
+    ['Комуникация', review.ratingCommunication],
+    ['Качество', review.ratingQuality],
+    ['Стойност', review.ratingValue],
+  ]
+
+  return (
+    <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      {rows.map(([label, value]) => (
+        <div key={label} className="rounded-2xl border border-line bg-soft p-3">
+          <div className="text-xs font-medium text-muted">{label}</div>
+          <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-ink">
+            <Stars value={value} />
+            {value}/5
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function Stars({ value }) {
+  return (
+    <span className="inline-flex text-accentDeep">
+      {[1, 2, 3, 4, 5].map(score => <Star key={score} size={16} fill={score <= value ? 'currentColor' : 'none'} />)}
+    </span>
   )
 }
 

@@ -24,6 +24,7 @@ import {
 } from '../../lib/admin.js'
 import { loadAdminPartnerServices } from '../../lib/partner-services.js'
 import { loadAdminReviewReports, loadAdminReviews } from '../../lib/reviews.js'
+import { INQUIRY_STATUS_META, StatusBadge } from './AdminStatus.jsx'
 
 const ORDER_STATUS_LABELS = {
   pending_payment: 'Очаква плащане',
@@ -203,7 +204,7 @@ function buildDashboardView(data) {
   const actions = [
     actionItem('applications', pendingApplications.length, 'Кандидатури за партньор', 'Нов специалист чака решение.', 'applications', UserCog, 'warning'),
     actionItem('services', pendingServices.length, 'Услуги за модерация', 'Партньорска услуга чака да бъде пусната или върната.', 'partner-services', PackageCheck, 'warning'),
-    actionItem('inquiries', openInquiries.length, 'Запитвания без финал', 'Клиент чака отговор или преглед.', 'inquiries', ClipboardList, openInquiries.length ? 'warning' : 'calm'),
+    actionItem('inquiries', openInquiries.length, 'Запитвания без финал', 'Клиент чака отговор или преглед.', 'inquiries', ClipboardList, openInquiries.length ? 'warning' : 'calm', { inquiryStatusFilter: 'open' }),
     actionItem('reports', openReports.length, 'Сигнали за отзиви', 'Trust проблем, който трябва да се затвори.', 'reviews', Flag, openReports.length ? 'danger' : 'calm'),
     actionItem('disputes', disputedOrders.length, 'Спорни поръчки', 'Поръчка е в спор и има нужда от намеса.', 'orders', CreditCard, disputedOrders.length ? 'danger' : 'calm'),
   ].filter(item => item.count > 0)
@@ -219,10 +220,12 @@ function buildDashboardView(data) {
     ...data.inquiries.slice(0, 3).map(row => ({
       key: `inquiry-${row.id}`,
       title: row.name || 'Ново запитване',
-      meta: `${formatAdminDate(row.created_at)} · ${statusLabel(row.status)}`,
+      meta: formatAdminDate(row.created_at),
       text: row.message || row.contact || '',
       section: 'inquiries',
       icon: ClipboardList,
+      status: row.status,
+      statusType: 'inquiry',
     })),
     ...pendingApplications.slice(0, 2).map(row => ({
       key: `application-${row.id}`,
@@ -263,8 +266,8 @@ function buildDashboardView(data) {
   }
 }
 
-function actionItem(key, count, title, text, section, icon, tone = 'calm') {
-  return { key, count, title, text, section, icon, tone }
+function actionItem(key, count, title, text, section, icon, tone = 'calm', context = {}) {
+  return { key, count, title, text, section, icon, tone, context }
 }
 
 function riskItem(key, count, title, text, section, icon) {
@@ -359,7 +362,7 @@ function ActionRow({ item, onOpenSection }) {
       : 'border-line bg-soft text-muted'
 
   return (
-    <button type="button" onClick={() => onOpenSection?.(item.section)} className={`w-full rounded-2xl border p-4 text-left transition hover:border-ink/40 ${toneClass}`}>
+    <button type="button" onClick={() => onOpenSection?.(item.section, item.context)} className={`w-full rounded-2xl border p-4 text-left transition hover:border-ink/40 ${toneClass}`}>
       <div className="flex items-center gap-4">
         <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-paper/80 text-ink"><Icon size={19} /></span>
         <span className="min-w-0 flex-1">
@@ -376,7 +379,7 @@ function ActionRow({ item, onOpenSection }) {
 function RiskRow({ item, onOpenSection }) {
   const Icon = item.icon
   return (
-    <button type="button" onClick={() => onOpenSection?.(item.section)} className="w-full rounded-2xl border border-line bg-soft p-4 text-left transition hover:border-ink/40">
+    <button type="button" onClick={() => onOpenSection?.(item.section, item.context)} className="w-full rounded-2xl border border-line bg-soft p-4 text-left transition hover:border-ink/40">
       <div className="flex items-start gap-3">
         <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-paper text-accentDeep"><Icon size={17} /></span>
         <span className="min-w-0 flex-1">
@@ -394,12 +397,15 @@ function RiskRow({ item, onOpenSection }) {
 function FeedItem({ item, onOpenSection }) {
   const Icon = item.icon || Sparkles
   return (
-    <button type="button" onClick={() => onOpenSection?.(item.section)} className="w-full rounded-2xl border border-line bg-soft p-4 text-left transition hover:border-ink/40">
+    <button type="button" onClick={() => onOpenSection?.(item.section, item.context)} className="w-full rounded-2xl border border-line bg-soft p-4 text-left transition hover:border-ink/40">
       <div className="flex items-start gap-3">
         <Icon size={18} className="mt-1 shrink-0 text-accentDeep" />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold text-ink">{item.title}</span>
-          <span className="mt-1 block text-xs text-muted">{item.meta}</span>
+          <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
+            <span>{item.meta}</span>
+            {item.statusType === 'inquiry' && <StatusBadge value={item.status} metaMap={INQUIRY_STATUS_META} className="!px-2 !py-0.5" />}
+          </span>
           {item.text && <span className="mt-2 block line-clamp-2 text-sm leading-6 text-ink/75">{item.text}</span>}
         </span>
       </div>

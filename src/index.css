@@ -19,6 +19,9 @@
   --hero-overlay-opacity: 0.28;
   --hero-overlay-border-opacity: 0.08;
   --hero-overlay-shadow-opacity: 0.6;
+  --section-pad-y: clamp(4rem, 6vw, 7rem);
+  --section-pad-y-tight: clamp(2.5rem, 4vw, 4.5rem);
+  --section-pad-y-compact: clamp(3rem, 5vw, 5rem);
 }
 
 html, body, #root {
@@ -88,7 +91,16 @@ body { font-family: theme('fontFamily.sans'); font-size: var(--step-sm); line-he
   width: 100%;
   min-width: 0;
   padding-inline: var(--pad-x);
-  padding-block: clamp(3.5rem, 6vw, 7rem);
+  padding-block: var(--section-pad-y);
+}
+
+.section.\!pt-0,
+.section.pt-0 {
+  padding-top: var(--section-pad-y-tight) !important;
+}
+
+.section.\!py-16 {
+  padding-block: var(--section-pad-y-compact) !important;
 }
 
 .container-page {
