@@ -110,6 +110,13 @@ body { font-family: theme('fontFamily.sans'); font-size: var(--step-sm); line-he
   margin-inline: auto;
 }
 
+.container-header {
+  width: 100%;
+  max-width: 100rem;
+  min-width: 0;
+  margin-inline: auto;
+}
+
 .home-hero {
   position: relative;
   min-height: 100svh;

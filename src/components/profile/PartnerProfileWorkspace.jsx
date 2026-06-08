@@ -21,7 +21,8 @@ import {
   UserRound,
 } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
-import { uploadProfileMedia } from '../../lib/profile-media-upload-client.js'
+import { LAYER_HEROS } from '../../data/images.js'
+import { uploadProfileMedia, uploadProfileCover } from '../../lib/profile-media-upload-client.js'
 import { getProfileImage, getProfileImageStyle, isMissingLayer01MetaColumn, normalizeProfile, PROFILE_SELECT_COLUMNS, PROFILE_SELECT_COLUMNS_BASE } from '../../lib/profiles.js'
 import { supabase } from '../../lib/supabase.js'
 import PasskeyManager, { PasskeySetupPrompt } from '../auth/PasskeyManager.jsx'
@@ -95,6 +96,8 @@ function makeProfileDraft(profile) {
     responseTimeHours: profile.responseTimeHours || '',
     acceptsRemote: Boolean(profile.acceptsRemote),
     pricingNote: profile.pricingNote || '',
+    coverUrl: profile.coverUrl || '',
+    coverY: profile.coverY ?? 50,
     layer01Meta: makeLayer01Draft(profile.layer01Meta || {}),
   }
 }
@@ -161,6 +164,34 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       imageUrl: '',
       fileName: file.name || 'avatar.jpg',
     })
+  }
+
+  async function uploadCover(file) {
+    if (!file) return
+    setSaveState({ status: 'uploading', message: 'Оптимизираме и качваме банера…' })
+    try {
+      const result = await uploadProfileCover({ file, target: userId })
+      updateProfile('coverUrl', result.publicUrl)
+      
+      // Auto-save to database immediately so it is not lost
+      const { error } = await supabase
+        .from('profiles')
+        .update({ cover_url: result.publicUrl })
+        .eq('id', currentProfile.id)
+      
+      if (error) throw error
+      
+      setCurrentProfile(current => ({ ...current, coverUrl: result.publicUrl }))
+      setSaveState({ status: 'saved', message: 'Банерът е качен и запазен.' })
+    } catch (error) {
+      setSaveState({ status: 'error', message: error.message || 'Качването на банер не успя.' })
+    }
+  }
+
+  function handleCoverFileChange(event) {
+    const file = event.target.files?.[0]
+    if (file) uploadCover(file)
+    event.target.value = ''
   }
 
   async function saveAvatarAndProfile(croppedFile) {
@@ -259,6 +290,8 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     image_zoom: profileDraft.imageZoom,
     image_x: profileDraft.imageX,
     image_y: profileDraft.imageY,
+    cover_url: profileDraft.coverUrl,
+    cover_y: profileDraft.coverY,
     description_long: profileDraft.descriptionLong,
     email_public: profileDraft.emailPublic,
     service_areas: fromCsv(profileDraft.serviceAreasText, []),
@@ -306,7 +339,17 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     try {
       const result = await uploadProfileMedia({ file, target: userId })
       updateProfile('imageUrl', result.publicUrl)
-      setSaveState({ status: 'uploaded', message: 'Снимката е готова. Натисни „Запази профила“.' })
+      
+      // Auto-save to database immediately so it is not lost
+      const { error } = await supabase
+        .from('profiles')
+        .update({ image_url: result.publicUrl })
+        .eq('id', currentProfile.id)
+      
+      if (error) throw error
+      
+      setCurrentProfile(current => ({ ...current, imageUrl: result.publicUrl }))
+      setSaveState({ status: 'saved', message: 'Профилната снимка е качена и запазена.' })
     } catch (error) {
       setSaveState({ status: 'error', message: error.message || 'Качването не успя.' })
     }
@@ -332,6 +375,8 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       image_zoom: Number(profileDraft.imageZoom),
       image_x: Number(profileDraft.imageX),
       image_y: Number(profileDraft.imageY),
+      cover_url: profileDraft.coverUrl.trim(),
+      cover_y: Number(profileDraft.coverY),
       phone: profileDraft.phone.trim() || null,
       email_public: profileDraft.emailPublic.trim() || null,
       website: profileDraft.website.trim() || null,
@@ -447,19 +492,35 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       <div className="container-page space-y-5">
         <PasskeySetupPrompt userId={userId} />
         <div className="overflow-hidden rounded-3xl border border-line bg-paper shadow-sm">
-          <div className="relative h-32 overflow-hidden bg-ink md:h-40">
-            {preview.imageUrl && (
-              <div
-                className="absolute inset-0 scale-105 bg-cover bg-center opacity-25 blur-md"
-                style={{ backgroundImage: `url(${preview.imageUrl})` }}
-              />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-r from-ink via-graphite to-accentDeep/80" />
+          <div className="group relative h-64 overflow-hidden bg-soft md:h-80">
+            <div
+              className="absolute inset-0 bg-cover"
+              style={{
+                backgroundImage: `url(${preview.coverUrl || LAYER_HEROS[preview.layerSlug] || ''})`,
+                backgroundPosition: `50% ${preview.coverY ?? 50}%`,
+              }}
+            />
+            <div className="absolute inset-0 bg-black/10 opacity-0 transition group-hover:opacity-100" />
+            <button
+              type="button"
+              onClick={() => document.getElementById('partner-cover-upload')?.click()}
+              className="absolute right-4 top-4 rounded-full bg-paper/90 p-2.5 text-ink shadow-sm backdrop-blur transition hover:bg-paper hover:scale-105"
+              title="Промяна на банер"
+            >
+              <Camera size={18} />
+            </button>
+            <input
+              id="partner-cover-upload"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleCoverFileChange}
+            />
           </div>
 
           <div className="relative flex flex-col gap-6 p-5 pt-0 md:p-7 md:pt-0 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-              <div className="-mt-12 h-28 w-28 shrink-0 overflow-hidden rounded-full border-4 border-paper bg-soft shadow-md md:-mt-14">
+              <div className="-mt-20 h-28 w-28 shrink-0 overflow-hidden rounded-full border-4 border-paper bg-soft shadow-md md:-mt-24">
                 <img src={getProfileImage(preview)} alt={preview.name} className="img-cover" style={getProfileImageStyle(preview)} />
               </div>
               <div className="pb-1">
@@ -681,22 +742,7 @@ function OverviewDashboard({ preview, stats, portfolio, completion, onTabChange 
           <InfoTile label="Портфолио" value={`${portfolio.length} проекта`} />
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button type="button" onClick={() => onTabChange('profile')} className="btn btn-primary">
-            <UserRound size={18} />
-            Редактирай профила
-          </button>
-          <button type="button" onClick={() => onTabChange('portfolio')} className="btn btn-ghost">
-            <FolderKanban size={18} />
-            Портфолио
-          </button>
-          {preview.layerSlug === 'ideya' && (
-            <button type="button" onClick={() => onTabChange('layer01')} className="btn btn-ghost">
-              <Compass size={18} />
-              Идея и посока
-            </button>
-          )}
-        </div>
+
       </section>
 
       <div className="grid gap-5 lg:grid-cols-12">

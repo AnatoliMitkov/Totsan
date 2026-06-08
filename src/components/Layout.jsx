@@ -84,13 +84,12 @@ function Header() {
   const { session, account, isAdmin, loading, mfaRequired } = useAccount()
   const canShowPrivateHeader = Boolean(session && account && !mfaRequired)
   const unreadCount = useUnreadCount(session?.user?.id, !loading && canShowPrivateHeader)
-  const isHomePage = pathname === '/'
   const isServicesActive = pathname.startsWith('/uslugi')
   const isCatalogActive = pathname === '/katalog'
   const isProActive = pathname === '/pro' || pathname === '/totsan-pro'
   const isVisualizationActive = pathname === '/vizualizacia'
-  const isHomeHeroMode = isHomePage && !isScrolled && !open
-  const headerSurfaceClass = isHomeHeroMode ? 'site-header--hero' : 'site-header--solid'
+  const isTopOverlayMode = !isScrolled && !open
+  const headerSurfaceClass = isTopOverlayMode ? 'site-header--hero' : 'site-header--solid'
   const loginHref = `/login?next=${encodeURIComponent(`${pathname}${search}${hash}`)}`
 
   useEffect(() => {
@@ -141,14 +140,14 @@ function Header() {
   return (
     <>
       <header className={`site-header fixed inset-x-0 top-0 z-40 border-b ${headerSurfaceClass} ${open ? 'site-header--menu-open' : ''}`}>
-        <div className="container-page grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 py-4 px-[var(--pad-x)] xl:gap-8">
-          <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 ${isHomeHeroMode ? 'text-paper [text-shadow:0_10px_28px_rgba(0,0,0,0.48)]' : 'text-ink'}`} onClick={close}>Totsan</Link>
+        <div className="container-header grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 py-4 px-4 sm:px-6 lg:px-8 xl:gap-4 2xl:gap-12">
+          <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 ${isTopOverlayMode ? 'text-paper [text-shadow:0_10px_28px_rgba(0,0,0,0.48)]' : 'text-ink'}`} onClick={close}>Totsan</Link>
 
-        <div className="min-w-0">
-          <nav aria-label="Основна навигация" className="hidden min-w-0 xl:flex xl:flex-wrap xl:items-center xl:gap-2 2xl:flex-nowrap">
+        <div className="min-w-0 flex justify-center">
+          <nav aria-label="Основна навигация" className="hidden min-w-0 xl:flex xl:flex-nowrap xl:items-center xl:gap-1.5 2xl:gap-3">
             {LAYERS.map(l => (
               <NavLink key={l.slug} to={`/sloy/${l.slug}`}
-                className={({isActive}) => desktopNavClassName(isActive, isHomeHeroMode)}>
+                className={({isActive}) => desktopNavClassName(isActive, isTopOverlayMode)}>
                 {l.number} · {l.title.split(' ')[0]}
               </NavLink>
             ))}
@@ -159,16 +158,16 @@ function Header() {
           <DesktopMoreMenu
             isOpen={isMoreOpen}
             setIsOpen={setIsMoreOpen}
-            isHomeHeroMode={isHomeHeroMode}
+            isHomeHeroMode={isTopOverlayMode}
             isServicesActive={isServicesActive}
             isCatalogActive={isCatalogActive}
             isProActive={isProActive}
             isVisualizationActive={isVisualizationActive}
           />
           {loading ? null : canShowPrivateHeader ? (
-            <Link to="/inbox" className={desktopUtilityLinkClassName(isHomeHeroMode)}>
+            <Link to="/inbox" className={desktopUtilityLinkClassName(isTopOverlayMode)}>
               <MessageCircle size={17} />
-              <span className="hidden xl:inline">Съобщения</span>
+              <span className="hidden 2xl:inline">Съобщения</span>
               {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accentDeep px-1.5 text-[11px] font-medium text-paper">{unreadCount}</span>}
             </Link>
           ) : null}
@@ -181,8 +180,8 @@ function Header() {
             <UserMenu session={session} account={account} isAdmin={isAdmin} />
           ) : (
             <>
-              <Link to={loginHref} className={`mobile-header-auth xl:hidden ${isHomeHeroMode ? 'mobile-header-auth-on-dark' : ''}`}>Вход</Link>
-              <Link to={loginHref} className={`desktop-header-auth ${isHomeHeroMode ? 'desktop-header-auth-on-dark' : ''}`}>Вход</Link>
+              <Link to={loginHref} className={`mobile-header-auth xl:hidden ${isTopOverlayMode ? 'mobile-header-auth-on-dark' : ''}`}>Вход</Link>
+              <Link to={loginHref} className={`desktop-header-auth ${isTopOverlayMode ? 'desktop-header-auth-on-dark' : ''}`}>Вход</Link>
             </>
           )}
           <button
@@ -190,7 +189,7 @@ function Header() {
             onClick={() => setOpen(o => !o)}
             aria-expanded={open}
             aria-controls="mobile-navigation"
-            className={`mobile-menu-toggle xl:hidden ${open ? 'is-open' : ''} ${isHomeHeroMode ? 'mobile-menu-toggle-on-dark' : ''}`}>
+            className={`mobile-menu-toggle xl:hidden ${open ? 'is-open' : ''} ${isTopOverlayMode ? 'mobile-menu-toggle-on-dark' : ''}`}>
             <span className="mobile-menu-toggle__icon mobile-menu-toggle__icon--menu" aria-hidden="true"><Menu size={18}/></span>
             <span className="mobile-menu-toggle__icon mobile-menu-toggle__icon--close" aria-hidden="true"><X size={18}/></span>
           </button>

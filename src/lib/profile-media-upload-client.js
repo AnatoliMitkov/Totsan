@@ -214,6 +214,10 @@ export async function uploadProfileMedia({ file, target = '' }) {
   return uploadMediaViaEdge({ file, target, purpose: 'profile' })
 }
 
+export async function uploadProfileCover({ file, target = '' }) {
+  return uploadMediaViaEdge({ file, target, purpose: 'profile', kind: 'cover' })
+}
+
 export async function uploadPortfolioMedia({ file, target = '', kind = 'photo' }) {
   return uploadMediaViaEdge({ file, target, purpose: 'portfolio', kind })
 }

@@ -23,6 +23,8 @@ export const PROFILE_SELECT_COLUMNS_BASE = `
   image_zoom,
   image_x,
   image_y,
+  cover_url,
+  cover_y,
   is_published,
   user_id,
   role,
@@ -122,6 +124,8 @@ export function normalizeProfile(input = {}, fallback = null) {
   const imageZoom = clamp(input.imageZoom ?? input.image_zoom ?? base.imageZoom ?? base.image_zoom, 1, 2.5, 1)
   const imageX = clamp(input.imageX ?? input.image_x ?? base.imageX ?? base.image_x, 0, 100, 50)
   const imageY = clamp(input.imageY ?? input.image_y ?? base.imageY ?? base.image_y, 0, 100, 50)
+  const coverUrl = String(input.coverUrl ?? input.cover_url ?? base.coverUrl ?? base.cover_url ?? '').trim()
+  const coverY = clamp(input.coverY ?? input.cover_y ?? base.coverY ?? base.cover_y, 0, 100, 50)
   const isPublished = input.isPublished ?? input.is_published ?? base.isPublished ?? base.is_published ?? true
   const bio = String(input.bio ?? base.bio ?? buildFallbackBio({ name, tag, city, since, projects }, layer)).trim()
   const headline = String(input.headline ?? base.headline ?? tag).trim()
@@ -174,6 +178,8 @@ export function normalizeProfile(input = {}, fallback = null) {
     imageZoom,
     imageX,
     imageY,
+    coverUrl,
+    coverY,
     isPublished: Boolean(isPublished),
     isStatic: !(input.id ?? base.id),
     userId,
@@ -220,6 +226,8 @@ function toProfessionalCardPerson(profile) {
     imageZoom: profile.imageZoom,
     imageX: profile.imageX,
     imageY: profile.imageY,
+    coverUrl: profile.coverUrl,
+    coverY: profile.coverY,
   }
 }
 
@@ -281,6 +289,8 @@ export function buildCatalogWithProfiles(profiles) {
         imageZoom: profile.imageZoom,
         imageX: profile.imageX,
         imageY: profile.imageY,
+        coverUrl: profile.coverUrl,
+        coverY: profile.coverY,
         layer01Meta: profile.layer01Meta,
       })
     })

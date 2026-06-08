@@ -162,150 +162,198 @@ export default function Pro() {
 
   return (
     <>
-      <section className="relative h-64 md:h-80 w-full overflow-hidden bg-ink">
-        <img src={LAYER_HEROS[layer.slug]} alt="" className="img-cover opacity-60 mix-blend-overlay" />
-        <div className="absolute inset-0 bg-gradient-to-t from-soft via-transparent to-transparent"></div>
+      {/* Cover Banner Section */}
+      <section className="relative h-64 md:h-80 w-full overflow-hidden bg-soft">
+        <img
+          src={item.coverUrl || LAYER_HEROS[layer.slug]}
+          alt=""
+          className="img-cover"
+          style={{ objectPosition: `50% ${item.coverY ?? 50}%` }}
+        />
       </section>
 
-      <section className="section pt-0 relative z-10 bg-soft">
-        <div className="container-page">
-          <div className="grid lg:grid-cols-12 gap-10">
-            {/* LEFT SIDEBAR */}
-            <aside className="lg:col-span-4 reveal -mt-20 md:-mt-32">
+      {/* Main Profile Grid Section */}
+      <div className="relative z-10 bg-soft flex flex-col pb-16 md:pb-24">
+        <div className="container-page w-full px-4 md:px-6 -mt-24">
+          <div className="grid lg:grid-cols-12 gap-8 lg:gap-12">
+
+            {/* LEFT COLUMN - Sticky Info, Stats & Inquiry Form */}
+            <aside className="lg:col-span-4 reveal">
               <div className="lg:sticky lg:top-24 space-y-6">
-                
+
                 {/* Profile Card */}
-                <div className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-sm">
+                <div className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.04)]">
                   <div className="flex flex-col items-center text-center">
-                    <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-paper shadow-md">
-                      <img src={getProfileImage(item)} alt={item.name} className="img-cover" style={getProfileImageStyle(item)} />
+
+                    {/* Squircle Double Border Profile Image */}
+                    <div className="relative group">
+                      <div className="w-32 h-32 rounded-3xl overflow-hidden border-4 border-paper bg-paper shadow-md transition-transform duration-300 group-hover:scale-[1.02]">
+                        <img src={getProfileImage(item)} alt={item.name} className="img-cover" style={getProfileImageStyle(item)} />
+                      </div>
+                      <span className="absolute bottom-1 right-1 flex h-5 w-5 rounded-full border-4 border-paper bg-trustGreen" title="Онлайн в Totsan" />
                     </div>
-                    <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-accentDeep">
-                      Слой {layer.number}
+
+                    <div className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-accentSoft/60 border border-accent/10 px-3.5 py-1 text-[11px] font-bold uppercase tracking-wider text-accentDeep">
+                      Слой {layer.number} · {layer.title.split(' ')[0]}
                     </div>
-                    <h1 className="mt-4 font-display text-3xl text-ink">{item.name}</h1>
-                    <p className="mt-2 text-sm text-ink/75">{item.headline || item.sub}</p>
-                    <p className="mt-1 text-sm text-muted">{item.city} · от {item.since} г.</p>
+
+                    <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight text-ink">{item.name}</h1>
+                    <p className="mt-2 text-sm font-medium text-ink/75 max-w-[280px] leading-relaxed">{item.headline || item.sub}</p>
+
+                    <div className="mt-3 flex items-center gap-1.5 text-xs text-muted font-medium">
+                      <MapPin size={14} className="text-accent" />
+                      <span>{item.city}</span>
+                      <span className="text-line">•</span>
+                      <span>от {item.since} г.</span>
+                    </div>
                   </div>
-                  
-                  <div className="mt-6 border-t border-line pt-6">
+
+                  {/* Stats tiles */}
+                  <div className="mt-8 border-t border-line/60 pt-6">
                     <PartnerStats profile={item} stats={stats} />
                   </div>
                 </div>
 
-                {/* Contact Actions */}
+                {/* Inquiry Box Form */}
                 <InquiryBox
                   proName={item.name}
-                  title={item.name ? `Опиши проекта си на ${item.name}` : 'Опиши проекта си'}
+                  title={item.name ? `Изпрати запитване до ${item.name}` : 'Опиши проекта си'}
                   layerSlug={item.layerSlug || item.layer}
                   targetSlug={item.slug}
                   clientId={session?.user?.id}
                 />
-                <div className="flex items-center gap-3 text-xs uppercase tracking-[0.14em] text-muted">
-                  <span className="h-px flex-1 bg-line" />или чат след това<span className="h-px flex-1 bg-line" />
+
+                <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-widest text-muted">
+                  <span className="h-px flex-1 bg-line/80" />или чат след запитване<span className="h-px flex-1 bg-line/80" />
                 </div>
+
+                {/* Chat Action Card */}
                 <ContactCard onStartChat={startChat} chatState={chatState} />
 
               </div>
             </aside>
 
-            {/* RIGHT MAIN COLUMN */}
-            <div className="lg:col-span-8 reveal lg:pt-8 space-y-12">
-              
-              <div>
-                <Link to="/katalog" className="eyebrow !text-ink/70 hover:!text-ink mb-6 inline-block">← Обратно в каталога</Link>
-                
-                <div className="eyebrow">За {item.name}</div>
-                <p className="mt-3" style={{fontSize:'var(--step-md)'}}>
+            {/* RIGHT COLUMN - Main Content Sections */}
+            <div className="lg:col-span-8 reveal lg:pt-6 space-y-12">
+
+              {/* Back Link & Biography */}
+              <div className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+                <Link to="/katalog" className="group inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted hover:text-ink transition-colors duration-200 mb-6">
+                  <span className="transition-transform duration-200 group-hover:-translate-x-1">←</span> Обратно в каталога
+                </Link>
+
+                <div className="eyebrow mb-2">Биография & Професионален опит</div>
+                <h2 className="font-display text-2xl font-semibold text-ink mb-4">За {item.name}</h2>
+                <p className="whitespace-pre-line text-ink/80 leading-relaxed font-sans" style={{ fontSize: 'var(--step-sm)' }}>
                   {item.descriptionLong || item.bio}
                 </p>
 
-                <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {/* Core Parameters Grid */}
+                <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <MetaTile icon={MapPin} label="Работи в" value={item.serviceAreas?.length ? item.serviceAreas.join(', ') : item.city} />
-                  <MetaTile icon={Languages} label="Езици" value={item.languages?.length ? item.languages.join(', ') : 'bg'} />
-                  <MetaTile icon={Globe2} label="Формат" value={item.acceptsRemote ? 'На място и дистанционно' : 'На място'} />
-                  <MetaTile icon={CheckCircle2} label="Опит" value={`${item.yearsExperience || Math.max(0, new Date().getFullYear() - item.since)} г.`} />
+                  <MetaTile icon={Languages} label="Езици" value={item.languages?.length ? item.languages.join(', ') : 'Български'} />
+                  <MetaTile icon={Globe2} label="Формат" value={item.acceptsRemote ? 'На място / Дистанционно' : 'На място'} />
+                  <MetaTile icon={CheckCircle2} label="Опит" value={`${item.yearsExperience || Math.max(0, new Date().getFullYear() - item.since)} години`} />
                 </div>
 
+                {/* Pricing Banner */}
                 {item.pricingNote && (
-                  <div className="mt-8 rounded-2xl border border-line bg-soft p-5">
-                    <div className="eyebrow">Цени</div>
-                    <p className="mt-2 text-muted">{item.pricingNote}</p>
+                  <div className="mt-6 rounded-2xl bg-accentSoft/30 border border-accentSoft/60 p-5 flex items-start gap-4 transition-all duration-300 hover:bg-accentSoft/40">
+                    <div className="text-2xl mt-0.5 select-none">💳</div>
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-accentDeep">Бюджет & Ценови условия</div>
+                      <p className="mt-1 text-sm font-semibold text-ink/90">{item.pricingNote}</p>
+                    </div>
                   </div>
                 )}
               </div>
 
+              {/* Services & Offers */}
               <ProfileServicesSection services={services} profile={item} />
 
+              {/* Specialist Extra Details */}
               {hasLayer01Details && <Layer01ProfileDetails meta={layer01Meta} />}
 
-              <div>
-                <div className="eyebrow">Как работят</div>
+              {/* Stepper Timeline */}
+              <div className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+                <div className="eyebrow mb-2">Методология</div>
+                <h3 className="font-display text-3xl font-semibold text-ink mb-6">Как протича процесът</h3>
+
                 {layer01Process.length > 0 ? (
-                  <div className="mt-5 space-y-4 border-l-2 border-line pl-5">
+                  <div className="relative border-l-2 border-line/60 ml-3 pl-6 space-y-6 py-2">
                     {layer01Process.map((step, index) => (
-                      <div key={`${step.title}-${index}`} className="relative rounded-2xl border border-line bg-paper p-5">
-                        <div className="absolute -left-[1.85rem] top-6 h-4 w-4 rounded-full border-2 border-accentDeep bg-paper" />
+                      <div key={`${step.title}-${index}`} className="relative group">
+                        {/* Stepper Dot */}
+                        <div className="absolute -left-[2.05rem] top-1.5 flex h-4.5 w-4.5 items-center justify-center rounded-full border-2 border-accentDeep bg-paper transition-colors duration-200 group-hover:bg-accentDeep" />
+
                         <div className="flex flex-wrap items-baseline justify-between gap-3">
-                          <div className="font-display text-xl text-ink">{step.title || `Стъпка ${index + 1}`}</div>
-                          {step.duration && <div className="text-xs font-semibold uppercase tracking-[0.14em] text-accentDeep">{step.duration}</div>}
+                          <div className="font-display text-xl font-semibold text-ink group-hover:text-accentDeep transition-colors duration-200">{step.title || `Стъпка ${index + 1}`}</div>
+                          {step.duration && <div className="text-[10px] font-bold uppercase tracking-wider text-accentDeep bg-accentSoft px-2 py-0.5 rounded-md">{step.duration}</div>}
                         </div>
-                        {step.description && <p className="mt-2 text-sm text-muted">{step.description}</p>}
+                        {step.description && <p className="mt-1.5 text-sm text-muted leading-relaxed">{step.description}</p>}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="mt-4 grid sm:grid-cols-2 gap-4">
+                  <div className="grid gap-4 sm:grid-cols-2">
                     {layer.process.map(p => (
-                      <div key={p.n} className="border border-line bg-paper rounded-xl p-5">
-                        <div className="font-display text-2xl text-accentDeep">{p.n}</div>
-                        <div className="font-display text-lg mt-1">{p.t}</div>
-                        <p className="text-sm text-muted mt-1">{p.d}</p>
+                      <div key={p.n} className="group relative border border-line bg-soft/30 rounded-2xl p-5 transition-all duration-300 hover:bg-soft hover:shadow-[0_8px_25px_rgba(0,0,0,0.02)]">
+                        <div className="absolute top-4 right-4 font-display text-2xl font-bold text-accent/20 transition-colors duration-200 group-hover:text-accent">{p.n}</div>
+                        <div className="font-display text-lg font-bold text-ink pr-8">{p.t}</div>
+                        <p className="text-sm text-muted mt-2 leading-relaxed">{p.d}</p>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
+              {/* Consultation Info */}
               {hasLayer01Details && Number.isFinite(Number(layer01Meta.consultation_fee)) && (
-                <div className="rounded-2xl border border-line bg-paper p-5">
-                  <div className="eyebrow">Консултация</div>
-                  <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-                    <div>
-                      <div className="font-display text-2xl text-ink">Стартова среща</div>
-                      {layer01Meta.consultation_note && <p className="mt-1 text-sm text-muted">{layer01Meta.consultation_note}</p>}
-                    </div>
-                    <div className="font-display text-3xl text-accentDeep">
+                <div className="rounded-3xl border border-line/60 bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-wrap items-center justify-between gap-6">
+                  <div>
+                    <div className="eyebrow mb-2">Консултации</div>
+                    <div className="font-display text-2xl font-semibold text-ink">Първоначална среща за проекта</div>
+                    {layer01Meta.consultation_note && <p className="mt-1.5 text-sm text-muted max-w-lg leading-relaxed">{layer01Meta.consultation_note}</p>}
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted">Такса за консултация</div>
+                    <div className="font-display text-3xl font-bold text-accentDeep mt-1">
                       {Number(layer01Meta.consultation_fee) === 0 ? 'Безплатна' : `${Number(layer01Meta.consultation_fee)} лв.`}
                     </div>
                   </div>
                 </div>
               )}
 
-              <div>
-                <div className="eyebrow">Портфолио</div>
-                <h2 className="mt-2 font-display text-3xl text-ink">Реални проекти</h2>
-                <div className="mt-5">
-                  <PortfolioGallery items={portfolio} emptyText="Този партньор още не е публикувал портфолио." />
+              {/* Portfolio Grid */}
+              <div className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+                <div className="eyebrow mb-2">Портфолио</div>
+                <h2 className="font-display text-3xl font-semibold text-ink mb-6">Реални реализирани проекти</h2>
+                <div>
+                  <PortfolioGallery items={portfolio} emptyText="Този партньор още не е публикувал свои проекти." />
                 </div>
               </div>
 
+              {/* Reviews List */}
               <ReviewsList partnerId={partnerUserId} title={`Отзиви за ${item.name}`} />
 
             </div>
           </div>
         </div>
-      </section>
+      </div>
     </>
   )
 }
 
 function MetaTile({ icon: Icon, label, value }) {
   return (
-    <div className="rounded-2xl border border-line bg-paper p-4">
-      <Icon size={18} className="text-accentDeep" />
-      <div className="mt-3 text-xs uppercase tracking-[0.14em] text-muted">{label}</div>
-      <div className="mt-1 text-sm font-medium text-ink">{value}</div>
+    <div className="flex items-center gap-4 rounded-2xl bg-paper p-4 border border-line/40 transition-all duration-300 hover:border-line hover:shadow-[0_8px_25px_rgba(0,0,0,0.02)]">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accentSoft/60 text-accentDeep">
+        <Icon size={20} />
+      </div>
+      <div>
+        <div className="text-[10px] font-bold uppercase tracking-wider text-muted">{label}</div>
+        <div className="mt-0.5 text-sm font-semibold text-ink line-clamp-1">{value}</div>
+      </div>
     </div>
   )
 }
@@ -320,13 +368,13 @@ function Layer01ProfileDetails({ meta }) {
   if (!hasLists) return null
 
   return (
-    <div className="rounded-2xl border border-line bg-paper p-5">
-      <div className="eyebrow">Идея и посока</div>
-      <div className="mt-4 grid gap-6 md:grid-cols-2">
+    <div className="rounded-3xl border border-line/50 bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+      <div className="eyebrow mb-4">Идея и посока</div>
+      <div className="grid gap-6 md:grid-cols-2">
         {specialist && (
           <div>
-            <div className="text-xs uppercase tracking-[0.14em] text-muted">Профил</div>
-            <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-line bg-soft px-3 py-1.5 text-sm font-medium text-ink">
+            <div className="text-xs font-bold uppercase tracking-wider text-muted mb-2">Профил</div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-line bg-soft px-3 py-1.5 text-sm font-medium text-ink">
               <span>{specialist.icon}</span>
               {specialist.label}
             </div>
@@ -335,8 +383,8 @@ function Layer01ProfileDetails({ meta }) {
 
         {objects.length > 0 && (
           <div>
-            <div className="text-xs uppercase tracking-[0.14em] text-muted">Обекти</div>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="text-xs font-bold uppercase tracking-wider text-muted mb-2">Обекти</div>
+            <div className="flex flex-wrap gap-2">
               {objects.map((item) => (
                 <span key={item.value} className="inline-flex items-center gap-2 rounded-full border border-line bg-soft px-3 py-1.5 text-sm text-ink">
                   <span>{item.icon}</span>
@@ -347,7 +395,7 @@ function Layer01ProfileDetails({ meta }) {
           </div>
         )}
 
-        {services.length > 0 && <Layer01List title="Услуги" items={services} />}
+        {services.length > 0 && <Layer01List title="Конкретни услуги" items={services} />}
         {deliverables.length > 0 && <Layer01List title="Какво получавате" items={deliverables} />}
       </div>
     </div>
@@ -357,11 +405,11 @@ function Layer01ProfileDetails({ meta }) {
 function Layer01List({ title, items }) {
   return (
     <div>
-      <div className="text-xs uppercase tracking-[0.14em] text-muted">{title}</div>
-      <ul className="mt-3 space-y-2">
+      <div className="text-xs font-bold uppercase tracking-wider text-muted mb-3">{title}</div>
+      <ul className="space-y-2.5">
         {items.map((item) => (
-          <li key={item.value} className="flex items-start gap-2 text-sm text-ink">
-            <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-accentDeep" />
+          <li key={item.value} className="flex items-start gap-2.5 text-sm text-ink/90">
+            <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-trustGreen" />
             <span>{item.label}</span>
           </li>
         ))}
@@ -382,35 +430,45 @@ function findLayer01Options(options, values) {
 function ProfileServicesSection({ services, profile }) {
   return (
     <div className="mt-10">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-5">
         <div>
-          <div className="eyebrow">Услуги</div>
-          <h2 className="mt-2 font-display text-3xl text-ink">Публикувани оферти от {profile.name}</h2>
+          <div className="eyebrow">Услуги & оферти</div>
+          <h2 className="mt-2 font-display text-3xl text-ink">Предложения от {profile.name}</h2>
         </div>
-        <Link to="/uslugi" className="inline-flex items-center gap-2 text-sm font-medium text-ink underline underline-offset-4">
+        <Link to="/uslugi" className="inline-flex items-center gap-2 text-sm font-medium text-ink underline underline-offset-4 hover:text-accentDeep transition-colors duration-200">
           Всички услуги <ArrowRight size={16} />
         </Link>
       </div>
 
       {services.length > 0 ? (
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
           {services.map(service => (
-            <Link key={service.id} to={`/uslugi/${service.slug}`} className="rounded-2xl border border-line bg-paper p-5 transition hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <BriefcaseBusiness size={20} className="mt-1 text-accentDeep" />
-                <span className="rounded-full bg-soft px-3 py-1 text-xs text-muted">{packagePriceLabel(service)}</span>
+            <Link
+              key={service.id}
+              to={`/uslugi/${service.slug}`}
+              className="group flex flex-col justify-between rounded-3xl border border-line/50 bg-paper p-6 transition-all duration-300 hover:-translate-y-1 hover:border-ink/25 hover:shadow-[0_12px_30px_rgba(13,35,64,0.06)]"
+            >
+              <div>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accentSoft/60 text-accentDeep">
+                    <BriefcaseBusiness size={20} />
+                  </div>
+                  <span className="rounded-full bg-accentSoft/50 px-3 py-1 text-xs font-bold text-accentDeep border border-accentSoft">
+                    {packagePriceLabel(service)}
+                  </span>
+                </div>
+                <h3 className="mt-5 font-display text-2xl leading-tight text-ink group-hover:text-accentDeep transition-colors duration-200">{service.title}</h3>
+                {service.subtitle && <p className="mt-2 line-clamp-2 text-sm text-muted">{service.subtitle}</p>}
               </div>
-              <h3 className="mt-4 font-display text-2xl leading-tight text-ink">{service.title}</h3>
-              {service.subtitle && <p className="mt-2 line-clamp-2 text-sm text-muted">{service.subtitle}</p>}
-              <div className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-ink">
-                Детайли <ArrowRight size={16} />
+              <div className="mt-6 flex items-center gap-2 text-sm font-semibold text-ink group-hover:text-accent transition-colors duration-200">
+                Детайли по офертата <ArrowRight size={16} className="transition-transform duration-200 group-hover:translate-x-1" />
               </div>
             </Link>
           ))}
         </div>
       ) : (
-        <div className="mt-5 rounded-2xl border border-dashed border-line bg-soft p-5 text-sm text-muted">
-          Този партньор още няма публични услуги. Можеш да започнеш разговор директно от бутона за контакт.
+        <div className="mt-6 rounded-3xl border border-dashed border-line/80 bg-soft/30 p-6 text-center text-sm text-muted">
+          Този партньор още няма публични услуги. Можеш да започнеш разговор директено от бутона за контакт.
         </div>
       )}
     </div>
@@ -419,11 +477,32 @@ function ProfileServicesSection({ services, profile }) {
 
 function ContactCard({ onStartChat, chatState }) {
   return (
-    <div className="rounded-2xl border border-line bg-paper p-6">
-      <div className="eyebrow">Чат</div>
-      <p className="mt-2 text-sm text-muted">Ако искаш по-директен разговор, можеш да отвориш защитен чат след запитването.</p>
-      <button type="button" onClick={onStartChat} disabled={chatState.status === 'loading'} className="btn btn-ghost mt-5 w-full justify-center disabled:opacity-50">{chatState.status === 'loading' ? 'Отваряме…' : 'Отвори чат'}</button>
-      {chatState.message && <div className={`mt-3 text-sm ${chatState.status === 'error' ? 'text-amber-800' : 'text-muted'}`}>{chatState.message}</div>}
+    <div className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accentSoft/60 text-accentDeep">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+          </svg>
+        </div>
+        <div>
+          <div className="text-xs font-bold uppercase tracking-wider text-muted">Директна връзка</div>
+          <div className="font-display text-lg font-semibold text-ink">Чат на живо</div>
+        </div>
+      </div>
+      <p className="mt-4 text-sm text-muted leading-relaxed">Имаш въпрос за наличност, цени или оглед? Пиши директно в чата на Totsan.</p>
+      <button
+        type="button"
+        onClick={onStartChat}
+        disabled={chatState.status === 'loading'}
+        className="btn btn-ghost mt-6 w-full justify-center py-3.5 text-sm font-semibold rounded-xl hover:bg-ink hover:text-paper hover:border-ink transition-all duration-200 disabled:opacity-50"
+      >
+        {chatState.status === 'loading' ? 'Отваряме чат…' : 'Започни чат'}
+      </button>
+      {chatState.message && (
+        <div className={`mt-3 text-center text-xs font-medium ${chatState.status === 'error' ? 'text-amber-800' : 'text-muted'}`}>
+          {chatState.message}
+        </div>
+      )}
     </div>
   )
 }
@@ -481,26 +560,65 @@ function InquiryBox({ proName, title, layerSlug, targetSlug, clientId }) {
   }
 
   return (
-    <form onSubmit={submit} className="border border-line rounded-2xl p-6 bg-paper">
-      <div className="eyebrow">{title || 'Опиши проекта си'}</div>
+    <form onSubmit={submit} className="border border-line rounded-3xl p-6 md:p-8 bg-paper shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+      <div className="text-xs font-bold uppercase tracking-wider text-accentDeep mb-2">{title || 'Опиши проекта си'}</div>
       {status === 'sent' ? (
-        <>
-          <p className="text-sm mt-3 flex items-center gap-2"><CheckCircle2 size={18} className="text-accentDeep"/> Запитването е изпратено на {proName}.</p>
-          <button type="button" onClick={() => setStatus('idle')} className="btn btn-ghost w-full justify-center mt-4">Изпрати ново</button>
-        </>
+        <div className="py-4 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-trustGreen/10 text-trustGreen">
+            <CheckCircle2 size={24} />
+          </div>
+          <h4 className="mt-4 font-display text-xl font-bold text-ink">Запитването е изпратено!</h4>
+          <p className="text-sm text-muted mt-2 leading-relaxed">
+            {proName} ще получи твоето съобщение и ще се свърже с теб в рамките на 48 часа.
+          </p>
+          <button type="button" onClick={() => setStatus('idle')} className="btn btn-ghost w-full justify-center mt-6 py-3.5 text-sm font-semibold rounded-xl">
+            Изпрати ново запитване
+          </button>
+        </div>
       ) : (
         <>
-          <p className="text-sm text-muted mt-2">Кратко описание на това, което ти трябва — отговор до 48 часа.</p>
-          <div className="mt-4 space-y-3">
-            <input value={form.name} onChange={set('name')} placeholder="Твоето име" className="w-full px-4 py-3 rounded-xl border border-line focus:border-ink outline-none text-sm"/>
-            <input value={form.contact} onChange={set('contact')} placeholder="Имейл или телефон" className="w-full px-4 py-3 rounded-xl border border-line focus:border-ink outline-none text-sm"/>
-            <textarea value={form.message} onChange={set('message')} rows={4} placeholder="Какво ти трябва?" className="w-full px-4 py-3 rounded-xl border border-line focus:border-ink outline-none text-sm"/>
-            <button disabled={status==='sending'} className="btn btn-primary w-full justify-center disabled:opacity-50">
-              {status==='sending' ? 'Изпраща се…' : 'Изпрати запитване'}
+          <p className="text-sm text-muted leading-relaxed">Попълни бързото запитване за оглед, оферта или съвместна работа. Отговор до 48 часа.</p>
+          <div className="mt-6 space-y-4">
+            <div>
+              <input
+                value={form.name}
+                onChange={set('name')}
+                placeholder="Твоето име"
+                className="w-full px-4 py-3.5 rounded-xl border border-line/75 bg-soft/20 focus:bg-paper focus:border-accentDeep outline-none text-sm transition-all duration-200 placeholder:text-muted/60"
+              />
+            </div>
+            <div>
+              <input
+                value={form.contact}
+                onChange={set('contact')}
+                placeholder="Имейл или телефон"
+                className="w-full px-4 py-3.5 rounded-xl border border-line/75 bg-soft/20 focus:bg-paper focus:border-accentDeep outline-none text-sm transition-all duration-200 placeholder:text-muted/60"
+              />
+            </div>
+            <div>
+              <textarea
+                value={form.message}
+                onChange={set('message')}
+                rows={4}
+                placeholder="Разкажи ни накратко за проекта си..."
+                className="w-full px-4 py-3.5 rounded-xl border border-line/75 bg-soft/20 focus:bg-paper focus:border-accentDeep outline-none text-sm transition-all duration-200 placeholder:text-muted/60 resize-none"
+              />
+            </div>
+            <button
+              disabled={status === 'sending'}
+              className="btn btn-primary w-full justify-center py-3.5 text-sm font-semibold tracking-wide shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 disabled:opacity-50"
+            >
+              {status === 'sending' ? 'Изпращане…' : 'Изпрати запитване'}
             </button>
           </div>
-          {status === 'error' && <div className="mt-3 text-xs text-red-700">Грешка при изпращане. Опитай пак.</div>}
-          <div className="mt-4 text-xs text-muted">Безплатно. Без обвързване.</div>
+          {status === 'error' && (
+            <div className="mt-3 text-center text-xs font-semibold text-red-600">
+              Грешка при изпращане. Опитай пак.
+            </div>
+          )}
+          <div className="mt-4 text-center text-[11px] text-muted">
+            Безплатно · Без допълнително обвързване
+          </div>
         </>
       )}
     </form>

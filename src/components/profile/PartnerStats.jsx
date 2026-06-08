@@ -26,10 +26,12 @@ export default function PartnerStats({ profile, stats, compact = false }) {
       {items.map((item) => {
         const Icon = item.icon || Clock
         return (
-          <div key={item.label} className="rounded-2xl border border-line bg-paper/90 p-4 text-center">
-            <Icon size={18} className="mx-auto text-accentDeep" />
-            <div className="mt-2 font-display text-2xl text-ink">{item.value}</div>
-            <div className="mt-1 text-xs uppercase tracking-[0.14em] text-muted">{item.label}</div>
+          <div key={item.label} className="flex flex-col items-center justify-center rounded-2xl bg-soft/60 p-4 text-center transition-all duration-300 hover:bg-soft hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-paper text-accent shadow-sm">
+              <Icon size={16} />
+            </div>
+            <div className="mt-2.5 font-display text-xl font-semibold text-ink">{item.value}</div>
+            <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-muted">{item.label}</div>
           </div>
         )
       })}

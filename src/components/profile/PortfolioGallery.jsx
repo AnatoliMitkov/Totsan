@@ -31,16 +31,31 @@ export default function PortfolioGallery({ items = [], emptyText = 'Още ня�
 
   return (
     <>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {visibleItems.map((item, index) => (
-          <button key={item.id || item.title} type="button" onClick={() => setActiveIndex(index)} className="group overflow-hidden rounded-2xl border border-line bg-paper text-left transition hover:border-ink/40">
-            <div className="aspect-[4/3] overflow-hidden bg-soft">
-              {item.coverUrl ? <img src={item.coverUrl} alt={item.title} className="img-cover transition duration-500 group-hover:scale-[1.04]" /> : <div className="flex h-full w-full items-center justify-center text-muted">Без снимка</div>}
+          <button
+            key={item.id || item.title}
+            type="button"
+            onClick={() => setActiveIndex(index)}
+            className="group w-full overflow-hidden rounded-2xl border border-line/60 bg-paper text-left transition-all duration-300 hover:-translate-y-1 hover:border-ink/35 hover:shadow-[0_12px_30px_rgba(13,35,64,0.08)]"
+          >
+            <div className="relative aspect-[4/3] overflow-hidden bg-soft">
+              {item.coverUrl ? (
+                <img src={item.coverUrl} alt={item.title} className="img-cover transition duration-700 ease-out group-hover:scale-[1.06]" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-muted text-sm font-medium">Няма снимка</div>
+              )}
+              <div className="absolute inset-0 bg-ink/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
             </div>
-            <div className="p-4">
-              <div className="font-display text-xl text-ink">{item.title}</div>
-              <div className="mt-2 text-xs uppercase tracking-[0.14em] text-muted">{layerLabel(item.layerSlug)}</div>
-              <div className="mt-2 text-sm text-muted">{[item.city, item.year].filter(Boolean).join(' · ') || 'Детайли при отваряне'}</div>
+            <div className="p-5">
+              <span className="inline-flex items-center rounded-full bg-soft px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accentDeep">
+                {layerLabel(item.layerSlug).split(' · ')[0]}
+              </span>
+              <h4 className="mt-2 font-display text-xl font-semibold text-ink group-hover:text-accent transition-colors duration-200 line-clamp-1">{item.title}</h4>
+              <div className="mt-2 flex items-center justify-between text-xs text-muted">
+                <span>{item.city || 'България'}</span>
+                <span>{item.year || ''}</span>
+              </div>
             </div>
           </button>
         ))}
