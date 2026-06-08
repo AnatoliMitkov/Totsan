@@ -364,14 +364,30 @@ function UserMenu({ session, account, isAdmin }) {
   }, [])
 
   return (
-    <div ref={ref} className="relative hidden sm:block">
-      <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 rounded-full border border-line bg-paper px-2 py-1.5 text-sm hover:border-ink/40 transition">
+    <div
+      ref={ref}
+      className="relative hidden sm:block"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocusCapture={() => setOpen(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false)
+      }}
+    >
+      <Link
+        to="/moy-profil"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls="user-menu"
+        className="flex items-center gap-2 rounded-full border border-line bg-paper px-2 py-1.5 text-sm hover:border-ink/40 transition"
+      >
         <Avatar src={avatarUrl} name={displayName} size={28} />
         <span className="hidden max-w-[10rem] truncate text-muted xl:inline">{displayName}</span>
-      </button>
+      </Link>
       {open && (
-        <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-line bg-paper shadow-lg overflow-hidden">
-          <div className="px-4 py-3 border-b border-line">
+        <div className="absolute right-0 top-full pt-2">
+          <div id="user-menu" role="menu" className="w-56 rounded-2xl border border-line bg-paper shadow-lg overflow-hidden">
+            <div className="px-4 py-3 border-b border-line">
             <div className="text-xs text-muted">Влязъл като</div>
             <div className="text-sm truncate">{displayName}</div>
             {email && <div className="mt-0.5 text-xs text-muted truncate">{email}</div>}
@@ -380,6 +396,7 @@ function UserMenu({ session, account, isAdmin }) {
           <Link to="/porachki" onClick={() => setOpen(false)} className="block px-4 py-2.5 text-sm hover:bg-soft">Поръчки</Link>
           <Link to="/moy-profil" onClick={() => setOpen(false)} className="block px-4 py-2.5 text-sm hover:bg-soft">Моят профил</Link>
           <button onClick={() => { setOpen(false); signOutAndRedirect(session?.user?.id) }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-t border-line">Изход</button>
+          </div>
         </div>
       )}
     </div>
