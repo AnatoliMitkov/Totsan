@@ -34,6 +34,7 @@ import BedroomAndLiving from './pages/BedroomAndLiving.jsx'
 import Bathroom from './pages/Bathroom.jsx'
 import LightingAndTextiles from './pages/LightingAndTextiles.jsx'
 import SharedProject from './pages/SharedProject.jsx'
+import Portfolio from './pages/Portfolio.jsx'
 import ProtectedRoute from './components/auth/ProtectedRoute.jsx'
 import MfaSessionLock from './components/auth/MfaSessionLock.jsx'
 import { signOutAndRedirect } from './lib/account.js'
@@ -217,6 +218,7 @@ function AppRoutes() {
     <MfaAppGate>
       <ErrorBoundary key={location.pathname}>
         <Routes>
+          <Route path="/portfolio" element={<Portfolio />} />
           <Route element={<Layout />}>
             <Route path="/" element={<Home />} />
             <Route path="/start" element={<Start />} />

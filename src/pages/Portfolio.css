@@ -1,0 +1,331 @@
+/* Portfolio Custom Stylesheet - marimba.design inspired */
+
+.portfolio-body {
+  background-color: #F0EFE9;
+  color: #000000;
+  font-family: 'Jost', sans-serif;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Typography */
+.portfolio-serif {
+  font-family: 'Instrument Serif', 'Cormorant Garamond', serif;
+  font-weight: 400;
+}
+
+.portfolio-sans {
+  font-family: 'Jost', 'Inter', sans-serif;
+}
+
+/* Custom Cursor */
+.portfolio-custom-cursor {
+  width: 20px;
+  height: 20px;
+  background-color: rgba(33, 46, 2, 0.15);
+  border: 1.5px solid #212E02;
+  border-radius: 50%;
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  transition: width 0.3s ease, height 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.portfolio-custom-cursor::after {
+  content: '';
+  width: 4px;
+  height: 4px;
+  background-color: #212E02;
+  border-radius: 50%;
+}
+
+.portfolio-custom-cursor.hovering {
+  width: 80px;
+  height: 80px;
+  background-color: #212E02;
+  border-color: #212E02;
+}
+
+.portfolio-custom-cursor.hovering::after {
+  content: 'VIEW';
+  font-family: 'Jost', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: #F0EFE9;
+  background-color: transparent;
+  border-radius: 0;
+  width: auto;
+  height: auto;
+}
+
+/* Page Loader */
+.portfolio-loader {
+  position: fixed;
+  inset: 0;
+  background-color: #212E02;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #F0EFE9;
+}
+
+.portfolio-loader-logo {
+  font-size: 3rem;
+  letter-spacing: 0.05em;
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.portfolio-loader-bar {
+  width: 200px;
+  height: 2px;
+  background-color: rgba(240, 239, 233, 0.2);
+  border-radius: 999px;
+  position: relative;
+  overflow: hidden;
+}
+
+.portfolio-loader-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background-color: #F0EFE9;
+  width: 0%;
+}
+
+.portfolio-loader-percent {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  opacity: 0.8;
+}
+
+/* Entrance Animations */
+.blur-in {
+  filter: blur(40px);
+  opacity: 0;
+}
+
+/* Scroll Slider Section */
+.portfolio-slider-container {
+  position: relative;
+  width: 100%;
+  background-color: #F0EFE9;
+}
+
+.portfolio-slider-pin-wrapper {
+  height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  position: relative;
+  padding: 4% 6%;
+  box-sizing: border-box;
+}
+
+.portfolio-slider-layout {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  gap: 5%;
+}
+
+/* Laptop Mockup Box */
+.portfolio-laptop-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.portfolio-laptop-mockup {
+  width: 100%;
+  max-width: 800px;
+  aspect-ratio: 16/10;
+  background-color: #121212;
+  border: 12px solid #282828;
+  border-bottom-width: 24px;
+  border-radius: 20px 20px 4px 4px;
+  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+
+.portfolio-laptop-mockup::after {
+  content: '';
+  position: absolute;
+  bottom: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 110%;
+  height: 6px;
+  background-color: #555555;
+  border-radius: 4px;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+}
+
+.portfolio-laptop-screen {
+  position: absolute;
+  inset: 0;
+  background-color: #1a1a1a;
+  overflow: hidden;
+}
+
+.portfolio-laptop-media-stack {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.portfolio-laptop-slide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  clip-path: inset(100% 0px 0px 0px);
+  transition: opacity 0.4s ease;
+}
+
+.portfolio-laptop-slide.active {
+  opacity: 1;
+  clip-path: inset(0px 0px 0px 0px);
+}
+
+.portfolio-laptop-slide img,
+.portfolio-laptop-slide video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Text Meta details Stack */
+.portfolio-details-stack {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+  position: relative;
+}
+
+.portfolio-project-details {
+  position: absolute;
+  width: 100%;
+  opacity: 0;
+  transform: translateY(30px);
+  pointer-events: none;
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.portfolio-project-details.active {
+  position: relative;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* Custom Scrollbar Filling height indicator */
+.portfolio-scrollbar-track {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 200px;
+  width: 2px;
+  background-color: rgba(33, 46, 2, 0.15);
+  border-radius: 99px;
+}
+
+.portfolio-scrollbar-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background-color: #212E02;
+  border-radius: 99px;
+  transition: height 0.1s linear;
+}
+
+/* Mobile Fallback styles (ScrollTrigger bypass) */
+@media (max-width: 1024px) {
+  .portfolio-slider-pin-wrapper {
+    height: auto !important;
+    padding: 3rem 1.5rem;
+  }
+  
+  .portfolio-slider-layout {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+  }
+  
+  .portfolio-laptop-wrapper {
+    height: auto;
+  }
+  
+  .portfolio-laptop-mockup {
+    max-width: 100%;
+  }
+  
+  .portfolio-details-stack {
+    height: auto;
+  }
+  
+  .portfolio-project-details {
+    position: relative !important;
+    opacity: 1 !important;
+    transform: none !important;
+    margin-bottom: 4rem;
+  }
+  
+  .portfolio-scrollbar-track {
+    display: none;
+  }
+}
+
+/* Decorative background patterns */
+.portfolio-decor-circle {
+  border: 1px solid rgba(33, 46, 2, 0.1);
+  border-radius: 50%;
+  position: absolute;
+  pointer-events: none;
+}
+
+/* Navigation Links */
+.portfolio-nav-link {
+  position: relative;
+  text-decoration: none;
+  color: #000000;
+  font-weight: 500;
+}
+
+.portfolio-nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 1.5px;
+  background-color: #212E02;
+  transition: width 0.3s ease;
+}
+
+.portfolio-nav-link:hover::after {
+  width: 100%;
+}
