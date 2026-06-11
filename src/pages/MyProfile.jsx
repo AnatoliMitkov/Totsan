@@ -11,6 +11,7 @@ import CustomerPreferences from '../components/profile/CustomerPreferences.jsx'
 import CustomerProject from '../components/profile/CustomerProject.jsx'
 import CompletenessBar from '../components/profile/CompletenessBar.jsx'
 import PartnerProfileWorkspace from '../components/profile/PartnerProfileWorkspace.jsx'
+import PublicProfileBanner from '../components/profile/PublicProfileBanner.jsx'
 import PasskeyManager, { PasskeySetupPrompt } from '../components/auth/PasskeyManager.jsx'
 import TotpMfaManager from '../components/auth/TotpMfa.jsx'
 import { isPasskeyVerifiedSession } from '../lib/passkeys.js'
@@ -210,12 +211,15 @@ function CustomerProfile({ session, account, refreshAccount }) {
   }
 
   return (
-    <section className="section bg-soft min-h-screen">
-      <div className="container-page space-y-5">
+    <>
+      <PublicProfileBanner heightClass="h-56 md:h-72" />
+      <div className="relative z-10 flex flex-col bg-soft pb-16 md:pb-24">
+        <div className="container-page w-full px-4 md:px-6 -mt-20 md:-mt-24 space-y-5">
         <CustomerHeader account={localAccount} displayName={displayName} completeness={completeness} onSignOut={() => signOutAndRedirect(session?.user?.id)} />
         <PasskeySetupPrompt userId={userId} />
 
-        <div className="flex flex-wrap items-center gap-2 rounded-3xl border border-line bg-paper p-2">
+        <div className="min-w-0 max-w-full overflow-hidden rounded-3xl border border-line bg-paper p-3 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+          <nav className="flex w-full min-w-0 max-w-full gap-1 overflow-x-auto pb-1">
           {[
             ['overview', 'Преглед'],
             ['personal', 'Лични данни'],
@@ -224,13 +228,14 @@ function CustomerProfile({ session, account, refreshAccount }) {
             ['activity', 'Активност'],
             ['security', 'Сигурност'],
           ].map(([tab, label]) => (
-            <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`rounded-full px-4 py-2 text-sm transition ${activeTab === tab ? 'bg-ink text-paper' : 'text-muted hover:bg-soft hover:text-ink'}`}>
+            <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`inline-flex min-h-11 shrink-0 items-center rounded-2xl px-4 py-2.5 text-left text-sm font-medium transition ${activeTab === tab ? 'bg-ink text-paper shadow-sm' : 'text-muted hover:bg-soft hover:text-ink'}`}>
               {label}
             </button>
           ))}
-          <button type="button" onClick={() => setMode('application')} className="ml-auto rounded-full border border-line px-4 py-2 text-sm text-ink transition hover:border-ink">
+          <button type="button" onClick={() => setMode('application')} className="inline-flex min-h-11 shrink-0 items-center rounded-2xl border border-line px-4 py-2.5 text-sm font-medium text-ink transition hover:border-ink">
             Стани партньор
           </button>
+          </nav>
         </div>
 
         {loadState.status === 'error' && (
@@ -300,8 +305,9 @@ function CustomerProfile({ session, account, refreshAccount }) {
             <TotpMfaManager session={session} />
           </div>
         )}
+        </div>
       </div>
-    </section>
+    </>
   )
 }
 

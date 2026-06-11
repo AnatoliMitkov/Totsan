@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, BriefcaseBusiness, CheckCircle2, Globe2, Languages, MapPin } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { LAYER_HEROS } from '../data/images.js'
@@ -11,6 +11,8 @@ import { useAccount } from '../lib/account.js'
 import { createConversationFromProfile } from '../lib/chat.js'
 import PortfolioGallery from '../components/profile/PortfolioGallery.jsx'
 import PartnerStats from '../components/profile/PartnerStats.jsx'
+import PublicProfileBanner from '../components/profile/PublicProfileBanner.jsx'
+import PublicProfilePanel from '../components/profile/PublicProfilePanel.jsx'
 import ReviewsList from '../components/reviews/ReviewsList.jsx'
 import { getPageLocation, trackEvent, trackPageView } from '../lib/analytics.js'
 import { buildBreadcrumbSchema, buildPersonSchema, useSeo } from '../lib/seo.js'
@@ -26,6 +28,9 @@ export default function Pro() {
   const [services, setServices] = useState([])
   const [chatState, setChatState] = useState({ status: 'idle', message: '' })
   const trackedProfileSlugRef = useRef('')
+  const servicesSectionRef = useRef(null)
+  const portfolioSectionRef = useRef(null)
+  const reviewsSectionRef = useRef(null)
   const profilePath = slug ? `/profil/${slug}` : '/katalog'
   const item = useMemo(() => {
     const liveProfile = profiles.find((profile) => profile.slug === slug)
@@ -131,18 +136,30 @@ export default function Pro() {
   if (!item && status === 'loading') return <LoadingProfile />
   if (!item) return <NotFound type="специалист" />
   const partnerUserId = item.userId || stats?.user_id || ''
+  const viewerUserId = session?.user?.id || ''
+  const isOwnProfile = Boolean(viewerUserId && partnerUserId && viewerUserId === partnerUserId)
   const layer01Meta = layer?.slug === 'ideya' ? item.layer01Meta || {} : {}
   const layer01Process = Array.isArray(layer01Meta.process_steps)
     ? layer01Meta.process_steps.filter((step) => step?.title || step?.description || step?.duration)
     : []
   const hasLayer01Details = Object.keys(layer01Meta).length > 0
 
+  function scrollToSection(sectionRef) {
+    const node = sectionRef.current
+    if (!node) return
+    node.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   async function startChat() {
     if (!session) {
-      navigate('/login')
+      navigate(`/login?next=${encodeURIComponent(profilePath)}`)
       return
     }
-    if (!item.id || item.isStatic) {
+    if (isOwnProfile) {
+      setChatState({ status: 'error', message: 'Не можеш да започнеш чат със собствения си публичен профил.' })
+      return
+    }
+    if ((!item.id && !partnerUserId) || item.isStatic) {
       setChatState({ status: 'error', message: 'Този профил още не е свързан с чат.' })
       return
     }
@@ -153,7 +170,11 @@ export default function Pro() {
     })
     setChatState({ status: 'loading', message: 'Отваряме защитен чат…' })
     try {
-      const conversation = await createConversationFromProfile({ profileId: item.id, subject: `Разговор с ${item.name}` })
+      const conversation = await createConversationFromProfile({
+        profileId: item.id,
+        partnerId: partnerUserId,
+        subject: `Разговор с ${item.name}`,
+      })
       navigate(`/inbox/${conversation.id}`)
     } catch (error) {
       setChatState({ status: 'error', message: error.message || 'Чатът не се отвори.' })
@@ -163,14 +184,11 @@ export default function Pro() {
   return (
     <>
       {/* Cover Banner Section */}
-      <section className="relative h-64 md:h-80 w-full overflow-hidden bg-soft">
-        <img
-          src={item.coverUrl || LAYER_HEROS[layer.slug]}
-          alt=""
-          className="img-cover"
-          style={{ objectPosition: `50% ${item.coverY ?? 50}%` }}
-        />
-      </section>
+      <PublicProfileBanner
+        imageSrc={item.coverUrl || LAYER_HEROS[layer.slug]}
+        imageAlt=""
+        imageStyle={{ objectPosition: `50% ${item.coverY ?? 50}%` }}
+      />
 
       {/* Main Profile Grid Section */}
       <div className="relative z-10 bg-soft flex flex-col pb-16 md:pb-24">
@@ -182,7 +200,7 @@ export default function Pro() {
               <div className="lg:sticky lg:top-24 space-y-6">
 
                 {/* Profile Card */}
-                <div className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.04)]">
+                <PublicProfilePanel className="transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.04)]">
                   <div className="flex flex-col items-center text-center">
 
                     {/* Squircle Double Border Profile Image */}
@@ -210,9 +228,20 @@ export default function Pro() {
 
                   {/* Stats tiles */}
                   <div className="mt-8 border-t border-line/60 pt-6">
-                    <PartnerStats profile={item} stats={stats} />
+                    <PartnerStats
+                      profile={item}
+                      stats={stats}
+                      serviceCount={services.length}
+                      projectCount={portfolio.length}
+                      onServicesClick={() => scrollToSection(servicesSectionRef)}
+                      onProjectsClick={() => scrollToSection(portfolioSectionRef)}
+                      onReviewsClick={() => scrollToSection(reviewsSectionRef)}
+                      onResponseClick={startChat}
+                      responseDisabled={isOwnProfile || (!item.id && !partnerUserId) || chatState.status === 'loading'}
+                      responseLabel={isOwnProfile ? 'Не можеш да започнеш чат със собствения си профил' : `Започни чат с ${item.name}`}
+                    />
                   </div>
-                </div>
+                </PublicProfilePanel>
 
                 {/* Inquiry Box Form */}
                 <InquiryBox
@@ -269,7 +298,7 @@ export default function Pro() {
               </div>
 
               {/* Services & Offers */}
-              <ProfileServicesSection services={services} profile={item} />
+              <ProfileServicesSection ref={servicesSectionRef} services={services} profile={item} />
 
               {/* Specialist Extra Details */}
               {hasLayer01Details && <Layer01ProfileDetails meta={layer01Meta} />}
@@ -325,7 +354,11 @@ export default function Pro() {
               )}
 
               {/* Portfolio Grid */}
-              <div className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+              <div
+                ref={portfolioSectionRef}
+                id="profile-projects"
+                className="scroll-mt-24 rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]"
+              >
                 <div className="eyebrow mb-2">Портфолио</div>
                 <h2 className="font-display text-3xl font-semibold text-ink mb-6">Реални реализирани проекти</h2>
                 <div>
@@ -334,7 +367,9 @@ export default function Pro() {
               </div>
 
               {/* Reviews List */}
-              <ReviewsList partnerId={partnerUserId} title={`Отзиви за ${item.name}`} />
+              <div ref={reviewsSectionRef} id="profile-reviews" className="scroll-mt-24">
+                <ReviewsList partnerId={partnerUserId} title={`Отзиви за ${item.name}`} emptyText="Все още няма публични отзиви." />
+              </div>
 
             </div>
           </div>
@@ -427,9 +462,9 @@ function findLayer01Options(options, values) {
   return values.map((value) => findLayer01Option(options, value)).filter(Boolean)
 }
 
-function ProfileServicesSection({ services, profile }) {
+const ProfileServicesSection = forwardRef(function ProfileServicesSection({ services, profile }, ref) {
   return (
-    <div className="mt-10">
+    <div ref={ref} id="profile-services" className="mt-10 scroll-mt-24">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-5">
         <div>
           <div className="eyebrow">Услуги & оферти</div>
@@ -473,7 +508,7 @@ function ProfileServicesSection({ services, profile }) {
       )}
     </div>
   )
-}
+})
 
 function ContactCard({ onStartChat, chatState }) {
   return (

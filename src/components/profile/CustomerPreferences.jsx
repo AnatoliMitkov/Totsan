@@ -199,7 +199,7 @@ export default function CustomerPreferences({ account, session, onSave }) {
 
   return (
     <form onSubmit={submit} className="grid gap-5 lg:grid-cols-12">
-      <div className="lg:col-span-8 rounded-3xl border border-line bg-paper p-5 md:p-7 space-y-6">
+      <div className="lg:col-span-8 rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-7 space-y-6">
         {/* Header */}
         <div>
           <div className="eyebrow">Предпочитания</div>
@@ -273,7 +273,7 @@ export default function CustomerPreferences({ account, session, onSave }) {
 
       {/* Sidebar info card */}
       <aside className="lg:col-span-4">
-        <div className="rounded-3xl border border-line bg-paper p-5 md:p-6 lg:sticky lg:top-24 space-y-4">
+        <div className="rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-6 lg:sticky lg:top-24 space-y-4">
           <div className="flex items-center gap-2">
             <Sparkles size={18} className="text-accent" />
             <div className="eyebrow">Защо питаме?</div>

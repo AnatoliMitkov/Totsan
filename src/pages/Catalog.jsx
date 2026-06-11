@@ -261,7 +261,7 @@ export default function Catalog() {
           </div>
 
           <div className="mt-4 reveal overflow-x-auto pb-1">
-            <div className="inline-flex max-w-full gap-2 rounded-full border border-line bg-paper p-1">
+            <div className="flex w-full min-w-max gap-2 rounded-full border border-line bg-paper p-1">
               {KIND_TABS.map((tab) => {
                 const isActive = kind === tab.value
                 return (
@@ -273,7 +273,7 @@ export default function Catalog() {
                       setKind(tab.value)
                       trackEvent('select_catalog_tab', { tab: tab.value })
                     }}
-                    className={`whitespace-nowrap rounded-full px-4 py-2.5 text-left text-sm font-medium transition ${
+                    className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2.5 text-left text-sm font-medium transition ${
                       isActive
                         ? 'bg-ink text-paper shadow-sm'
                         : 'text-muted hover:bg-soft hover:text-ink'

@@ -1,5 +1,6 @@
-import { LogOut, UserRound } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { CalendarDays, LogOut, MapPin, UserRound } from 'lucide-react'
+import PublicProfileAvatar from './PublicProfileAvatar.jsx'
+import PublicProfilePanel from './PublicProfilePanel.jsx'
 
 function formatMemberDate(value) {
   if (!value) return 'днес'
@@ -7,77 +8,45 @@ function formatMemberDate(value) {
 }
 
 export default function CustomerHeader({ account, displayName, completeness, onSignOut }) {
-  const initial = (displayName?.[0] || '?').toUpperCase()
   const avatarUrl = account?.avatar_url || ''
   const targetPercent = completeness?.percent || 0
-  const [percent, setPercent] = useState(0)
-  const [isResetting, setIsResetting] = useState(false)
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPercent(targetPercent)
-    }, 150)
-    return () => clearTimeout(timer)
-  }, [targetPercent])
-
-  const handleMouseEnter = () => {
-    if (percent !== targetPercent) return // Prevent triggering while already animating
-    setIsResetting(true)
-    setPercent(0)
-    setTimeout(() => {
-      setIsResetting(false)
-      setPercent(targetPercent)
-    }, 50)
-  }
-
-  const circumference = 2 * Math.PI * 48
-  const strokeDashoffset = circumference - (percent / 100) * circumference
+  const city = account?.city || account?.country || ''
 
   return (
-    <div className="rounded-3xl border border-line bg-paper p-5 md:p-7">
-      <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-4">
-          <div 
-            className="relative h-24 w-24 shrink-0 cursor-pointer rounded-full transition-all duration-300 hover:scale-[1.03] hover:shadow-[0_0_28px_rgba(0,0,0,0.12)]" 
-            onMouseEnter={handleMouseEnter}
-          >
-            <svg className="absolute inset-0 h-full w-full -rotate-90 pointer-events-none" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="48" fill="none" stroke="#ECEEF0" strokeWidth="4" />
-              <circle 
-                cx="50" 
-                cy="50" 
-                r="48" 
-                fill="none" 
-                stroke="#1B1D1F" 
-                strokeWidth="4"
-                strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
-                className={isResetting ? '' : 'transition-all duration-[1200ms] ease-in-out'}
-              />
-            </svg>
-            <div className="absolute inset-1 overflow-hidden rounded-full border border-line bg-soft">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={displayName} className="img-cover" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-3xl font-medium text-muted">
-                  {initial || <UserRound size={28} />}
-                </div>
+    <PublicProfilePanel className="transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.04)]">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-end sm:text-left">
+          <PublicProfileAvatar
+            src={avatarUrl}
+            alt={displayName}
+            fallbackIcon={UserRound}
+            statusTitle="Профил в Totsan"
+          />
+
+          <div className="min-w-0 pb-1">
+            <div className="eyebrow">Моят профил</div>
+            <h1 className="mt-2 break-words font-display text-3xl font-semibold leading-none tracking-tight text-ink md:text-5xl">
+              {displayName}
+            </h1>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs font-medium text-muted sm:justify-start">
+              <span className="inline-flex items-center gap-1.5">
+                <CalendarDays size={14} className="text-accent" />
+                В Totsan от {formatMemberDate(account?.created_at)}
+              </span>
+              {city && (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin size={14} className="text-accent" />
+                  {city}
+                </span>
               )}
             </div>
           </div>
-
-          <div>
-            <div className="eyebrow">Моят профил</div>
-            <h1 className="mt-1 font-display text-4xl leading-none text-ink md:text-5xl">{displayName}</h1>
-            <p className="mt-2 text-sm text-muted">В Totsan от {formatMemberDate(account?.created_at)}</p>
-          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 md:justify-end">
-          <div className="rounded-2xl border border-line bg-soft px-4 py-3 text-sm">
+        <div className="flex flex-wrap items-center justify-center gap-3 lg:justify-end">
+          <div className="rounded-2xl border border-line/60 bg-soft/60 px-4 py-3 text-sm">
             <span className="text-muted">Попълване</span>
-            <span className="ml-2 font-medium text-ink">{targetPercent}%</span>
+            <span className="ml-2 font-semibold text-ink">{targetPercent}%</span>
           </div>
           <button type="button" className="btn btn-ghost" onClick={onSignOut}>
             <LogOut size={18} />
@@ -85,6 +54,6 @@ export default function CustomerHeader({ account, displayName, completeness, onS
           </button>
         </div>
       </div>
-    </div>
+    </PublicProfilePanel>
   )
 }
