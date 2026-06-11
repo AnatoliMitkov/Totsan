@@ -130,6 +130,11 @@ export function useAccount() {
       sessionRef.current = next
       setSession(nextSession)
       setAuthLoading(false)
+
+      if (!sessionChanged) {
+        return
+      }
+
       setAccount(null)
       setAccountLoading(Boolean(nextSession?.user))
       setMfa((current) => ({ ...current, loading: Boolean(nextSession?.user) }))

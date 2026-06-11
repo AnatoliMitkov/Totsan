@@ -55,6 +55,30 @@ function maskList(value: unknown) {
   return { items, wasMasked }
 }
 
+function normalizeExecutionMode(value: unknown) {
+  return value === 'staged' ? 'staged' : 'single'
+}
+
+function normalizeOfferStages(value: unknown) {
+  if (!Array.isArray(value)) return []
+
+  return value
+    .map((stage, index) => {
+      if (!stage || typeof stage !== 'object' || Array.isArray(stage)) return null
+
+      const record = stage as Record<string, unknown>
+      const title = maskText(record.title).masked.trim()
+      const description = maskText(record.description).masked.trim()
+      const parsedOrder = Number(record.order)
+      const order = Number.isFinite(parsedOrder) ? Math.max(0, Math.round(parsedOrder)) : index + 1
+
+      if (!title && !description) return null
+
+      return { title, description, order }
+    })
+    .filter(Boolean)
+}
+
 function previewFor(value: string) {
   return value.replace(/\s+/g, ' ').trim().slice(0, 140)
 }
@@ -221,6 +245,8 @@ Deno.serve(async (req) => {
       const title = maskText(payload.title)
       const description = maskText(payload.description)
       const deliverables = maskList(payload.deliverables)
+      const executionMode = normalizeExecutionMode(payload.executionMode)
+      const stages = normalizeOfferStages(payload.stages)
       if (!title.masked.trim()) throw new Error('Офертата има нужда от заглавие.')
 
       const priceAmount = Number(payload.priceAmount || 0)
@@ -239,6 +265,8 @@ Deno.serve(async (req) => {
         currency: String(payload.currency || 'EUR').trim().toUpperCase().slice(0, 3) || 'EUR',
         delivery_days: Number.isFinite(deliveryDays) ? Math.max(0, Math.round(deliveryDays)) : null,
         revisions: Number.isFinite(revisions) ? Math.max(0, Math.round(revisions)) : null,
+        execution_mode: executionMode,
+        stages,
         expires_at: payload.expiresAt || null,
       }).select('*').single()
       if (offerError) throw offerError

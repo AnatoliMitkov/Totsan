@@ -28,6 +28,8 @@ export const MESSAGE_SELECT = `
   offer:offers(*)
 `
 
+const PROFILE_SELECT = 'user_id, name, image_url'
+
 export function isClient(conversation, userId) {
   return conversation?.client_id === userId
 }
@@ -49,6 +51,54 @@ export function conversationRole(conversation, userId) {
   return 'guest'
 }
 
+export function getConversationParticipant(conversation, role) {
+  if (!conversation) return null
+  if (role === 'client') return conversation.client || null
+  if (role === 'partner') return conversation.partner || null
+  return null
+}
+
+export function getOtherParticipant(conversation, userId) {
+  const role = conversationRole(conversation, userId)
+  if (role === 'client') return conversation?.partner || null
+  if (role === 'partner') return conversation?.client || null
+  return null
+}
+
+export function getParticipantDisplayName(participant, fallback = 'Потребител') {
+  return participant?.display_name || participant?.full_name || fallback
+}
+
+export function getConversationTitle(conversation, userId, fallback = 'Потребител') {
+  const participant = getOtherParticipant(conversation, userId)
+  const participantName = getParticipantDisplayName(participant, '')
+  if (participantName) return participantName
+  const subjectName = conversationSubjectName(conversation?.subject)
+  return subjectName || fallback
+}
+
+export function getRoleLabel(role) {
+  if (role === 'client') return 'Клиент'
+  if (role === 'partner') return 'Партньор'
+  return 'Потребител'
+}
+
+function conversationSubjectName(subject = '') {
+  const text = String(subject || '').trim()
+  if (!text) return ''
+  if (text.startsWith('Разговор с ')) return text.slice('Разговор с '.length).trim()
+  return ''
+}
+
+export function compactSystemText(value = '') {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  if (text === 'Офертата е приета. Скоро ще можеш да платиш директно в сайта.') return 'Офертата е приета.'
+  if (text === 'Офертата е изтеглена от партньора.') return 'Офертата е изтеглена.'
+  if (text === 'Офертата е платена и поръчката е активна.') return 'Офертата е платена · Поръчката е активна'
+  return text
+}
+
 export function formatChatTime(value) {
   if (!value) return ''
   const date = new Date(value)
@@ -68,6 +118,65 @@ function sortConversations(rows = []) {
 
 function sortMessages(rows = []) {
   return [...rows].sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime())
+}
+
+async function loadProfilesByUserIds(ids = []) {
+  const uniqueIds = [...new Set(ids.filter(Boolean))]
+  if (uniqueIds.length === 0) return new Map()
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select(PROFILE_SELECT)
+    .in('user_id', uniqueIds)
+    .eq('is_published', true)
+
+  if (error) throw error
+  return new Map((data || []).map((row) => [row.user_id, {
+    display_name: row.name || '',
+    full_name: row.name || '',
+    avatar_url: row.image_url || '',
+  }]))
+}
+
+function normalizeConversation(conversation, profilesByUserId) {
+  if (!conversation) return null
+  return {
+    ...conversation,
+    client: profilesByUserId.get(conversation.client_id) || null,
+    partner: profilesByUserId.get(conversation.partner_id) || null,
+  }
+}
+
+async function enrichConversations(rows = []) {
+  const profilesByUserId = await loadProfilesByUserIds(rows.flatMap((row) => [row.client_id, row.partner_id]))
+  return rows.map((row) => normalizeConversation(row, profilesByUserId))
+}
+
+async function enrichConversation(row) {
+  if (!row) return null
+  const [conversation] = await enrichConversations([row])
+  return conversation || null
+}
+
+export async function loadConversationStatuses(conversationIds = []) {
+  const uniqueIds = [...new Set(conversationIds.filter(Boolean))]
+  if (uniqueIds.length === 0) return new Map()
+
+  const { data, error } = await supabase
+    .from('orders')
+    .select('id, conversation_id, status, created_at')
+    .in('conversation_id', uniqueIds)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+
+  const latestByConversation = new Map()
+  ;(data || []).forEach((row) => {
+    if (!latestByConversation.has(row.conversation_id)) {
+      latestByConversation.set(row.conversation_id, row)
+    }
+  })
+  return latestByConversation
 }
 
 async function invokeChatAction(action, payload = {}) {
@@ -101,7 +210,7 @@ export async function loadConversations() {
     .order('last_message_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
   if (error) throw error
-  return sortConversations(data || [])
+  return enrichConversations(sortConversations(data || []))
 }
 
 export async function loadConversation(conversationId) {
@@ -112,7 +221,7 @@ export async function loadConversation(conversationId) {
     .eq('id', conversationId)
     .maybeSingle()
   if (error) throw error
-  return data || null
+  return enrichConversation(data || null)
 }
 
 export async function loadMessages(conversationId) {

@@ -126,7 +126,7 @@ function MfaAppGate({ children }) {
 
     setState((current) => ({
       ...current,
-      loading: true,
+      loading: !current.session,
       session: nextSession,
       error: '',
     }))

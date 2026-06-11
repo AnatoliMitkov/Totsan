@@ -2,12 +2,12 @@ import { Send, Sparkles } from 'lucide-react'
 
 export default function ComposeBar({ value, onChange, onSubmit, canSendOffer, onOpenOffer, status }) {
   return (
-    <form onSubmit={onSubmit} className="rounded-3xl border border-line bg-paper p-3 md:p-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end">
-        <textarea value={value} onChange={(event) => onChange(event.target.value)} rows={2} placeholder="Напиши съобщение…" className="min-h-[3.25rem] flex-1 resize-none rounded-2xl border border-line bg-soft px-4 py-3 text-sm outline-none transition focus:border-ink" />
-        <div className={`grid gap-2 md:flex md:pb-1 ${canSendOffer ? 'grid-cols-2' : 'grid-cols-1'}`}>
-          {canSendOffer && <button type="button" onClick={onOpenOffer} disabled={status === 'sending'} className="btn btn-ghost !py-3 justify-center text-sm disabled:opacity-50"><Sparkles size={17} /> Оферта</button>}
-          <button disabled={status === 'sending' || !value.trim()} className="btn btn-primary !py-3 justify-center text-sm disabled:opacity-50"><Send size={17} /> Изпрати</button>
+    <form onSubmit={onSubmit} className="w-full min-w-0 rounded-3xl border border-line bg-paper p-3 md:p-4">
+      <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-end">
+        <textarea value={value} onChange={(event) => onChange(event.target.value)} rows={2} placeholder="Напиши съобщение…" className="min-h-[3.25rem] min-w-0 w-full flex-1 resize-none rounded-2xl border border-line bg-soft px-4 py-3 text-sm outline-none transition focus:border-ink" />
+        <div className={`grid min-w-0 gap-2 md:flex md:w-auto md:pb-1 ${canSendOffer ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {canSendOffer && <button type="button" onClick={onOpenOffer} disabled={status === 'sending'} className="btn btn-ghost w-full justify-center !py-3 text-sm disabled:opacity-50"><Sparkles size={17} /> Оферта</button>}
+          <button disabled={status === 'sending' || !value.trim()} className="btn btn-primary w-full justify-center !py-3 text-sm disabled:opacity-50"><Send size={17} /> Изпрати</button>
         </div>
       </div>
     </form>

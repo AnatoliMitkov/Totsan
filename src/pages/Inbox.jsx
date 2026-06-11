@@ -7,6 +7,7 @@ import OfferComposer from '../components/chat/OfferComposer.jsx'
 import { useAccount } from '../lib/account.js'
 import {
   conversationRole,
+  loadConversationStatuses,
   loadConversation,
   loadConversations,
   loadMessages,
@@ -28,6 +29,7 @@ export default function Inbox() {
   const [messages, setMessages] = useState([])
   const [status, setStatus] = useState('loading')
   const [messageStatus, setMessageStatus] = useState('idle')
+  const [conversationStatuses, setConversationStatuses] = useState(new Map())
   const [error, setError] = useState('')
   const [draft, setDraft] = useState('')
   const [offerOpen, setOfferOpen] = useState(false)
@@ -48,6 +50,7 @@ export default function Inbox() {
         if (directConversation) nextConversations = [directConversation, ...nextConversations]
       }
       setConversations(nextConversations)
+      setConversationStatuses(await loadConversationStatuses(nextConversations.map((conversation) => conversation.id)))
 
       const activeId = conversationId || nextConversations[0]?.id || ''
       if (activeId) {
@@ -174,17 +177,18 @@ export default function Inbox() {
       ) : status === 'error' ? (
         <Panel title="Съобщенията не се заредиха"><p className="mt-2 text-sm text-red-700">{error}</p><button type="button" onClick={() => loadAll()} className="btn btn-ghost mt-5">Опитай пак</button></Panel>
       ) : (
-        <div className="grid gap-5 lg:grid-cols-[22rem_minmax(0,1fr)]">
+        <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
           <ConversationList
             conversations={conversations}
             activeId={activeConversationId}
             userId={userId}
+            statusByConversation={conversationStatuses}
             onSelect={(id) => {
               if (id && id !== activeConversationId) navigate(`/inbox/${id}`)
             }}
           />
           <div className="min-w-0 space-y-4">
-            <ChatThread conversation={activeConversation} messages={messages} userId={userId} onOfferAction={handleOfferAction} />
+            <ChatThread conversation={activeConversation} messages={messages} userId={userId} orderStatus={conversationStatuses.get(activeConversationId) || null} onOfferAction={handleOfferAction} />
             {activeConversation && activeConversation.status === 'open' && (
               <ComposeBar value={draft} onChange={setDraft} onSubmit={submitMessage} canSendOffer={role === 'partner'} onOpenOffer={() => setOfferOpen(true)} status={messageStatus} />
             )}
@@ -199,8 +203,8 @@ export default function Inbox() {
 
 function InboxShell({ children }) {
   return (
-    <section className="section bg-soft min-h-[calc(100vh-var(--header-h,0px))]">
-      <div className="container-page">
+    <section className="section bg-soft min-h-[calc(100vh-var(--header-h,0px))] overflow-x-hidden">
+      <div className="container-page min-w-0 max-w-full">
         {children}
       </div>
     </section>
@@ -209,8 +213,8 @@ function InboxShell({ children }) {
 
 function Panel({ title, children }) {
   return (
-    <div className="rounded-3xl border border-line bg-paper p-6 md:p-8">
-      <h1 className="font-display text-3xl text-ink">{title}</h1>
+    <div className="w-full min-w-0 rounded-3xl border border-line bg-paper p-6 md:p-8">
+      <h1 className="font-display text-3xl text-ink break-words">{title}</h1>
       {children}
     </div>
   )
