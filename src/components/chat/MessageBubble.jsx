@@ -23,7 +23,7 @@ export default function MessageBubble({ message, userId, conversation, onOfferAc
       )}
       <div className={`min-w-0 max-w-[min(36rem,88%)] overflow-hidden rounded-3xl border px-4 py-3 ${own ? 'border-ink bg-ink text-paper' : 'border-line bg-soft text-ink'}`}>
         {message.kind === 'offer' && message.offer ? (
-          <OfferCard offer={message.offer} conversation={conversation} userId={userId} onAction={onOfferAction} compact={own} />
+          <OfferCard offer={message.offer} conversation={conversation} userId={userId} onAction={onOfferAction} compact={own} messageCreatedAt={message.created_at} />
         ) : (
           <p className="break-words whitespace-pre-wrap text-sm leading-relaxed">{message.body}</p>
         )}

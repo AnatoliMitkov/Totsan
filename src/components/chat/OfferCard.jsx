@@ -3,7 +3,7 @@ import { CheckCircle2, Clock, CreditCard, Layers3, XCircle } from 'lucide-react'
 import { conversationRole } from '../../lib/chat.js'
 import { formatMoney } from '../../lib/money.js'
 
-export default function OfferCard({ offer, conversation, userId, onAction, compact = false }) {
+export default function OfferCard({ offer, conversation, userId, onAction, compact = false, messageCreatedAt = '' }) {
   const role = conversationRole(conversation, userId)
   const canClientAct = role === 'client' && offer.status === 'sent'
   const canPartnerAct = role === 'partner' && offer.status === 'sent'
@@ -20,6 +20,7 @@ export default function OfferCard({ offer, conversation, userId, onAction, compa
       .filter((stage) => stage.title || stage.description)
       .sort((left, right) => left.order - right.order)
     : []
+  const createdLabel = formatOfferTimestamp(offer.created_at || messageCreatedAt)
 
   async function handleWithdraw() {
     if (!canPartnerAct || withdrawStatus === 'withdrawing') return
@@ -37,6 +38,7 @@ export default function OfferCard({ offer, conversation, userId, onAction, compa
         <div className="min-w-0">
           <div className="text-xs uppercase tracking-[0.14em] opacity-70">Оферта</div>
           <h3 className="mt-1 break-words font-display text-2xl leading-tight">{offer.title}</h3>
+          {createdLabel && <div className="mt-1 text-[11px] opacity-60">{createdLabel}</div>}
         </div>
         <StatusPill status={offer.status} compact={compact} />
       </div>
@@ -128,4 +130,17 @@ function InlineBadge({ compact, children }) {
 function StatusPill({ status, compact }) {
   const labels = { sent: 'Изпратена', accepted: 'Приета', declined: 'Отказана', withdrawn: 'Изтеглена', expired: 'Изтекла', draft: 'Чернова' }
   return <span className={`max-w-full rounded-full border px-3 py-1 text-xs ${compact ? 'border-paper/30 text-paper/80' : 'border-line bg-paper text-muted'}`}>{labels[status] || status}</span>
+}
+
+function formatOfferTimestamp(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat('bg-BG', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
 }

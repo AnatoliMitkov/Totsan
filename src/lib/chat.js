@@ -31,11 +31,11 @@ export const MESSAGE_SELECT = `
 const PROFILE_SELECT = 'user_id, name, image_url'
 
 export function isClient(conversation, userId) {
-  return conversation?.client_id === userId
+  return String(conversation?.client_id || '') === String(userId || '')
 }
 
 export function isPartner(conversation, userId) {
-  return conversation?.partner_id === userId
+  return String(conversation?.partner_id || '') === String(userId || '')
 }
 
 export function isUnread(conversation, userId) {
@@ -59,10 +59,17 @@ export function getConversationParticipant(conversation, role) {
 }
 
 export function getOtherParticipant(conversation, userId) {
-  const role = conversationRole(conversation, userId)
-  if (role === 'client') return conversation?.partner || null
-  if (role === 'partner') return conversation?.client || null
+  if (isPartner(conversation, userId)) return conversation?.client || null
+  if (isClient(conversation, userId)) return conversation?.partner || null
+  if (conversation?.client && !conversation?.partner) return conversation.client
+  if (conversation?.partner && !conversation?.client) return conversation.partner
   return null
+}
+
+export function getOtherParticipantRole(conversation, userId) {
+  if (isPartner(conversation, userId)) return 'client'
+  if (isClient(conversation, userId)) return 'partner'
+  return 'guest'
 }
 
 export function getParticipantDisplayName(participant, fallback = 'Потребител') {

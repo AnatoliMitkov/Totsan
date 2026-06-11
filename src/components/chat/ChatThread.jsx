@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import MessageBubble from './MessageBubble.jsx'
 import Avatar from '../Avatar.jsx'
-import { compactSystemText, getConversationTitle, getOtherParticipant, getRoleLabel, conversationRole } from '../../lib/chat.js'
+import { compactSystemText, getConversationTitle, getOtherParticipant, getOtherParticipantRole, getRoleLabel } from '../../lib/chat.js'
 
 const ACTIVE_ORDER_STATUSES = new Set(['paid', 'in_progress'])
 
@@ -56,11 +56,10 @@ export default function ChatThread({ conversation, messages, userId, orderStatus
     )
   }
 
-  const role = conversationRole(conversation, userId)
   const otherParticipant = getOtherParticipant(conversation, userId)
   const avatarUrl = otherParticipant?.avatar_url || ''
   const displayName = getConversationTitle(conversation, userId)
-  const roleLabel = role === 'guest' ? 'Потребител' : getRoleLabel(role === 'client' ? 'partner' : 'client')
+  const roleLabel = getRoleLabel(getOtherParticipantRole(conversation, userId))
   const statusLine = compactOrderStatusLine(orderStatus)
 
   return (

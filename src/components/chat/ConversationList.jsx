@@ -1,4 +1,4 @@
-import { compactSystemText, formatChatTime, getConversationTitle, isUnread } from '../../lib/chat.js'
+import { compactSystemText, formatChatTime, getConversationTitle, getOtherParticipant, isUnread } from '../../lib/chat.js'
 import Avatar from '../Avatar.jsx'
 
 export default function ConversationList({ conversations, activeId, userId, statusByConversation, onSelect }) {
@@ -11,7 +11,7 @@ export default function ConversationList({ conversations, activeId, userId, stat
         {conversations.map((conversation) => {
           const unread = isUnread(conversation, userId)
           const active = conversation.id === activeId
-          const otherParticipant = conversation?.client_id === userId ? conversation.partner : conversation.client
+          const otherParticipant = getOtherParticipant(conversation, userId)
           const avatarUrl = otherParticipant?.avatar_url || ''
           const displayName = getConversationTitle(conversation, userId)
           const compactPreview = compactSystemText(conversation.last_message_preview || 'Няма съобщения още.')
