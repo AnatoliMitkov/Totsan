@@ -238,7 +238,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
           </div>
         </div>
       )}
-      <form onSubmit={submit} className="lg:col-span-8 rounded-3xl border border-line bg-paper p-5 md:p-7 space-y-6">
+      <form onSubmit={submit} className="lg:col-span-8 rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-7 space-y-6">
         <div>
           <div className="eyebrow">Моят проект</div>
           <h2 className="mt-2 font-display text-3xl text-ink">Проект-паспорт</h2>
@@ -294,7 +294,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
       </form>
 
       <aside className="lg:col-span-4 space-y-5">
-        <div className="rounded-3xl border border-line bg-paper p-5 md:p-6">
+        <div className="rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-6">
           <div className="eyebrow">Медии</div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
             <label className="block text-sm font-medium text-ink">Тип файл<select value={uploadKind} onChange={event => setUploadKind(event.target.value)} className={INPUT}>
@@ -315,7 +315,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
           <div className={`mt-3 text-sm ${uploadStatus.type === 'error' ? 'text-red-700' : 'text-muted'}`}>{uploadStatus.message || `${media.length} качени файла`}</div>
         </div>
 
-        <div className="rounded-3xl border border-line bg-paper p-5 md:p-6">
+        <div className="rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-6">
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="eyebrow">Quiz</div>
@@ -343,7 +343,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
         </div>
       </aside>
 
-      <div className="lg:col-span-12 rounded-3xl border border-line bg-paper p-5 md:p-7">
+      <div className="lg:col-span-12 rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-7">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <div className="eyebrow">Галерия</div>

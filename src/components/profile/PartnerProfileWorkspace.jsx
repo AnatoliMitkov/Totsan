@@ -41,6 +41,8 @@ import PortfolioGallery from './PortfolioGallery.jsx'
 import ImageCropperModal from './ImageCropperModal.jsx'
 import Avatar from '../Avatar.jsx'
 import PartnerStats from './PartnerStats.jsx'
+import PublicProfileBanner from './PublicProfileBanner.jsx'
+import PublicProfilePanel from './PublicProfilePanel.jsx'
 import PartnerServiceEditor from './PartnerServiceEditor.jsx'
 import PartnerMaterialsEditor from './PartnerMaterialsEditor.jsx'
 import PartnerOrders from './PartnerOrders.jsx'
@@ -488,10 +490,32 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
   }
 
   return (
-    <section className="section bg-soft min-h-screen">
-      <div className="container-page space-y-5">
-        <PasskeySetupPrompt userId={userId} />
-        <div className="overflow-hidden rounded-3xl border border-line bg-paper shadow-sm">
+    <>
+      <PublicProfileBanner
+        imageSrc={preview.coverUrl || LAYER_HEROS[preview.layerSlug] || ''}
+        imageAlt=""
+        imageStyle={{ objectPosition: `50% ${preview.coverY ?? 50}%` }}
+      >
+        <button
+          type="button"
+          onClick={() => document.getElementById('partner-cover-upload')?.click()}
+          className="absolute right-4 top-4 rounded-full bg-paper/90 p-2.5 text-ink shadow-sm backdrop-blur transition hover:bg-paper hover:scale-105"
+          title="Промяна на банер"
+        >
+          <Camera size={18} />
+        </button>
+        <input
+          id="partner-cover-upload"
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleCoverFileChange}
+        />
+      </PublicProfileBanner>
+      <div className="relative z-10 flex flex-col bg-soft pb-16 md:pb-24">
+        <div className="container-page w-full px-4 md:px-6 -mt-24 space-y-5">
+        <PublicProfilePanel className="transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.04)]">
+          {false && (
           <div className="group relative h-64 overflow-hidden bg-soft md:h-80">
             <div
               className="absolute inset-0 bg-cover"
@@ -517,28 +541,29 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
               onChange={handleCoverFileChange}
             />
           </div>
+          )}
 
-          <div className="relative flex flex-col gap-6 p-5 pt-0 md:p-7 md:pt-0 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-              <div className="-mt-20 h-28 w-28 shrink-0 overflow-hidden rounded-full border-4 border-paper bg-soft shadow-md md:-mt-24">
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-end sm:text-left">
+              <div className="h-32 w-32 shrink-0 overflow-hidden rounded-3xl border-4 border-paper bg-soft shadow-md transition-transform duration-300 hover:scale-[1.02]">
                 <img src={getProfileImage(preview)} alt={preview.name} className="img-cover" style={getProfileImageStyle(preview)} />
               </div>
-              <div className="pb-1">
+              <div className="min-w-0 pb-1">
                 <div className="eyebrow">Партньорски профил</div>
-                <h1 className="mt-1 font-display text-4xl leading-none text-ink md:text-5xl">{preview.name}</h1>
+                <h1 className="mt-2 break-words font-display text-3xl font-semibold leading-none tracking-tight text-ink md:text-5xl">{preview.name}</h1>
                 <p className="mt-2 text-sm text-muted">{preview.headline || preview.tag} · {preview.city}</p>
                 <div className="mt-3 inline-flex rounded-full border border-line bg-soft px-3 py-1 text-xs font-medium text-muted">
                   Слой {preview.layerNumber} · {preview.layerTitle}
                 </div>
               </div>
             </div>
-            <div className="flex flex-wrap gap-3 pb-1">
+            <div className="flex flex-wrap justify-center gap-3 pb-1 lg:justify-end">
               {preview.isPublished && <Link to={`/profil/${preview.slug}`} className="btn btn-primary"><Eye size={18} /> Виж публично</Link>}
               <button type="button" onClick={startPaymentOnboarding} disabled={paymentState.status === 'opening'} className="btn btn-ghost"><CreditCard size={18} /> {account?.stripe_account_id ? 'Плащания' : 'Активирай плащания'}</button>
               <button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}><LogOut size={18} /> Изход</button>
             </div>
           </div>
-        </div>
+        </PublicProfilePanel>
 
         <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
           <WorkspaceSidebar
@@ -630,8 +655,9 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
             )}
           </main>
         </div>
+        </div>
       </div>
-    </section>
+    </>
   )
 }
 
@@ -667,7 +693,7 @@ function getProfileCompletion(profile, portfolio, layer01Meta) {
 
 function WorkspaceSidebar({ tabs, activeTab, profile, completion, portfolioCount, onTabChange }) {
   return (
-    <aside className="min-w-0 max-w-full overflow-hidden rounded-3xl border border-line bg-paper p-3 shadow-sm lg:sticky lg:top-24 lg:overflow-visible">
+    <aside className="min-w-0 max-w-full overflow-hidden rounded-3xl border border-line bg-paper p-3 shadow-[0_8px_30px_rgb(0,0,0,0.02)] lg:sticky lg:top-24 lg:overflow-visible">
       <nav className="flex w-full min-w-0 max-w-full gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
         {tabs.map((tab) => {
           const Icon = tab.icon

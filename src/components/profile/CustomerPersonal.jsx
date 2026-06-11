@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Pencil, Save } from 'lucide-react'
 import ImageCropperModal from './ImageCropperModal.jsx'
-import Avatar from '../Avatar.jsx'
+import PublicProfileAvatar from './PublicProfileAvatar.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const MAX_AVATAR_BYTES = 10 * 1024 * 1024
@@ -158,7 +158,7 @@ export default function CustomerPersonal({ account, session, onSave, onUploadAva
 
   return (
     <form onSubmit={submit} className="grid gap-5 lg:grid-cols-12">
-      <div className="lg:col-span-8 rounded-3xl border border-line bg-paper p-5 md:p-7 space-y-5">
+      <div className="lg:col-span-8 rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-7 space-y-5">
         <div>
           <div className="eyebrow">Лични данни</div>
           <h2 className="mt-2 font-display text-3xl text-ink">Твоят клиентски профил</h2>
@@ -193,12 +193,12 @@ export default function CustomerPersonal({ account, session, onSave, onUploadAva
       </div>
 
       <aside className="lg:col-span-4">
-        <div className="rounded-3xl border border-line bg-paper p-5 md:p-6 lg:sticky lg:top-24">
+        <div className="rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-6 lg:sticky lg:top-24">
           <div className="eyebrow">Аватар</div>
           <div className="group relative mt-5 flex justify-center">
             <button type="button" onClick={openAvatarEditor} className="relative rounded-full transition hover:ring-2 hover:ring-ink focus:outline-none focus:ring-2 focus:ring-ink" aria-label="Смени снимката">
-              <Avatar src={draft.avatarUrl} name={draft.displayName || draft.fullName} size={200} />
-              <div className="absolute inset-0 hidden items-center justify-center rounded-full bg-ink/40 text-paper opacity-0 transition md:flex md:group-hover:opacity-100">
+              <PublicProfileAvatar src={draft.avatarUrl} alt={draft.displayName || draft.fullName} statusTitle="Профил в Totsan" />
+              <div className="absolute inset-0 hidden items-center justify-center rounded-3xl bg-ink/40 text-paper opacity-0 transition md:flex md:group-hover:opacity-100">
                 <Pencil size={32} />
               </div>
             </button>

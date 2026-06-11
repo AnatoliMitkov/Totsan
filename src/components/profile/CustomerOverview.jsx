@@ -40,29 +40,29 @@ export default function CustomerOverview({ account, project, media, completeness
     <div className="grid gap-5 lg:grid-cols-12">
       <div className="lg:col-span-8 space-y-5">
         <div className="grid gap-4 md:grid-cols-3">
-          <button type="button" onClick={() => onSelectTab('project')} className="rounded-2xl border border-line bg-paper p-5 text-left transition hover:border-ink/40">
+          <button type="button" onClick={() => onSelectTab('project')} className="rounded-3xl border border-line bg-paper p-5 text-left shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-ink/40 hover:shadow-[0_12px_30px_rgba(13,35,64,0.06)]">
             <Home size={22} className="text-accentDeep" />
             <div className="mt-4 font-display text-2xl text-ink">Моят проект</div>
             <p className="mt-2 text-sm text-muted">Добави помещение, бюджет и идея.</p>
           </button>
-          <button type="button" onClick={() => onSelectTab('project')} className="rounded-2xl border border-line bg-paper p-5 text-left transition hover:border-ink/40">
+          <button type="button" onClick={() => onSelectTab('project')} className="rounded-3xl border border-line bg-paper p-5 text-left shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-ink/40 hover:shadow-[0_12px_30px_rgba(13,35,64,0.06)]">
             <Camera size={22} className="text-accentDeep" />
             <div className="mt-4 font-display text-2xl text-ink">Снимки</div>
             <p className="mt-2 text-sm text-muted">Качени: {media.length}. Цел: поне 3.</p>
           </button>
-          <Link to="/katalog" className="rounded-2xl border border-line bg-paper p-5 transition hover:border-ink/40">
+          <Link to="/katalog" className="rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-ink/40 hover:shadow-[0_12px_30px_rgba(13,35,64,0.06)]">
             <Sparkles size={22} className="text-accentDeep" />
             <div className="mt-4 font-display text-2xl text-ink">Специалисти</div>
             <p className="mt-2 text-sm text-muted">Виж хора от Слой {activeLayer.number}.</p>
           </Link>
-          <Link to="/inbox" className="rounded-2xl border border-line bg-paper p-5 transition hover:border-ink/40 md:col-span-3">
+          <Link to="/inbox" className="rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] transition hover:-translate-y-0.5 hover:border-ink/40 hover:shadow-[0_12px_30px_rgba(13,35,64,0.06)] md:col-span-3">
             <MessageCircle size={22} className="text-accentDeep" />
             <div className="mt-4 font-display text-2xl text-ink">Активни разговори</div>
             <p className="mt-2 text-sm text-muted">{conversationCount === null ? 'Отвори съобщенията си.' : `Отворени разговори: ${conversationCount}.`}</p>
           </Link>
         </div>
 
-        <div className="rounded-2xl border border-line bg-paper p-5 md:p-6">
+        <div className="rounded-3xl border border-line bg-paper p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <div className="eyebrow">Активен проект</div>
@@ -97,7 +97,7 @@ export default function CustomerOverview({ account, project, media, completeness
           )}
         </div>
 
-        <div className="rounded-2xl border border-line bg-paper p-5 md:p-6">
+        <div className="rounded-3xl border border-line bg-paper p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-8">
           <div className="eyebrow">Активност</div>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <InfoTile label="Регистрация" value={account?.created_at ? new Date(account.created_at).toLocaleDateString('bg-BG') : 'Скоро'} />
@@ -109,7 +109,7 @@ export default function CustomerOverview({ account, project, media, completeness
 
       <aside className="lg:col-span-4 space-y-5">
         <CompletenessBar completeness={completeness} />
-        <div className="rounded-2xl border border-line bg-paper p-5">
+        <div className="rounded-3xl border border-line bg-paper p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-8">
           <div className="eyebrow">Следващи стъпки</div>
           <div className="mt-4 grid gap-3">
             {nextChecks.length > 0 ? nextChecks.map(check => (
@@ -124,7 +124,7 @@ export default function CustomerOverview({ account, project, media, completeness
           {isAdmin && <Link to="/admin" className="btn btn-ghost mt-5 w-full justify-center">Админ панел</Link>}
         </div>
 
-        <div className="rounded-2xl border border-line bg-paper p-5">
+        <div className="rounded-3xl border border-line bg-paper p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-8">
           <div className="flex items-center gap-2">
             <Share2 size={18} className="text-accent" />
             <div className="eyebrow">Сподели проекта</div>
@@ -149,7 +149,7 @@ export default function CustomerOverview({ account, project, media, completeness
 
 function InfoTile({ label, value }) {
   return (
-    <div className="rounded-2xl border border-line bg-soft p-4">
+    <div className="rounded-2xl border border-line/40 bg-soft/60 p-4">
       <div className="text-xs uppercase tracking-[0.14em] text-muted">{label}</div>
       <div className="mt-1 text-sm font-medium text-ink">{value}</div>
     </div>
