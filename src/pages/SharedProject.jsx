@@ -72,7 +72,7 @@ export default function SharedProject() {
 
   return (
     <>
-      <PublicProfileBanner heightClass="h-56 md:h-72" />
+      <PublicProfileBanner />
 
       <div className="relative z-10 flex flex-col bg-soft pb-16 md:pb-24">
         <div className="container-page w-full px-4 md:px-6 -mt-20 md:-mt-24">

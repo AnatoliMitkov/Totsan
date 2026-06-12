@@ -407,7 +407,7 @@ function UserMenu({ session, account, isAdmin }) {
 function Footer({ isAuthPage = false }) {
   return (
     <footer className={`border-t border-line ${isAuthPage ? 'mt-0' : 'mt-24'}`}>
-      <div className="container-page section !py-12 grid gap-10 md:grid-cols-4">
+      <div className="container-page section !py-12 grid gap-10 md:grid-cols-5">
         <div>
           <div className="font-display text-2xl">Totsan</div>
           <p className="text-muted mt-2 text-sm max-w-xs">Пространството ти — от идея до последния щрих, на едно място.</p>
@@ -435,6 +435,13 @@ function Footer({ isAuthPage = false }) {
           <ul className="space-y-1.5 text-sm text-muted">
             <li><Link to="/pro" className="hover:text-ink">Totsan Pro</Link></li>
             <li><Link to="/login?signup=true&role=pro" className="hover:text-ink">Стани партньор</Link></li>
+          </ul>
+        </div>
+        <div>
+          <div className="eyebrow mb-3">Правни</div>
+          <ul className="space-y-1.5 text-sm text-muted">
+            <li><Link to="/obshti-usloviya" className="hover:text-ink">Общи условия</Link></li>
+            <li><Link to="/politika-za-poveritelnost" className="hover:text-ink">Политика за поверителност</Link></li>
           </ul>
         </div>
       </div>

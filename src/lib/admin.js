@@ -137,18 +137,6 @@ export function updateAccount(id, updates) {
   return invokeAdminAction('update_account', { id, updates })
 }
 
-export function listUserPasskeys(id) {
-  return invokeAdminAction('list_user_passkeys', { id })
-}
-
-export function deleteUserPasskey(id, passkeyId) {
-  return invokeAdminAction('delete_user_passkey', { id, passkeyId })
-}
-
-export function resetUserPasskeys(id) {
-  return invokeAdminAction('reset_user_passkeys', { id })
-}
-
 export function sendUserRecoveryEmail(id) {
   return invokeAdminAction('send_user_recovery_email', { id })
 }

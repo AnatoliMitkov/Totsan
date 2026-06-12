@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { Activity, Camera, FolderKanban, Home, Lock, Settings2, UserRound } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { getAccountDisplayName, useAccount, signOutAndRedirect } from '../lib/account.js'
-import { uploadProfileMedia } from '../lib/profile-media-upload-client.js'
+import { uploadProfileCover, uploadProfileMedia } from '../lib/profile-media-upload-client.js'
 import { LAYERS } from '../data/layers.js'
 import CustomerHeader from '../components/profile/CustomerHeader.jsx'
 import CustomerOverview from '../components/profile/CustomerOverview.jsx'
@@ -10,11 +11,10 @@ import CustomerPersonal from '../components/profile/CustomerPersonal.jsx'
 import CustomerPreferences from '../components/profile/CustomerPreferences.jsx'
 import CustomerProject from '../components/profile/CustomerProject.jsx'
 import CompletenessBar from '../components/profile/CompletenessBar.jsx'
+import ImageCropperModal from '../components/profile/ImageCropperModal.jsx'
 import PartnerProfileWorkspace from '../components/profile/PartnerProfileWorkspace.jsx'
 import PublicProfileBanner from '../components/profile/PublicProfileBanner.jsx'
-import PasskeyManager, { PasskeySetupPrompt } from '../components/auth/PasskeyManager.jsx'
 import TotpMfaManager from '../components/auth/TotpMfa.jsx'
-import { isPasskeyVerifiedSession } from '../lib/passkeys.js'
 import {
   calculateClientProfileCompleteness,
   deactivateClientProject,
@@ -34,6 +34,26 @@ import {
 } from '../lib/profiles.js'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
+const MAX_BANNER_BYTES = 12 * 1024 * 1024
+const BANNER_RATIO_TEXT = 'Препоръчителен размер: 1600 x 520 px'
+const BANNER_DESCRIPTION = 'Широк банер работи най-добре около 3:1. Препоръчваме 1600 x 520 px за най-чист резултат.'
+
+const CUSTOMER_TABS = [
+  { id: 'overview', label: 'Преглед', icon: Home },
+  { id: 'personal', label: 'Лични данни', icon: UserRound },
+  { id: 'preferences', label: 'Предпочитания', icon: Settings2 },
+  { id: 'project', label: 'Моят проект', icon: FolderKanban },
+  { id: 'activity', label: 'Активност', icon: Activity },
+  { id: 'security', label: 'Сигурност', icon: Lock },
+]
+
+const MAX_AVATAR_BYTES = 10 * 1024 * 1024
+function validateAvatarFile(file) {
+  if (!file) return 'Липсва файл.'
+  if (!file.type.startsWith('image/')) return 'Моля, избери изображение.'
+  if (file.size > MAX_AVATAR_BYTES) return 'Снимката трябва да е до 10 MB.'
+  return ''
+}
 
 function withCacheBust(url) {
   if (!url) return ''
@@ -41,15 +61,51 @@ function withCacheBust(url) {
   return `${url}${separator}v=${Date.now()}`
 }
 
-export default function MyProfile() {
-  const { session, account, loading, refresh, requirePasskeyVerification } = useAccount()
-  const [searchParams] = useSearchParams()
-  const [passkeyVerified, setPasskeyVerified] = useState(false)
-  const sessionPasskeyVerified = isPasskeyVerifiedSession(session?.user?.id)
+function stripCacheBust(url) {
+  if (!url) return ''
 
-  useEffect(() => {
-    setPasskeyVerified(sessionPasskeyVerified)
-  }, [session?.user?.id, session?.user?.last_sign_in_at, sessionPasskeyVerified])
+  try {
+    const parsed = new URL(url)
+    parsed.searchParams.delete('v')
+    return parsed.toString()
+  } catch {
+    return url.replace(/([?&])v=\d+(&?)/, (_, prefix, suffix) => {
+      if (prefix === '?' && suffix) return '?'
+      return suffix ? prefix : ''
+    }).replace(/[?&]$/, '')
+  }
+}
+
+function validateBannerFile(file) {
+  if (!file) return 'Липсва файл.'
+  if (!file.type.startsWith('image/')) return 'Моля, избери изображение за банера.'
+  if (file.size > MAX_BANNER_BYTES) return 'Банерът трябва да е до 12 MB.'
+  return ''
+}
+
+function buildAccountSavePayload(account, values = {}) {
+  return {
+    fullName: values.fullName ?? account?.full_name ?? '',
+    displayName: values.displayName ?? account?.display_name ?? '',
+    phone: values.phone ?? account?.phone ?? '',
+    avatarUrl: values.avatarUrl ?? stripCacheBust(account?.avatar_url || ''),
+    coverUrl: values.coverUrl ?? stripCacheBust(account?.cover_url || ''),
+    city: values.city ?? account?.city ?? '',
+    country: values.country ?? account?.country ?? 'BG',
+    bio: values.bio ?? account?.bio ?? '',
+    locale: values.locale ?? account?.locale ?? 'bg',
+    marketingOptIn: values.marketingOptIn ?? Boolean(account?.marketing_opt_in),
+    interests: Array.isArray(values.interests) ? values.interests : (Array.isArray(account?.interests) ? account.interests : []),
+    stylePreferences: Array.isArray(values.stylePreferences) ? values.stylePreferences : (Array.isArray(account?.style_preferences) ? account.style_preferences : []),
+    preferredContactMethod: values.preferredContactMethod ?? account?.preferred_contact_method ?? '',
+    ageGroup: values.ageGroup ?? account?.age_group ?? '',
+    gender: values.gender ?? account?.gender ?? '',
+  }
+}
+
+export default function MyProfile() {
+  const { session, account, loading, refresh } = useAccount()
+  const [searchParams] = useSearchParams()
 
   if (loading) {
     return <div className="section"><div className="container-page text-muted">Зареждане…</div></div>
@@ -70,8 +126,6 @@ export default function MyProfile() {
     )
   }
 
-
-
   if (account?.role === 'specialist') {
     return <ProEditor session={session} account={account} />
   }
@@ -88,6 +142,8 @@ function CustomerProfile({ session, account, refreshAccount }) {
   const [pendingBrief, setPendingBrief] = useState(null)
   const [media, setMedia] = useState([])
   const [loadState, setLoadState] = useState({ status: 'loading', message: '' })
+  const [bannerEditor, setBannerEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'banner.jpg' })
+  const [avatarEditor, setAvatarEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'avatar.jpg' })
   const email = session.user.email || account?.email || ''
   const userId = session.user.id
   const displayName = getAccountDisplayName(localAccount, session, 'приятел')
@@ -144,10 +200,12 @@ function CustomerProfile({ session, account, refreshAccount }) {
   }), [localAccount, session, project, media])
 
   async function savePersonal(values) {
-    const savedAccount = await saveCustomerAccountProfile(values)
-    const nextAccount = savedAccount?.avatar_url
-      ? { ...savedAccount, avatar_url: withCacheBust(savedAccount.avatar_url) }
-      : savedAccount
+    const savedAccount = await saveCustomerAccountProfile(buildAccountSavePayload(localAccount, values))
+    const nextAccount = {
+      ...savedAccount,
+      avatar_url: savedAccount?.avatar_url ? withCacheBust(savedAccount.avatar_url) : '',
+      cover_url: savedAccount?.cover_url ? withCacheBust(savedAccount.cover_url) : '',
+    }
     await refreshAccount?.()
     setLocalAccount(nextAccount)
     return savedAccount
@@ -156,6 +214,106 @@ function CustomerProfile({ session, account, refreshAccount }) {
   async function uploadAvatar(file) {
     const result = await uploadProfileMedia({ file, target: userId })
     return result.publicUrl
+  }
+
+  function openAvatarEditor() {
+    if (localAccount?.avatar_url) {
+      setAvatarEditor({
+        open: true,
+        file: null,
+        imageUrl: stripCacheBust(localAccount.avatar_url),
+        fileName: displayName ? `${displayName}-avatar.jpg` : 'avatar.jpg',
+      })
+      return
+    }
+
+    const input = document.getElementById('customer-avatar-upload')
+    if (input) input.click()
+  }
+
+  function closeAvatarEditor() {
+    setAvatarEditor(current => ({ ...current, open: false }))
+  }
+
+  function handleAvatarFile(file) {
+    const error = validateAvatarFile(file)
+    if (error) {
+      setLoadState({ status: 'error', message: error })
+      return
+    }
+
+    setAvatarEditor({
+      open: true,
+      file,
+      imageUrl: '',
+      fileName: file.name || 'avatar.jpg',
+    })
+  }
+
+  async function saveAvatar(croppedFile) {
+    setLoadState({ status: 'loading', message: 'Запазваме снимката…' })
+    try {
+      const avatarUrl = await uploadAvatar(croppedFile)
+      await savePersonal({ avatarUrl })
+      setLoadState({ status: 'ready', message: 'Снимката е запазена успешно.' })
+    } catch (error) {
+      setLoadState({ status: 'error', message: error.message || 'Снимката не успя да се запази.' })
+      throw error
+    }
+  }
+
+  function openBannerEditor() {
+    if (localAccount?.cover_url) {
+      setBannerEditor({
+        open: true,
+        file: null,
+        imageUrl: stripCacheBust(localAccount.cover_url),
+        fileName: displayName ? `${displayName}-banner.jpg` : 'banner.jpg',
+      })
+      return
+    }
+
+    const input = document.getElementById('customer-banner-upload')
+    if (input) input.click()
+  }
+
+  function closeBannerEditor() {
+    setBannerEditor(current => ({ ...current, open: false }))
+  }
+
+  function handleBannerFile(file) {
+    const error = validateBannerFile(file)
+    if (error) {
+      setLoadState({ status: 'error', message: error })
+      return
+    }
+
+    setBannerEditor({
+      open: true,
+      file,
+      imageUrl: '',
+      fileName: file.name || 'banner.jpg',
+    })
+  }
+
+  async function saveBanner(croppedFile) {
+    try {
+      const result = await uploadProfileCover({ file: croppedFile, target: userId })
+      const coverUrl = result.publicUrl
+      const savedAccount = await saveCustomerAccountProfile(buildAccountSavePayload(localAccount, { coverUrl }))
+
+      const nextAccount = {
+        ...savedAccount,
+        avatar_url: savedAccount?.avatar_url ? withCacheBust(savedAccount.avatar_url) : '',
+        cover_url: coverUrl ? withCacheBust(coverUrl) : '',
+      }
+
+      await refreshAccount?.()
+      setLocalAccount(nextAccount)
+    } catch (error) {
+      setLoadState({ status: 'error', message: error.message || 'Банерът не успя да се запази.' })
+      throw error
+    }
   }
 
   async function saveProject(projectDraft, options = {}) {
@@ -212,101 +370,229 @@ function CustomerProfile({ session, account, refreshAccount }) {
 
   return (
     <>
-      <PublicProfileBanner heightClass="h-56 md:h-72" />
+      <PublicProfileBanner
+        imageSrc={localAccount?.cover_url || ''}
+        imageAlt={displayName}
+        className="group cursor-pointer"
+        onClick={openBannerEditor}
+      >
+        <div className="absolute inset-x-0 bottom-0 z-10 pointer-events-none">
+          <div className="container-page flex justify-end px-4 pb-4 md:px-6 md:pb-6">
+            <div className="max-w-xs rounded-3xl border border-white/30 bg-ink/55 p-3 text-paper shadow-lg backdrop-blur-sm transition-all duration-300 transform translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 pointer-events-auto">
+              <div className="text-sm font-medium">Снимка на банера</div>
+              <p className="mt-1 text-xs text-paper/85">{BANNER_RATIO_TEXT}</p>
+              <button type="button" onClick={(e) => { e.stopPropagation(); openBannerEditor(); }} className="btn mt-3 w-full justify-center border-0 bg-white/90 text-ink hover:bg-white">
+                <Camera size={18} />
+                {localAccount?.cover_url ? 'Редактирай банера' : 'Качи банер'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </PublicProfileBanner>
       <div className="relative z-10 flex flex-col bg-soft pb-16 md:pb-24">
         <div className="container-page w-full px-4 md:px-6 -mt-20 md:-mt-24 space-y-5">
-        <CustomerHeader account={localAccount} displayName={displayName} completeness={completeness} onSignOut={() => signOutAndRedirect(session?.user?.id)} />
-        <PasskeySetupPrompt userId={userId} />
+        <CustomerHeader account={localAccount} displayName={displayName} completeness={completeness} onEditAvatar={openAvatarEditor} onSignOut={() => signOutAndRedirect(session?.user?.id)} />
 
-        <div className="min-w-0 max-w-full overflow-hidden rounded-3xl border border-line bg-paper p-3 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-          <nav className="flex w-full min-w-0 max-w-full gap-1 overflow-x-auto pb-1">
-          {[
-            ['overview', 'Преглед'],
-            ['personal', 'Лични данни'],
-            ['preferences', 'Предпочитания'],
-            ['project', 'Моят проект'],
-            ['activity', 'Активност'],
-            ['security', 'Сигурност'],
-          ].map(([tab, label]) => (
-            <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`inline-flex min-h-11 shrink-0 items-center rounded-2xl px-4 py-2.5 text-left text-sm font-medium transition ${activeTab === tab ? 'bg-ink text-paper shadow-sm' : 'text-muted hover:bg-soft hover:text-ink'}`}>
-              {label}
-            </button>
-          ))}
-          <button type="button" onClick={() => setMode('application')} className="inline-flex min-h-11 shrink-0 items-center rounded-2xl border border-line px-4 py-2.5 text-sm font-medium text-ink transition hover:border-ink">
-            Стани партньор
-          </button>
-          </nav>
+        <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
+          <aside className="min-w-0 max-w-full overflow-hidden rounded-3xl border border-line bg-paper p-3 shadow-[0_8px_30px_rgb(0,0,0,0.02)] lg:sticky lg:top-24 lg:overflow-visible">
+            <nav className="flex w-full min-w-0 max-w-full gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
+              {CUSTOMER_TABS.map((tab) => {
+                const Icon = tab.icon
+                const isActive = activeTab === tab.id
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`inline-flex min-h-11 shrink-0 items-center gap-3 rounded-2xl px-4 py-2.5 text-left text-sm font-medium transition lg:w-full ${isActive ? 'bg-ink text-paper shadow-sm' : 'text-muted hover:bg-soft hover:text-ink'}`}
+                  >
+                    <Icon size={18} />
+                    <span>{tab.label}</span>
+                  </button>
+                )
+              })}
+              <button type="button" onClick={() => setMode('application')} className="mt-2 inline-flex min-h-11 shrink-0 items-center justify-center rounded-2xl border border-line px-4 py-2.5 text-sm font-medium text-ink transition hover:border-ink lg:w-full">
+                Стани партньор
+              </button>
+            </nav>
+            <div className="mt-3 hidden border-t border-line pt-4 lg:block">
+              <div className="px-2">
+                <div className="text-xs uppercase tracking-[0.14em] text-muted">Попълване</div>
+                <div className="mt-2 flex items-end justify-between gap-3">
+                  <div className="font-display text-4xl leading-none text-ink">{completeness.percent}%</div>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-soft">
+                  <div className="h-full rounded-full bg-accentDeep" style={{ width: `${completeness.percent}%` }} />
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <main className="min-w-0 space-y-5">
+            {loadState.status === 'error' && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{loadState.message}</div>
+            )}
+
+            {loadState.status === 'loading' && (
+              <div className="rounded-2xl border border-line bg-paper p-5 text-sm text-muted">Зареждаме проекта…</div>
+            )}
+
+            {activeTab === 'overview' && (
+              <CustomerOverview
+                account={localAccount}
+                project={project}
+                media={media}
+                completeness={completeness}
+                isAdmin={isAdmin}
+                onSelectTab={setActiveTab}
+                onToggleShare={async (isShareable) => {
+                  if (!project?.id) return
+                  try {
+                    const { toggleClientProjectShare } = await import('../lib/projects.js')
+                    const data = await toggleClientProjectShare(session.user.id, project.id, isShareable)
+                    setProject(prev => ({ ...prev, isShareable: data.is_shareable, publicShareId: data.public_share_id }))
+                  } catch (e) {
+                    console.error(e)
+                    alert('Грешка при споделяне на профила.')
+                  }
+                }}
+              />
+            )}
+
+            {activeTab === 'personal' && (
+              <CustomerPersonal
+                account={localAccount}
+                session={session}
+                onSave={savePersonal}
+              />
+            )}
+
+            {activeTab === 'preferences' && (
+              <CustomerPreferences
+                account={localAccount}
+                session={session}
+                onSave={savePersonal}
+              />
+            )}
+
+            {activeTab === 'project' && (
+              <CustomerProject
+                project={project}
+                pendingBrief={loadState.status === 'ready' ? pendingBrief : null}
+                media={media}
+                onSave={saveProject}
+                onImportPendingBrief={clearPendingBrief}
+                onUploadMedia={uploadProjectMediaRow}
+                onUpdateMedia={updateProjectMediaRow}
+                onDeleteMedia={deleteProjectMediaRow}
+              />
+            )}
+
+            {activeTab === 'activity' && <CustomerActivity account={localAccount} completeness={completeness} />}
+            {activeTab === 'security' && (
+              <div className="space-y-5">
+                <TotpMfaManager session={session} />
+              </div>
+            )}
+          </main>
         </div>
-
-        {loadState.status === 'error' && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{loadState.message}</div>
-        )}
-
-        {loadState.status === 'loading' && (
-          <div className="rounded-2xl border border-line bg-paper p-5 text-sm text-muted">Зареждаме проекта…</div>
-        )}
-
-        {activeTab === 'overview' && (
-          <CustomerOverview
-            account={localAccount}
-            project={project}
-            media={media}
-            completeness={completeness}
-            isAdmin={isAdmin}
-            onSelectTab={setActiveTab}
-            onToggleShare={async (isShareable) => {
-              if (!project?.id) return
-              try {
-                const { toggleClientProjectShare } = await import('../lib/projects.js')
-                const data = await toggleClientProjectShare(session.user.id, project.id, isShareable)
-                setProject(prev => ({ ...prev, isShareable: data.is_shareable, publicShareId: data.public_share_id }))
-              } catch (e) {
-                console.error(e)
-                alert('Грешка при споделяне на профила.')
-              }
-            }}
-          />
-        )}
-
-        {activeTab === 'personal' && (
-          <CustomerPersonal
-            account={localAccount}
-            session={session}
-            onSave={savePersonal}
-            onUploadAvatar={uploadAvatar}
-          />
-        )}
-
-        {activeTab === 'preferences' && (
-          <CustomerPreferences
-            account={localAccount}
-            session={session}
-            onSave={savePersonal}
-          />
-        )}
-
-        {activeTab === 'project' && (
-          <CustomerProject
-            project={project}
-            pendingBrief={loadState.status === 'ready' ? pendingBrief : null}
-            media={media}
-            onSave={saveProject}
-            onImportPendingBrief={clearPendingBrief}
-            onUploadMedia={uploadProjectMediaRow}
-            onUpdateMedia={updateProjectMediaRow}
-            onDeleteMedia={deleteProjectMediaRow}
-          />
-        )}
-
-        {activeTab === 'activity' && <CustomerActivity account={localAccount} completeness={completeness} />}
-        {activeTab === 'security' && (
-          <div className="space-y-5">
-            <PasskeyManager userId={userId} session={session} />
-            <TotpMfaManager session={session} />
-          </div>
-        )}
         </div>
       </div>
+
+      <input
+        id="customer-banner-upload"
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          event.target.value = ''
+          if (file) handleBannerFile(file)
+        }}
+      />
+
+      <input
+        id="customer-avatar-upload"
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          event.target.value = ''
+          if (file) handleAvatarFile(file)
+        }}
+      />
+
+      {bannerEditor.open && (
+        <ImageCropperModal
+          file={bannerEditor.file}
+          imageUrl={bannerEditor.imageUrl}
+          initialFileName={bannerEditor.fileName}
+          title="Редактирай банера"
+          description={BANNER_DESCRIPTION}
+          aspect={1600 / 520}
+          cropShape="rect"
+          objectFit="horizontal-cover"
+          outputWidth={1600}
+          outputHeight={520}
+          minZoom={1}
+          maxZoom={4}
+          zoomStep={0.05}
+          previewClassName="w-full rounded-2xl relative"
+          previewStyle={{ aspectRatio: '1600 / 520' }}
+          previewImageClassName="absolute inset-0 h-full w-full object-cover"
+          emptyStateLabel="Качи банер, за да го позиционираш."
+          onClose={closeBannerEditor}
+          onSelectFile={async (file) => {
+            const error = validateBannerFile(file)
+            if (error) {
+              setLoadState({ status: 'error', message: error })
+              return
+            }
+
+            setBannerEditor({
+              open: true,
+              file,
+              imageUrl: '',
+              fileName: file.name || 'banner.jpg',
+            })
+          }}
+          onCropSave={saveBanner}
+        />
+      )}
+
+      {avatarEditor.open && (
+        <ImageCropperModal
+          file={avatarEditor.file}
+          imageUrl={avatarEditor.imageUrl}
+          initialFileName={avatarEditor.fileName}
+          title="Редактирай снимка"
+          description="Премести снимката и виж как ще изглежда като аватар."
+          aspect={1}
+          cropShape="round"
+          outputWidth={512}
+          outputHeight={512}
+          previewClassName="h-36 w-36 rounded-full"
+          previewImageClassName="h-full w-full object-cover"
+          emptyStateLabel="Качи снимка, за да я позиционираш."
+          onClose={closeAvatarEditor}
+          onSelectFile={async (file) => {
+            const error = validateAvatarFile(file)
+            if (error) {
+              setLoadState({ status: 'error', message: error })
+              return
+            }
+
+            setAvatarEditor({
+              open: true,
+              file,
+              imageUrl: '',
+              fileName: file.name || 'avatar.jpg',
+            })
+          }}
+          onCropSave={saveAvatar}
+        />
+      )}
     </>
   )
 }

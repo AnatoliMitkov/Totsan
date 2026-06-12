@@ -240,11 +240,12 @@ export async function loadActiveClientProject(userId) {
 }
 
 export async function saveCustomerAccountProfile(values) {
-  const { data, error } = await supabase.rpc('update_own_account_profile', {
+  const payload = {
     p_full_name: values.fullName || values.displayName || '',
     p_display_name: values.displayName || values.fullName || '',
     p_phone: values.phone || '',
     p_avatar_url: values.avatarUrl || '',
+    p_cover_url: values.coverUrl || '',
     p_city: values.city || '',
     p_country: values.country || 'BG',
     p_bio: values.bio || '',
@@ -255,7 +256,19 @@ export async function saveCustomerAccountProfile(values) {
     p_preferred_contact_method: values.preferredContactMethod || '',
     p_age_group: values.ageGroup || '',
     p_gender: values.gender || '',
-  })
+  }
+
+  const { data, error } = await supabase.rpc('update_own_account_profile', payload)
+
+  if (error && (error.code === 'PGRST202' || String(error.message || '').includes('p_cover_url'))) {
+    const { p_cover_url: _coverUrl, ...legacyPayload } = payload
+    const legacyResult = await supabase.rpc('update_own_account_profile', legacyPayload)
+    if (legacyResult.error) throw legacyResult.error
+    return {
+      ...legacyResult.data,
+      cover_url: values.coverUrl || legacyResult.data?.cover_url || '',
+    }
+  }
 
   if (error) throw error
   return data

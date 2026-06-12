@@ -3,6 +3,14 @@ import { createClient } from '@supabase/supabase-js'
 const url = import.meta.env.VITE_SUPABASE_URL
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 
+// Validate config consistency
+if (!url && anonKey) {
+  console.warn('[supabase] Supabase URL is missing but key is present. This will cause failures.')
+}
+if (url && !anonKey) {
+  console.warn('[supabase] Supabase URL is present but public key is missing. This will cause failures.')
+}
+
 export const supabaseUrl = url || ''
 export const supabasePublicKey = anonKey || ''
 export const hasSupabaseConfig = Boolean(url && anonKey)
@@ -42,8 +50,6 @@ function createMockSupabaseClient() {
       signInWithOAuth: async () => ({ data: null, error: missingConfigError }),
       signInWithPassword: async () => ({ data: null, error: missingConfigError }),
       resetPasswordForEmail: async () => ({ data: null, error: missingConfigError }),
-      signInWithPasskey: async () => ({ data: null, error: missingConfigError }),
-      registerPasskey: async () => ({ data: null, error: missingConfigError }),
       signUp: async () => ({ data: null, error: missingConfigError }),
       updateUser: async () => ({ data: null, error: missingConfigError }),
       mfa: {
@@ -54,10 +60,6 @@ function createMockSupabaseClient() {
         listFactors: async () => ({ data: { all: [], totp: [], phone: [], webauthn: [] }, error: missingConfigError }),
         unenroll: async () => ({ data: null, error: missingConfigError }),
         getAuthenticatorAssuranceLevel: async () => ({ data: { currentLevel: null, nextLevel: null, currentAuthenticationMethods: [] }, error: missingConfigError }),
-      },
-      passkey: {
-        list: async () => ({ data: null, error: missingConfigError }),
-        delete: async () => ({ data: null, error: missingConfigError }),
       },
     },
     from: query,
@@ -86,9 +88,6 @@ export const supabase = hasSupabaseConfig
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        experimental: {
-          passkey: true,
-        },
       },
     })
   : createMockSupabaseClient()

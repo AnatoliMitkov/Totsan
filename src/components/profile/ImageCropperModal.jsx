@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Cropper from 'react-easy-crop'
 import { Check, Loader2, Upload, X } from 'lucide-react'
 
@@ -16,11 +16,11 @@ function loadImage(src) {
   })
 }
 
-async function createCroppedAvatarBlob(imageSrc, pixelCrop) {
+async function createCroppedImageBlob(imageSrc, pixelCrop, outputWidth, outputHeight) {
   const image = await loadImage(imageSrc)
   const canvas = document.createElement('canvas')
-  canvas.width = OUTPUT_SIZE
-  canvas.height = OUTPUT_SIZE
+  canvas.width = outputWidth
+  canvas.height = outputHeight
 
   const context = canvas.getContext('2d', { alpha: false })
   if (!context) {
@@ -37,8 +37,8 @@ async function createCroppedAvatarBlob(imageSrc, pixelCrop) {
     pixelCrop.height,
     0,
     0,
-    OUTPUT_SIZE,
-    OUTPUT_SIZE
+    outputWidth,
+    outputHeight
   )
 
   return new Promise((resolve, reject) => {
@@ -65,29 +65,42 @@ export default function ImageCropperModal({
   file = null,
   imageUrl = '',
   initialFileName = 'avatar.jpg',
+  fileName: legacyFileName = '',
   onClose,
   onCropSave,
+  onSave,
   onSelectFile,
+  title = 'Редактирай снимка',
+  description = 'Премести снимката и виж как ще изглежда като аватар.',
+  aspect = 1,
+  cropShape = 'round',
+  objectFit = 'contain',
+  outputWidth = OUTPUT_SIZE,
+  outputHeight = OUTPUT_SIZE,
+  previewClassName = 'h-36 w-36 rounded-full',
+  previewStyle = undefined,
+  previewImageClassName = 'h-full w-full object-cover',
+  minZoom = 1,
+  maxZoom = 3,
+  zoomStep = 0.1,
+  emptyStateLabel = 'Качи снимка, за да я позиционираш.',
 }) {
   const [imageSrc, setImageSrc] = useState('')
-  const [mediaSize, setMediaSize] = useState(null)
-  const [cropAreaSize, setCropAreaSize] = useState(0)
-  const [fileName, setFileName] = useState(initialFileName)
+  const [fileName, setFileName] = useState(legacyFileName || initialFileName)
   const [crop, setCrop] = useState({ x: 0, y: 0 })
-  const [zoomMultiplier, setZoomMultiplier] = useState(1)
+  const [zoom, setZoom] = useState(1)
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [isPreparingPreview, setIsPreparingPreview] = useState(false)
   const [error, setError] = useState('')
-  const cropFrameRef = useRef(null)
+  const saveHandler = onCropSave || onSave
+  const previewClasses = useMemo(
+    () => `relative overflow-hidden border border-line bg-paper shadow-sm ${previewClassName}`,
+    [previewClassName]
+  )
 
   const hasImage = Boolean(imageSrc)
-  const baseScale = useMemo(() => {
-    if (!mediaSize?.width || !mediaSize?.height || !cropAreaSize) return 1
-    return Math.max(cropAreaSize / mediaSize.width, cropAreaSize / mediaSize.height)
-  }, [cropAreaSize, mediaSize])
-  const finalScale = baseScale * zoomMultiplier
 
   useEffect(() => {
     let active = true
@@ -95,25 +108,19 @@ export default function ImageCropperModal({
     async function prepareSource() {
       setError('')
       setCrop({ x: 0, y: 0 })
-      setZoomMultiplier(1)
-      setMediaSize(null)
+      setZoom(1)
       setCroppedAreaPixels(null)
 
       if (file instanceof File) {
         try {
           const nextImageSrc = await readFileAsDataUrl(file)
-          const loadedImage = await loadImage(nextImageSrc)
+          await loadImage(nextImageSrc)
           if (!active) return
           setImageSrc(nextImageSrc)
-          setFileName(file.name || initialFileName)
-          setMediaSize({
-            width: loadedImage.naturalWidth || loadedImage.width,
-            height: loadedImage.naturalHeight || loadedImage.height,
-          })
+          setFileName(file.name || legacyFileName || initialFileName)
         } catch (nextError) {
           if (!active) return
           setImageSrc('')
-          setMediaSize(null)
           setError(nextError.message || 'Файлът не може да бъде прочетен.')
         }
         return
@@ -121,53 +128,26 @@ export default function ImageCropperModal({
 
       if (imageUrl) {
         try {
-          const loadedImage = await loadImage(imageUrl)
+          await loadImage(imageUrl)
           if (!active) return
           setImageSrc(imageUrl)
-          setFileName(initialFileName)
-          setMediaSize({
-            width: loadedImage.naturalWidth || loadedImage.width,
-            height: loadedImage.naturalHeight || loadedImage.height,
-          })
+          setFileName(legacyFileName || initialFileName)
         } catch (nextError) {
           if (!active) return
           setImageSrc('')
-          setMediaSize(null)
           setError(nextError.message || RECROP_MESSAGE)
         }
         return
       }
 
       setImageSrc('')
-      setMediaSize(null)
     }
 
     prepareSource()
     return () => {
       active = false
     }
-  }, [file, imageUrl, initialFileName])
-
-  useEffect(() => {
-    const el = cropFrameRef.current
-    if (!el) return undefined
-
-    const updateSize = () => {
-      const nextSize = Math.floor(Math.min(el.clientWidth, el.clientHeight))
-      setCropAreaSize(nextSize)
-    }
-
-    updateSize()
-
-    if (typeof ResizeObserver === 'function') {
-      const observer = new ResizeObserver(updateSize)
-      observer.observe(el)
-      return () => observer.disconnect()
-    }
-
-    window.addEventListener('resize', updateSize)
-    return () => window.removeEventListener('resize', updateSize)
-  }, [])
+  }, [file, imageUrl, initialFileName, legacyFileName])
 
   useEffect(() => {
     if (!hasImage || !croppedAreaPixels) {
@@ -181,7 +161,7 @@ export default function ImageCropperModal({
     async function buildPreview() {
       setIsPreparingPreview(true)
       try {
-        const blob = await createCroppedAvatarBlob(imageSrc, croppedAreaPixels)
+        const blob = await createCroppedImageBlob(imageSrc, croppedAreaPixels, outputWidth, outputHeight)
         if (!active) return
         objectUrl = URL.createObjectURL(blob)
         setPreviewUrl((current) => {
@@ -202,7 +182,7 @@ export default function ImageCropperModal({
       active = false
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [croppedAreaPixels, hasImage, imageSrc])
+  }, [croppedAreaPixels, hasImage, imageSrc, outputHeight, outputWidth])
 
   useEffect(() => () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl)
@@ -218,9 +198,9 @@ export default function ImageCropperModal({
     setIsSaving(true)
     setError('')
     try {
-      const croppedBlob = await createCroppedAvatarBlob(imageSrc, croppedAreaPixels)
+      const croppedBlob = await createCroppedImageBlob(imageSrc, croppedAreaPixels, outputWidth, outputHeight)
       const croppedFile = new File([croppedBlob], fileName || 'avatar.jpg', { type: 'image/jpeg' })
-      await onCropSave(croppedFile)
+      await saveHandler?.(croppedFile)
       onClose()
     } catch (nextError) {
       setError(nextError.message === RECROP_MESSAGE ? RECROP_MESSAGE : SAVE_ERROR_MESSAGE)
@@ -243,8 +223,8 @@ export default function ImageCropperModal({
       <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[28px] border border-line bg-paper shadow-2xl">
         <div className="flex items-center justify-between border-b border-line px-4 py-4 sm:px-6">
           <div>
-            <h3 className="font-medium text-ink">Редактирай снимка</h3>
-            <p className="mt-1 text-sm text-muted">Премести снимката и виж как ще изглежда като аватар.</p>
+            <h3 className="font-medium text-ink">{title}</h3>
+            <p className="mt-1 text-sm text-muted">{description}</p>
           </div>
           <button type="button" onClick={onClose} disabled={isSaving} className="rounded-full p-2 text-muted transition hover:bg-soft hover:text-ink">
             <X size={20} />
@@ -253,24 +233,29 @@ export default function ImageCropperModal({
 
         <div className="grid gap-5 overflow-y-auto p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_240px]">
           <div>
-            <div ref={cropFrameRef} className="relative h-[320px] overflow-hidden rounded-3xl border border-line bg-soft sm:h-[420px]">
+            <div className="relative h-[320px] overflow-hidden rounded-3xl border border-line bg-soft sm:h-[420px]">
               {hasImage ? (
                 <Cropper
                   image={imageSrc}
                   crop={crop}
-                  zoom={finalScale}
-                  aspect={1}
-                  cropShape="round"
+                  zoom={zoom}
+                  minZoom={minZoom}
+                  maxZoom={maxZoom}
+                  aspect={aspect}
+                  cropShape={cropShape}
                   showGrid
                   restrictPosition
-                  objectFit="cover"
+                  objectFit={objectFit}
                   onCropChange={setCrop}
                   onCropComplete={handleCropComplete}
-                  onZoomChange={setZoomMultiplier}
+                  onZoomChange={setZoom}
+                  style={{
+                    mediaStyle: { maxWidth: 'none', maxHeight: 'none' }
+                  }}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted">
-                  Качи снимка, за да я позиционираш.
+                  {emptyStateLabel}
                 </div>
               )}
             </div>
@@ -278,15 +263,15 @@ export default function ImageCropperModal({
             <label className="mt-4 block text-sm font-medium text-ink">
               <span className="flex items-center justify-between gap-3">
                 <span>Мащаб</span>
-                <span className="text-xs text-muted">{zoomMultiplier.toFixed(1)}x</span>
+                <span className="text-xs text-muted">{zoom.toFixed(1)}x</span>
               </span>
               <input
                 type="range"
-                min={1}
-                max={3}
-                step={0.1}
-                value={zoomMultiplier}
-                onChange={(event) => setZoomMultiplier(Number(event.target.value))}
+                min={minZoom}
+                max={maxZoom}
+                step={zoomStep}
+                value={zoom}
+                onChange={(event) => setZoom(Number(event.target.value))}
                 className="mt-3 w-full accent-ink"
                 disabled={!hasImage || isSaving}
               />
@@ -297,9 +282,9 @@ export default function ImageCropperModal({
             <div className="rounded-3xl border border-line bg-soft/70 p-4">
               <div className="text-sm font-medium text-ink">Преглед</div>
               <div className="mt-4 flex justify-center">
-                <div className="relative h-36 w-36 overflow-hidden rounded-full border border-line bg-paper shadow-sm">
+                <div className={previewClasses} style={previewStyle}>
                   {previewUrl ? (
-                    <img src={previewUrl} alt="" className="h-full w-full object-cover" />
+                    <img src={previewUrl} alt="" className={previewImageClassName} />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-sm text-muted">
                       {isPreparingPreview ? 'Подготвяме преглед…' : 'Няма снимка'}
@@ -325,7 +310,7 @@ export default function ImageCropperModal({
               <button type="button" onClick={onClose} disabled={isSaving} className="btn btn-ghost flex-1 justify-center">
                 Отказ
               </button>
-              <button type="button" onClick={handleSave} disabled={!hasImage || !croppedAreaPixels || isSaving} className="btn btn-primary flex-1 justify-center">
+              <button type="button" onClick={handleSave} disabled={!hasImage || !croppedAreaPixels || isSaving || !saveHandler} className="btn btn-primary flex-1 justify-center">
                 {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
                 {isSaving ? 'Запазване…' : 'Запази'}
               </button>

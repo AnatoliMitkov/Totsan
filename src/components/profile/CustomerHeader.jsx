@@ -1,4 +1,4 @@
-import { CalendarDays, LogOut, MapPin, UserRound } from 'lucide-react'
+import { CalendarDays, LogOut, MapPin, Pencil, UserRound } from 'lucide-react'
 import PublicProfileAvatar from './PublicProfileAvatar.jsx'
 import PublicProfilePanel from './PublicProfilePanel.jsx'
 
@@ -7,7 +7,7 @@ function formatMemberDate(value) {
   return new Date(value).toLocaleDateString('bg-BG', { month: 'long', year: 'numeric' })
 }
 
-export default function CustomerHeader({ account, displayName, completeness, onSignOut }) {
+export default function CustomerHeader({ account, displayName, completeness, onEditAvatar, onSignOut }) {
   const avatarUrl = account?.avatar_url || ''
   const targetPercent = completeness?.percent || 0
   const city = account?.city || account?.country || ''
@@ -16,12 +16,24 @@ export default function CustomerHeader({ account, displayName, completeness, onS
     <PublicProfilePanel className="transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.04)]">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-end sm:text-left">
-          <PublicProfileAvatar
-            src={avatarUrl}
-            alt={displayName}
-            fallbackIcon={UserRound}
-            statusTitle="Профил в Totsan"
-          />
+          <div className="group relative">
+            <button
+              type="button"
+              onClick={onEditAvatar}
+              className="relative block rounded-[24px] overflow-hidden transition hover:ring-2 hover:ring-ink focus:outline-none focus:ring-2 focus:ring-ink"
+              aria-label="Смени снимката"
+            >
+              <PublicProfileAvatar
+                src={avatarUrl}
+                alt={displayName}
+                fallbackIcon={UserRound}
+                statusTitle="Профил в Totsan"
+              />
+              <div className="absolute inset-0 flex items-center justify-center rounded-3xl bg-ink/40 text-paper opacity-0 transition group-hover:opacity-100">
+                <Pencil size={32} />
+              </div>
+            </button>
+          </div>
 
           <div className="min-w-0 pb-1">
             <div className="eyebrow">Моят профил</div>

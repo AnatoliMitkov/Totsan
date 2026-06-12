@@ -35,6 +35,7 @@ import Bathroom from './pages/Bathroom.jsx'
 import LightingAndTextiles from './pages/LightingAndTextiles.jsx'
 import SharedProject from './pages/SharedProject.jsx'
 import Portfolio from './pages/Portfolio.jsx'
+import { PrivacyPage, TermsPage } from './pages/Legal.jsx'
 import ProtectedRoute from './components/auth/ProtectedRoute.jsx'
 import MfaSessionLock from './components/auth/MfaSessionLock.jsx'
 import { signOutAndRedirect } from './lib/account.js'
@@ -236,6 +237,8 @@ function AppRoutes() {
             <Route path="/za-nas" element={<About />} />
             <Route path="/kontakt" element={<Contact />} />
             <Route path="/contact" element={<Navigate to="/kontakt" replace />} />
+            <Route path="/obshti-usloviya" element={<TermsPage />} />
+            <Route path="/politika-za-poveritelnost" element={<PrivacyPage />} />
             <Route path="/vizualizacia" element={<Vizualizacia />} />
             <Route path="/gradina-i-dvor" element={<GardenAndYard />} />
             <Route path="/tapeti-i-cvetove" element={<WallpapersAndColors />} />

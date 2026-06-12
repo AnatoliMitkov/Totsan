@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase.js'
-import { clearPasskeyVerifiedSession, getPasskeySecurityState } from './passkeys.js'
 import { loadMfaStatus } from './mfa.js'
 
-const ACCOUNT_COLUMNS = 'id, email, full_name, display_name, role, specialist_status, account_status, phone, avatar_url, city, country, bio, locale, marketing_opt_in, interests, style_preferences, preferred_contact_method, age_group, gender, stripe_account_id, created_at'
+const ACCOUNT_COLUMNS_BASE = 'id, email, full_name, display_name, role, specialist_status, account_status, phone, avatar_url, city, country, bio, locale, marketing_opt_in, interests, style_preferences, preferred_contact_method, age_group, gender, stripe_account_id, created_at'
+const ACCOUNT_COLUMNS = `id, email, full_name, display_name, role, specialist_status, account_status, phone, avatar_url, cover_url, city, country, bio, locale, marketing_opt_in, interests, style_preferences, preferred_contact_method, age_group, gender, stripe_account_id, created_at`
 
 function emptyMfaState() {
   return { loading: false, needsMfa: false, verified: false, factor: null }
@@ -19,12 +19,26 @@ function mfaStateFromStatus(status) {
 }
 
 async function fetchOwnAccount(userId) {
-  const { data, error } = await supabase
+  const withCover = await supabase
     .from('accounts')
     .select(ACCOUNT_COLUMNS)
     .eq('id', userId)
     .maybeSingle()
 
+  if (!withCover.error) return withCover.data || null
+
+  const withoutCover = await supabase
+    .from('accounts')
+    .select(ACCOUNT_COLUMNS_BASE)
+    .eq('id', userId)
+    .maybeSingle()
+
+  if (withoutCover.error) return null
+  return withoutCover.data ? { ...withoutCover.data, cover_url: '' } : null
+}
+
+async function ensureOwnAccount() {
+  const { data, error } = await supabase.rpc('ensure_own_account')
   if (error) return null
   return data || null
 }
@@ -47,12 +61,13 @@ export function getAccountAvatar(account) {
 
 export async function signOutAndRedirect(userId = '') {
   if (userId) {
-    clearPasskeyVerifiedSession(userId)
     const { clearPendingMfaEnrollment } = await import('./mfa.js')
     clearPendingMfaEnrollment(userId)
   }
   await supabase.auth.signOut()
-  if (typeof window !== 'undefined') {
+  
+  // Safely redirect: check for browser environment
+  if (typeof window !== 'undefined' && typeof window.location !== 'undefined') {
     window.location.assign('/')
   }
 }
@@ -64,9 +79,12 @@ export function useAccount() {
   const [accountLoading, setAccountLoading] = useState(true)
   const [mfa, setMfa] = useState({ loading: true, needsMfa: false, verified: false, factor: null })
   const sessionRef = useRef({ signInAt: '', userId: '' })
+  const abortControllerRef = useRef(new AbortController())
 
   useEffect(() => {
     let active = true
+    const ac = new AbortController()
+    abortControllerRef.current = ac
 
     async function loadAccountAndMfa(currentSession) {
       if (!currentSession?.user) {
@@ -85,7 +103,7 @@ export function useAccount() {
         mfaStatus = null
       }
 
-      if (!active) return
+      if (!active || ac.signal.aborted) return
 
       const nextMfaState = mfaStatus ? mfaStateFromStatus(mfaStatus) : emptyMfaState()
       setMfa(nextMfaState)
@@ -96,14 +114,17 @@ export function useAccount() {
         return
       }
 
-      const nextAccount = await fetchOwnAccount(currentSession.user.id)
-      if (!active) return
+      let nextAccount = await fetchOwnAccount(currentSession.user.id)
+      if (!nextAccount) {
+        nextAccount = await ensureOwnAccount()
+      }
+      if (!active || ac.signal.aborted) return
       setAccount(nextAccount)
       setAccountLoading(false)
     }
 
     supabase.auth.getSession().then(({ data }) => {
-      if (!active) return
+      if (!active || ac.signal.aborted) return
       sessionRef.current = {
         signInAt: data.session?.user?.last_sign_in_at || '',
         userId: data.session?.user?.id || '',
@@ -114,18 +135,13 @@ export function useAccount() {
     })
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (!active) return
+      if (!active || ac.signal.aborted) return
       const previous = sessionRef.current
       const next = {
         signInAt: nextSession?.user?.last_sign_in_at || '',
         userId: nextSession?.user?.id || '',
       }
       const sessionChanged = previous.signInAt !== next.signInAt || previous.userId !== next.userId
-
-      if (sessionChanged) {
-        if (previous.userId) clearPasskeyVerifiedSession(previous.userId)
-        if (next.userId) clearPasskeyVerifiedSession(next.userId)
-      }
 
       sessionRef.current = next
       setSession(nextSession)
@@ -143,6 +159,7 @@ export function useAccount() {
 
     return () => {
       active = false
+      ac.abort()
       sub.subscription.unsubscribe()
     }
   }, [])
@@ -180,7 +197,10 @@ export function useAccount() {
       return
     }
 
-    const nextAccount = await fetchOwnAccount(data.session.user.id)
+    let nextAccount = await fetchOwnAccount(data.session.user.id)
+    if (!nextAccount) {
+      nextAccount = await ensureOwnAccount()
+    }
     setAccount(nextAccount)
     setAccountLoading(false)
   }
@@ -204,7 +224,6 @@ export function useAccount() {
     isAdmin: account?.role === 'admin',
     isSpecialist: account?.role === 'specialist',
     specialistStatus: account?.specialist_status || null,
-    requirePasskeyVerification: getPasskeySecurityState(session?.user).requirePasskeyVerification,
     refresh,
     refreshMfa,
   }

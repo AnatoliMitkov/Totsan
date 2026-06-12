@@ -2,11 +2,13 @@ export default function PublicProfileBanner({
   imageSrc = '',
   imageAlt = '',
   imageStyle = undefined,
-  heightClass = 'h-64 md:h-80',
+  heightClass = 'aspect-[1600/520]',
+  className = '',
+  onClick = undefined,
   children = null,
 }) {
   return (
-    <section className={`relative w-full overflow-hidden bg-soft ${heightClass}`}>
+    <section onClick={onClick} className={`relative w-full overflow-hidden bg-soft ${heightClass} ${className}`}>
       {imageSrc ? (
         <img src={imageSrc} alt={imageAlt} className="img-cover" style={imageStyle} />
       ) : (

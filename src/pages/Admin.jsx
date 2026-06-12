@@ -4,12 +4,11 @@ import { ArrowRight, BarChart3, ClipboardList, CreditCard, FileClock, FolderKanb
 import { brand, supabase } from '../lib/supabase.js'
 import { HERO_COLLAGE, HOME_PROJECTS } from '../data/images.js'
 import { getAccountDisplayName, useAccount } from '../lib/account.js'
-import { PasskeySignInButton } from '../components/auth/PasskeyManager.jsx'
-import { isPasskeyVerifiedSession, clearPasskeyVerifiedSession } from '../lib/passkeys.js'
 import { trackEvent } from '../lib/analytics.js'
 
 const INPUT_CLASS = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const PRODUCTION_APP_ORIGIN = 'https://totsan.com'
+const TERMS_REQUIRED_MESSAGE = 'Първо потвърди, че се съгласяваш с общите условия и политиката за поверителност.'
 
 function normalizeOrigin(value = '') {
   const raw = String(value || '').trim()
@@ -70,12 +69,6 @@ const ADMIN_SECTIONS = [
 export default function Admin() {
   const { session, account, loading, mfaRequired } = useAccount()
   const location = useLocation()
-  const [passkeyVerified, setPasskeyVerified] = useState(false)
-  const sessionPasskeyVerified = isPasskeyVerifiedSession(session?.user?.id)
-
-  useEffect(() => {
-    setPasskeyVerified(sessionPasskeyVerified)
-  }, [session?.user?.id, session?.user?.last_sign_in_at, sessionPasskeyVerified])
 
   if (loading) return <div className="flex h-screen items-center justify-center bg-soft"><div className="text-muted">Проверяваме достъпа…</div></div>
   if (!session) return <LoginPanel />
@@ -119,7 +112,6 @@ function normalizeNextPath(value = '') {
 }
 
 async function signOutToHome(userId = '') {
-  clearPasskeyVerifiedSession(userId)
   await supabase.auth.signOut()
   if (typeof window !== 'undefined') {
     window.location.assign('/')
@@ -294,6 +286,8 @@ function LoginPanel() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [rememberFor30Days, setRememberFor30Days] = useState(true)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [termsTouched, setTermsTouched] = useState(false)
 
   const pwdRules = {
     length: password.length >= 8,
@@ -307,6 +301,12 @@ function LoginPanel() {
   useEffect(() => {
     if (isSignup) setSignupRole(requestedSignupRole)
   }, [isSignup, requestedSignupRole])
+
+  useEffect(() => {
+    if (isLogin || isRecoveryMode) {
+      setTermsTouched(false)
+    }
+  }, [isLogin, isRecoveryMode])
 
   useEffect(() => {
     function syncRecoveryState() {
@@ -343,6 +343,10 @@ function LoginPanel() {
   async function signInWithProvider(provider) {
     if (isRecoveryMode) return
 
+    if (!isLogin && !requireTermsAccepted()) {
+      return
+    }
+
     if (!isLogin && signupRole === 'pro') {
       setStatus('error')
       setPendingAction('')
@@ -373,6 +377,27 @@ function LoginPanel() {
 
     setStatus('sent')
     setMessage('Пренасочваме към Google…')
+  }
+
+  function requireTermsAccepted() {
+    if (termsAccepted) return true
+
+    setTermsTouched(true)
+    setStatus('error')
+    setPendingAction('')
+    setMessage(TERMS_REQUIRED_MESSAGE)
+    return false
+  }
+
+  function updateTermsAccepted(checked) {
+    setTermsAccepted(checked)
+    if (!checked) return
+
+    setTermsTouched(false)
+    if (message === TERMS_REQUIRED_MESSAGE) {
+      setStatus('idle')
+      setMessage('')
+    }
   }
 
   async function handleForgotPassword() {
@@ -456,6 +481,10 @@ function LoginPanel() {
         return
       }
     } else {
+      if (!requireTermsAccepted()) {
+        return
+      }
+
       if (!fullName.trim() || !displayName.trim()) {
         setStatus('error')
         setMessage('Попълни и двете имена.')
@@ -712,9 +741,24 @@ function LoginPanel() {
               </div>
             )}
             {!isLogin && !isRecoveryMode && (
-              <label className="flex items-center gap-2 text-sm text-muted">
-                <input type="checkbox" required className="rounded border-line text-accent focus:ring-accent" />
-                Съгласявам се с общите условия и политиката за поверителност
+              <label className={`flex items-start gap-3 rounded-2xl border px-3 py-3 text-sm transition ${termsTouched && !termsAccepted ? 'border-red-300 bg-red-50 text-red-700' : 'border-transparent text-muted'}`}>
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(event) => updateTermsAccepted(event.target.checked)}
+                  aria-invalid={termsTouched && !termsAccepted}
+                  className={`mt-0.5 rounded focus:ring-2 ${termsTouched && !termsAccepted ? 'border-red-500 text-red-600 focus:ring-red-200' : 'border-line text-accent focus:ring-accent'}`}
+                />
+                <span>
+                  Съгласявам се с{' '}
+                  <Link to="/obshti-usloviya" onClick={(event) => event.stopPropagation()} className="font-medium text-accent hover:underline">
+                    общите условия
+                  </Link>
+                  {' '}и{' '}
+                  <Link to="/politika-za-poveritelnost" onClick={(event) => event.stopPropagation()} className="font-medium text-accent hover:underline">
+                    политиката за поверителност
+                  </Link>
+                </span>
               </label>
             )}
             <button disabled={status === 'sending'} className={actionButtonClass}>
@@ -744,8 +788,6 @@ function LoginPanel() {
                   icon={<GoogleIcon />}
                 />
               </div>
-
-              {isLogin && <PasskeySignInButton className="mt-5" />}
 
               <div className={`${isLogin ? 'mt-10' : 'mt-7'} text-center text-sm text-muted`}>
                 {isLogin ? 'Нямаш акаунт? ' : 'Вече имаш акаунт? '}

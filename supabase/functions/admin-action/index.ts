@@ -87,11 +87,6 @@ Deno.serve(async (req) => {
     global: { headers: { Authorization: authorization } },
   })
   const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
-    auth: {
-      experimental: {
-        passkey: true,
-      },
-    },
   })
 
   const { data: authData } = await userClient.auth.getUser()
@@ -263,71 +258,6 @@ Deno.serve(async (req) => {
         },
       })
       return jsonResponse(200, { ok: true, row: data })
-    }
-
-    if (action === 'list_user_passkeys') {
-      const id = assertUuid(payload.id, 'Account id')
-      const { data: targetAccount, error: targetAccountError } = await adminClient
-        .from('accounts')
-        .select('id, email, full_name, display_name')
-        .eq('id', id)
-        .single()
-
-      if (targetAccountError) throw targetAccountError
-
-      const { data, error } = await adminClient.auth.admin.passkey.list({ userId: id })
-      if (error) throw error
-
-      return jsonResponse(200, { ok: true, passkeys: data || [], target: targetAccount })
-    }
-
-    if (action === 'delete_user_passkey') {
-      const id = assertUuid(payload.id, 'Account id')
-      const passkeyId = assertUuid(payload.passkeyId, 'Passkey id')
-      const { data: targetAccount, error: targetAccountError } = await adminClient
-        .from('accounts')
-        .select('id, email, full_name, display_name')
-        .eq('id', id)
-        .single()
-
-      if (targetAccountError) throw targetAccountError
-
-      const { error } = await adminClient.auth.admin.passkey.delete({ userId: id, passkeyId })
-      if (error) throw error
-
-      await writeAudit(adminClient, user.id, action, 'account', id, {
-        passkey_id: passkeyId,
-        actor_email: actorEmail,
-        target: targetAccount,
-      })
-      return jsonResponse(200, { ok: true })
-    }
-
-    if (action === 'reset_user_passkeys') {
-      const id = assertUuid(payload.id, 'Account id')
-      const { data: targetAccount, error: targetAccountError } = await adminClient
-        .from('accounts')
-        .select('id, email, full_name, display_name')
-        .eq('id', id)
-        .single()
-
-      if (targetAccountError) throw targetAccountError
-
-      const { data: passkeys, error: listError } = await adminClient.auth.admin.passkey.list({ userId: id })
-      if (listError) throw listError
-
-      const deleteResults = await Promise.all((passkeys || []).map((passkey) =>
-        adminClient.auth.admin.passkey.delete({ userId: id, passkeyId: passkey.id })
-      ))
-      const failed = deleteResults.find((result) => result.error)
-      if (failed?.error) throw failed.error
-
-      await writeAudit(adminClient, user.id, action, 'account', id, {
-        deleted_count: passkeys?.length || 0,
-        actor_email: actorEmail,
-        target: targetAccount,
-      })
-      return jsonResponse(200, { ok: true, deletedCount: passkeys?.length || 0 })
     }
 
     if (action === 'send_user_recovery_email') {

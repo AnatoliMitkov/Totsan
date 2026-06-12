@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # 1. Vite Frontend React Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: totsan-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    env_file:
+      - .env.local
+    environment:
+      - DOCKER=true
+      - NODE_ENV=development
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - totsan-network
+
+  # 2. Local PostgreSQL Database with Supabase Compatibility
+  db:
+    image: supabase/postgres:15.6.1.118
+    container_name: totsan-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - JWT_SECRET=super-secret-jwt-token-change-me-in-production
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Mount migrations so they run automatically when the database is initialized
+      - ./supabase/migrations:/docker-entrypoint-initdb.d/migrations:ro
+    # Health check to ensure database is ready before app starts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - totsan-network
+
+volumes:
+  pgdata:
+    driver: local
+
+networks:
+  totsan-network:
+    driver: bridge

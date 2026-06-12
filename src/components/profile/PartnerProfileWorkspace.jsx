@@ -25,7 +25,6 @@ import { LAYER_HEROS } from '../../data/images.js'
 import { uploadProfileMedia, uploadProfileCover } from '../../lib/profile-media-upload-client.js'
 import { getProfileImage, getProfileImageStyle, isMissingLayer01MetaColumn, normalizeProfile, PROFILE_SELECT_COLUMNS, PROFILE_SELECT_COLUMNS_BASE } from '../../lib/profiles.js'
 import { supabase } from '../../lib/supabase.js'
-import PasskeyManager, { PasskeySetupPrompt } from '../auth/PasskeyManager.jsx'
 import TotpMfaManager from '../auth/TotpMfa.jsx'
 import {
   DEFAULT_PORTFOLIO_ITEM,
@@ -645,7 +644,6 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
 
             {activeTab === 'security' && (
               <div className="space-y-5">
-                <PasskeyManager userId={userId} session={session} />
                 <TotpMfaManager session={session} />
               </div>
             )}
@@ -891,12 +889,12 @@ function ProfileForm({
 
           {avatarEditor.open && (
             <ImageCropperModal
-              open={avatarEditor.open}
               file={avatarEditor.file}
               imageUrl={avatarEditor.imageUrl}
-              fileName={avatarEditor.fileName}
+              initialFileName={avatarEditor.fileName}
               onClose={onCloseAvatarEditor}
-              onSave={onSaveAvatar}
+              onSelectFile={async (file) => onAvatarFile(file)}
+              onCropSave={onSaveAvatar}
             />
           )}
         </div>

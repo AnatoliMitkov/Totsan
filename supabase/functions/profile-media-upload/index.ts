@@ -138,6 +138,32 @@ function optimizeProfileImage(bytes: Uint8Array) {
   })
 }
 
+async function cleanupLegacyProfileFiles(adminClient: ReturnType<typeof createClient>, bucket: string, directory: string, keepFileName: string) {
+  const { data: files, error } = await adminClient.storage
+    .from(bucket)
+    .list(directory, { limit: 100 })
+
+  if (error) {
+    console.error('profile-media-upload cleanup list error', error)
+    return
+  }
+
+  const stalePaths = (files || [])
+    .map((item) => item.name)
+    .filter((name) => name !== keepFileName && (name.startsWith('avatar-') || name.startsWith('cover-')))
+    .map((name) => `${directory}/${name}`)
+
+  if (!stalePaths.length) return
+
+  const { error: removeError } = await adminClient.storage
+    .from(bucket)
+    .remove(stalePaths)
+
+  if (removeError) {
+    console.error('profile-media-upload cleanup remove error', removeError)
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -201,9 +227,11 @@ Deno.serve(async (req) => {
   const isProjectUpload = purpose === 'project'
   const isPortfolioUpload = purpose === 'portfolio'
   const isServiceUpload = purpose === 'service'
+  const isProfileUpload = !isProjectUpload && !isPortfolioUpload && !isServiceUpload
   const requestedTarget = sanitizeTarget(String(formData.get('target') || ''))
   const target = isAdmin && !isProjectUpload ? (requestedTarget || user.id) : user.id
   const mediaKind = sanitizeKind(String(formData.get('kind') || 'photo'))
+  const profileMediaKind = mediaKind === 'cover' ? 'cover' : 'avatar'
   const bytes = new Uint8Array(await upload.arrayBuffer())
 
   let optimized: Uint8Array
@@ -219,7 +247,7 @@ Deno.serve(async (req) => {
   const fingerprint = await sha256Hex(optimized)
   const bucket = isProjectUpload ? PROJECT_MEDIA_BUCKET : isPortfolioUpload ? PORTFOLIO_MEDIA_BUCKET : isServiceUpload ? SERVICE_MEDIA_BUCKET : OPTIMIZED_BUCKET
   const directory = isProjectUpload ? `projects/${target}` : isPortfolioUpload ? `portfolio/${target}` : isServiceUpload ? `services/${target}` : `profiles/${target}`
-  const fileName = `${isProjectUpload || isPortfolioUpload || isServiceUpload ? mediaKind : 'avatar'}-${fingerprint}.webp`
+  const fileName = isProfileUpload ? `${profileMediaKind}.webp` : `${mediaKind}-${fingerprint}.webp`
   const storagePath = `${directory}/${fileName}`
 
   const { data: existingFiles, error: listError } = await adminClient.storage
@@ -263,7 +291,7 @@ Deno.serve(async (req) => {
     .upload(storagePath, copyBytes(optimized), {
       contentType: 'image/webp',
       cacheControl: '31536000',
-      upsert: false,
+      upsert: isProfileUpload,
     })
 
   if (uploadError) {
@@ -281,6 +309,10 @@ Deno.serve(async (req) => {
     }
 
     signedUrl = signedData?.signedUrl || null
+  }
+
+  if (isProfileUpload) {
+    await cleanupLegacyProfileFiles(adminClient, bucket, directory, fileName)
   }
 
   return jsonResponse(200, {

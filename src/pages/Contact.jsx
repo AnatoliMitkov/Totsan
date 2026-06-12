@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { CheckCircle2 } from 'lucide-react'
 import { LAYERS } from '../data/layers.js'
 import { supabase, brand } from '../lib/supabase.js'
+import { useAccount } from '../lib/account.js'
 import { trackEvent } from '../lib/analytics.js'
 import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
 
@@ -18,6 +19,7 @@ export default function Contact() {
   })
 
   const { state } = useLocation()
+  const { session } = useAccount()
   const subject = state?.subject || ''
   const [form, setForm] = useState({ name: '', contact: '', layer: '', message: subject ? `${subject}\n\n` : '' })
   const [status, setStatus] = useState('idle') // idle | sending | sent | error
@@ -41,6 +43,7 @@ export default function Contact() {
       layer_slug: form.layer || null,
       message: form.message.trim(),
       source: 'contact_form',
+      client_id: session?.user?.id || null,  // Auto-link to user if logged in
     })
 
     if (error) {
@@ -53,6 +56,8 @@ export default function Contact() {
     trackEvent('submit_inquiry', {
       source: 'contact_form',
       layer: form.layer || undefined,
+      user_id: session?.user?.id || undefined,
+      is_authenticated: Boolean(session),
     })
     setForm({ name: '', contact: '', layer: '', message: '' })
   }
@@ -107,7 +112,10 @@ export default function Contact() {
                 <button disabled={status === 'sending'} className="btn btn-primary mt-6 disabled:opacity-50">
                   {status === 'sending' ? 'Изпраща се…' : 'Изпрати запитване'}
                 </button>
-                <div className="mt-3 text-xs text-muted">С изпращане се съгласяваш с нашите условия.</div>
+                <div className="mt-3 text-xs text-muted">
+                  С изпращане се съгласяваш с нашите{' '}
+                  <Link to="/obshti-usloviya" className="font-medium text-accent hover:underline">условия</Link>.
+                </div>
               </>
             )}
           </form>

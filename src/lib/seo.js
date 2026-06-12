@@ -40,6 +40,14 @@ const STATIC_ROUTE_SEO = {
     title: 'Контакт | Totsan',
     description: 'Изпрати кратко запитване до Totsan и ще се върнем с подходящи хора и следващи стъпки за проекта ти.',
   },
+  '/obshti-usloviya': {
+    title: 'Общи условия | Totsan',
+    description: 'Общи условия за използване на платформата Totsan.',
+  },
+  '/politika-za-poveritelnost': {
+    title: 'Политика за поверителност | Totsan',
+    description: 'Политика за поверителност и обработване на лични данни в Totsan.',
+  },
   '/vizualizacia': {
     title: '3D визуализация | Totsan',
     description: 'Разгледай 3D визуализация като част от началните слоеве на проекта и заяви следваща стъпка през Totsan.',

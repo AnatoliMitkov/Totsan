@@ -1,0 +1,18 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy dependency files
+COPY package*.json ./
+
+# Install npm dependencies
+RUN npm install
+
+# Copy all source files
+COPY . .
+
+# Expose Vite dev port
+EXPOSE 5173
+
+# Run Vite with host exposure and disable browser opening in container
+CMD ["npx", "vite", "--host", "0.0.0.0"]

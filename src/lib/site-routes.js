@@ -15,6 +15,8 @@ export const STATIC_PUBLIC_PATHS = [
   '/kak-raboti',
   '/za-nas',
   '/kontakt',
+  '/obshti-usloviya',
+  '/politika-za-poveritelnost',
   '/vizualizacia',
   '/gradina-i-dvor',
   '/tapeti-i-cvetove',

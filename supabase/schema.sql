@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- TOTSAN V2 — Supabase Schema
 -- Пейсни целия този файл в Supabase Dashboard → SQL Editor → Run.
 -- Това създава таблиците + правилата за сигурност (Row Level Security).
@@ -475,6 +475,7 @@ set email = excluded.email,
 alter table public.accounts
   add column if not exists phone text,
   add column if not exists avatar_url text,
+  add column if not exists cover_url text,
   add column if not exists city text,
   add column if not exists country text not null default 'BG',
   add column if not exists bio text,
@@ -598,6 +599,7 @@ create or replace function public.update_own_account_profile(
   p_display_name text,
   p_phone text,
   p_avatar_url text,
+  p_cover_url text,
   p_city text,
   p_country text,
   p_bio text,
@@ -622,6 +624,7 @@ begin
       display_name = nullif(btrim(coalesce(p_display_name, p_full_name, '')), ''),
       phone = nullif(btrim(coalesce(p_phone, '')), ''),
       avatar_url = nullif(btrim(coalesce(p_avatar_url, '')), ''),
+      cover_url = nullif(btrim(coalesce(p_cover_url, '')), ''),
       city = nullif(btrim(coalesce(p_city, '')), ''),
       country = coalesce(nullif(upper(btrim(coalesce(p_country, ''))), ''), 'BG'),
       bio = nullif(btrim(coalesce(p_bio, '')), ''),
@@ -644,11 +647,11 @@ end;
 $$;
 
 revoke execute on function public.update_own_account_profile(
-  text, text, text, text, text, text, text, text, boolean, text[], text[], text, text, text
+  text, text, text, text, text, text, text, text, text, boolean, text[], text[], text, text, text
 ) from public, anon;
 
 grant execute on function public.update_own_account_profile(
-  text, text, text, text, text, text, text, text, boolean, text[], text[], text, text, text
+  text, text, text, text, text, text, text, text, text, boolean, text[], text[], text, text, text
 ) to authenticated;
 
 create table if not exists public.client_projects (
