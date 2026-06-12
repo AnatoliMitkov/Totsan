@@ -10,6 +10,7 @@ export default function Layout() {
   const { pathname } = useLocation()
   const isAuthPage = pathname === '/login'
   const isHomePage = pathname === '/'
+  const isInboxPage = pathname === '/inbox' || pathname.startsWith('/inbox/')
 
   // На всяка смяна на страница: скрол нагоре + ново наблюдение за reveal анимациите
   useEffect(() => {
@@ -63,14 +64,14 @@ export default function Layout() {
   }, [])
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className={isInboxPage ? 'flex h-[100dvh] min-h-0 flex-col overflow-hidden' : 'min-h-screen flex flex-col'}>
       <Header />
       <main
-        className={`flex-1 min-h-0 ${isHomePage ? 'homepage-main' : ''}`}
+        className={isInboxPage ? 'h-[100dvh] min-h-0 flex-none overflow-hidden' : `flex-1 min-h-0 ${isHomePage ? 'homepage-main' : ''}`}
         style={{ paddingTop: isHomePage ? '0px' : 'var(--header-h, 64px)' }}>
         <Outlet />
       </main>
-      <Footer isAuthPage={isAuthPage} />
+      {!isInboxPage && <Footer isAuthPage={isAuthPage} />}
     </div>
   )
 }

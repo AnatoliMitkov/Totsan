@@ -1,3 +1,4 @@
+import { avatarFor } from '../data/images.js'
 import { supabase, supabasePublicKey, supabaseUrl } from './supabase.js'
 
 export const CONVERSATION_SELECT = `
@@ -15,7 +16,7 @@ export const CONVERSATION_SELECT = `
   updated_at
 `
 
-export const MESSAGE_SELECT = `
+const LEGACY_MESSAGE_SELECT = `
   id,
   conversation_id,
   sender_id,
@@ -28,7 +29,102 @@ export const MESSAGE_SELECT = `
   offer:offers(*)
 `
 
+export const MESSAGE_SELECT = `
+  id,
+  conversation_id,
+  sender_id,
+  kind,
+  body,
+  attachments,
+  offer_id,
+  reply_to_message_id,
+  was_masked,
+  created_at,
+  offer:offers(*)
+`
+
 const PROFILE_SELECT = 'user_id, name, image_url'
+const ACCOUNT_AVATAR_SELECT = 'id, full_name, display_name, avatar_url, email'
+const LEGACY_MESSAGE_PREVIEW_SELECT = 'id, conversation_id, sender_id, kind, body, offer_id, created_at'
+const MESSAGE_PREVIEW_SELECT = 'id, conversation_id, sender_id, kind, body, offer_id, reply_to_message_id, created_at'
+const REACTION_SELECT = 'id, message_id, user_id, emoji, created_at'
+export const MESSAGE_PAGE_SIZE = 30
+const chatFeatureSupport = {
+  replies: null,
+  reactions: null,
+}
+
+function supabaseErrorText(error) {
+  return [
+    error?.message,
+    error?.details,
+    error?.hint,
+    error?.error_description,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+}
+
+function isMissingReplyColumnError(error) {
+  const text = supabaseErrorText(error)
+  return text.includes('reply_to_message_id') && (
+    text.includes('column')
+    || text.includes('schema cache')
+    || text.includes('does not exist')
+    || text.includes('not found')
+  )
+}
+
+function isMissingReactionsTableError(error) {
+  const text = supabaseErrorText(error)
+  return text.includes('message_reactions') && (
+    text.includes('schema cache')
+    || text.includes('does not exist')
+    || text.includes('not found')
+    || text.includes('relation')
+  )
+}
+
+function normalizeMessageRecord(row) {
+  if (!row) return row
+  return {
+    ...row,
+    reply_to_message_id: row.reply_to_message_id || null,
+  }
+}
+
+async function runMessageQuery(request) {
+  let select = chatFeatureSupport.replies === false ? LEGACY_MESSAGE_SELECT : MESSAGE_SELECT
+  let { data, error } = await request(select)
+
+  if (error && chatFeatureSupport.replies !== false && isMissingReplyColumnError(error)) {
+    chatFeatureSupport.replies = false
+    ;({ data, error } = await request(LEGACY_MESSAGE_SELECT))
+  } else if (!error && chatFeatureSupport.replies !== false) {
+    chatFeatureSupport.replies = true
+  }
+
+  if (error) throw error
+  return Array.isArray(data)
+    ? data.map(normalizeMessageRecord)
+    : normalizeMessageRecord(data || null)
+}
+
+async function runMessagePreviewQuery(request) {
+  let select = chatFeatureSupport.replies === false ? LEGACY_MESSAGE_PREVIEW_SELECT : MESSAGE_PREVIEW_SELECT
+  let { data, error } = await request(select)
+
+  if (error && chatFeatureSupport.replies !== false && isMissingReplyColumnError(error)) {
+    chatFeatureSupport.replies = false
+    ;({ data, error } = await request(LEGACY_MESSAGE_PREVIEW_SELECT))
+  } else if (!error && chatFeatureSupport.replies !== false) {
+    chatFeatureSupport.replies = true
+  }
+
+  if (error) throw error
+  return (data || []).map(normalizeMessageRecord)
+}
 
 export function isClient(conversation, userId) {
   return String(conversation?.client_id || '') === String(userId || '')
@@ -59,10 +155,18 @@ export function getConversationParticipant(conversation, role) {
 }
 
 export function getOtherParticipant(conversation, userId) {
-  if (isPartner(conversation, userId)) return conversation?.client || null
-  if (isClient(conversation, userId)) return conversation?.partner || null
-  if (conversation?.client && !conversation?.partner) return conversation.client
-  if (conversation?.partner && !conversation?.client) return conversation.partner
+  if (!conversation) return null
+  const currentId = String(userId || '')
+  const clientId = String(conversation.client_id || '')
+  const partnerId = String(conversation.partner_id || '')
+
+  if (currentId === partnerId && currentId !== clientId) return conversation.client || null
+  if (currentId === clientId && currentId !== partnerId) return conversation.partner || null
+  if (currentId === clientId && currentId === partnerId) return conversation.partner || conversation.client || null
+
+  if (conversation.client && clientId !== currentId) return conversation.client
+  if (conversation.partner && partnerId !== currentId) return conversation.partner
+
   return null
 }
 
@@ -80,6 +184,11 @@ export function getConversationTitle(conversation, userId, fallback = 'Потр�
   const participant = getOtherParticipant(conversation, userId)
   const participantName = getParticipantDisplayName(participant, '')
   if (participantName) return participantName
+  
+  if (isPartner(conversation, userId)) {
+    return fallback
+  }
+
   const subjectName = conversationSubjectName(conversation?.subject)
   return subjectName || fallback
 }
@@ -124,25 +233,186 @@ function sortConversations(rows = []) {
 }
 
 function sortMessages(rows = []) {
-  return [...rows].sort((left, right) => new Date(left.created_at).getTime() - new Date(right.created_at).getTime())
+  return [...rows].sort((left, right) => {
+    const timeDiff = new Date(left.created_at).getTime() - new Date(right.created_at).getTime()
+    if (timeDiff !== 0) return timeDiff
+    return String(left.id || '').localeCompare(String(right.id || ''))
+  })
+}
+
+function dedupeMessagesById(rows = []) {
+  const unique = new Map()
+  rows.forEach((row) => {
+    if (!row?.id) return
+    const current = unique.get(row.id)
+    unique.set(row.id, mergeMessageRecords(current, row))
+  })
+  return Array.from(unique.values())
+}
+
+function mergeMessageRecords(existing, incoming) {
+  if (!existing) return incoming
+  if (!incoming) return existing
+  return {
+    ...existing,
+    ...incoming,
+    offer: incoming.offer ?? existing.offer ?? null,
+    reply_to_message: incoming.reply_to_message ?? existing.reply_to_message ?? null,
+    reactions: incoming.reactions ?? existing.reactions ?? [],
+  }
+}
+
+function normalizeCursorTimestamp(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().replace(/\.\d{3}Z$/, 'Z')
+}
+
+export function getMessageCursor(message) {
+  if (!message?.id || !message?.created_at) return null
+  const createdAt = normalizeCursorTimestamp(message.created_at)
+  if (!createdAt) return null
+  return {
+    id: message.id,
+    created_at: createdAt,
+  }
+}
+
+export function mergeMessagesById(existing = [], incoming = []) {
+  return sortMessages(dedupeMessagesById([...existing, ...incoming]))
+}
+
+function toReplyPreview(row) {
+  if (!row?.id) return null
+  return {
+    id: row.id,
+    conversation_id: row.conversation_id,
+    sender_id: row.sender_id,
+    kind: row.kind,
+    body: row.body,
+    offer_id: row.offer_id,
+    reply_to_message_id: row.reply_to_message_id || null,
+    created_at: row.created_at,
+  }
+}
+
+async function loadMessagePreviewsByIds(messageIds = []) {
+  const uniqueIds = [...new Set(messageIds.filter(Boolean))]
+  if (uniqueIds.length === 0) return []
+
+  return runMessagePreviewQuery((select) => (
+    supabase
+      .from('messages')
+      .select(select)
+      .in('id', uniqueIds)
+  ))
+}
+
+export async function loadMessageReactions(messageIds = []) {
+  const uniqueIds = [...new Set(messageIds.filter(Boolean))]
+  if (uniqueIds.length === 0) return new Map()
+
+  const { data, error } = await supabase
+    .from('message_reactions')
+    .select(REACTION_SELECT)
+    .in('message_id', uniqueIds)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    if (isMissingReactionsTableError(error)) {
+      chatFeatureSupport.reactions = false
+      return new Map()
+    }
+    throw error
+  }
+  chatFeatureSupport.reactions = true
+
+  const reactionsByMessageId = new Map()
+  ;(data || []).forEach((reaction) => {
+    const current = reactionsByMessageId.get(reaction.message_id) || []
+    current.push(reaction)
+    reactionsByMessageId.set(reaction.message_id, current)
+  })
+  return reactionsByMessageId
+}
+
+async function enrichMessages(rows = []) {
+  const messages = sortMessages(dedupeMessagesById(rows || []))
+  if (messages.length === 0) return []
+
+  const messageIds = messages.map((message) => message.id)
+  const messageIdSet = new Set(messageIds)
+  const replyIds = [...new Set(messages.map((message) => message.reply_to_message_id).filter((replyId) => replyId && !messageIdSet.has(replyId)))]
+
+  const [replyRows, reactionsByMessageId] = await Promise.all([
+    loadMessagePreviewsByIds(replyIds),
+    loadMessageReactions(messageIds),
+  ])
+
+  const repliesById = new Map()
+  messages.forEach((message) => {
+    const preview = toReplyPreview(message)
+    if (preview) repliesById.set(preview.id, preview)
+  })
+  replyRows.forEach((row) => {
+    const preview = toReplyPreview(row)
+    if (preview) repliesById.set(preview.id, preview)
+  })
+
+  return messages.map((message) => ({
+    ...message,
+    reply_to_message: message.reply_to_message_id ? repliesById.get(message.reply_to_message_id) || null : null,
+    reactions: reactionsByMessageId.get(message.id) || [],
+  }))
 }
 
 async function loadProfilesByUserIds(ids = []) {
   const uniqueIds = [...new Set(ids.filter(Boolean))]
   if (uniqueIds.length === 0) return new Map()
 
-  const { data, error } = await supabase
-    .from('profiles')
-    .select(PROFILE_SELECT)
-    .in('user_id', uniqueIds)
-    .eq('is_published', true)
+  const [profilesResult, accountsResult] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select(PROFILE_SELECT)
+      .in('user_id', uniqueIds),
+    supabase
+      .from('accounts')
+      .select(ACCOUNT_AVATAR_SELECT)
+      .in('id', uniqueIds),
+  ])
 
-  if (error) throw error
-  return new Map((data || []).map((row) => [row.user_id, {
-    display_name: row.name || '',
-    full_name: row.name || '',
-    avatar_url: row.image_url || '',
-  }]))
+  if (profilesResult.error) throw profilesResult.error
+  if (accountsResult.error) throw accountsResult.error
+
+  const accountsByUserId = new Map((accountsResult.data || []).map((row) => [row.id, row]))
+  const profileEntries = (profilesResult.data || []).map((row) => {
+    const account = accountsByUserId.get(row.user_id) || {}
+    const accountAvatarUrl = account.avatar_url || ''
+    const avatarCandidates = [row.image_url, accountAvatarUrl, avatarFor(row.name || '')].filter(Boolean)
+    return [row.user_id, {
+      display_name: row.name || account.display_name || account.full_name || '',
+      full_name: row.name || account.full_name || '',
+      avatar_url: avatarCandidates[0] || '',
+      avatar_candidates: avatarCandidates,
+    }]
+  })
+
+  const profilesByUserId = new Map(profileEntries)
+  uniqueIds.forEach((userId) => {
+    if (profilesByUserId.has(userId)) return
+    const account = accountsByUserId.get(userId)
+    if (!account) return
+    const name = account.display_name || account.full_name || (account.email ? account.email.split('@')[0] : '')
+    const avatarCandidates = [account.avatar_url, avatarFor(name)].filter(Boolean)
+    profilesByUserId.set(userId, {
+      display_name: name,
+      full_name: account.full_name || name,
+      avatar_url: avatarCandidates[0] || '',
+      avatar_candidates: avatarCandidates,
+    })
+  })
+
+  return profilesByUserId
 }
 
 function normalizeConversation(conversation, profilesByUserId) {
@@ -233,13 +503,71 @@ export async function loadConversation(conversationId) {
 
 export async function loadMessages(conversationId) {
   if (!conversationId) return []
-  const { data, error } = await supabase
-    .from('messages')
-    .select(MESSAGE_SELECT)
-    .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: true })
-  if (error) throw error
-  return sortMessages(data || [])
+  const data = await runMessageQuery((select) => (
+    supabase
+      .from('messages')
+      .select(select)
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true })
+  ))
+  return enrichMessages(data || [])
+}
+
+export async function loadMessageById(messageId) {
+  if (!messageId) return null
+  const data = await runMessageQuery((select) => (
+    supabase
+      .from('messages')
+      .select(select)
+      .eq('id', messageId)
+      .maybeSingle()
+  ))
+  if (!data) return null
+  const [message] = await enrichMessages([data])
+  return message || null
+}
+
+export async function loadMessagePage(conversationId, { limit = MESSAGE_PAGE_SIZE, before = null } = {}) {
+  if (!conversationId) {
+    return {
+      messages: [],
+      hasOlder: false,
+      oldestCursor: null,
+      newestCursor: null,
+    }
+  }
+
+  const safeLimit = Math.max(1, Math.min(100, Number(limit) || MESSAGE_PAGE_SIZE))
+  const data = await runMessageQuery((select) => {
+    let query = supabase
+      .from('messages')
+      .select(select)
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(safeLimit + 1)
+
+    if (before?.created_at && before?.id) {
+      const createdAt = normalizeCursorTimestamp(before.created_at)
+      if (createdAt) {
+        query = query.or(`created_at.lt.${createdAt},and(created_at.eq.${createdAt},id.lt.${before.id})`)
+      }
+    }
+
+    return query
+  })
+
+  const descendingRows = dedupeMessagesById(data || [])
+  const hasOlder = descendingRows.length > safeLimit
+  const pageRows = hasOlder ? descendingRows.slice(0, safeLimit) : descendingRows
+  const messages = await enrichMessages(pageRows)
+
+  return {
+    messages,
+    hasOlder,
+    oldestCursor: getMessageCursor(messages[0] || null),
+    newestCursor: getMessageCursor(messages[messages.length - 1] || null),
+  }
 }
 
 export async function markConversationRead(conversation, userId) {
@@ -324,9 +652,39 @@ export async function createConversationWithClient({ clientId, partnerId, projec
   return data
 }
 
-export async function sendTextMessage({ conversationId, body }) {
-  const result = await invokeChatAction('send_message', { conversationId, body, kind: 'text' })
+export async function sendTextMessage({ conversationId, body, replyToMessageId = '' }) {
+  const result = await invokeChatAction('send_message', { conversationId, body, kind: 'text', replyToMessageId })
   return result
+}
+
+export async function toggleMessageReaction({ messageId, emoji, userId, active }) {
+  if (!messageId || !emoji || !userId) throw new Error('Липсва реакция или съобщение.')
+
+  if (active) {
+    const { error } = await supabase
+      .from('message_reactions')
+      .delete()
+      .eq('message_id', messageId)
+      .eq('user_id', userId)
+      .eq('emoji', emoji)
+    if (error) throw error
+    return
+  }
+
+  const { error } = await supabase
+    .from('message_reactions')
+    .upsert(
+      {
+        message_id: messageId,
+        user_id: userId,
+        emoji,
+      },
+      {
+        onConflict: 'message_id,user_id,emoji',
+        ignoreDuplicates: true,
+      },
+    )
+  if (error) throw error
 }
 
 export async function sendOffer({ conversationId, offer }) {
@@ -359,6 +717,7 @@ export function subscribeToConversation(conversationId, onChange) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `id=eq.${conversationId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'offers', filter: `conversation_id=eq.${conversationId}` }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, onChange)
     .subscribe()
 
   return () => { supabase.removeChannel(channel) }

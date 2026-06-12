@@ -196,12 +196,25 @@ Deno.serve(async (req) => {
     if (action === 'send_message') {
       const conversationId = assertUuid(payload.conversationId, 'Conversation id')
       const kind = String(payload.kind || 'text')
+      const replyToMessageId = optionalUuid(payload.replyToMessageId)
       if (!MESSAGE_KINDS.has(kind)) throw new Error('Message kind is invalid.')
 
       const { data: conversation, error: conversationError } = await adminClient.from('conversations').select('*').eq('id', conversationId).single()
       if (conversationError) throw conversationError
       if (!isParticipant(conversation, user.id)) throw new Error('Conversation access denied.')
       if (conversation.status !== 'open') throw new Error('Conversation is not open.')
+
+      if (replyToMessageId) {
+        const { data: replyTarget, error: replyError } = await adminClient
+          .from('messages')
+          .select('id, conversation_id')
+          .eq('id', replyToMessageId)
+          .maybeSingle()
+        if (replyError) throw replyError
+        if (!replyTarget || replyTarget.conversation_id !== conversationId) {
+          throw new Error('Reply target is invalid.')
+        }
+      }
 
       const since = new Date(Date.now() - 60_000).toISOString()
       const { count, error: countError } = await adminClient.from('messages').select('id', { count: 'exact', head: true }).eq('sender_id', user.id).gte('created_at', since)
@@ -218,6 +231,7 @@ Deno.serve(async (req) => {
         kind,
         body: bodyResult.masked.trim(),
         attachments,
+        reply_to_message_id: replyToMessageId,
         was_masked: bodyResult.wasMasked,
       }).select('*').single()
       if (messageError) throw messageError
