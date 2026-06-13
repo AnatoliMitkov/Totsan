@@ -77,6 +77,25 @@ function stripCacheBust(url) {
   }
 }
 
+function getApplicationDetails(row) {
+  const raw = row?.details
+  if (!raw) return {}
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+    } catch {
+      return {}
+    }
+  }
+  return typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
+}
+
+function getApplicationSelfPhotoUrl(row) {
+  const details = getApplicationDetails(row)
+  return String(details?.basic?.selfPhotoUrl || '').trim()
+}
+
 function validateBannerFile(file) {
   if (!file) return 'Липсва файл.'
   if (!file.type.startsWith('image/')) return 'Моля, избери изображение за банера.'
@@ -818,8 +837,20 @@ function ProEditor({ session, account, refreshAccount }) {
       return
     }
 
+    if (appRes.data) {
+      setApplication(appRes.data)
+    } else {
+      setApplication(null)
+    }
+
     if (profRes.data) {
-      setProfile(normalizeProfile(profRes.data))
+      const fallbackSelfPhotoUrl = getApplicationSelfPhotoUrl(appRes.data)
+      const normalizedProfile = normalizeProfile(profRes.data)
+      setProfile(
+        !normalizedProfile.imageUrl && fallbackSelfPhotoUrl
+          ? { ...normalizedProfile, imageUrl: fallbackSelfPhotoUrl }
+          : normalizedProfile
+      )
       setStatus('ready')
       return
     }

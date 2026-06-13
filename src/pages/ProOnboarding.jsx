@@ -38,7 +38,7 @@ const REQUIRED_FIELDS = [
     { key: 'name', isComplete: draft => Boolean(draft.name.trim()), message: 'Добавете име или фирма.' },
     { key: 'partnerType', isComplete: draft => Boolean(draft.partnerType), message: 'Изберете тип партньор.' },
     { key: 'selfPhotoUrl', isComplete: draft => Boolean(draft.selfPhotoUrl), message: 'Добавете една снимка на себе си.' },
-    { key: 'phone', isComplete: draft => Boolean(draft.phone.trim()), message: 'Първо добавете телефон за проверка.' },
+    { key: 'phone', isComplete: draft => isValidPhone(draft.phone), message: 'Добавете валиден телефонен номер.' },
     { key: 'city', isComplete: draft => Boolean(draft.city.trim()), message: 'Добавете град.' },
   ],
   [
@@ -94,6 +94,15 @@ function hasSocialProfile(draft) {
     draft.instagram,
     ...(Array.isArray(draft.socialLinks) ? draft.socialLinks.map(item => item.url) : []),
   ].some(value => String(value || '').trim())
+}
+
+function normalizePhone(value) {
+  return String(value || '').replace(/\D/g, '').slice(0, 15)
+}
+
+function isValidPhone(value) {
+  const digits = normalizePhone(value)
+  return digits.length >= 8 && digits.length <= 15
 }
 
 function makeProofProject() {
@@ -700,7 +709,7 @@ function BasicStep({ draft, update, touchedFields, attempted, markTouched, photo
       <SelfPhotoField draft={draft} attempted={attempted} uploadState={photoUploadState} onPhotoFile={onPhotoFile} />
       <SocialProfilesField draft={draft} update={update} attempted={attempted} />
       <div className="grid gap-4 md:grid-cols-2">
-        <TextField label="Телефон" value={draft.phone} onChange={event => update('phone', event.target.value)} onBlur={() => markTouched('phone')} type="tel" required touched={touchedFields.phone} attempted={attempted} helper="Телефонът е нужен за проверка от Totsan. Няма да бъде публичен без ваше разрешение." errorText="Първо добавете телефон за проверка." />
+        <TextField label="Телефон" value={draft.phone} onChange={event => update('phone', normalizePhone(event.target.value))} onBlur={() => markTouched('phone')} type="tel" inputMode="numeric" pattern="[0-9]*" required valid={isValidPhone} touched={touchedFields.phone} attempted={attempted} helper="Въведете само цифри. Телефонът е нужен за проверка от Totsan." errorText="Добавете валиден телефонен номер." />
         <TextField label="Град" value={draft.city} onChange={event => update('city', event.target.value)} onBlur={() => markTouched('city')} required touched={touchedFields.city} attempted={attempted} errorText="Добавете град." />
       </div>
     </div>
@@ -783,12 +792,22 @@ function SelfPhotoField({ draft, attempted, uploadState, onPhotoFile }) {
 }
 
 function ServicesStep({ draft, update, toggleArray, attempted }) {
+  function handleServiceToggle(value) {
+    const wasSelected = draft.services.includes(value)
+    toggleArray('services', value)
+    if (value === 'друго' && wasSelected) {
+      update('customService', '')
+    }
+  }
+
+  const hasOtherService = draft.services.includes('друго')
+
   return (
     <div className="space-y-5">
       <TotsanSelect label="Какъв тип услуги предлагате?" value={draft.mainCategory} onChange={(value) => update('mainCategory', value)} options={MAIN_CATEGORIES} placeholder="Изберете основна категория" />
-      <ChipGrid options={SERVICE_OPTIONS} selected={draft.services} onToggle={(value) => toggleArray('services', value)} />
+      <ChipGrid options={SERVICE_OPTIONS} selected={draft.services} onToggle={handleServiceToggle} />
       {attempted && draft.services.length === 0 && <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">Изберете поне една услуга.</div>}
-      <Field label="Друга услуга (по желание)"><input value={draft.customService} onChange={event => update('customService', event.target.value)} className={INPUT} placeholder="Напр. реставрация, дограма, озеленяване..." /></Field>
+      {hasOtherService && <Field label="Друга услуга (по желание)"><input value={draft.customService} onChange={event => update('customService', event.target.value)} className={INPUT} placeholder="Напр. реставрация, дограма, озеленяване..." /></Field>}
     </div>
   )
 }
@@ -993,6 +1012,8 @@ function TextField({
   onChange,
   onBlur,
   type = 'text',
+  inputMode = undefined,
+  pattern = undefined,
   rows = 0,
   placeholder = '',
   helper = '',
@@ -1025,6 +1046,8 @@ function TextField({
           onChange={onChange}
           onBlur={onBlur}
           type={rows ? undefined : type}
+          inputMode={rows ? undefined : inputMode}
+          pattern={rows ? undefined : pattern}
           rows={rows || undefined}
           placeholder={placeholder}
           required={required}

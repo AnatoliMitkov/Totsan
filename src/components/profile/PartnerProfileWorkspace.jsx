@@ -245,18 +245,20 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     setSaveState({ status: 'uploading', message: 'Оптимизираме и качваме банера…' })
     try {
       const result = await uploadProfileCover({ file, target: userId })
-      updateProfile('coverUrl', result.publicUrl)
+      const nextCoverUrl = result.publicUrl || result.signedUrl || ''
+      if (!nextCoverUrl) throw new Error('Банерът е качен, но липсва валиден адрес.')
+      updateProfile('coverUrl', nextCoverUrl)
       updateProfile('coverY', 50)
       
       // Auto-save to database immediately so it is not lost
       const { error } = await supabase
         .from('profiles')
-        .update({ cover_url: result.publicUrl, cover_y: 50 })
+        .update({ cover_url: nextCoverUrl, cover_y: 50 })
         .eq('id', currentProfile.id)
       
       if (error) throw error
       
-      setCurrentProfile(current => ({ ...current, coverUrl: result.publicUrl, coverY: 50 }))
+      setCurrentProfile(current => ({ ...current, coverUrl: nextCoverUrl, coverY: 50 }))
       setSaveState({ status: 'saved', message: 'Банерът е качен и запазен.' })
       await refreshAccount?.()
     } catch (error) {
@@ -416,7 +418,9 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     setSaveState({ status: 'uploading', message: 'Оптимизираме и качваме снимката…' })
     try {
       const result = await uploadProfileMedia({ file, target: userId })
-      updateProfile('imageUrl', result.publicUrl)
+      const nextImageUrl = result.publicUrl || result.signedUrl || ''
+      if (!nextImageUrl) throw new Error('Снимката е качена, но липсва валиден адрес.')
+      updateProfile('imageUrl', nextImageUrl)
       updateProfile('imageZoom', 1)
       updateProfile('imageX', 50)
       updateProfile('imageY', 50)
@@ -424,12 +428,12 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       // Auto-save to database immediately so it is not lost
       const { error } = await supabase
         .from('profiles')
-        .update({ image_url: result.publicUrl, image_zoom: 1, image_x: 50, image_y: 50 })
+        .update({ image_url: nextImageUrl, image_zoom: 1, image_x: 50, image_y: 50 })
         .eq('id', currentProfile.id)
       
       if (error) throw error
       
-      setCurrentProfile(current => ({ ...current, imageUrl: result.publicUrl, imageZoom: 1, imageX: 50, imageY: 50 }))
+      setCurrentProfile(current => ({ ...current, imageUrl: nextImageUrl, imageZoom: 1, imageX: 50, imageY: 50 }))
       setSaveState({ status: 'saved', message: 'Профилната снимка е качена и запазена.' })
       await refreshAccount?.()
     } catch (error) {
@@ -495,6 +499,8 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     if (profileDraft.syncAccountName) {
       await saveCustomerAccountProfile(buildAccountNameSyncPayload(account, normalized.name))
       await refreshAccount?.()
+      await onSaved?.()
+      await onSaved?.()
     }
     setCurrentProfile(normalized)
     setProfileDraft(makeProfileDraft(normalized))

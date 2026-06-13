@@ -188,8 +188,16 @@ Deno.serve(async (req) => {
       }
 
       const reviewedAt = new Date().toISOString()
+      const accountPayload: Record<string, unknown> = {
+        role: 'specialist',
+        specialist_status: 'approved',
+        account_status: 'active',
+        last_admin_action_at: reviewedAt,
+      }
+      if (profileImageUrl) accountPayload.avatar_url = profileImageUrl
+
       const [{ error: accountError }, { data: updatedApplication, error: updateAppError }] = await Promise.all([
-        adminClient.from('accounts').update({ role: 'specialist', specialist_status: 'approved', account_status: 'active', last_admin_action_at: reviewedAt }).eq('id', app.user_id),
+        adminClient.from('accounts').update(accountPayload).eq('id', app.user_id),
         adminClient.from('partner_applications').update({ status: 'approved', reviewed_at: reviewedAt, decision_note: decisionNote }).eq('id', applicationId).select('*').single(),
       ])
       if (accountError) throw accountError

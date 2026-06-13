@@ -167,38 +167,39 @@ function ApplicationDetailsModal({ row, onClose }) {
   const areaChips = splitTextList(areas.nearbyPlaces)
   const outsideCity = getOutsideCityValue(details, areas)
   const socialProfiles = basic.socialProfiles || {}
+  const selfPhotoUrl = basic.selfPhotoUrl || row.image_url || ''
   const socialProfileLinks = [
     ['Website', socialProfiles.website],
     ['Facebook', socialProfiles.facebook],
     ['Instagram', socialProfiles.instagram],
-    ...toArray(socialProfiles.other).map((item) => [item.label || 'Профил', item.url]),
+    ...toObjectArray(socialProfiles.other).map((item) => [item.label || 'Профил', item.url]),
   ].filter(([, value]) => hasValue(value))
-  const proofLinks = [
-    ['Website', proof.website],
-    ['Facebook', proof.facebook],
-    ['Instagram', proof.instagram],
-  ].filter(([, value]) => hasValue(value))
-  const proofProjects = toArray(proof.projects)
-  const workStyleChips = toArray(workStyle.modes).map(value => WORK_STYLE_LABELS[value] || value)
-  const workStyleRows = [
-    ['Допълнително описание', workStyle.custom],
-    ['Оферира по снимки', formatBoolean(workStyle.quoteByPhotos)],
-    ['Гаранция', formatBoolean(workStyle.warranty)],
-    ['Фактура / договор', formatBoolean(workStyle.invoiceContract)],
-    ['Наличност', workStyle.availability],
+  const proofProjects = toObjectArray(proof.projects)
+  const workStyleChips = toTextArray(workStyle.modes).map((value) => WORK_STYLE_LABELS[value] || value)
+  const summaryTiles = [
+    ['Категория', category || '—'],
+    ['Основен град', areas.primaryCity || basic.city || row.city || '—'],
+    ['Извън града', formatOutsideDecision(areas.outsideCityDecision) || formatBoolean(outsideCity) || '—'],
+    ['Тип партньор', basic.partnerType || details.partnerType || '—'],
   ]
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-ink/35 px-4 py-6 backdrop-blur-sm">
       <div className="mx-auto max-w-5xl rounded-[2rem] border border-white/70 bg-paper p-5 shadow-[0_40px_120px_-60px_rgba(13,35,64,0.75)] md:p-7">
         <div className="flex flex-col gap-4 border-b border-line pb-5 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="eyebrow">Преглед на кандидатура</div>
-            <h2 className="mt-2 font-display text-3xl text-ink">{row.name || 'Без име'}</h2>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <StatusPill value={row.status} />
-              <InfoChip>{formatAdminDate(row.created_at)}</InfoChip>
-              {row.reviewed_at && <InfoChip>решение: {formatAdminDate(row.reviewed_at)}</InfoChip>}
+          <div className="flex min-w-0 flex-1 items-start gap-4">
+            <ApplicantAvatar photoUrl={selfPhotoUrl} name={row.name || basic.name || row.company} />
+            <div className="min-w-0 flex-1">
+              <div className="eyebrow">Преглед на кандидатура</div>
+              <h2 className="mt-2 break-words font-display text-3xl text-ink">{row.name || basic.name || 'Без име'}</h2>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <StatusPill value={row.status} />
+                <InfoChip>{formatAdminDate(row.created_at)}</InfoChip>
+                {row.reviewed_at && <InfoChip>решение: {formatAdminDate(row.reviewed_at)}</InfoChip>}
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {summaryTiles.map(([label, value]) => <ReviewTile key={label} label={label} value={value} compact />)}
+              </div>
             </div>
           </div>
           <button type="button" onClick={onClose} className="btn btn-ghost self-start !px-3" aria-label="Затвори"><X size={18} /></button>
@@ -207,12 +208,11 @@ function ApplicationDetailsModal({ row, onClose }) {
         <div className="mt-6 grid gap-5 lg:grid-cols-2">
           <DetailSection title="Основна информация">
             <Rows rows={[
-              ['Име / фирма', row.name],
-              ['Фирма', row.company],
-              ['Тип партньор', details.partnerType],
-              ['Имейл', row.email],
-              ['Телефон', row.phone],
-              ['Град', details.city || row.city],
+              ['Име / фирма', row.name || basic.name],
+              ['Тип партньор', basic.partnerType || details.partnerType],
+              ['Имейл', row.email || basic.accountEmail],
+              ['Телефон', row.phone || basic.phone],
+              ['Град', basic.city || details.city || row.city],
               ['Статус', APPLICATION_STATUS_LABELS[row.status] || row.status],
               ['Бележка при решение', row.decision_note],
             ]} />
@@ -228,34 +228,30 @@ function ApplicationDetailsModal({ row, onClose }) {
               ['Категория', category],
               ['Друга услуга', services.custom],
             ]} />
-            <TitledChips title="Услуги" values={services.selected} />
+            <TitledChips title="Услуги" values={toTextArray(services.selected)} />
           </DetailSection>
 
           <DetailSection title="Къде работи">
             <Rows rows={[
               ['Основен град', areas.primaryCity],
-              ['Радиус', areas.radius],
-              ['Работи извън основния град', formatBoolean(outsideCity)],
+              ['Приема проекти извън града', formatOutsideDecision(areas.outsideCityDecision) || formatBoolean(outsideCity)],
+              ['Радиус на работа', outsideCity ? areas.radius : ''],
+              ['Ограничава се до конкретни райони', formatBoolean(areas.limitToSpecificAreas)],
             ]} hideEmpty={areaChips.length > 0} />
             <TitledChips title="Райони / населени места" values={areaChips} />
           </DetailSection>
 
           <DetailSection title="Как работи">
             <TitledChips title="Начин на работа" values={workStyleChips} />
-            <Rows rows={workStyleRows} hideEmpty={workStyleChips.length > 0} />
+            <Rows rows={[
+              ['Допълнително описание', workStyle.custom],
+            ]} hideEmpty={workStyleChips.length > 0} />
           </DetailSection>
 
           <DetailSection title="Доказателства">
             <Rows rows={[
-              ['Примерен проект', proof.projectDescription],
               ['Бележка', proof.note],
-              ['Снимки', proof.uploadsDeferred ? 'Ще бъдат добавени по-късно' : ''],
-            ]} hideEmpty={proofLinks.length > 0} />
-            {proofLinks.length > 0 && (
-              <div className="mt-3 space-y-2">
-                {proofLinks.map(([label, value]) => <LinkRow key={label} label={label} value={value} />)}
-              </div>
-            )}
+            ]} hideEmpty={proofProjects.length > 0} />
             <ProjectProofCards projects={proofProjects} />
           </DetailSection>
 
@@ -268,17 +264,30 @@ function ApplicationDetailsModal({ row, onClose }) {
             ]} />
           </DetailSection>
         </div>
-
-        <DetailSection title="Преглед" className="mt-5">
-          <div className="grid gap-3 md:grid-cols-5">
-            <ReviewTile label="Кандидат" value={row.name || '—'} />
-            <ReviewTile label="Категория" value={category || '—'} />
-            <ReviewTile label="Район" value={areas.primaryCity || areas.nearbyPlaces || details.city || '—'} />
-            <ReviewTile label="Статус" value={APPLICATION_STATUS_LABELS[row.status] || row.status || '—'} />
-            <ReviewTile label="Подадена на" value={formatAdminDate(row.created_at)} />
-          </div>
-        </DetailSection>
       </div>
+    </div>
+  )
+}
+
+function ApplicantAvatar({ photoUrl, name }) {
+  if (hasValue(photoUrl)) {
+    return (
+      <div className="h-20 w-20 shrink-0 overflow-hidden rounded-3xl border border-white/70 bg-soft shadow-[0_18px_50px_-34px_rgba(13,35,64,0.55)]">
+        <img src={photoUrl} alt={name || 'Профилна снимка'} className="h-full w-full object-cover" />
+      </div>
+    )
+  }
+
+  const initials = String(name || 'Т')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || 'Т'
+
+  return (
+    <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-[linear-gradient(135deg,#17305c_0%,#3058a6_100%)] text-xl font-semibold text-white shadow-[0_18px_50px_-34px_rgba(13,35,64,0.55)]">
+      {initials}
     </div>
   )
 }
@@ -308,7 +317,7 @@ function Rows({ rows, hideEmpty = false }) {
 }
 
 function ChipList({ values }) {
-  const items = toArray(values).filter(Boolean)
+  const items = toTextArray(values).filter(Boolean)
   if (items.length === 0) return <EmptySection />
   return (
     <div className="flex flex-wrap gap-2">
@@ -318,7 +327,7 @@ function ChipList({ values }) {
 }
 
 function TitledChips({ title, values }) {
-  const items = toArray(values).filter(Boolean)
+  const items = toTextArray(values).filter(Boolean)
   if (items.length === 0) return null
   return (
     <div className="mt-3 rounded-2xl border border-white/70 bg-paper/75 p-3">
@@ -344,13 +353,13 @@ function LinkRow({ label, value }) {
 }
 
 function ProjectProofCards({ projects }) {
-  const items = toArray(projects).filter(project => hasValue(project?.description) || toArray(project?.photos).length > 0)
+  const items = toObjectArray(projects).filter(project => hasValue(project?.description) || toObjectArray(project?.photos).length > 0)
   if (items.length === 0) return null
 
   return (
     <div className="mt-3 space-y-3">
       {items.map((project, index) => {
-        const photos = toArray(project.photos).filter(photo => hasValue(photo?.url))
+        const photos = toObjectArray(project.photos).filter(photo => hasValue(photo?.url))
         return (
           <div key={project.id || index} className="rounded-2xl border border-white/70 bg-paper/75 p-3">
             <div className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-muted">Проект {index + 1}</div>
@@ -376,9 +385,9 @@ function InfoChip({ children, tone = 'neutral' }) {
   return <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${classes}`}>{children}</span>
 }
 
-function ReviewTile({ label, value }) {
+function ReviewTile({ label, value, compact = false }) {
   return (
-    <div className="rounded-2xl border border-white/70 bg-paper/75 p-4">
+    <div className={`rounded-2xl border border-white/70 bg-paper/75 ${compact ? 'p-3' : 'p-4'}`}>
       <div className="text-xs uppercase tracking-[0.14em] text-muted">{label}</div>
       <div className="mt-1 font-semibold text-ink">{value}</div>
     </div>
@@ -413,9 +422,19 @@ function getCategoryLabel(row, details = getDetails(row)) {
 }
 
 function toArray(value) {
-  if (Array.isArray(value)) return value.map(item => String(item || '').trim()).filter(Boolean)
+  if (Array.isArray(value)) return value
   if (typeof value === 'string') return value.split(',').map(item => item.trim()).filter(Boolean)
   return []
+}
+
+function toTextArray(value) {
+  return toArray(value)
+    .map((item) => typeof item === 'string' ? item.trim() : String(item || '').trim())
+    .filter(Boolean)
+}
+
+function toObjectArray(value) {
+  return toArray(value).filter((item) => item && typeof item === 'object' && !Array.isArray(item))
 }
 
 function splitTextList(value) {
