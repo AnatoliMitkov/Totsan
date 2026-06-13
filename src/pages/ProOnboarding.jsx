@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, BriefcaseBusiness, Check, CheckCircle2, ClipboardList, FileCheck2, MapPin, ShieldCheck, Sparkles, UserRound } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BriefcaseBusiness, Camera, Check, CheckCircle2, ClipboardList, FileCheck2, ImagePlus, MapPin, Plus, ShieldCheck, Sparkles, Trash2, UserRound } from 'lucide-react'
 import { useAccount } from '../lib/account.js'
 import { supabase } from '../lib/supabase.js'
+import { uploadPortfolioMedia, uploadProfileMedia } from '../lib/profile-media-upload-client.js'
 import TotsanSelect from '../components/ui/TotsanSelect.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
@@ -20,11 +21,7 @@ const SERVICE_OPTIONS = ['баня до ключ', 'ВиК', 'електро', '
 const WORK_STYLE_OPTIONS = [
   ['laborOnly', 'Само труд'],
   ['laborMaterials', 'Труд + материали'],
-  ['consultation', 'Консултация'],
-  ['siteVisit', 'Оглед на място'],
-  ['fullOrganization', 'Цялостна организация'],
 ]
-const AVAILABILITY_OPTIONS = ['Веднага', 'До 2 седмици', 'До 1 месец', 'По график']
 
 const STEPS = [
   { title: 'Основна информация', icon: UserRound },
@@ -40,6 +37,7 @@ const REQUIRED_FIELDS = [
   [
     { key: 'name', isComplete: draft => Boolean(draft.name.trim()), message: 'Добавете име или фирма.' },
     { key: 'partnerType', isComplete: draft => Boolean(draft.partnerType), message: 'Изберете тип партньор.' },
+    { key: 'selfPhotoUrl', isComplete: draft => Boolean(draft.selfPhotoUrl), message: 'Добавете една снимка на себе си.' },
     { key: 'phone', isComplete: draft => Boolean(draft.phone.trim()), message: 'Първо добавете телефон за проверка.' },
     { key: 'city', isComplete: draft => Boolean(draft.city.trim()), message: 'Добавете град.' },
   ],
@@ -48,14 +46,17 @@ const REQUIRED_FIELDS = [
     { key: 'services', isComplete: draft => draft.services.length > 0, message: 'Изберете поне една услуга.' },
   ],
   [
-    { key: 'primaryCityOrAreas', isComplete: draft => Boolean(draft.primaryCity.trim() || draft.serviceAreas.trim()), message: 'Добавете основен град или район на работа.' },
-    { key: 'radiusOrOutside', isComplete: draft => Boolean(draft.workRadius.trim() || draft.outsideCityDecision), message: 'Добавете радиус или изберете дали приемате извън града.' },
+    { key: 'primaryCity', isComplete: draft => Boolean(draft.primaryCity.trim()), message: 'Добавете основен град.' },
+    { key: 'outsideCityDecision', isComplete: draft => Boolean(draft.outsideCityDecision), message: 'Изберете дали приемате проекти извън града.' },
+    { key: 'workRadius', isComplete: draft => draft.outsideCityDecision !== 'yes' || Boolean(draft.workRadius.trim()), message: 'Добавете радиус на работа.' },
+    { key: 'serviceAreas', isComplete: draft => !draft.limitToSpecificAreas || Boolean(draft.serviceAreas.trim()), message: 'Добавете конкретни райони.' },
   ],
   [
-    { key: 'workStyle', isComplete: draft => draft.workStyle.length > 0, message: 'Изберете поне един начин на работа.' },
-    { key: 'availability', isComplete: draft => Boolean(draft.availability), message: 'Изберете наличност.' },
+    { key: 'workStyle', isComplete: draft => draft.workStyle.length > 0 || Boolean(draft.customWorkStyle.trim()), message: 'Изберете начин на работа или добавете описание.' },
   ],
-  [],
+  [
+    { key: 'proofProjects', isComplete: draft => draft.proofProjects.length > 0 && draft.proofProjects.every(project => project.description.trim() && project.photos.length > 0), message: 'Добавете поне един проект с описание и снимка.' },
+  ],
   [
     { key: 'intro', isComplete: draft => Boolean(draft.intro.trim()), message: 'Добавете кратко професионално представяне.' },
     { key: 'strongestOrPreferred', isComplete: draft => Boolean(draft.strongestServices.trim() || draft.preferredProjects.trim()), message: 'Добавете най-силни услуги или предпочитан тип проекти.' },
@@ -77,13 +78,30 @@ function getStepCompletion(draft, index) {
 }
 
 function isStepStarted(draft, index) {
-  if (index === 0) return Boolean(draft.name.trim() || draft.partnerType || draft.phone.trim() || draft.city.trim() || draft.worksOutsideCity)
+  if (index === 0) return Boolean(draft.name.trim() || draft.partnerType || draft.selfPhotoUrl || hasSocialProfile(draft) || draft.phone.trim() || draft.city.trim() || draft.worksOutsideCity)
   if (index === 1) return Boolean(draft.mainCategory || draft.services.length || draft.customService.trim())
-  if (index === 2) return Boolean(draft.primaryCity.trim() || draft.serviceAreas.trim() || draft.workRadius.trim() || draft.outsideCityDecision)
-  if (index === 3) return Boolean(draft.workStyle.length || draft.quoteByPhotos || draft.warranty || draft.invoiceContract || draft.availability)
-  if (index === 4) return Boolean(draft.projectProof.trim() || draft.website.trim() || draft.facebook.trim() || draft.instagram.trim() || draft.proofNote.trim())
+  if (index === 2) return Boolean(draft.primaryCity.trim() || draft.serviceAreas.trim() || draft.workRadius.trim() || draft.outsideCityDecision || draft.limitToSpecificAreas)
+  if (index === 3) return Boolean(draft.workStyle.length || draft.customWorkStyleEnabled || draft.customWorkStyle.trim())
+  if (index === 4) return draft.proofProjects.length > 0
   if (index === 5) return Boolean(draft.intro.trim() || draft.strongestServices.trim() || draft.preferredProjects.trim() || draft.rejectedProjects.trim())
   return false
+}
+
+function hasSocialProfile(draft) {
+  return [
+    draft.website,
+    draft.facebook,
+    draft.instagram,
+    ...(Array.isArray(draft.socialLinks) ? draft.socialLinks.map(item => item.url) : []),
+  ].some(value => String(value || '').trim())
+}
+
+function makeProofProject() {
+  return {
+    id: `project-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    description: '',
+    photos: [],
+  }
 }
 
 function getOverallProgress(draft) {
@@ -102,15 +120,21 @@ function makeInitialDraft(account, session) {
     phone: account?.phone || '',
     city: account?.city || '',
     worksOutsideCity: false,
+    selfPhotoUrl: '',
+    selfPhotoPath: '',
+    selfPhotoName: '',
     mainCategory: '',
     services: [],
     customService: '',
     primaryCity: account?.city || '',
     serviceAreas: '',
     workRadius: '',
+    limitToSpecificAreas: false,
     acceptsOutsideCity: false,
     outsideCityDecision: '',
     workStyle: [],
+    customWorkStyleEnabled: false,
+    customWorkStyle: '',
     quoteByPhotos: false,
     warranty: false,
     invoiceContract: false,
@@ -119,6 +143,8 @@ function makeInitialDraft(account, session) {
     website: '',
     facebook: '',
     instagram: '',
+    socialLinks: [{ id: 'social-primary', label: '', url: '' }],
+    proofProjects: [],
     proofNote: '',
     intro: '',
     strongestServices: '',
@@ -150,6 +176,9 @@ function mergeSavedDraft(base, saved) {
     phone: saved.phone?.trim() ? saved.phone : base.phone,
     city: saved.city?.trim() ? saved.city : base.city,
     primaryCity: saved.primaryCity?.trim() ? saved.primaryCity : base.primaryCity,
+    socialLinks: Array.isArray(saved.socialLinks) && saved.socialLinks.length ? saved.socialLinks : base.socialLinks,
+    proofProjects: Array.isArray(saved.proofProjects) ? saved.proofProjects : [],
+    limitToSpecificAreas: Boolean(saved.limitToSpecificAreas || saved.serviceAreas?.trim()),
     outsideCityDecision: saved.outsideCityDecision || (saved.acceptsOutsideCity ? 'yes' : ''),
   }
 }
@@ -161,6 +190,8 @@ export default function ProOnboarding() {
   const [draft, setDraft] = useState(() => makeInitialDraft(null, null))
   const [loadState, setLoadState] = useState({ status: 'idle', application: null, message: '' })
   const [submitState, setSubmitState] = useState({ status: 'idle', message: '' })
+  const [photoUploadState, setPhotoUploadState] = useState({ status: 'idle', message: '' })
+  const [proofUploadState, setProofUploadState] = useState({})
   const [touchedFields, setTouchedFields] = useState({})
   const [attemptedSteps, setAttemptedSteps] = useState({})
   const [pulseStep, setPulseStep] = useState(null)
@@ -241,6 +272,99 @@ export default function ProOnboarding() {
     })
   }
 
+  function updateProofProject(projectId, patch) {
+    setDraft(current => ({
+      ...current,
+      proofProjects: current.proofProjects.map(project => (
+        project.id === projectId ? { ...project, ...patch } : project
+      )),
+    }))
+  }
+
+  function addProofProject() {
+    setDraft(current => (
+      current.proofProjects.length >= 5
+        ? current
+        : { ...current, proofProjects: [...current.proofProjects, makeProofProject()] }
+    ))
+  }
+
+  function removeProofProject(projectId) {
+    setDraft(current => ({
+      ...current,
+      proofProjects: current.proofProjects.filter(project => project.id !== projectId),
+    }))
+  }
+
+  async function handleProofProjectPhotos(projectId, files) {
+    const selectedFiles = Array.from(files || []).filter(file => file.type.startsWith('image/'))
+    if (!selectedFiles.length) return
+
+    const project = draft.proofProjects.find(item => item.id === projectId)
+    const remainingSlots = Math.max(0, 8 - (project?.photos?.length || 0))
+    const filesToUpload = selectedFiles.slice(0, remainingSlots)
+    if (!filesToUpload.length) return
+
+    setProofUploadState(current => ({ ...current, [projectId]: 'uploading' }))
+    try {
+      const uploads = await Promise.all(filesToUpload.map(async (file) => {
+        const result = await uploadPortfolioMedia({ file, target: session.user.id, kind: 'photo' })
+        return {
+          url: result.publicUrl || result.signedUrl || '',
+          path: result.path || '',
+          name: file.name || 'project-photo',
+          width: result.width || null,
+          height: result.height || null,
+        }
+      }))
+
+      setDraft(current => ({
+        ...current,
+        proofProjects: current.proofProjects.map(item => (
+          item.id === projectId
+            ? { ...item, photos: [...item.photos, ...uploads].slice(0, 8) }
+            : item
+        )),
+      }))
+      setProofUploadState(current => ({ ...current, [projectId]: 'ready' }))
+    } catch (error) {
+      setProofUploadState(current => ({ ...current, [projectId]: error.message || 'Качването не успя.' }))
+    }
+  }
+
+  function removeProofProjectPhoto(projectId, photoIndex) {
+    setDraft(current => ({
+      ...current,
+      proofProjects: current.proofProjects.map(project => (
+        project.id === projectId
+          ? { ...project, photos: project.photos.filter((_, index) => index !== photoIndex) }
+          : project
+      )),
+    }))
+  }
+
+  async function handleSelfPhotoFile(file) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setPhotoUploadState({ status: 'error', message: 'Изберете снимка във валиден image формат.' })
+      return
+    }
+
+    setPhotoUploadState({ status: 'uploading', message: 'Качваме снимката...' })
+    try {
+      const result = await uploadProfileMedia({ file, target: session.user.id })
+      setDraft(current => ({
+        ...current,
+        selfPhotoUrl: result.publicUrl || '',
+        selfPhotoPath: result.path || '',
+        selfPhotoName: file.name || 'profile-photo',
+      }))
+      setPhotoUploadState({ status: 'ready', message: 'Снимката е качена.' })
+    } catch (error) {
+      setPhotoUploadState({ status: 'error', message: error.message || 'Качването на снимката не успя.' })
+    }
+  }
+
   function validateStep(index) {
     const completion = getStepCompletion(draft, index)
     return completion.missing[0]?.message || ''
@@ -272,6 +396,15 @@ export default function ProOnboarding() {
   }
 
   function next() {
+    if (step === 0 && photoUploadState.status === 'uploading') {
+      setSubmitState({ status: 'error', message: 'Изчакайте снимката да се качи.' })
+      return
+    }
+    if (step === 4 && Object.values(proofUploadState).some(value => value === 'uploading')) {
+      setSubmitState({ status: 'error', message: 'Изчакайте снимките към проекта да се качат.' })
+      return
+    }
+
     const error = validateStep(step)
     if (error) {
       markAttempted(step)
@@ -307,9 +440,18 @@ export default function ProOnboarding() {
         name: draft.name.trim(),
         accountEmail: session.user.email || draft.email,
         partnerType: draft.partnerType,
+        selfPhotoUrl: draft.selfPhotoUrl,
+        selfPhotoPath: draft.selfPhotoPath,
+        selfPhotoName: draft.selfPhotoName,
         phone: draft.phone.trim(),
         city: draft.city.trim(),
         worksOutsideCity: draft.worksOutsideCity,
+        socialProfiles: {
+          website: draft.website.trim(),
+          facebook: draft.facebook.trim(),
+          instagram: draft.instagram.trim(),
+          other: draft.socialLinks.map(item => ({ label: item.label.trim(), url: item.url.trim() })).filter(item => item.url),
+        },
       },
       partnerType: draft.partnerType,
       city: draft.city,
@@ -324,23 +466,25 @@ export default function ProOnboarding() {
         primaryCity: draft.primaryCity.trim(),
         nearbyPlaces: draft.serviceAreas.trim(),
         radius: draft.workRadius.trim(),
+        limitToSpecificAreas: draft.limitToSpecificAreas,
         acceptsOutsideCity: draft.acceptsOutsideCity,
         outsideCityDecision: draft.outsideCityDecision,
       },
       workStyle: {
         modes: draft.workStyle,
+        custom: draft.customWorkStyle.trim(),
         quoteByPhotos: draft.quoteByPhotos,
         warranty: draft.warranty,
         invoiceContract: draft.invoiceContract,
         availability: draft.availability,
       },
       proof: {
-        projectDescription: draft.projectProof.trim(),
-        website: draft.website.trim(),
-        facebook: draft.facebook.trim(),
-        instagram: draft.instagram.trim(),
+        projects: draft.proofProjects.map(project => ({
+          description: project.description.trim(),
+          photos: project.photos,
+        })),
         note: draft.proofNote.trim(),
-        uploadsDeferred: true,
+        uploadsDeferred: false,
       },
       presentation: {
         intro: draft.intro.trim(),
@@ -355,7 +499,7 @@ export default function ProOnboarding() {
       email: session.user.email,
       phone: draft.phone.trim(),
       layer_slug: draft.mainCategory,
-      about: draft.intro.trim() || draft.projectProof.trim() || null,
+      about: draft.intro.trim() || draft.proofProjects[0]?.description?.trim() || null,
       role: 'pro',
       status: 'pending',
       user_id: session.user.id,
@@ -480,11 +624,11 @@ export default function ProOnboarding() {
           )}
 
           <div className="mt-7">
-            {step === 0 && <BasicStep draft={draft} update={update} touchedFields={touchedFields} attempted={attemptedSteps[0]} markTouched={markTouched} />}
+            {step === 0 && <BasicStep draft={draft} update={update} touchedFields={touchedFields} attempted={attemptedSteps[0]} markTouched={markTouched} photoUploadState={photoUploadState} onPhotoFile={handleSelfPhotoFile} />}
             {step === 1 && <ServicesStep draft={draft} update={update} toggleArray={toggleArray} attempted={attemptedSteps[1]} />}
             {step === 2 && <AreasStep draft={draft} update={update} touchedFields={touchedFields} attempted={attemptedSteps[2]} markTouched={markTouched} />}
             {step === 3 && <WorkStyleStep draft={draft} update={update} toggleArray={toggleArray} attempted={attemptedSteps[3]} />}
-            {step === 4 && <ProofStep draft={draft} update={update} touchedFields={touchedFields} markTouched={markTouched} />}
+            {step === 4 && <ProofStep draft={draft} attempted={attemptedSteps[4]} uploadState={proofUploadState} onAddProject={addProofProject} onRemoveProject={removeProofProject} onUpdateProject={updateProofProject} onProjectPhotos={handleProofProjectPhotos} onRemovePhoto={removeProofProjectPhoto} />}
             {step === 5 && <PresentationStep draft={draft} update={update} touchedFields={touchedFields} attempted={attemptedSteps[5]} markTouched={markTouched} />}
             {step === 6 && <ReviewStep draft={draft} selectedCategory={selectedCategory} stepCompletion={stepCompletion} />}
           </div>
@@ -543,7 +687,7 @@ function StatusCard({ title, text, primaryTo = '', primaryLabel = '' }) {
   )
 }
 
-function BasicStep({ draft, update, touchedFields, attempted, markTouched }) {
+function BasicStep({ draft, update, touchedFields, attempted, markTouched, photoUploadState, onPhotoFile }) {
   return (
     <div className="space-y-5">
       <div className="grid gap-4 md:grid-cols-2">
@@ -553,11 +697,87 @@ function BasicStep({ draft, update, touchedFields, attempted, markTouched }) {
         </Field>
       </div>
       <TotsanSelect label="Тип партньор" value={draft.partnerType} onChange={(value) => update('partnerType', value)} options={PARTNER_TYPES.map(value => ({ value, label: value }))} placeholder="Изберете" />
+      <SelfPhotoField draft={draft} attempted={attempted} uploadState={photoUploadState} onPhotoFile={onPhotoFile} />
+      <SocialProfilesField draft={draft} update={update} attempted={attempted} />
       <div className="grid gap-4 md:grid-cols-2">
         <TextField label="Телефон" value={draft.phone} onChange={event => update('phone', event.target.value)} onBlur={() => markTouched('phone')} type="tel" required touched={touchedFields.phone} attempted={attempted} helper="Телефонът е нужен за проверка от Totsan. Няма да бъде публичен без ваше разрешение." errorText="Първо добавете телефон за проверка." />
         <TextField label="Град" value={draft.city} onChange={event => update('city', event.target.value)} onBlur={() => markTouched('city')} required touched={touchedFields.city} attempted={attempted} errorText="Добавете град." />
       </div>
-      <ToggleCard active={draft.worksOutsideCity} onClick={() => update('worksOutsideCity', !draft.worksOutsideCity)} label="Работя и извън града" />
+    </div>
+  )
+}
+
+function SocialProfilesField({ draft, update, attempted }) {
+  function addSocialLink() {
+    update('socialLinks', [...draft.socialLinks, { id: `social-${Date.now()}`, label: '', url: '' }])
+  }
+
+  function updateSocialLink(id, patch) {
+    update('socialLinks', draft.socialLinks.map(item => item.id === id ? { ...item, ...patch } : item))
+  }
+
+  function removeSocialLink(id) {
+    update('socialLinks', draft.socialLinks.filter(item => item.id !== id))
+  }
+
+  return (
+    <div className="rounded-3xl border border-line bg-soft/60 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-sm font-semibold text-ink">Линк</div>
+        </div>
+        <button type="button" onClick={addSocialLink} className="btn btn-ghost justify-center">
+          <Plus size={18} />
+          Добави друг
+        </button>
+      </div>
+      {draft.socialLinks.length > 0 && (
+        <div className="mt-4 space-y-3">
+          {draft.socialLinks.map(link => (
+            <div key={link.id} className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <Field label="Линк"><input value={link.url} onChange={event => updateSocialLink(link.id, { url: event.target.value })} className={INPUT} placeholder="https://" /></Field>
+              {draft.socialLinks.length > 1 && (
+                <button type="button" onClick={() => removeSocialLink(link.id)} className="btn btn-ghost justify-center text-red-700">
+                  <Trash2 size={18} />
+                  Махни
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SelfPhotoField({ draft, attempted, uploadState, onPhotoFile }) {
+  const showError = attempted && !draft.selfPhotoUrl && uploadState.status !== 'uploading'
+
+  return (
+    <div className={`rounded-3xl border p-4 ${showError ? 'border-red-200 bg-red-50/70' : 'border-line bg-soft/60'}`}>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-2xl border border-line bg-paper text-muted">
+            {draft.selfPhotoUrl ? (
+              <img src={draft.selfPhotoUrl} alt="Снимка за кандидатурата" className="h-full w-full object-cover" />
+            ) : (
+              <Camera size={24} />
+            )}
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-ink">Снимка на вас</div>
+            <div className="mt-1 text-xs leading-5 text-muted">Добавете една ясна снимка. Тя е задължителна за кандидатурата.</div>
+            {draft.selfPhotoName && <div className="mt-1 text-xs font-medium text-muted">{draft.selfPhotoName}</div>}
+          </div>
+        </div>
+        <label className="btn btn-ghost cursor-pointer justify-center">
+          <Camera size={18} />
+          {draft.selfPhotoUrl ? 'Смени снимка' : 'Добави снимка'}
+          <input type="file" accept="image/*" className="sr-only" onChange={(event) => { onPhotoFile(event.target.files?.[0]); event.target.value = '' }} />
+        </label>
+      </div>
+      {uploadState.message && <div className={`mt-3 text-xs font-medium ${uploadState.status === 'error' ? 'text-red-700' : 'text-muted'}`}>{uploadState.message}</div>}
+      {showError && <div className="mt-3 text-xs font-medium text-red-700">Добавете една снимка на себе си.</div>}
     </div>
   )
 }
@@ -574,57 +794,130 @@ function ServicesStep({ draft, update, toggleArray, attempted }) {
 }
 
 function AreasStep({ draft, update, touchedFields, attempted, markTouched }) {
-  const areaIsValid = Boolean(draft.primaryCity.trim() || draft.serviceAreas.trim())
-  const outsideIsValid = Boolean(draft.workRadius.trim() || draft.outsideCityDecision)
+  const cityIsValid = Boolean(draft.primaryCity.trim())
+  const outsideIsValid = Boolean(draft.outsideCityDecision)
+  const radiusIsValid = draft.outsideCityDecision !== 'yes' || Boolean(draft.workRadius.trim())
+  const serviceAreasIsValid = !draft.limitToSpecificAreas || Boolean(draft.serviceAreas.trim())
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 md:grid-cols-2">
-        <TextField label="Основен град" value={draft.primaryCity} onChange={event => update('primaryCity', event.target.value)} onBlur={() => markTouched('primaryCity')} required valid={() => areaIsValid} touched={touchedFields.primaryCity} attempted={attempted} errorText="Добавете основен град или район." />
-        <TextField label="Радиус на работа" value={draft.workRadius} onChange={event => update('workRadius', event.target.value)} onBlur={() => markTouched('workRadius')} placeholder="Напр. 30 км" required valid={() => outsideIsValid} touched={touchedFields.workRadius} attempted={attempted} errorText="Добавете радиус или изберете дали приемате извън града." />
-      </div>
-      <TextField label="Райони / близки населени места" value={draft.serviceAreas} onChange={event => update('serviceAreas', event.target.value)} onBlur={() => markTouched('serviceAreas')} rows={4} placeholder="Русе, Мартен, Басарбово..." required valid={() => areaIsValid} touched={touchedFields.serviceAreas} attempted={attempted} errorText="Добавете основен град или район." />
+      <TextField label="Основен град" value={draft.primaryCity} onChange={event => update('primaryCity', event.target.value)} onBlur={() => markTouched('primaryCity')} required valid={() => cityIsValid} touched={touchedFields.primaryCity} attempted={attempted} errorText="Добавете основен град." />
       <div>
         <div className="text-sm font-medium text-ink">Приемате ли проекти извън града?</div>
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
           <ToggleCard active={draft.outsideCityDecision === 'yes'} onClick={() => { update('outsideCityDecision', 'yes'); update('acceptsOutsideCity', true) }} label="Да, приемам извън града" />
-          <ToggleCard active={draft.outsideCityDecision === 'no'} onClick={() => { update('outsideCityDecision', 'no'); update('acceptsOutsideCity', false) }} label="Не, само в района" />
+          <ToggleCard active={draft.outsideCityDecision === 'no'} onClick={() => { update('outsideCityDecision', 'no'); update('acceptsOutsideCity', false); update('workRadius', ''); update('limitToSpecificAreas', false); update('serviceAreas', '') }} label="Не, само в района" />
         </div>
-        {attempted && !outsideIsValid && <div className="mt-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">Изберете радиус или отговорете дали приемате извън града.</div>}
+        {attempted && !outsideIsValid && <div className="mt-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">Изберете дали приемате проекти извън града.</div>}
       </div>
+      {draft.outsideCityDecision === 'yes' && (
+        <>
+          <TextField label="Радиус на работа" value={draft.workRadius} onChange={event => update('workRadius', event.target.value)} onBlur={() => markTouched('workRadius')} placeholder="Напр. 30 км" required valid={() => radiusIsValid} touched={touchedFields.workRadius} attempted={attempted} errorText="Добавете радиус на работа." />
+          <ToggleCard active={draft.limitToSpecificAreas} onClick={() => update('limitToSpecificAreas', !draft.limitToSpecificAreas)} label="Искам да посоча конкретни райони" />
+          {draft.limitToSpecificAreas && (
+            <TextField label="Райони / близки населени места" value={draft.serviceAreas} onChange={event => update('serviceAreas', event.target.value)} onBlur={() => markTouched('serviceAreas')} rows={4} placeholder="Русе, Мартен, Басарбово..." required valid={() => serviceAreasIsValid} touched={touchedFields.serviceAreas} attempted={attempted} errorText="Добавете конкретни райони." />
+          )}
+        </>
+      )}
     </div>
   )
 }
 
 function WorkStyleStep({ draft, update, toggleArray, attempted }) {
+  function toggleWorkStyle(value) {
+    const exclusivePair = {
+      laborOnly: 'laborMaterials',
+      laborMaterials: 'laborOnly',
+    }
+
+    if (exclusivePair[value]) {
+      const withoutPair = draft.workStyle.filter(item => item !== exclusivePair[value])
+      update('workStyle', withoutPair.includes(value) ? withoutPair.filter(item => item !== value) : [...withoutPair, value])
+      return
+    }
+
+    toggleArray('workStyle', value)
+  }
+
   return (
     <div className="space-y-5">
       <ChipGrid options={WORK_STYLE_OPTIONS.map(([, label]) => label)} selected={WORK_STYLE_OPTIONS.filter(([key]) => draft.workStyle.includes(key)).map(([, label]) => label)} onToggle={(label) => {
         const match = WORK_STYLE_OPTIONS.find(([, itemLabel]) => itemLabel === label)
-        if (match) toggleArray('workStyle', match[0])
+        if (match) toggleWorkStyle(match[0])
       }} />
-      {attempted && draft.workStyle.length === 0 && <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">Изберете поне един начин на работа.</div>}
-      <div className="grid gap-3 md:grid-cols-3">
-        <ToggleCard active={draft.quoteByPhotos} onClick={() => update('quoteByPhotos', !draft.quoteByPhotos)} label="Оферирам по снимки" />
-        <ToggleCard active={draft.warranty} onClick={() => update('warranty', !draft.warranty)} label="Давам гаранция" />
-        <ToggleCard active={draft.invoiceContract} onClick={() => update('invoiceContract', !draft.invoiceContract)} label="Фактура / договор" />
-      </div>
-      <TotsanSelect label="Наличност" value={draft.availability} onChange={(value) => update('availability', value)} options={AVAILABILITY_OPTIONS.map(value => ({ value, label: value }))} placeholder="Изберете" />
-      {attempted && !draft.availability && <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">Изберете наличност.</div>}
+      <ToggleCard active={draft.customWorkStyleEnabled} onClick={() => update('customWorkStyleEnabled', !draft.customWorkStyleEnabled)} label="Добави" />
+      {draft.customWorkStyleEnabled && (
+        <TextField label="Опишете как работите" value={draft.customWorkStyle} onChange={event => update('customWorkStyle', event.target.value)} rows={4} placeholder="Напр. работя само по етапи, с предварителна уговорка..." />
+      )}
+      {attempted && draft.workStyle.length === 0 && !draft.customWorkStyle.trim() && <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">Изберете начин на работа или добавете описание.</div>}
     </div>
   )
 }
 
-function ProofStep({ draft, update, touchedFields, markTouched }) {
+function ProofStep({ draft, attempted, uploadState, onAddProject, onRemoveProject, onUpdateProject, onProjectPhotos, onRemovePhoto }) {
+  const showError = attempted && (draft.proofProjects.length === 0 || draft.proofProjects.some(project => !project.description.trim() || project.photos.length === 0))
+
   return (
     <div className="space-y-5">
-      <div className="rounded-3xl border border-line bg-soft p-4 text-sm text-muted">Снимки и документи ще могат да се добавят по-късно. Ако имате описание или връзки към реални примери, добавете ги тук. Ако не - продължете спокойно.</div>
-      <TextField label="Примерен проект / доказателство" value={draft.projectProof} onChange={event => update('projectProof', event.target.value)} onBlur={() => markTouched('projectProof')} rows={5} touched={touchedFields.projectProof} />
-      <div className="grid gap-4 md:grid-cols-3">
-        <TextField label="Website" value={draft.website} onChange={event => update('website', event.target.value)} onBlur={() => markTouched('website')} placeholder="https://" touched={touchedFields.website} />
-        <TextField label="Facebook" value={draft.facebook} onChange={event => update('facebook', event.target.value)} onBlur={() => markTouched('facebook')} touched={touchedFields.facebook} />
-        <TextField label="Instagram" value={draft.instagram} onChange={event => update('instagram', event.target.value)} onBlur={() => markTouched('instagram')} touched={touchedFields.instagram} />
+      <div>
+        <h2 className="font-display text-3xl text-ink">Покажете ни Вашата работа</h2>
+        <p className="mt-2 text-sm leading-6 text-muted">Добавете поне един реален проект с кратко описание и снимки. Можете да добавите до 5 проекта.</p>
       </div>
-      <TextField label="Бележка" value={draft.proofNote} onChange={event => update('proofNote', event.target.value)} onBlur={() => markTouched('proofNote')} rows={3} touched={touchedFields.proofNote} />
+
+      {draft.proofProjects.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {draft.proofProjects.map((project, index) => (
+            <div key={project.id} className="rounded-3xl border border-line bg-paper p-4 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.14em] text-muted">Проект {index + 1}</div>
+                  <div className="mt-1 font-semibold text-ink">Продуктова карта</div>
+                </div>
+                <button type="button" onClick={() => onRemoveProject(project.id)} className="rounded-full p-2 text-muted transition hover:bg-red-50 hover:text-red-700" aria-label="Премахни проект">
+                  <Trash2 size={18} />
+                </button>
+              </div>
+              <TextField label="Кратко описание на проекта" value={project.description} onChange={event => onUpdateProject(project.id, { description: event.target.value })} rows={4} placeholder="Какво направихте, какъв беше обхватът, какъв беше резултатът..." />
+              <div className="mt-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-medium text-ink">Снимки ({project.photos.length}/8)</div>
+                  <label className={`btn btn-ghost cursor-pointer justify-center ${project.photos.length >= 8 ? 'pointer-events-none opacity-50' : ''}`}>
+                    <ImagePlus size={18} />
+                    Добави снимки
+                    <input type="file" accept="image/*" multiple className="sr-only" disabled={project.photos.length >= 8} onChange={(event) => { onProjectPhotos(project.id, event.target.files); event.target.value = '' }} />
+                  </label>
+                </div>
+                {uploadState[project.id] && uploadState[project.id] !== 'ready' && (
+                  <div className={`mt-2 text-xs font-medium ${uploadState[project.id] === 'uploading' ? 'text-muted' : 'text-red-700'}`}>
+                    {uploadState[project.id] === 'uploading' ? 'Качваме снимките...' : uploadState[project.id]}
+                  </div>
+                )}
+                <div className="mt-3 grid grid-cols-4 gap-2">
+                  {project.photos.map((photo, photoIndex) => (
+                    <div key={`${photo.path || photo.url}-${photoIndex}`} className="group relative aspect-square overflow-hidden rounded-2xl border border-line bg-soft">
+                      <img src={photo.url} alt={`Проект ${index + 1} снимка ${photoIndex + 1}`} className="h-full w-full object-cover" />
+                      <button type="button" onClick={() => onRemovePhoto(project.id, photoIndex)} className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-full bg-paper/90 text-red-700 opacity-0 shadow-sm transition group-hover:opacity-100" aria-label="Премахни снимка">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {draft.proofProjects.length < 5 && (
+        <button type="button" onClick={onAddProject} className="flex min-h-32 w-full flex-col items-center justify-center rounded-3xl border border-dashed border-line bg-paper/60 p-6 text-center text-ink transition hover:border-ink/40 hover:bg-paper">
+          <span className="grid h-11 w-11 place-items-center rounded-full bg-soft text-accentDeep">
+            <Plus size={22} />
+          </span>
+          <span className="mt-3 font-semibold">Добави проект</span>
+          <span className="mt-1 text-sm text-muted">До 5 проектни карти, до 8 снимки във всяка.</span>
+        </button>
+      )}
+
+      {showError && <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">Добавете поне един проект с описание и поне една снимка.</div>}
     </div>
   )
 }
@@ -662,10 +955,13 @@ function ReviewStep({ draft, selectedCategory, stepCompletion }) {
   const rows = [
     ['Име / фирма', draft.name],
     ['Тип', draft.partnerType],
+    ['Снимка', draft.selfPhotoUrl ? 'Добавена' : '—'],
+    ['Сайт / социални профили', [draft.website, draft.facebook, draft.instagram, ...draft.socialLinks.map(item => item.url)].filter(Boolean).join(', ')],
     ['Телефон', draft.phone],
     ['Град / райони', [draft.primaryCity, draft.serviceAreas].filter(Boolean).join(' · ')],
     ['Услуги', [selectedCategory?.label, ...draft.services, draft.customService].filter(Boolean).join(', ')],
-    ['Начин на работа', draft.workStyle.map(key => WORK_STYLE_OPTIONS.find(([value]) => value === key)?.[1] || key).join(', ')],
+    ['Начин на работа', [...draft.workStyle.map(key => WORK_STYLE_OPTIONS.find(([value]) => value === key)?.[1] || key), draft.customWorkStyle].filter(Boolean).join(', ')],
+    ['Проекти', draft.proofProjects.map(project => project.description).filter(Boolean).join('\n\n')],
     ['Представяне', draft.intro],
   ]
   return (

@@ -162,15 +162,31 @@ function ApplicationDetailsModal({ row, onClose }) {
   const workStyle = details.workStyle || {}
   const proof = details.proof || {}
   const presentation = details.presentation || {}
+  const basic = details.basic || {}
   const category = getCategoryLabel(row, details)
   const areaChips = splitTextList(areas.nearbyPlaces)
   const outsideCity = getOutsideCityValue(details, areas)
+  const socialProfiles = basic.socialProfiles || {}
+  const socialProfileLinks = [
+    ['Website', socialProfiles.website],
+    ['Facebook', socialProfiles.facebook],
+    ['Instagram', socialProfiles.instagram],
+    ...toArray(socialProfiles.other).map((item) => [item.label || 'Профил', item.url]),
+  ].filter(([, value]) => hasValue(value))
   const proofLinks = [
     ['Website', proof.website],
     ['Facebook', proof.facebook],
     ['Instagram', proof.instagram],
   ].filter(([, value]) => hasValue(value))
+  const proofProjects = toArray(proof.projects)
   const workStyleChips = toArray(workStyle.modes).map(value => WORK_STYLE_LABELS[value] || value)
+  const workStyleRows = [
+    ['Допълнително описание', workStyle.custom],
+    ['Оферира по снимки', formatBoolean(workStyle.quoteByPhotos)],
+    ['Гаранция', formatBoolean(workStyle.warranty)],
+    ['Фактура / договор', formatBoolean(workStyle.invoiceContract)],
+    ['Наличност', workStyle.availability],
+  ]
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-ink/35 px-4 py-6 backdrop-blur-sm">
@@ -200,6 +216,11 @@ function ApplicationDetailsModal({ row, onClose }) {
               ['Статус', APPLICATION_STATUS_LABELS[row.status] || row.status],
               ['Бележка при решение', row.decision_note],
             ]} />
+            {socialProfileLinks.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {socialProfileLinks.map(([label, value]) => <LinkRow key={`${label}-${value}`} label={label} value={value} />)}
+              </div>
+            )}
           </DetailSection>
 
           <DetailSection title="Услуги">
@@ -221,12 +242,7 @@ function ApplicationDetailsModal({ row, onClose }) {
 
           <DetailSection title="Как работи">
             <TitledChips title="Начин на работа" values={workStyleChips} />
-            <Rows rows={[
-              ['Оферира по снимки', formatBoolean(workStyle.quoteByPhotos)],
-              ['Гаранция', formatBoolean(workStyle.warranty)],
-              ['Фактура / договор', formatBoolean(workStyle.invoiceContract)],
-              ['Наличност', workStyle.availability],
-            ]} hideEmpty={workStyleChips.length > 0} />
+            <Rows rows={workStyleRows} hideEmpty={workStyleChips.length > 0} />
           </DetailSection>
 
           <DetailSection title="Доказателства">
@@ -240,6 +256,7 @@ function ApplicationDetailsModal({ row, onClose }) {
                 {proofLinks.map(([label, value]) => <LinkRow key={label} label={label} value={value} />)}
               </div>
             )}
+            <ProjectProofCards projects={proofProjects} />
           </DetailSection>
 
           <DetailSection title="Представяне">
@@ -322,6 +339,34 @@ function LinkRow({ label, value }) {
         {value}
         {isLocal && <span className="ml-2 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[0.68rem] font-medium text-amber-800">локален/тестов линк</span>}
       </div>
+    </div>
+  )
+}
+
+function ProjectProofCards({ projects }) {
+  const items = toArray(projects).filter(project => hasValue(project?.description) || toArray(project?.photos).length > 0)
+  if (items.length === 0) return null
+
+  return (
+    <div className="mt-3 space-y-3">
+      {items.map((project, index) => {
+        const photos = toArray(project.photos).filter(photo => hasValue(photo?.url))
+        return (
+          <div key={project.id || index} className="rounded-2xl border border-white/70 bg-paper/75 p-3">
+            <div className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-muted">Проект {index + 1}</div>
+            {project.description && <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink">{project.description}</div>}
+            {photos.length > 0 && (
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                {photos.map((photo, photoIndex) => (
+                  <a key={`${photo.url}-${photoIndex}`} href={photo.url} target="_blank" rel="noreferrer" className="block aspect-square overflow-hidden rounded-xl border border-line bg-soft">
+                    <img src={photo.url} alt={`Проект ${index + 1} снимка ${photoIndex + 1}`} className="h-full w-full object-cover" />
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
