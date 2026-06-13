@@ -139,6 +139,13 @@ Deno.serve(async (req) => {
       if (existingError) throw existingError
 
       let profileId = existingProfile?.id || null
+      const details = app.details && typeof app.details === 'object' ? app.details : {}
+      const basic = details.basic && typeof details.basic === 'object' ? details.basic : {}
+      const serviceAreas = details.serviceAreas && typeof details.serviceAreas === 'object' ? details.serviceAreas : {}
+      const workStyle = details.workStyle && typeof details.workStyle === 'object' ? details.workStyle : {}
+      const profileCity = String(serviceAreas.primaryCity || basic.city || app.city || '').trim()
+      const profileTag = String(basic.partnerType || 'Специалист').trim()
+      const profileImageUrl = String(basic.selfPhotoUrl || '').trim()
       if (!profileId) {
         const baseSlug = slugify(app.name || app.email || 'profil') || 'profil'
         const slug = `${baseSlug}-${applicationId.slice(0, 6)}`
@@ -146,16 +153,38 @@ Deno.serve(async (req) => {
           slug,
           layer_slug: app.layer_slug || 'postroyka',
           name: app.name || 'Нов специалист',
-          tag: 'Специалист',
-          city: '—',
+          tag: profileTag,
+          city: profileCity || '—',
           since: new Date().getFullYear(),
           bio: app.about || '',
+          headline: String(workStyle.custom || profileTag || '').trim() || null,
+          image_url: profileImageUrl || null,
+          image_zoom: 1,
+          image_x: 50,
+          image_y: 50,
           user_id: app.user_id,
           role: 'pro',
-          is_published: false,
+          is_published: true,
         }).select('id').single()
         if (profileError) throw profileError
         profileId = profile.id
+      } else {
+        const profilePayload: Record<string, unknown> = {
+          is_published: true,
+          layer_slug: app.layer_slug || 'postroyka',
+          name: app.name || 'Нов специалист',
+          tag: profileTag,
+          city: profileCity || '—',
+          bio: app.about || '',
+        }
+        if (profileImageUrl) {
+          profilePayload.image_url = profileImageUrl
+          profilePayload.image_zoom = 1
+          profilePayload.image_x = 50
+          profilePayload.image_y = 50
+        }
+        const { error: publishProfileError } = await adminClient.from('profiles').update(profilePayload).eq('id', profileId)
+        if (publishProfileError) throw publishProfileError
       }
 
       const reviewedAt = new Date().toISOString()
