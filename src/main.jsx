@@ -35,6 +35,9 @@ import Bathroom from './pages/Bathroom.jsx'
 import LightingAndTextiles from './pages/LightingAndTextiles.jsx'
 import SharedProject from './pages/SharedProject.jsx'
 import Portfolio from './pages/Portfolio.jsx'
+import { CheckEmailPage, ProStartPage, WelcomePage } from './pages/OnboardingPages.jsx'
+import ProOnboarding from './pages/ProOnboarding.jsx'
+import ProStatus from './pages/ProStatus.jsx'
 import { PrivacyPage, TermsPage } from './pages/Legal.jsx'
 import ProtectedRoute from './components/auth/ProtectedRoute.jsx'
 import MfaSessionLock from './components/auth/MfaSessionLock.jsx'
@@ -231,6 +234,9 @@ function AppRoutes() {
             <Route path="/katalog" element={<Catalog />} />
             <Route path="/profil/:slug" element={<Pro />} />
             <Route path="/pro" element={<TotsanPro />} />
+            <Route path="/pro/start" element={<ProStartPage />} />
+            <Route path="/pro/onboarding" element={<ProOnboarding />} />
+            <Route path="/pro/status" element={<ProStatus />} />
             <Route path="/totsan-pro" element={<Navigate to="/pro" replace />} />
             <Route path="/produkt/:slug" element={<Product />} />
             <Route path="/kak-raboti" element={<HowItWorks />} />
@@ -249,6 +255,9 @@ function AppRoutes() {
             <Route path="/banya" element={<Bathroom />} />
             <Route path="/osvetlenie-i-tekstil" element={<LightingAndTextiles />} />
             <Route path="/login" element={<Admin />} />
+            <Route path="/check-email" element={<CheckEmailPage />} />
+            <Route path="/welcome" element={<WelcomePage />} />
+            <Route path="/partner-onboarding" element={<Navigate to="/pro/onboarding" replace />} />
             <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
             <Route path="/moy-profil" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
             <Route path="/porachki" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />

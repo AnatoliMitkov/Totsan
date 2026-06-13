@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, Mail, RefreshCcw, Search } from 'lucide-react'
-import { ADMIN_INPUT_CLASS, ADMIN_SELECT_CLASS, INQUIRY_STATUS_LABELS, contactHref, formatAdminDate, loadInquiries, matchesSearch, paginateRows, updateInquiryStatus } from '../../lib/admin.js'
+import { ADMIN_INPUT_CLASS, INQUIRY_STATUS_LABELS, contactHref, formatAdminDate, loadInquiries, matchesSearch, paginateRows, updateInquiryStatus } from '../../lib/admin.js'
 import { supabase } from '../../lib/supabase.js'
 import { INQUIRY_STATUS_META, StatusSelect } from './AdminStatus.jsx'
+import TotsanSelect from '../ui/TotsanSelect.jsx'
 
 const SOURCE_LABELS = {
   project_brief: 'Проектен бриф',
@@ -100,8 +101,8 @@ export default function InquiriesManager({ globalQuery = '', inquiryStatusShortc
         </div>
         <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_12rem_12rem]">
           <label className="relative block text-sm font-medium text-ink">Търсене<Search size={17} className="pointer-events-none absolute left-4 top-[2.35rem] text-muted" /><input value={query} onChange={(event) => setQuery(event.target.value)} className={`${ADMIN_INPUT_CLASS} pl-11`} placeholder="Име, контакт, съобщение…" /></label>
-          <label className="block text-sm font-medium text-ink">Статус<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={`${ADMIN_SELECT_CLASS} mt-2 w-full rounded-2xl`}>{STATUS_FILTER_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-          <label className="block text-sm font-medium text-ink">Източник<select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className={`${ADMIN_SELECT_CLASS} mt-2 w-full rounded-2xl`}><option value="all">Всички източници</option><option value="project_brief">Проектен бриф</option><option value="contact_form">Контактна форма</option><option value="pro_inquiry">Към специалист</option><option value="other">Други</option></select></label>
+          <TotsanSelect label="Статус" value={statusFilter} onChange={setStatusFilter} options={STATUS_FILTER_OPTIONS} />
+          <TotsanSelect label="Източник" value={sourceFilter} onChange={setSourceFilter} options={[['all', 'Всички източници'], ['project_brief', 'Проектен бриф'], ['contact_form', 'Контактна форма'], ['pro_inquiry', 'Към специалист'], ['other', 'Други']]} />
         </div>
         {message && <div className="mt-4 text-sm text-muted">{message}</div>}
       </div>
@@ -122,7 +123,7 @@ export default function InquiriesManager({ globalQuery = '', inquiryStatusShortc
               <div className="flex w-full flex-col gap-2 md:w-auto md:items-end">
                 <StatusSelect
                   value={row.status}
-                  onChange={(event) => changeStatus(row, event.target.value)}
+                  onChange={(value) => changeStatus(row, value)}
                   options={Object.entries(INQUIRY_STATUS_LABELS)}
                   metaMap={INQUIRY_STATUS_META}
                   ariaLabel="Статус на запитването"

@@ -1,4 +1,5 @@
-import { AlertCircle, CheckCircle2, ChevronDown, Eye, MessageSquareReply, XCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Eye, MessageSquareReply, XCircle } from 'lucide-react'
+import TotsanSelect from '../ui/TotsanSelect.jsx'
 
 export const INQUIRY_STATUS_META = {
   new: {
@@ -62,18 +63,14 @@ export function StatusSelect({
   return (
     <span className={`relative inline-flex min-w-[11rem] items-center ${className}`.trim()}>
       <Icon size={15} className="pointer-events-none absolute left-3.5 z-10 text-current" />
-      <select
+      <TotsanSelect
         value={value}
         onChange={onChange}
+        options={options}
         disabled={disabled}
         aria-label={ariaLabel}
-        className={`w-full appearance-none rounded-full border py-2 pl-9 pr-9 text-sm font-semibold outline-none transition focus:border-ink disabled:opacity-60 ${statusToneClass(meta.tone)}`}
-      >
-        {options.map(([optionValue, optionLabel]) => (
-          <option key={optionValue} value={optionValue}>{optionLabel}</option>
-        ))}
-      </select>
-      <ChevronDown size={15} className="pointer-events-none absolute right-3.5 text-current" />
+        buttonClassName={`!min-h-0 !rounded-full !py-2 !pl-9 !pr-9 font-semibold ${statusToneClass(meta.tone)}`}
+      />
     </span>
   )
 }

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { avatarFor } from '../data/images.js'
 import { LAYERS as BASE_LAYERS } from '../data/layers.js'
 import { getStaticProductsForLayer } from './product-metadata.js'
 import { supabase } from './supabase.js'
@@ -315,11 +314,11 @@ export function buildCatalogWithProfiles(profiles) {
 }
 
 export function getProfileImage(profile) {
-  return profile?.imageUrl || profile?.image_url || avatarFor(profile?.name || '')
+  return profile?.imageUrl || profile?.image_url || ''
 }
 
 export function getProfileImageCandidates(profile) {
-  return [profile?.imageUrl, profile?.image_url, avatarFor(profile?.name || '')].filter(Boolean)
+  return [profile?.imageUrl, profile?.image_url].filter(Boolean)
 }
 
 export function getProfileImageStyle(profile) {

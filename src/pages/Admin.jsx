@@ -1,10 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, useLocation } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowRight, BarChart3, ClipboardList, CreditCard, FileClock, FolderKanban, KeyRound, Mail, MessagesSquare, PackageCheck, ScrollText, Search, ShieldCheck, Sparkles, Star, UserCog, Users, CheckCircle2, Circle, Eye, EyeOff } from 'lucide-react'
 import { brand, supabase } from '../lib/supabase.js'
 import { HERO_COLLAGE, HOME_PROJECTS } from '../data/images.js'
 import { getAccountDisplayName, useAccount } from '../lib/account.js'
-import { trackEvent } from '../lib/analytics.js'
 
 const INPUT_CLASS = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const PRODUCTION_APP_ORIGIN = 'https://totsan.com'
@@ -109,6 +108,11 @@ function normalizeNextPath(value = '') {
   if (!raw || !raw.startsWith('/') || raw.startsWith('//')) return ''
   if (raw.startsWith('/login')) return ''
   return raw
+}
+
+function getSignupConfirmationRedirect(signupRole) {
+  const path = signupRole === 'pro' ? '/pro/onboarding' : '/welcome'
+  return new URL(path, getAuthRedirectOrigin()).toString()
 }
 
 async function signOutToHome(userId = '') {
@@ -252,6 +256,7 @@ function AdminSectionFallback() {
 
 function LoginPanel() {
   const location = useLocation()
+  const navigate = useNavigate()
   const params = new URLSearchParams(location.search)
   const isSignup = params.get('signup') === 'true'
   const isResetRequested = params.get('reset') === 'true'
@@ -278,8 +283,6 @@ function LoginPanel() {
   const [fullName, setFullName] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [signupRole, setSignupRole] = useState(requestedSignupRole) // 'customer' | 'pro'
-  const [proPhone, setProPhone] = useState('')
-  const [proAbout, setProAbout] = useState('')
   const [status, setStatus] = useState('idle')
   const [message, setMessage] = useState('')
   const [pendingAction, setPendingAction] = useState('')
@@ -297,6 +300,7 @@ function LoginPanel() {
     special: /[^A-Za-z0-9]/.test(password),
   }
   const pwdValid = Object.values(pwdRules).every(Boolean)
+  const showPartnerRedirect = !isLogin && !isRecoveryMode && signupRole === 'pro'
 
   useEffect(() => {
     if (isSignup) setSignupRole(requestedSignupRole)
@@ -521,12 +525,11 @@ function LoginPanel() {
         email: email.trim(),
         password,
         options: {
+          emailRedirectTo: getSignupConfirmationRedirect(signupRole),
           data: {
             full_name: fullName.trim(),
             display_name: displayName.trim(),
             role: signupRole === 'pro' ? 'specialist' : 'user',
-            phone: signupRole === 'pro' ? proPhone.trim() : undefined,
-            about: signupRole === 'pro' ? proAbout.trim() : undefined,
           }
         }
       })
@@ -541,19 +544,22 @@ function LoginPanel() {
 
     setStatus('sent')
     setPendingAction('')
-    if (!isLogin && signupRole === 'pro') {
-      trackEvent('partner_application_submit', {
-        method: 'email',
-        source: 'login_panel',
-      })
-    }
     setMessage(
       isLogin
         ? 'Входът е успешен.'
         : signupRole === 'pro'
-          ? 'Регистрацията е приета. Провери имейла си, ако е нужно потвърждение.'
-          : 'Регистрацията е успешна.'
+          ? 'Партньорският акаунт е създаден. След потвърждение ще продължите към кандидатурата си.'
+          : 'Акаунтът е създаден. Проверете имейла си.'
     )
+
+    if (!isLogin) {
+      const checkEmailParams = new URLSearchParams()
+      checkEmailParams.set('email', email.trim())
+      navigate(`/check-email?${checkEmailParams.toString()}`, {
+        replace: true,
+        state: { email: email.trim() },
+      })
+    }
   }
 
   return (
@@ -564,7 +570,11 @@ function LoginPanel() {
             {isRecoveryMode ? 'Нова парола' : isLogin ? 'Добре дошли' : 'Започни сега'}
           </h2>
           <p className="mt-3 text-sm text-muted">
-            {isRecoveryMode ? 'Въведи нова парола.' : isLogin ? 'Влез с имейл и парола или продължи с Google.' : 'Създай профил с имейл и парола или продължи с Google.'}
+            {isRecoveryMode
+              ? 'Въведи нова парола.'
+              : isLogin
+                ? 'Влез с имейл и парола или продължи с Google.'
+                : 'Създай профил с имейл и парола или продължи с Google.'}
           </p>
 
           <form onSubmit={submit} className={`${(isLogin || isRecoveryMode) ? 'mt-10 space-y-5' : 'mt-7 space-y-4'}`}>
@@ -592,7 +602,20 @@ function LoginPanel() {
               </div>
             )}
 
-            {!isLogin && !isRecoveryMode && (
+            {showPartnerRedirect && (
+              <div className="rounded-3xl border border-line bg-soft p-5">
+                <div className="eyebrow">Totsan Pro</div>
+                <h3 className="mt-2 font-display text-2xl text-ink">Професионалист ли сте?</h3>
+                <p className="mt-3 text-sm leading-6 text-muted">
+                  Партньорските акаунти се създават през Totsan Pro, за да ви преведем през правилната кандидатура.
+                </p>
+                <Link to="/pro" className="btn btn-primary mt-5 w-full justify-center">
+                  Към Totsan Pro <ArrowRight size={18} />
+                </Link>
+              </div>
+            )}
+
+            {!isLogin && !isRecoveryMode && !showPartnerRedirect && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block text-sm font-medium text-ink">
                   Име и фамилия
@@ -617,7 +640,7 @@ function LoginPanel() {
               </div>
             )}
             
-            {!isRecoveryMode && (
+            {!isRecoveryMode && !showPartnerRedirect && (
             <label className="block text-sm font-medium text-ink">
               Имейл
               <input
@@ -631,6 +654,7 @@ function LoginPanel() {
             </label>
             )}
 
+            {!showPartnerRedirect && (
             <label className="block text-sm font-medium text-ink">
               <div className="flex justify-between">
                 <span>Парола</span>
@@ -659,8 +683,9 @@ function LoginPanel() {
                 </button>
               </div>
             </label>
+            )}
 
-            {!isLogin && !isRecoveryMode && password && (
+            {!isLogin && !isRecoveryMode && !showPartnerRedirect && password && (
               <div className="text-xs space-y-1.5 mt-2">
                 <div className="text-muted mb-2">Изисквания за паролата:</div>
                 <RuleItem isValid={pwdRules.length} text="Минимум 8 знака" />
@@ -671,7 +696,7 @@ function LoginPanel() {
               </div>
             )}
 
-            {(!isLogin || isRecoveryMode) && (
+            {(!isLogin || isRecoveryMode) && !showPartnerRedirect && (
               <label className="block text-sm font-medium text-ink mt-4">
                 Потвърди паролата
                 <div className="relative mt-2">
@@ -699,31 +724,6 @@ function LoginPanel() {
               </label>
             )}
 
-            {!isLogin && !isRecoveryMode && signupRole === 'pro' && (
-              <div className="grid gap-3">
-                <label className="block text-sm font-medium text-ink">
-                  Телефон (по желание)
-                  <input
-                    value={proPhone}
-                    onChange={e => setProPhone(e.target.value)}
-                    type="tel"
-                    placeholder="+359..."
-                    className={INPUT_CLASS}
-                  />
-                </label>
-                <label className="block text-sm font-medium text-ink">
-                  Накратко за теб / фирмата
-                  <textarea
-                    value={proAbout}
-                    onChange={e => setProAbout(e.target.value)}
-                    rows={3}
-                    placeholder="Какво правиш, в кой град, опит…"
-                    className={INPUT_CLASS}
-                  />
-                </label>
-              </div>
-            )}
-
             {isLogin && !isRecoveryMode && (
               <div className="rounded-2xl border border-line bg-soft px-3 py-2.5">
                 <button
@@ -740,7 +740,7 @@ function LoginPanel() {
                 </button>
               </div>
             )}
-            {!isLogin && !isRecoveryMode && (
+            {!isLogin && !isRecoveryMode && !showPartnerRedirect && (
               <label className={`flex items-start gap-3 rounded-2xl border px-3 py-3 text-sm transition ${termsTouched && !termsAccepted ? 'border-red-300 bg-red-50 text-red-700' : 'border-transparent text-muted'}`}>
                 <input
                   type="checkbox"
@@ -761,9 +761,9 @@ function LoginPanel() {
                 </span>
               </label>
             )}
-            <button disabled={status === 'sending'} className={actionButtonClass}>
+            {!showPartnerRedirect && <button disabled={status === 'sending'} className={actionButtonClass}>
               {status === 'sending' ? 'Обработка…' : isRecoveryMode ? 'Запази' : isLogin ? 'Вход' : 'Регистрация'}
-            </button>
+            </button>}
           </form>
 
           {message && (
@@ -772,7 +772,7 @@ function LoginPanel() {
             </div>
           )}
 
-          {!isRecoveryMode && (
+          {!isRecoveryMode && !showPartnerRedirect && (
             <>
               <div className={`${isLogin ? 'my-8' : 'my-6'} flex items-center gap-4 text-[11px] uppercase tracking-[0.2em] text-muted/60`}>
                 <span className="h-px flex-1 bg-line"></span>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Camera, CheckCircle2, ImagePlus, Play, Save, Trash2, UploadCloud } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
 import { DEFAULT_PROJECT, PROJECT_MEDIA_KINDS, PROPERTY_TYPES, mergeQuizAnswer, isMeaningfulProject } from '../../lib/projects.js'
+import TotsanSelect from '../ui/TotsanSelect.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 
@@ -253,10 +254,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
         <label className="block text-sm font-medium text-ink">Заглавие<input value={draft.title} onChange={event => update('title', event.target.value)} className={INPUT} placeholder="Двустаен в Лозенец" /></label>
 
         <div className="grid gap-4 md:grid-cols-3">
-          <label className="block text-sm font-medium text-ink">Тип помещение<select value={draft.propertyType} onChange={event => update('propertyType', event.target.value)} className={INPUT}>
-            <option value="">Избери</option>
-            {PROPERTY_TYPES.map(type => <option key={type.value} value={type.value}>{type.label}</option>)}
-          </select></label>
+          <TotsanSelect label="Тип помещение" value={draft.propertyType} onChange={(value) => update('propertyType', value)} placeholder="Избери" options={[{ value: '', label: 'Избери' }, ...PROPERTY_TYPES]} />
           <label className="block text-sm font-medium text-ink">Кв.м.<input value={draft.areaSqm} onChange={event => update('areaSqm', event.target.value)} type="number" min="0" step="0.1" className={INPUT} /></label>
           <label className="block text-sm font-medium text-ink">Стаи<input value={draft.roomsCount} onChange={event => update('roomsCount', event.target.value)} type="number" min="0" className={INPUT} /></label>
         </div>
@@ -267,18 +265,13 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
-          <label className="block text-sm font-medium text-ink md:col-span-2">Текущ слой<select value={draft.currentLayerSlug} onChange={event => update('currentLayerSlug', event.target.value)} className={INPUT}>
-            {LAYERS.map(layer => <option key={layer.slug} value={layer.slug}>Слой {layer.number} · {layer.title}</option>)}
-          </select></label>
+          <TotsanSelect className="md:col-span-2" label="Текущ слой" value={draft.currentLayerSlug} onChange={(value) => update('currentLayerSlug', value)} options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} />
           <label className="block text-sm font-medium text-ink">Бюджет от<input value={draft.budgetMin} onChange={event => update('budgetMin', event.target.value)} type="number" min="0" className={INPUT} /></label>
           <label className="block text-sm font-medium text-ink">Бюджет до<input value={draft.budgetMax} onChange={event => update('budgetMax', event.target.value)} type="number" min="0" className={INPUT} /></label>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <label className="block text-sm font-medium text-ink">Валута<select value={draft.budgetCurrency} onChange={event => update('budgetCurrency', event.target.value)} className={INPUT}>
-            <option value="EUR">EUR</option>
-            <option value="BGN">BGN</option>
-          </select></label>
+          <TotsanSelect label="Валута" value={draft.budgetCurrency} onChange={(value) => update('budgetCurrency', value)} options={[{ value: 'EUR', label: 'EUR' }, { value: 'BGN', label: 'BGN' }]} />
           <label className="block text-sm font-medium text-ink">Желан старт<input value={draft.desiredStartDate} onChange={event => update('desiredStartDate', event.target.value)} type="date" className={INPUT} /></label>
         </div>
 
@@ -297,9 +290,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
         <div className="rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-6">
           <div className="eyebrow">Медии</div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-            <label className="block text-sm font-medium text-ink">Тип файл<select value={uploadKind} onChange={event => setUploadKind(event.target.value)} className={INPUT}>
-              {PROJECT_MEDIA_KINDS.map(kind => <option key={kind.value} value={kind.value}>{kind.label}</option>)}
-            </select></label>
+            <TotsanSelect label="Тип файл" value={uploadKind} onChange={setUploadKind} options={PROJECT_MEDIA_KINDS} />
           </div>
           <label
             className={`mt-4 flex min-h-[12rem] cursor-pointer flex-col items-center justify-center rounded-3xl border border-dashed p-5 text-center transition ${dragOver ? 'border-ink bg-cloud' : 'border-line bg-soft'}`}

@@ -45,7 +45,7 @@ const comparison = [
   },
 ]
 
-const PRO_SIGNUP_URL = '/login?signup=true&role=pro'
+const PRO_SIGNUP_URL = '/pro/start'
 
 const steps = [
   {

@@ -6,11 +6,15 @@ import { getAccountDisplayName, getAccountAvatar, useAccount, signOutAndRedirect
 import { loadUnreadConversationCount, subscribeToConversationList } from '../lib/chat.js'
 import Avatar from './Avatar.jsx'
 
+const BLOCKED_ACCOUNT_STATUSES = new Set(['banned', 'blocked'])
+
 export default function Layout() {
   const { pathname } = useLocation()
+  const { account } = useAccount()
   const isAuthPage = pathname === '/login'
   const isHomePage = pathname === '/'
   const isInboxPage = pathname === '/inbox' || pathname.startsWith('/inbox/')
+  const isBlockedAccount = BLOCKED_ACCOUNT_STATUSES.has(account?.account_status)
 
   // На всяка смяна на страница: скрол нагоре + ново наблюдение за reveal анимациите
   useEffect(() => {
@@ -71,7 +75,7 @@ export default function Layout() {
         style={{ paddingTop: isHomePage ? '0px' : 'var(--header-h, 64px)' }}>
         <Outlet />
       </main>
-      {!isInboxPage && <Footer isAuthPage={isAuthPage} />}
+      {!isInboxPage && <Footer isAuthPage={isAuthPage || isBlockedAccount} />}
     </div>
   )
 }

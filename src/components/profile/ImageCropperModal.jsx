@@ -79,7 +79,7 @@ export default function ImageCropperModal({
   outputHeight = OUTPUT_SIZE,
   previewClassName = 'h-36 w-36 rounded-full',
   previewStyle = undefined,
-  previewImageClassName = 'h-full w-full object-cover',
+  previewImageClassName = 'absolute inset-0 h-full w-full object-cover',
   minZoom = 1,
   maxZoom = 3,
   zoomStep = 0.1,

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CreditCard, RefreshCw, Search, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase.js'
-import { ADMIN_INPUT_CLASS, ADMIN_SELECT_CLASS, adminUpdateOrderStatus, formatAdminDate, loadAdminOrders } from '../../lib/admin.js'
+import { ADMIN_INPUT_CLASS, adminUpdateOrderStatus, formatAdminDate, loadAdminOrders } from '../../lib/admin.js'
+import TotsanSelect from '../ui/TotsanSelect.jsx'
 import { ORDER_STATUS_LABELS, formatOrderMoney, orderStatusTone } from '../../lib/orders.js'
 
 const STATUS_FILTERS = [
@@ -136,9 +137,7 @@ export default function OrdersManager({ globalQuery }) {
                 </div>
                 <div className="space-y-3">
                   <Link to={`/order/${order.id}`} className="btn btn-ghost w-full justify-center whitespace-nowrap !py-2 text-sm"><CreditCard size={16} /> Детайли</Link>
-                  <select value={draft.status} onChange={(event) => updateDraft(order.id, 'status', event.target.value)} className={`${ADMIN_SELECT_CLASS} w-full rounded-xl px-3 py-2 text-sm`}>
-                    {STATUS_OPTIONS.map((option) => <option key={option} value={option}>{ORDER_STATUS_LABELS[option] || option}</option>)}
-                  </select>
+                  <TotsanSelect value={draft.status} onChange={(value) => updateDraft(order.id, 'status', value)} options={STATUS_OPTIONS.map((option) => ({ value: option, label: ORDER_STATUS_LABELS[option] || option }))} />
                   <textarea rows={3} value={draft.note} onChange={(event) => updateDraft(order.id, 'note', event.target.value)} className={`${ADMIN_INPUT_CLASS} !py-2 text-sm rounded-xl`} placeholder="Админ бележка" />
                   <button type="button" onClick={() => saveStatus(order)} disabled={actionState.status === 'saving'} className="btn btn-primary w-full justify-center whitespace-nowrap !py-2 text-sm">Запази статус</button>
                   <button type="button" onClick={async () => {

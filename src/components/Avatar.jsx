@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 export default function Avatar({ src, srcCandidates = [], name, size = 36, className = '', imgStyle = {} }) {
-  const initial = (name || '?')[0].toUpperCase()
+  const initial = getInitials(name)
   const candidates = useMemo(() => {
     const list = Array.isArray(srcCandidates) ? srcCandidates : []
     return [...new Set([src, ...list].filter(Boolean))]
@@ -15,7 +15,7 @@ export default function Avatar({ src, srcCandidates = [], name, size = 36, class
 
   return (
     <div
-      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-line bg-soft ${className}`}
+      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-line bg-gradient-to-br from-accentSoft via-paper to-cloud ${className}`}
       style={{ width: size, height: size }}
     >
       {currentSrc ? (
@@ -34,11 +34,17 @@ export default function Avatar({ src, srcCandidates = [], name, size = 36, class
         />
       ) : null}
       <span
-        className="flex items-center justify-center font-medium text-ink/70"
+        className="flex items-center justify-center font-medium text-accentDeep"
         style={{ fontSize: Math.max(10, size * 0.4), display: currentSrc ? 'none' : 'flex' }}
       >
         {initial}
       </span>
     </div>
   )
+}
+
+function getInitials(value = '') {
+  const parts = String(value || '').trim().split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase()
+  return (parts[0]?.[0] || '?').toUpperCase()
 }

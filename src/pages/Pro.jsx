@@ -4,7 +4,7 @@ import { ArrowRight, BriefcaseBusiness, CheckCircle2, Globe2, Languages, MapPin 
 import { supabase } from '../lib/supabase.js'
 import { LAYER_HEROS } from '../data/images.js'
 import { DELIVERABLES, SPECIALIST_TYPES, SPECIFIC_SERVICES, TARGET_OBJECTS } from '../data/layer01-meta.js'
-import { getProfileImage, getProfileImageStyle, slugify, useProfileDirectory } from '../lib/profiles.js'
+import { getProfileImage, getProfileImageStyle, normalizeProfile, runProfileSelectWithLayer01Fallback, slugify, useProfileDirectory } from '../lib/profiles.js'
 import { loadProfilePortfolio, loadProfileStats } from '../lib/portfolio.js'
 import { loadPublicPartnerServicesForProfile, packagePriceLabel } from '../lib/partner-services.js'
 import { useAccount } from '../lib/account.js'
@@ -18,11 +18,13 @@ import { getPageLocation, trackEvent, trackPageView } from '../lib/analytics.js'
 import { buildBreadcrumbSchema, buildPersonSchema, useSeo } from '../lib/seo.js'
 
 export default function Pro() {
-  const { state } = useLocation()
+  const location = useLocation()
+  const { state } = location
   const navigate = useNavigate()
   const { slug } = useParams()
   const { catalog, layers, profiles, status } = useProfileDirectory()
-  const { session } = useAccount()
+  const { session, account, loading: accountLoading } = useAccount()
+  const [previewState, setPreviewState] = useState({ status: 'idle', profile: null, message: '' })
   const [portfolio, setPortfolio] = useState([])
   const [stats, setStats] = useState(null)
   const [services, setServices] = useState([])
@@ -32,7 +34,38 @@ export default function Pro() {
   const portfolioSectionRef = useRef(null)
   const reviewsSectionRef = useRef(null)
   const profilePath = slug ? `/profil/${slug}` : '/katalog'
+  const previewRequested = new URLSearchParams(location.search || '').get('preview') === 'true'
+  const canAdminPreview = Boolean(previewRequested && account?.role === 'admin')
+
+  useEffect(() => {
+    if (!previewRequested || !slug || accountLoading) return
+    if (account?.role !== 'admin') {
+      setPreviewState({ status: 'ready', profile: null, message: '' })
+      return
+    }
+
+    let active = true
+    setPreviewState({ status: 'loading', profile: null, message: '' })
+
+    async function loadPreviewProfile() {
+      const { data, error } = await runProfileSelectWithLayer01Fallback((columns) => (
+        supabase.from('profiles').select(columns).eq('slug', slug).maybeSingle()
+      ))
+
+      if (!active) return
+      if (error && error.code !== 'PGRST116') {
+        setPreviewState({ status: 'error', profile: null, message: error.message })
+        return
+      }
+      setPreviewState({ status: 'ready', profile: data ? normalizeProfile(data) : null, message: '' })
+    }
+
+    loadPreviewProfile()
+    return () => { active = false }
+  }, [account?.role, accountLoading, previewRequested, slug])
+
   const item = useMemo(() => {
+    if (canAdminPreview && previewState.profile) return previewState.profile
     const liveProfile = profiles.find((profile) => profile.slug === slug)
     if (liveProfile) return liveProfile
     if (state?.item?.kind === 'pro') {
@@ -42,7 +75,7 @@ export default function Pro() {
       }
     }
     return catalog.find((entry) => entry.kind === 'pro' && (entry.slug || slugify(entry.name)) === slug)
-  }, [catalog, profiles, slug, state])
+  }, [canAdminPreview, catalog, previewState.profile, profiles, slug, state])
   const layer = useMemo(() => {
     if (!item) return layers[0] || null
     return layers.find((current) => current.slug === (item.layerSlug || item.layer)) || layers[0] || null
@@ -66,10 +99,11 @@ export default function Pro() {
           ]),
           buildPersonSchema(item, profilePath),
         ],
+        robots: canAdminPreview ? 'noindex, nofollow' : undefined,
       }
     }
 
-    if (status === 'loading') return null
+    if (status === 'loading' || previewState.status === 'loading' || (previewRequested && accountLoading)) return null
 
     return {
       title: 'Специалистът не е намерен | Totsan',
@@ -77,7 +111,7 @@ export default function Pro() {
       canonicalPath: profilePath,
       robots: 'noindex, nofollow',
     }
-  }, [item, layer, profilePath, slug, status])
+  }, [accountLoading, canAdminPreview, item, layer, previewRequested, previewState.status, profilePath, slug, status])
 
   useSeo(seoConfig)
 
@@ -133,8 +167,11 @@ export default function Pro() {
     })
   }, [item, layer, profilePath, seoConfig?.title, slug])
 
-  if (!item && status === 'loading') return <LoadingProfile />
+  if (!item && (status === 'loading' || previewState.status === 'loading' || (previewRequested && accountLoading))) return <LoadingProfile />
+  if (!item && previewState.status === 'error') return <NotFound type="специалист" />
   if (!item) return <NotFound type="специалист" />
+  if (!layer && status === 'loading') return <LoadingProfile />
+  if (!layer) return <NotFound type="специалист" />
   const partnerUserId = item.userId || stats?.user_id || ''
   const viewerUserId = session?.user?.id || ''
   const isOwnProfile = Boolean(viewerUserId && partnerUserId && viewerUserId === partnerUserId)

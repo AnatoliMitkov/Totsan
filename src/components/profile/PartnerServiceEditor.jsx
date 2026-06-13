@@ -35,6 +35,7 @@ import {
   uploadPartnerServiceImage,
 } from '../../lib/partner-services.js'
 import FallbackImage from '../FallbackImage.jsx'
+import TotsanSelect from '../ui/TotsanSelect.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-base font-normal leading-6 outline-none transition focus:border-ink'
 
@@ -708,7 +709,7 @@ function InfoSection({ draft, onChange, onStarter }) {
       </div>
       <div className="grid gap-4 md:grid-cols-3">
         <Field label="Слой">
-          <select value={draft.layerSlug} onChange={event => onChange('layerSlug', event.target.value)} className={INPUT}>{LAYERS.map(layer => <option key={layer.slug} value={layer.slug}>Слой {layer.number} · {layer.title}</option>)}</select>
+          <TotsanSelect value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} />
         </Field>
         <Field label="Тагове" hint="Раздели с запетая. Използват се за търсене.">
           <input value={draft.tagsText} onChange={event => onChange('tagsText', event.target.value)} className={INPUT} placeholder="боя, шпакловка, освежаване" />

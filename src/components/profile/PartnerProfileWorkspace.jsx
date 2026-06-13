@@ -21,10 +21,11 @@ import {
   UserRound,
 } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
-import { LAYER_HEROS } from '../../data/images.js'
 import { uploadProfileMedia, uploadProfileCover } from '../../lib/profile-media-upload-client.js'
-import { getProfileImage, getProfileImageStyle, isMissingLayer01MetaColumn, normalizeProfile, PROFILE_SELECT_COLUMNS, PROFILE_SELECT_COLUMNS_BASE } from '../../lib/profiles.js'
+import { getProfileImageStyle, isMissingLayer01MetaColumn, normalizeProfile, PROFILE_SELECT_COLUMNS, PROFILE_SELECT_COLUMNS_BASE } from '../../lib/profiles.js'
 import { supabase } from '../../lib/supabase.js'
+import { getAccountDisplayName } from '../../lib/account.js'
+import { saveCustomerAccountProfile } from '../../lib/projects.js'
 import TotpMfaManager from '../auth/TotpMfa.jsx'
 import {
   DEFAULT_PORTFOLIO_ITEM,
@@ -41,14 +42,26 @@ import ImageCropperModal from './ImageCropperModal.jsx'
 import Avatar from '../Avatar.jsx'
 import PartnerStats from './PartnerStats.jsx'
 import PublicProfileBanner from './PublicProfileBanner.jsx'
+import PublicProfileAvatar from './PublicProfileAvatar.jsx'
 import PublicProfilePanel from './PublicProfilePanel.jsx'
 import PartnerServiceEditor from './PartnerServiceEditor.jsx'
 import PartnerMaterialsEditor from './PartnerMaterialsEditor.jsx'
 import PartnerOrders from './PartnerOrders.jsx'
 import PartnerInquiries from './PartnerInquiries.jsx'
 import Layer01SpecEditor, { cleanLayer01Draft, makeLayer01Draft } from './Layer01SpecEditor.jsx'
+import TotsanSelect from '../ui/TotsanSelect.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
+const MAX_BANNER_BYTES = 12 * 1024 * 1024
+const BANNER_DESCRIPTION = 'Широк банер работи най-добре около 3:1. Препоръчваме 1600 x 520 px за най-чист резултат.'
+
+function validateBannerFile(file) {
+  if (!file) return 'Липсва файл.'
+  if (!file.type.startsWith('image/')) return 'Моля, избери изображение за банера.'
+  if (file.size > MAX_BANNER_BYTES) return 'Банерът трябва да е до 12 MB.'
+  return ''
+}
+
 const TABS = [
   { id: 'overview', label: 'Преглед', icon: Home },
   { id: 'profile', label: 'Профил', icon: UserRound },
@@ -69,6 +82,26 @@ function csv(value) {
 function fromCsv(value, fallback = []) {
   const next = String(value || '').split(',').map(item => item.trim()).filter(Boolean)
   return next.length ? next : fallback
+}
+
+function buildAccountNameSyncPayload(account, profileName) {
+  return {
+    fullName: account?.full_name || '',
+    displayName: profileName || account?.display_name || '',
+    phone: account?.phone || '',
+    avatarUrl: account?.avatar_url || '',
+    coverUrl: account?.cover_url || '',
+    city: account?.city || '',
+    country: account?.country || 'BG',
+    bio: account?.bio || '',
+    locale: account?.locale || 'bg',
+    marketingOptIn: Boolean(account?.marketing_opt_in),
+    interests: Array.isArray(account?.interests) ? account.interests : [],
+    stylePreferences: Array.isArray(account?.style_preferences) ? account.style_preferences : [],
+    preferredContactMethod: account?.preferred_contact_method || '',
+    ageGroup: account?.age_group || '',
+    gender: account?.gender || '',
+  }
 }
 
 function makeProfileDraft(profile) {
@@ -100,6 +133,7 @@ function makeProfileDraft(profile) {
     coverUrl: profile.coverUrl || '',
     coverY: profile.coverY ?? 50,
     layer01Meta: makeLayer01Draft(profile.layer01Meta || {}),
+    syncAccountName: false,
   }
 }
 
@@ -126,7 +160,7 @@ function paymentMessageFromStripe(result) {
   }
 }
 
-export default function PartnerProfileWorkspace({ profile, userId, account, session, onSaved }) {
+export default function PartnerProfileWorkspace({ profile, userId, account, session, refreshAccount, onSaved }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [currentProfile, setCurrentProfile] = useState(profile)
   const [profileDraft, setProfileDraft] = useState(() => makeProfileDraft(profile))
@@ -137,6 +171,45 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
   const [portfolioState, setPortfolioState] = useState({ status: 'idle', message: '' })
   const [paymentState, setPaymentState] = useState({ status: 'idle', message: '' })
   const [avatarEditor, setAvatarEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'avatar.jpg' })
+  const [bannerEditor, setBannerEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'banner.jpg' })
+
+  function openBannerEditor() {
+    if (profileDraft.coverUrl) {
+      setBannerEditor({
+        open: true,
+        file: null,
+        imageUrl: profileDraft.coverUrl,
+        fileName: profileDraft.name ? `${profileDraft.name}-banner.jpg` : 'banner.jpg',
+      })
+      return
+    }
+    const input = document.getElementById('partner-cover-upload')
+    if (input) input.click()
+  }
+
+  function closeBannerEditor() {
+    setBannerEditor(current => ({ ...current, open: false }))
+  }
+
+  function handleBannerFile(file) {
+    if (!file) return
+    const error = validateBannerFile(file)
+    if (error) {
+      setSaveState({ status: 'error', message: error })
+      return
+    }
+    setBannerEditor({
+      open: true,
+      file,
+      imageUrl: '',
+      fileName: file.name || 'banner.jpg',
+    })
+  }
+
+  async function saveBanner(croppedFile) {
+    closeBannerEditor()
+    await uploadCover(croppedFile)
+  }
 
   function openAvatarEditor() {
     if (profileDraft.imageUrl) {
@@ -173,17 +246,19 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     try {
       const result = await uploadProfileCover({ file, target: userId })
       updateProfile('coverUrl', result.publicUrl)
+      updateProfile('coverY', 50)
       
       // Auto-save to database immediately so it is not lost
       const { error } = await supabase
         .from('profiles')
-        .update({ cover_url: result.publicUrl })
+        .update({ cover_url: result.publicUrl, cover_y: 50 })
         .eq('id', currentProfile.id)
       
       if (error) throw error
       
-      setCurrentProfile(current => ({ ...current, coverUrl: result.publicUrl }))
+      setCurrentProfile(current => ({ ...current, coverUrl: result.publicUrl, coverY: 50 }))
       setSaveState({ status: 'saved', message: 'Банерът е качен и запазен.' })
+      await refreshAccount?.()
     } catch (error) {
       setSaveState({ status: 'error', message: error.message || 'Качването на банер не успя.' })
     }
@@ -191,7 +266,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
 
   function handleCoverFileChange(event) {
     const file = event.target.files?.[0]
-    if (file) uploadCover(file)
+    if (file) handleBannerFile(file)
     event.target.value = ''
   }
 
@@ -309,6 +384,8 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
   const profileCompletion = useMemo(() => (
     getProfileCompletion(preview, portfolio, profileDraft.layerSlug === 'ideya' ? profileDraft.layer01Meta : null)
   ), [portfolio, preview, profileDraft.layer01Meta, profileDraft.layerSlug])
+  const accountDisplayName = getAccountDisplayName(account, session, '')
+  const hasNameMismatch = Boolean(accountDisplayName && preview.name && accountDisplayName.trim() !== preview.name.trim())
 
   useEffect(() => {
     if (!availableTabs.some((tab) => tab.id === activeTab)) {
@@ -340,17 +417,21 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     try {
       const result = await uploadProfileMedia({ file, target: userId })
       updateProfile('imageUrl', result.publicUrl)
+      updateProfile('imageZoom', 1)
+      updateProfile('imageX', 50)
+      updateProfile('imageY', 50)
       
       // Auto-save to database immediately so it is not lost
       const { error } = await supabase
         .from('profiles')
-        .update({ image_url: result.publicUrl })
+        .update({ image_url: result.publicUrl, image_zoom: 1, image_x: 50, image_y: 50 })
         .eq('id', currentProfile.id)
       
       if (error) throw error
       
-      setCurrentProfile(current => ({ ...current, imageUrl: result.publicUrl }))
+      setCurrentProfile(current => ({ ...current, imageUrl: result.publicUrl, imageZoom: 1, imageX: 50, imageY: 50 }))
       setSaveState({ status: 'saved', message: 'Профилната снимка е качена и запазена.' })
+      await refreshAccount?.()
     } catch (error) {
       setSaveState({ status: 'error', message: error.message || 'Качването не успя.' })
     }
@@ -411,9 +492,14 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     }
 
     const normalized = normalizeProfile(data)
+    if (profileDraft.syncAccountName) {
+      await saveCustomerAccountProfile(buildAccountNameSyncPayload(account, normalized.name))
+      await refreshAccount?.()
+    }
     setCurrentProfile(normalized)
     setProfileDraft(makeProfileDraft(normalized))
-    setSaveState({ status: 'saved', message: 'Профилът е запазен.' })
+    setSaveState({ status: 'saved', message: profileDraft.syncAccountName ? 'Профилът е запазен и името в акаунта е синхронизирано.' : 'Профилът е запазен.' })
+    if (!profileDraft.syncAccountName) await refreshAccount?.()
     onSaved?.()
   }
 
@@ -491,18 +577,37 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
   return (
     <>
       <PublicProfileBanner
-        imageSrc={preview.coverUrl || LAYER_HEROS[preview.layerSlug] || ''}
+        imageSrc={preview.coverUrl || ''}
         imageAlt=""
         imageStyle={{ objectPosition: `50% ${preview.coverY ?? 50}%` }}
+        heightClass="min-h-[clamp(14rem,46vw,18rem)] sm:min-h-[16rem] md:aspect-[1600/520] md:min-h-0"
+        className="group cursor-pointer focus-within:ring-2 focus-within:ring-ink"
+        onClick={openBannerEditor}
+        placeholderLabel="Добавете банер"
+        placeholderClassName="hidden md:grid"
       >
-        <button
-          type="button"
-          onClick={() => document.getElementById('partner-cover-upload')?.click()}
-          className="absolute right-4 top-4 rounded-full bg-paper/90 p-2.5 text-ink shadow-sm backdrop-blur transition hover:bg-paper hover:scale-105"
-          title="Промяна на банер"
-        >
-          <Camera size={18} />
-        </button>
+        <div className="absolute right-3 top-3 z-20 md:hidden">
+          <button
+            type="button"
+            onClick={(event) => { event.stopPropagation(); openBannerEditor() }}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-paper/88 text-ink shadow-sm backdrop-blur transition hover:bg-paper"
+            aria-label={preview.coverUrl ? 'Смени банер' : 'Добавете банер'}
+          >
+            <Camera size={18} />
+          </button>
+        </div>
+        <div className="absolute inset-x-0 bottom-0 z-10 hidden pointer-events-none md:block">
+          <div className="container-page flex justify-end px-6 pb-6 pt-0">
+            <div className="w-auto max-w-xs rounded-3xl border border-white/30 bg-ink/55 p-3 text-paper shadow-lg backdrop-blur-sm transition-all duration-300 pointer-events-auto translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+              <div className="text-sm font-medium">{preview.coverUrl ? 'Смени банер' : 'Добавете банер'}</div>
+              <p className="mt-1 text-[11px] leading-4 text-paper/85 sm:text-xs">Препоръчителен размер: 1600 × 600 px</p>
+              <button type="button" onClick={(event) => { event.stopPropagation(); openBannerEditor() }} className="btn mt-3 w-full justify-center border-0 bg-white/90 text-ink hover:bg-white">
+                <Camera size={18} />
+                {preview.coverUrl ? 'Смени банер' : 'Добавете банер'}
+              </button>
+            </div>
+          </div>
+        </div>
         <input
           id="partner-cover-upload"
           type="file"
@@ -512,54 +617,35 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
         />
       </PublicProfileBanner>
       <div className="relative z-10 flex flex-col bg-soft pb-16 md:pb-24">
-        <div className="container-page w-full px-4 md:px-6 -mt-24 space-y-5">
+        <div className="container-page -mt-10 w-full space-y-5 px-4 sm:-mt-12 md:-mt-24 md:px-6">
         <PublicProfilePanel className="transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.04)]">
-          {false && (
-          <div className="group relative h-64 overflow-hidden bg-soft md:h-80">
-            <div
-              className="absolute inset-0 bg-cover"
-              style={{
-                backgroundImage: `url(${preview.coverUrl || LAYER_HEROS[preview.layerSlug] || ''})`,
-                backgroundPosition: `50% ${preview.coverY ?? 50}%`,
-              }}
-            />
-            <div className="absolute inset-0 bg-black/10 opacity-0 transition group-hover:opacity-100" />
-            <button
-              type="button"
-              onClick={() => document.getElementById('partner-cover-upload')?.click()}
-              className="absolute right-4 top-4 rounded-full bg-paper/90 p-2.5 text-ink shadow-sm backdrop-blur transition hover:bg-paper hover:scale-105"
-              title="Промяна на банер"
-            >
-              <Camera size={18} />
-            </button>
-            <input
-              id="partner-cover-upload"
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleCoverFileChange}
-            />
-          </div>
-          )}
-
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-end sm:text-left">
-              <div className="h-32 w-32 shrink-0 overflow-hidden rounded-3xl border-4 border-paper bg-soft shadow-md transition-transform duration-300 hover:scale-[1.02]">
-                <img src={getProfileImage(preview)} alt={preview.name} className="img-cover" style={getProfileImageStyle(preview)} />
-              </div>
+            <div className="flex flex-col items-center gap-4 text-center lg:flex-row lg:items-end lg:text-left">
+              <button
+                type="button"
+                onClick={openAvatarEditor}
+                className="group relative shrink-0 rounded-3xl transition hover:ring-2 hover:ring-ink focus:outline-none focus:ring-2 focus:ring-ink"
+                aria-label={preview.imageUrl ? 'Смени снимка' : 'Добавете снимка'}
+              >
+                <PublicProfileAvatar src={preview.imageUrl || ''} alt={preview.name} name={preview.name} imageStyle={getProfileImageStyle(preview)} statusTitle="Партньорски профил" sizeClassName="h-24 w-24 sm:h-28 sm:w-28 md:h-32 md:w-32" statusClassName="bottom-0.5 right-0.5 h-4 w-4 border-[3px] sm:bottom-1 sm:right-1 sm:h-5 sm:w-5 sm:border-4" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center rounded-3xl bg-ink/45 px-3 text-center text-paper opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                  <Camera size={24} />
+                  <span className="mt-1 text-xs font-semibold">{preview.imageUrl ? 'Смени снимка' : 'Добавете снимка'}</span>
+                </div>
+              </button>
               <div className="min-w-0 pb-1">
                 <div className="eyebrow">Партньорски профил</div>
-                <h1 className="mt-2 break-words font-display text-3xl font-semibold leading-none tracking-tight text-ink md:text-5xl">{preview.name}</h1>
+                <h1 className="mt-2 break-words font-display text-[clamp(2rem,7vw,3.25rem)] font-semibold leading-[0.95] tracking-tight text-ink">{preview.name}</h1>
                 <p className="mt-2 text-sm text-muted">{preview.headline || preview.tag} · {preview.city}</p>
-                <div className="mt-3 inline-flex rounded-full border border-line bg-soft px-3 py-1 text-xs font-medium text-muted">
+                <div className="mt-3 inline-flex max-w-full rounded-full border border-line bg-soft px-3 py-1 text-center text-xs font-medium text-muted">
                   Слой {preview.layerNumber} · {preview.layerTitle}
                 </div>
               </div>
             </div>
-            <div className="flex flex-wrap justify-center gap-3 pb-1 lg:justify-end">
-              {preview.isPublished && <Link to={`/profil/${preview.slug}`} className="btn btn-primary"><Eye size={18} /> Виж публично</Link>}
-              <button type="button" onClick={startPaymentOnboarding} disabled={paymentState.status === 'opening'} className="btn btn-ghost"><CreditCard size={18} /> {account?.stripe_account_id ? 'Плащания' : 'Активирай плащания'}</button>
-              <button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}><LogOut size={18} /> Изход</button>
+            <div className="flex w-full flex-col gap-3 pb-1 sm:flex-row sm:flex-wrap lg:w-auto lg:justify-end">
+              {preview.isPublished && <Link to={`/profil/${preview.slug}`} className="btn btn-primary w-full justify-center sm:w-auto"><Eye size={18} /> Виж публично</Link>}
+              <button type="button" onClick={startPaymentOnboarding} disabled={paymentState.status === 'opening'} className="btn btn-ghost w-full justify-center sm:w-auto"><CreditCard size={18} /> {account?.stripe_account_id ? 'Плащания' : 'Активирай плащания'}</button>
+              <button className="btn btn-ghost w-full justify-center sm:w-auto" onClick={() => supabase.auth.signOut()}><LogOut size={18} /> Изход</button>
             </div>
           </div>
         </PublicProfilePanel>
@@ -590,6 +676,8 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
                 draft={profileDraft}
                 saveState={saveState}
                 preview={preview}
+                accountDisplayName={accountDisplayName}
+                hasNameMismatch={hasNameMismatch}
                 onChange={updateProfile}
                 onSubmit={saveProfile}
                 avatarEditor={avatarEditor}
@@ -692,7 +780,7 @@ function getProfileCompletion(profile, portfolio, layer01Meta) {
 function WorkspaceSidebar({ tabs, activeTab, profile, completion, portfolioCount, onTabChange }) {
   return (
     <aside className="min-w-0 max-w-full overflow-hidden rounded-3xl border border-line bg-paper p-3 shadow-[0_8px_30px_rgb(0,0,0,0.02)] lg:sticky lg:top-24 lg:overflow-visible">
-      <nav className="flex w-full min-w-0 max-w-full gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
+      <nav className="flex w-full min-w-0 max-w-full gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-col lg:overflow-visible lg:pb-0">
         {tabs.map((tab) => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id
@@ -701,7 +789,7 @@ function WorkspaceSidebar({ tabs, activeTab, profile, completion, portfolioCount
               key={tab.id}
               type="button"
               onClick={() => onTabChange(tab.id)}
-              className={`inline-flex min-h-11 shrink-0 items-center gap-3 rounded-2xl px-4 py-2.5 text-left text-sm font-medium transition lg:w-full ${isActive ? 'bg-ink text-paper shadow-sm' : 'text-muted hover:bg-soft hover:text-ink'}`}
+              className={`inline-flex min-h-11 shrink-0 snap-start items-center gap-3 rounded-2xl px-4 py-2.5 text-left text-sm font-medium transition lg:w-full ${isActive ? 'bg-ink text-paper shadow-sm' : 'text-muted hover:bg-soft hover:text-ink'}`}
             >
               <Icon size={18} />
               <span>{tab.label}</span>
@@ -806,6 +894,8 @@ function ProfileForm({
   draft,
   saveState,
   preview,
+  accountDisplayName,
+  hasNameMismatch,
   avatarEditor,
   onChange,
   onSubmit,
@@ -826,10 +916,20 @@ function ProfileForm({
           <Field label="Име / фирма"><input value={draft.name} onChange={event => onChange('name', event.target.value)} className={INPUT} /></Field>
           <Field label="One-liner"><input value={draft.headline} onChange={event => onChange('headline', event.target.value)} className={INPUT} placeholder="Напр. Интериори с точен бюджет и срок" /></Field>
         </div>
+        {hasNameMismatch && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            Името в акаунта и името в публичния профил са различни.
+            {accountDisplayName && <span className="mt-1 block text-xs text-amber-800">Име в акаунта: {accountDisplayName}</span>}
+          </div>
+        )}
+        <label className="flex items-start gap-3 rounded-2xl border border-line bg-soft p-4 text-sm text-muted">
+          <input type="checkbox" checked={draft.syncAccountName} onChange={event => onChange('syncAccountName', event.target.checked)} className="mt-1 accent-black" />
+          <span>Синхронизирай и името в акаунта</span>
+        </label>
         <div className="grid gap-4 md:grid-cols-3">
           <Field label="Роля"><input value={draft.tag} onChange={event => onChange('tag', event.target.value)} className={INPUT} /></Field>
           <Field label="Град"><input value={draft.city} onChange={event => onChange('city', event.target.value)} className={INPUT} /></Field>
-          <Field label="Слой"><select value={draft.layerSlug} onChange={event => onChange('layerSlug', event.target.value)} className={INPUT}>{LAYERS.map(layer => <option key={layer.slug} value={layer.slug}>Слой {layer.number} · {layer.title}</option>)}</select></Field>
+          <Field label="Слой"><TotsanSelect value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} /></Field>
         </div>
         <div className="grid gap-4 md:grid-cols-4">
           <Field label="От година"><input type="number" min="1900" max="2100" value={draft.since} onChange={event => onChange('since', event.target.value)} className={INPUT} /></Field>
@@ -873,14 +973,15 @@ function ProfileForm({
           <div className="eyebrow">Снимка</div>
           <div className="group relative mt-4 flex justify-center">
             <button type="button" onClick={onOpenAvatarEditor} className="relative rounded-full transition hover:ring-2 hover:ring-ink focus:outline-none focus:ring-2 focus:ring-ink" aria-label="Смени снимката">
-              <Avatar src={getProfileImage(preview)} name={preview.name} size={200} imgStyle={getProfileImageStyle(preview)} />
-              <div className="absolute inset-0 hidden items-center justify-center rounded-full bg-ink/40 text-paper opacity-0 transition md:flex md:group-hover:opacity-100">
+              <Avatar src={preview.imageUrl || ''} name={preview.name} size={200} imgStyle={getProfileImageStyle(preview)} />
+              <div className="absolute inset-0 hidden flex-col items-center justify-center rounded-full bg-ink/45 px-5 text-center text-paper opacity-0 transition md:flex md:group-hover:opacity-100 md:group-focus-within:opacity-100">
                 <Camera size={32} />
+                <span className="mt-2 text-sm font-semibold">{preview.imageUrl ? 'Смени снимка' : 'Добавете снимка'}</span>
               </div>
             </button>
           </div>
           <button type="button" onClick={onOpenAvatarEditor} className="btn btn-ghost mt-4 w-full cursor-pointer justify-center">
-            <Camera size={18} /> Смени снимката
+            <Camera size={18} /> {preview.imageUrl ? 'Смени снимката' : 'Добавете снимка'}
           </button>
           <input id="partner-avatar-upload" type="file" accept="image/*" className="sr-only" onChange={(event) => { 
             onAvatarFile(event.target.files?.[0]);
@@ -895,6 +996,31 @@ function ProfileForm({
               onClose={onCloseAvatarEditor}
               onSelectFile={async (file) => onAvatarFile(file)}
               onCropSave={onSaveAvatar}
+            />
+          )}
+
+          {bannerEditor.open && (
+            <ImageCropperModal
+              file={bannerEditor.file}
+              imageUrl={bannerEditor.imageUrl}
+              initialFileName={bannerEditor.fileName}
+              title="Редактирай банера"
+              description={BANNER_DESCRIPTION}
+              aspect={1600 / 520}
+              cropShape="rect"
+              objectFit="horizontal-cover"
+              outputWidth={1600}
+              outputHeight={520}
+              minZoom={1}
+              maxZoom={4}
+              zoomStep={0.05}
+              previewClassName="w-full rounded-2xl relative"
+              previewStyle={{ aspectRatio: '1600 / 520' }}
+              previewImageClassName="absolute inset-0 h-full w-full object-cover"
+              emptyStateLabel="Качи банер, за да го позиционираш."
+              onClose={closeBannerEditor}
+              onSelectFile={async (file) => handleBannerFile(file)}
+              onCropSave={saveBanner}
             />
           )}
         </div>
@@ -940,7 +1066,7 @@ function PortfolioEditor({ items, draft, state, onSelect, onNew, onChange, onSub
 
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Заглавие"><input value={draft.title} onChange={event => onChange('title', event.target.value)} className={INPUT} placeholder="Апартамент 90 м2" /></Field>
-          <Field label="Слой"><select value={draft.layerSlug} onChange={event => onChange('layerSlug', event.target.value)} className={INPUT}>{LAYERS.map(layer => <option key={layer.slug} value={layer.slug}>Слой {layer.number} · {layer.title}</option>)}</select></Field>
+          <Field label="Слой"><TotsanSelect value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} /></Field>
         </div>
         <div className="grid gap-4 md:grid-cols-4">
           <Field label="Град"><input value={draft.city} onChange={event => onChange('city', event.target.value)} className={INPUT} /></Field>

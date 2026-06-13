@@ -13,10 +13,14 @@ begin
   -- with matching email and link them
   update public.partner_applications
   set user_id = new.id
-  where email = new.email
-    and user_id is null
-    and status != 'rejected'
-  limit 1;
+  where id = (
+    select id
+    from public.partner_applications
+    where email = new.email
+      and user_id is null
+      and status != 'rejected'
+    limit 1
+  );
   
   return new;
 end;

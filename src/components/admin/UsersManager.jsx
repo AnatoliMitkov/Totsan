@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Ban, CheckCircle2, ChevronDown, Edit3, ExternalLink, Eye, EyeOff, Save, Search, ShieldCheck, UserRound, X } from 'lucide-react'
+import { Ban, CheckCircle2, Edit3, ExternalLink, Eye, EyeOff, Save, Search, ShieldCheck, UserRound, X } from 'lucide-react'
 import {
   ACCOUNT_ROLE_LABELS,
   ACCOUNT_STATUS_LABELS,
-  ADMIN_SELECT_CLASS,
   SPECIALIST_STATUS_LABELS,
   formatAdminDate,
   loadAccounts,
+  loadPartnerApplications,
   paginateRows,
   updateAccount,
 } from '../../lib/admin.js'
 import { LAYERS } from '../../data/layers.js'
 import { getProfileImage, getProfileImageStyle, normalizeProfile, runProfileSelectWithLayer01Fallback } from '../../lib/profiles.js'
 import { supabase } from '../../lib/supabase.js'
+import TotsanSelect from '../ui/TotsanSelect.jsx'
 
 const ADMIN_ROLE_MANAGER_EMAILS = new Set(['a.mitkov@totsan.com', 'ivelinva2@gmail.com'])
 
@@ -30,6 +31,14 @@ const ROLE_META = {
   admin: { label: 'Админ', tone: 'admin' },
 }
 
+const PARTNER_APPLICATION_META = {
+  none: { label: 'Няма', tone: 'neutral' },
+  not_applicable: { label: 'Не е приложимо', tone: 'neutral' },
+  pending: { label: 'Очаква преглед', tone: 'warning' },
+  approved: { label: 'Одобрена', tone: 'success' },
+  rejected: { label: 'Отхвърлена', tone: 'danger' },
+}
+
 const TONE_CLASSES = {
   admin: 'border-indigo-200 bg-indigo-50 text-indigo-800',
   danger: 'border-red-200 bg-red-50 text-red-800',
@@ -42,6 +51,7 @@ const TONE_CLASSES = {
 export default function UsersManager({ globalQuery = '', account: currentAccount }) {
   const [accounts, setAccounts] = useState([])
   const [profiles, setProfiles] = useState([])
+  const [applications, setApplications] = useState([])
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
@@ -59,16 +69,18 @@ export default function UsersManager({ globalQuery = '', account: currentAccount
     setStatus('loading')
     setError('')
     try {
-      const [accs, { data: profs, error: profsError }] = await Promise.all([
+      const [accs, profsResult, apps] = await Promise.all([
         loadAccounts(),
         runProfileSelectWithLayer01Fallback((columns) => (
           supabase.from('profiles').select(columns).order('name')
         )),
+        loadPartnerApplications(),
       ])
-      if (profsError) throw profsError
+      if (profsResult.error) throw profsResult.error
 
       setAccounts(accs)
-      setProfiles(profs || [])
+      setProfiles(profsResult.data || [])
+      setApplications(apps || [])
       setStatus('ready')
     } catch (loadError) {
       setError(loadError.message || 'Данните не се заредиха.')
@@ -82,6 +94,12 @@ export default function UsersManager({ globalQuery = '', account: currentAccount
       if (profile.user_id) profilesByUserId.set(profile.user_id, profile)
     })
 
+    const applicationsByUserId = new Map()
+    applications.forEach((application) => {
+      if (!application.user_id || applicationsByUserId.has(application.user_id)) return
+      applicationsByUserId.set(application.user_id, application)
+    })
+
     const handledProfileIds = new Set()
     const result = []
 
@@ -93,6 +111,7 @@ export default function UsersManager({ globalQuery = '', account: currentAccount
         type: profile ? 'combined' : 'account',
         account,
         profile: profile ? normalizeProfile(profile) : null,
+        application: applicationsByUserId.get(account.id) || null,
       })
     })
 
@@ -103,19 +122,22 @@ export default function UsersManager({ globalQuery = '', account: currentAccount
           type: 'profile',
           account: null,
           profile: normalizeProfile(profile),
+          application: null,
         })
       }
     })
 
     return result
-  }, [accounts, profiles])
+  }, [accounts, applications, profiles])
 
   const filtered = useMemo(() => {
     const searchNeedle = String(query || globalQuery || '').trim().toLowerCase()
     if (!searchNeedle) return entities
 
-    return entities.filter(({ type, account, profile }) => {
-      const statusValue = getAccountStatusValue(account)
+    return entities.filter(({ type, account, profile, application }) => {
+      const accountStatusValue = getAccountStatusValue(account)
+      const roleValue = getRoleValue(account, profile)
+      const partnerStatusValue = getPartnerApplicationStatus(account, profile, application)
       const searchString = [
         type,
         account?.email,
@@ -123,9 +145,12 @@ export default function UsersManager({ globalQuery = '', account: currentAccount
         account?.display_name,
         account?.phone,
         account?.city,
-        account?.role,
-        ACCOUNT_ROLE_LABELS[account?.role],
-        ACCOUNT_STATUS_META[statusValue]?.label,
+        roleValue,
+        ACCOUNT_ROLE_LABELS[roleValue],
+        ACCOUNT_STATUS_META[accountStatusValue]?.label,
+        PARTNER_APPLICATION_META[partnerStatusValue]?.label,
+        application?.name,
+        application?.email,
         profile?.name,
         profile?.tag,
         profile?.city,
@@ -159,7 +184,10 @@ export default function UsersManager({ globalQuery = '', account: currentAccount
       }
 
       if (entity.profile) {
-        const profileUpdates = buildProfileUpdates(entity.profile, draft)
+        const effectiveDraft = draft.accountStatus === 'banned'
+          ? { ...draft, isPublished: false }
+          : draft
+        const profileUpdates = buildProfileUpdates(entity.profile, effectiveDraft)
         if (Object.keys(profileUpdates).length > 0) {
           const { data, error: updateError } = await runProfileSelectWithLayer01Fallback((columns) => (
             supabase
@@ -241,12 +269,15 @@ export default function UsersManager({ globalQuery = '', account: currentAccount
 }
 
 function UserCard({ entity, currentAccount, busyMessage, onEdit }) {
-  const { account, profile, type } = entity
+  const { account, profile, type, application } = entity
   const isSelf = account && account.id === currentAccount?.id
-  const statusValue = getAccountStatusValue(account)
-  const roleValue = account?.role || (profile ? 'specialist' : 'user')
+  const accountStatusValue = getAccountStatusValue(account)
+  const roleValue = getRoleValue(account, profile)
+  const partnerStatusValue = getPartnerApplicationStatus(account, profile, application)
+  const warnings = getAdminWarnings({ account, profile, application, roleValue, partnerStatusValue })
   const profileUrl = profile?.slug ? `/profil/${profile.slug}` : ''
-  const canOpenProfile = Boolean(profileUrl && profile?.isPublished)
+  const canOpenProfile = Boolean(profileUrl && (profile?.isPublished || currentAccount?.role === 'admin'))
+  const profileHref = profileUrl && profile?.isPublished ? profileUrl : `${profileUrl}?preview=true`
 
   return (
     <article className="rounded-3xl border border-line bg-paper p-5 transition hover:border-ink/20">
@@ -256,7 +287,7 @@ function UserCard({ entity, currentAccount, busyMessage, onEdit }) {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="truncate font-display text-2xl text-ink">{displayName(account, profile)}</h3>
-              <StatusPill value={statusValue} />
+              <AccountStatusBadge value={accountStatusValue} />
               <RolePill value={roleValue} />
               {type === 'profile' && <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900">Осиротял профил</span>}
             </div>
@@ -268,22 +299,26 @@ function UserCard({ entity, currentAccount, busyMessage, onEdit }) {
               {isSelf && <span className="font-medium text-accent">Това е твоят профил</span>}
             </div>
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
-              {profile ? (
-                <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 ${profile.isPublished ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-line bg-soft text-muted'}`}>
-                  {profile.isPublished ? <Eye size={13} /> : <EyeOff size={13} />}
-                  {profile.isPublished ? 'Видим в каталога' : 'Скрит от каталога'}
-                </span>
-              ) : (
-                <span className="rounded-full border border-line bg-soft px-3 py-1 text-muted">Няма публичен профил</span>
-              )}
+              {roleValue === 'specialist' && <PartnerApplicationBadge value={partnerStatusValue} />}
+              <ProfileBadge profile={profile} role={roleValue} />
+              {profile && <CatalogBadge isPublished={profile.isPublished} />}
               {account?.account_status === 'banned' && <span className="rounded-full border border-red-200 bg-red-50 px-3 py-1 font-medium text-red-800">Достъпът е блокиран</span>}
             </div>
+            {warnings.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {warnings.map((warning) => (
+                  <div key={warning} className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+                    {warning}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-2 xl:flex-col xl:items-stretch">
           {canOpenProfile ? (
-            <a href={profileUrl} target="_blank" rel="noreferrer" className="btn btn-ghost !py-2 text-sm">
+            <a href={profileHref} target="_blank" rel="noreferrer" className="btn btn-ghost !py-2 text-sm">
               <ExternalLink size={16} /> Виж профила
             </a>
           ) : (
@@ -306,7 +341,7 @@ function EditUserModal({ entity, canManageAdmins, currentAccount, actionState, o
   const [localMessage, setLocalMessage] = useState('')
   const [saving, setSaving] = useState(false)
   const { account, profile } = entity
-  const statusValue = getAccountStatusValue(account)
+  const accountStatusValue = getAccountStatusValue(account)
   const isCurrentAction = actionState.id === (account ? `acc_${account.id}` : `prof_${profile?.id}`)
 
   async function submit(event) {
@@ -330,7 +365,7 @@ function EditUserModal({ entity, canManageAdmins, currentAccount, actionState, o
             <div className="eyebrow">Редакция</div>
             <h2 className="mt-2 font-display text-3xl text-ink">{displayName(account, profile)}</h2>
             <div className="mt-2 flex flex-wrap gap-2">
-              <StatusPill value={statusValue} />
+              <AccountStatusBadge value={accountStatusValue} />
               <RolePill value={draft.role} />
             </div>
           </div>
@@ -344,26 +379,17 @@ function EditUserModal({ entity, canManageAdmins, currentAccount, actionState, o
             <div className="text-sm font-semibold text-ink">Настройки на акаунта</div>
             {account ? (
               <div className="mt-4 space-y-4">
-                <StatusSelectControl
+                <ReadOnlyStatus
                   label="Роля"
-                  value={draft.role}
-                  onChange={(value) => setDraft((current) => ({
-                    ...current,
-                    role: value,
-                    specialistStatus: value === 'specialist' ? (current.specialistStatus || 'pending') : '',
-                  }))}
-                  options={getRoleOptions(canManageAdmins)}
+                  value={ACCOUNT_ROLE_LABELS[draft.role] || draft.role}
                   tone={ROLE_META[draft.role]?.tone}
-                  disabled={!canManageAdmins}
+                  helper="Ролята се променя само чрез партньорска кандидатура или отделно guided действие."
                 />
-                <StatusSelectControl
+                <ReadOnlyStatus
                   label="Specialist статус"
-                  value={draft.specialistStatus}
-                  onChange={(value) => setDraft((current) => ({ ...current, specialistStatus: value }))}
-                  options={Object.entries(SPECIALIST_STATUS_LABELS)}
-                  tone={statusTone(draft.specialistStatus)}
-                  disabled={draft.role !== 'specialist'}
-                  helper={draft.role !== 'specialist' ? 'Активен е само за специалисти.' : ''}
+                  value={draft.role === 'specialist' ? (SPECIALIST_STATUS_LABELS[draft.specialistStatus] || draft.specialistStatus || 'Няма') : 'Не е приложимо'}
+                  tone={draft.role === 'specialist' ? statusTone(draft.specialistStatus) : 'neutral'}
+                  helper="Одобрение и отказ се управляват от кандидатурите, не от този модал."
                 />
                 <StatusSelectControl
                   label="Account статус"
@@ -435,21 +461,27 @@ function EditUserModal({ entity, canManageAdmins, currentAccount, actionState, o
 
 function StatusSelectControl({ label, value, onChange, options, tone = 'neutral', disabled = false, helper = '' }) {
   return (
-    <label className="block text-sm font-medium text-ink">
-      {label}
-      <span className="relative mt-2 block">
-        <select
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          disabled={disabled}
-          className={`${ADMIN_SELECT_CLASS} !mt-0 w-full appearance-none rounded-2xl border px-4 py-3 pr-11 font-semibold disabled:opacity-55 ${toneClass(tone)}`}
-        >
-          {options.map(([optionValue, optionLabel]) => <option key={optionValue} value={optionValue}>{optionLabel}</option>)}
-        </select>
-        <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-current" />
-      </span>
-      {helper && <span className="mt-1 block text-xs font-normal text-muted">{helper}</span>}
-    </label>
+    <TotsanSelect
+      label={label}
+      value={value}
+      onChange={onChange}
+      options={options}
+      disabled={disabled}
+      helper={helper}
+      buttonClassName={`font-semibold ${toneClass(tone)}`}
+    />
+  )
+}
+
+function ReadOnlyStatus({ label, value, tone = 'neutral', helper = '' }) {
+  return (
+    <div>
+      <div className="text-sm font-medium text-ink">{label}</div>
+      <div className={`mt-2 rounded-2xl border px-4 py-3 text-sm font-semibold ${toneClass(tone)}`}>
+        {value || '—'}
+      </div>
+      {helper && <div className="mt-1.5 text-xs leading-5 text-muted">{helper}</div>}
+    </div>
   )
 }
 
@@ -485,8 +517,33 @@ function getRoleOptions(canManageAdmins) {
 function getAccountStatusValue(account) {
   if (!account) return 'active'
   if (account.account_status === 'banned') return 'banned'
-  if (account.role === 'specialist') return account.specialist_status || 'pending'
   return 'active'
+}
+
+function getRoleValue(account, profile) {
+  return account?.role || (profile ? 'specialist' : 'user')
+}
+
+function getPartnerApplicationStatus(account, profile, application) {
+  if (getRoleValue(account, profile) !== 'specialist') return 'not_applicable'
+  if (application?.status && PARTNER_APPLICATION_META[application.status]) return application.status
+  if (account?.specialist_status === 'approved') return 'approved'
+  if (account?.specialist_status === 'rejected') return 'rejected'
+  return 'none'
+}
+
+function getAdminWarnings({ account, profile, application, roleValue, partnerStatusValue }) {
+  const warnings = []
+
+  if (roleValue === 'specialist' && partnerStatusValue === 'approved' && profile && !profile.isPublished) {
+    warnings.push('Партньорът е одобрен, но не е видим в каталога.')
+  }
+
+  if (roleValue === 'specialist' && !application && !profile) {
+    warnings.push('Партньорски акаунт без завършена кандидатура.')
+  }
+
+  return warnings
 }
 
 function createDraft({ account, profile }) {
@@ -501,12 +558,8 @@ function createDraft({ account, profile }) {
 
 function buildAccountUpdates(account, draft) {
   const updates = {}
-  const nextRole = draft.role || 'user'
-  const nextSpecialistStatus = nextRole === 'specialist' ? (draft.specialistStatus || 'pending') : null
   const nextAccountStatus = draft.accountStatus || 'active'
 
-  if (nextRole !== (account.role || 'user')) updates.role = nextRole
-  if (nextSpecialistStatus !== (account.specialist_status || null)) updates.specialistStatus = nextSpecialistStatus
   if (nextAccountStatus !== (account.account_status || 'active')) updates.accountStatus = nextAccountStatus
 
   return updates
@@ -527,20 +580,43 @@ function mapLocalUpdates(updates) {
   return next
 }
 
-function StatusPill({ value }) {
+function AccountStatusBadge({ value }) {
   const meta = ACCOUNT_STATUS_META[value] || ACCOUNT_STATUS_META.active
   const Icon = meta.icon || ShieldCheck
   return (
     <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold ${toneClass(meta.tone)}`}>
       <Icon size={13} />
-      {meta.label}
+      Акаунт: {meta.label}
     </span>
   )
 }
 
 function RolePill({ value }) {
   const meta = ROLE_META[value] || ROLE_META.user
-  return <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${toneClass(meta.tone)}`}>{meta.label}</span>
+  return <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${toneClass(meta.tone)}`}>Роля: {meta.label}</span>
+}
+
+function PartnerApplicationBadge({ value }) {
+  const meta = PARTNER_APPLICATION_META[value] || PARTNER_APPLICATION_META.none
+  return <span className={`rounded-full border px-3 py-1 font-medium ${toneClass(meta.tone)}`}>Кандидатура: {meta.label}</span>
+}
+
+function ProfileBadge({ profile, role }) {
+  if (profile) {
+    return <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 font-medium text-emerald-800">Профил: Създаден</span>
+  }
+
+  const label = role === 'user' ? 'Клиентски акаунт — няма публична визитка' : 'Профил: Няма'
+  return <span className="rounded-full border border-line bg-soft px-3 py-1 font-medium text-muted">{label}</span>
+}
+
+function CatalogBadge({ isPublished }) {
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 font-medium ${isPublished ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-line bg-soft text-muted'}`}>
+      {isPublished ? <Eye size={13} /> : <EyeOff size={13} />}
+      {isPublished ? 'Каталог: Видим' : 'Каталог: Скрит'}
+    </span>
+  )
 }
 
 function statusTone(value) {
