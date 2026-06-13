@@ -131,7 +131,7 @@ export default function TotsanPro() {
   return (
     <>
       {/* ── Hero ── */}
-      <section className="section relative overflow-hidden bg-ink text-paper">
+      <section className="section relative overflow-hidden bg-ink text-paper" style={{ paddingTop: 'calc(var(--header-h, 64px) + var(--section-pad-y, 4rem))' }}>
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute left-[-6rem] top-[-6rem] h-[22rem] w-[22rem] rounded-full bg-accent/20 blur-3xl" />
           <div className="absolute bottom-[-8rem] right-[-5rem] h-[24rem] w-[24rem] rounded-full bg-trustGreen/15 blur-3xl" />

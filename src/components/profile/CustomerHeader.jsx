@@ -39,8 +39,7 @@ export default function CustomerHeader({ account, displayName, completeness, onE
           </div>
 
           <div className="min-w-0 pb-1">
-            <div className="eyebrow">Моят профил</div>
-            <h1 className="mt-2 break-words font-display text-[clamp(2rem,7vw,3.25rem)] font-semibold leading-[0.95] tracking-tight text-ink">
+            <h1 className="break-words font-display text-[clamp(2rem,7vw,3.25rem)] font-semibold leading-[0.95] tracking-tight text-ink">
               {displayName}
             </h1>
             <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs font-medium text-muted lg:justify-start">

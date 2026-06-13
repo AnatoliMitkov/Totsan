@@ -39,11 +39,36 @@ const MAX_BANNER_BYTES = 12 * 1024 * 1024
 const BANNER_RATIO_TEXT = 'Препоръчителен размер: 1600 x 520 px'
 const BANNER_DESCRIPTION = 'Широк банер работи най-добре около 3:1. Препоръчваме 1600 x 520 px за най-чист резултат.'
 
+function CustomSpaceIcon({ size = 18, className = '' }) {
+  return (
+    <svg
+      id="Layer_2"
+      data-name="Layer 2"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 2639.63 2316.21"
+      width={size}
+      height={size}
+      className={className}
+      fill="currentColor"
+    >
+      <g id="Layer_1-2" data-name="Layer 1">
+        <circle cx="344.77" cy="1598.91" r="47.16"/>
+        <path d="M2337.99,1853.85v333.17l133.65,92.31,5.67,17.47-11.86,17.7-389.92,1.71c-12.4-4.46-18.75-16.6-14.92-29.54l138.32-99.65v-333.17h-324.48v223.08c0,23.29-45.58,49.73-46.46,53.34-5.52,22.67,13.24,84.76-15.55,93.24-13.27,3.91-82.52,3.49-92.1-4.07-16.27-12.83-4.79-66.38-8.13-87.47h-648.96c-3.34,21.09,8.13,74.65-8.13,87.47-9.58,7.55-78.83,7.98-92.1,4.07-28.79-8.49-10.03-70.58-15.55-93.24-.88-3.61-46.46-30.05-46.46-53.34v-223.08h-136.16L17.64,2271.18l-17.64-11.75L2.46,425.12,759.36,0l1871.79,4.93,8.47,26.3-3.32,1810.95c-1.28,2.74-10.5,11.68-11.5,11.68h-286.82ZM2592.94,46.05H785.13v1761.45h121.68c3.03-34.34,34.14-55.96,64.08-67.35,5.24-71.7-29.78-178.27,71.86-187.82,223.43,12.23,462.65-15.5,684.19-.02,109,7.61,72.14,110.23,77.63,187.84,29.94,11.39,61.05,33.01,64.08,67.35h330.27v-370.83h-147.75c-18.5,0-11.97-32.38-8.92-43.72,28.53-106.38,100.7-222.97,132.37-331.14l12.7-16.27c9.52-4.55,137.94-5.73,153.44-2.76,8.01,1.53,13.23,4.48,17.32,11.65l164.4,351.81c6.91,40.64-41.48,29.63-68.62,30.43v162.24h-46.35v-162.24h-69.53v370.83h254.95V46.05ZM576.54,1906l162.24-89.81V63.43L43.47,451.64v1755.66l162.48-90.78,2.61-900.08,333.01-194.51c9.36-8.48,34.96,4.36,34.96,12.03v872.03ZM252.06,2091.42l278.12-159.34v-848.86l-278.12,156.44v851.75ZM2094.63,1390.31h365.04l-141.73-301.73c-22.28,4.65-91.64-7.38-104.7,6.05l-118.61,295.68ZM2291.64,1436.67h-46.35v773.53l-81.12,60.84h208.59l-81.12-60.84v-773.53ZM1364.56,1598.9h-333.17c-25.14,0-10.56,119.58-14.83,141.24,50.42,17.22,76.87,60.51,69.85,113.73,82.02,6.57,177.51-8.95,257.87-.03,16.23,1.8,41.28,16.86,45.23,16.28,8.38-1.23,21.36-14.02,41.68-16.28,80.34-8.94,175.87,6.61,257.87.03-7.02-53.22,19.43-96.51,69.85-113.73-4.27-21.67,10.31-141.24-14.83-141.24h-333.17v162.24h-46.35v-162.24ZM980.55,1785.46c-20.73,4.53-31.01,22.36-33.31,42.19-2.96,25.49-2.4,235.31,3,246.41,2.36,4.85,7.6,8.87,12.78,10.39l853.51-1.7,10.39-12.78c-5.9-75.38,12.14-175.28.82-247.64-6.01-38.47-55.67-52.02-80.91-23.65-25.36,28.51-3.77,131.92-11.62,173.8-1.78,9.51-6,16.09-15.49,19.28l-668.1-1.7c-39.63-19.27,36.38-228.04-71.09-204.58ZM1364.56,1946.56c3.4-11.01-2.18-46.35-14.49-46.35h-263.64v46.35h278.12ZM1689.03,1900.21h-263.64c-12.31,0-17.88,35.35-14.49,46.35h278.12v-46.35ZM1016.94,2131.92l-23.3.03.06,46.44,23.3-.03-.06-46.44ZM1781.78,2131.92l-23.3.03.06,46.44,23.3-.03-.06-46.44Z"/>
+        <path d="M2106.48,138.35l.07,881.4-881.33.07-.07-881.4,881.33-.07ZM2059.87,185.11h-788.02v788.02h788.02V185.11Z"/>
+        <path d="M1642.94,231.05l.08,325.15-325.15.08-.08-325.15,325.15-.08ZM1364.56,277.82v231.77h231.77v-231.77h-231.77Z"/>
+        <path d="M2013.77,231.05l.08,325.15-325.15.08-.08-325.15,325.15-.08ZM1735.39,277.82v231.77h231.77v-231.77h-231.77Z"/>
+        <path d="M1643.02,601.96v325.15h-325.15v-325.15h325.15ZM1364.56,648.65v231.77h231.77v-231.77h-231.77Z"/>
+        <path d="M2013.84,601.95l.08,325.08-325.22.08-.08-325.08,325.22-.08ZM1735.39,648.65v231.77h231.77v-231.77h-231.77Z"/>
+      </g>
+    </svg>
+  )
+}
+
 const CUSTOMER_TABS = [
   { id: 'overview', label: 'Преглед', icon: Home },
   { id: 'personal', label: 'Лични данни', icon: UserRound },
   { id: 'preferences', label: 'Предпочитания', icon: Settings2 },
-  { id: 'project', label: 'Моят проект', icon: FolderKanban },
+  { id: 'project', label: 'Моето пространство', icon: CustomSpaceIcon },
   { id: 'activity', label: 'Активност', icon: Activity },
   { id: 'security', label: 'Сигурност', icon: Lock },
 ]
@@ -158,7 +183,6 @@ export default function MyProfile() {
 }
 
 function AdminProfile({ session, account }) {
-  const [dangerOpen, setDangerOpen] = useState(false)
   const displayName = getAccountDisplayName(account, session, 'Администратор')
   const email = account?.email || session?.user?.email || ''
   const createdAt = account?.created_at ? new Date(account.created_at).toLocaleDateString('bg-BG', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Не е налично'
@@ -172,7 +196,7 @@ function AdminProfile({ session, account }) {
   ]
 
   return (
-    <section className="min-h-[calc(100dvh-var(--header-h,0px))] bg-soft py-8 md:py-10">
+    <section className="min-h-[calc(100dvh-var(--header-h,0px))] bg-soft pb-8 md:pb-10 pt-[calc(var(--header-h,64px)+2rem)] md:pt-[calc(var(--header-h,64px)+2.5rem)]">
       <div className="container-page space-y-6">
         <div className="overflow-hidden rounded-[2rem] border border-white/70 bg-paper/85 shadow-[0_22px_70px_rgba(13,35,64,0.08)] backdrop-blur">
           <div className="relative p-6 md:p-8">
@@ -210,86 +234,42 @@ function AdminProfile({ session, account }) {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-          <main className="space-y-6">
-            <section className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_12px_40px_rgba(13,35,64,0.04)] md:p-7">
-              <div className="eyebrow">Бърз достъп</div>
-              <h2 className="mt-2 font-display text-3xl text-ink">Административни инструменти</h2>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                {shortcuts.map((item) => {
-                  const Icon = item.icon
-                  return (
-                    <Link key={item.to} to={item.to} className="group rounded-3xl border border-line bg-soft/70 p-5 transition hover:-translate-y-0.5 hover:border-ink/30 hover:bg-paper hover:shadow-[0_14px_34px_rgba(13,35,64,0.07)]">
-                      <div className="flex items-start gap-4">
-                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-paper text-accentDeep shadow-sm transition group-hover:bg-ink group-hover:text-paper">
-                          <Icon size={21} />
-                        </span>
-                        <span>
-                          <span className="block font-medium text-ink">{item.label}</span>
-                          <span className="mt-1 block text-sm leading-5 text-muted">{item.description}</span>
-                        </span>
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            </section>
+        <div className="mx-auto max-w-4xl space-y-6">
+          <section className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_12px_40px_rgba(13,35,64,0.04)] md:p-7">
+            <div className="eyebrow">Бърз достъп</div>
+            <h2 className="mt-2 font-display text-3xl text-ink">Административни инструменти</h2>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {shortcuts.map((item) => {
+                const Icon = item.icon
+                return (
+                  <Link key={item.to} to={item.to} className="group rounded-3xl border border-line bg-soft/70 p-5 transition hover:-translate-y-0.5 hover:border-ink/30 hover:bg-paper hover:shadow-[0_14px_34px_rgba(13,35,64,0.07)]">
+                    <div className="flex items-start gap-4">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-paper text-accentDeep shadow-sm transition group-hover:bg-ink group-hover:text-paper">
+                        <Icon size={21} />
+                      </span>
+                      <span>
+                        <span className="block font-medium text-ink">{item.label}</span>
+                        <span className="mt-1 block text-sm leading-5 text-muted">{item.description}</span>
+                      </span>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </section>
 
-            <section className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_12px_40px_rgba(13,35,64,0.04)] md:p-7">
-              <div className="eyebrow">Сигурност</div>
-              <h2 className="mt-2 font-display text-3xl text-ink">Защита на акаунта</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-                Управлението на многофакторна автентикация използва съществуващия защитен поток на Totsan.
-              </p>
-              <div className="mt-5">
-                <TotpMfaManager session={session} />
-              </div>
-            </section>
-          </main>
-
-          <aside className="space-y-6 lg:sticky lg:top-24">
-            <section className="rounded-[2rem] border border-red-100 bg-red-50/80 p-5 shadow-[0_12px_40px_rgba(127,29,29,0.05)] md:p-6">
-              <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-red-700 shadow-sm">
-                  <AlertTriangle size={22} />
-                </span>
-                <div>
-                  <div className="eyebrow text-red-800">Опасна зона</div>
-                  <h2 className="font-display text-2xl text-red-950">Опасна зона</h2>
-                </div>
-              </div>
-              <p className="mt-4 text-sm leading-6 text-red-950/75">
-                Тези действия могат да засегнат достъпа до акаунта и административните права.
-              </p>
-              <button type="button" onClick={() => setDangerOpen(true)} className="btn mt-5 w-full justify-center border-red-200 bg-white text-red-800 hover:border-red-300 hover:bg-red-50">
-                Заяви промяна или деактивация
-              </button>
-            </section>
-          </aside>
+          <section className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_12px_40px_rgba(13,35,64,0.04)] md:p-7">
+            <div className="eyebrow">Сигурност</div>
+            <h2 className="mt-2 font-display text-3xl text-ink">Защита на акаунта</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+              Управлението на многофакторна автентикация използва съществуващия защитен поток на Totsan.
+            </p>
+            <div className="mt-5">
+              <TotpMfaManager session={session} />
+            </div>
+          </section>
         </div>
       </div>
-
-      {dangerOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/55 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-[2rem] border border-line bg-paper p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="eyebrow text-red-800">Опасна зона</div>
-                <h2 className="mt-2 font-display text-3xl text-ink">Допълнителна проверка</h2>
-              </div>
-              <button type="button" onClick={() => setDangerOpen(false)} className="rounded-full p-2 text-muted transition hover:bg-soft hover:text-ink" aria-label="Затвори">
-                <X size={20} />
-              </button>
-            </div>
-            <p className="mt-4 text-sm leading-6 text-muted">
-              Промени по администраторски акаунт се извършват само след допълнителна проверка.
-            </p>
-            <button type="button" onClick={() => setDangerOpen(false)} className="btn btn-primary mt-6 w-full justify-center">
-              Разбрах
-            </button>
-          </div>
-        </div>
-      )}
     </section>
   )
 }
@@ -543,22 +523,24 @@ function CustomerProfile({ session, account, refreshAccount }) {
       <PublicProfileBanner
         imageSrc={localAccount?.cover_url || ''}
         imageAlt={displayName}
-        heightClass="min-h-[clamp(14rem,46vw,18rem)] sm:min-h-[16rem] md:aspect-[1600/520] md:min-h-0"
+        heightClass="h-[200px] sm:h-[240px] md:aspect-[1600/520] md:h-auto md:min-h-0"
         className="group cursor-pointer focus-within:ring-2 focus-within:ring-ink"
         onClick={openBannerEditor}
         placeholderLabel="Добавете банер"
         placeholderClassName="hidden md:grid"
       >
-        <div className="absolute right-3 top-3 z-20 md:hidden">
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); openBannerEditor() }}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-paper/88 text-ink shadow-sm backdrop-blur transition hover:bg-paper"
-            aria-label={localAccount?.cover_url ? 'Смени банер' : 'Добавете банер'}
-          >
-            <Camera size={18} />
-          </button>
-        </div>
+        {!localAccount?.cover_url && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pt-[var(--header-h,64px)] pb-10 md:hidden">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); openBannerEditor() }}
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/70 bg-paper/88 text-ink shadow-sm backdrop-blur transition hover:bg-paper"
+              aria-label="Добавете банер"
+            >
+              <Camera size={20} />
+            </button>
+          </div>
+        )}
         <div className="absolute inset-x-0 bottom-0 z-10 hidden pointer-events-none md:block">
           <div className="container-page flex justify-end px-6 pb-6 pt-0">
             <div className="w-auto max-w-xs rounded-3xl border border-white/30 bg-ink/55 p-3 text-paper shadow-lg backdrop-blur-sm transition-all duration-300 pointer-events-auto translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
@@ -574,111 +556,113 @@ function CustomerProfile({ session, account, refreshAccount }) {
       </PublicProfileBanner>
       <div className="relative z-10 flex flex-col bg-soft pb-16 md:pb-24">
         <div className="container-page -mt-10 w-full space-y-5 px-4 sm:-mt-12 md:-mt-24 md:px-6">
-        <CustomerHeader account={localAccount} displayName={displayName} completeness={completeness} onEditAvatar={openAvatarEditor} onSignOut={() => signOutAndRedirect(session?.user?.id)} />
+          <CustomerHeader account={localAccount} displayName={displayName} completeness={completeness} onEditAvatar={openAvatarEditor} onSignOut={() => signOutAndRedirect(session?.user?.id)} />
 
-        <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
-          <aside className="min-w-0 max-w-full overflow-hidden rounded-3xl border border-line bg-paper p-3 shadow-[0_8px_30px_rgb(0,0,0,0.02)] lg:sticky lg:top-24 lg:overflow-visible">
-            <nav className="flex w-full min-w-0 max-w-full gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-col lg:overflow-visible lg:pb-0">
-              {CUSTOMER_TABS.map((tab) => {
-                const Icon = tab.icon
-                const isActive = activeTab === tab.id
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`inline-flex min-h-11 shrink-0 snap-start items-center gap-3 rounded-2xl px-4 py-2.5 text-left text-sm font-medium transition lg:w-full ${isActive ? 'bg-ink text-paper shadow-sm' : 'text-muted hover:bg-soft hover:text-ink'}`}
-                  >
-                    <Icon size={18} />
-                    <span>{tab.label}</span>
-                  </button>
-                )
-              })}
-              <button type="button" onClick={() => setMode('application')} className="mt-2 inline-flex min-h-11 shrink-0 snap-start items-center justify-center rounded-2xl border border-line px-4 py-2.5 text-sm font-medium text-ink transition hover:border-ink lg:w-full">
-                Стани партньор
-              </button>
-            </nav>
-            <div className="mt-3 hidden border-t border-line pt-4 lg:block">
-              <div className="px-2">
-                <div className="text-xs uppercase tracking-[0.14em] text-muted">Попълване</div>
-                <div className="mt-2 flex items-end justify-between gap-3">
-                  <div className="font-display text-4xl leading-none text-ink">{completeness.percent}%</div>
-                </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-soft">
-                  <div className="h-full rounded-full bg-accentDeep" style={{ width: `${completeness.percent}%` }} />
+          <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
+            <aside className="min-w-0 max-w-full overflow-hidden rounded-3xl border border-line bg-paper p-3 shadow-[0_8px_30px_rgb(0,0,0,0.02)] lg:sticky lg:top-24 lg:overflow-visible">
+              <nav className="flex w-full min-w-0 max-w-full gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-col lg:overflow-visible lg:pb-0">
+                {CUSTOMER_TABS.map((tab) => {
+                  const Icon = tab.icon
+                  const isActive = activeTab === tab.id
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`inline-flex min-h-11 shrink-0 snap-start items-center gap-3 rounded-2xl px-4 py-2.5 text-left text-sm font-medium transition lg:w-full ${isActive ? 'bg-ink text-paper shadow-sm' : 'text-muted hover:bg-soft hover:text-ink'}`}
+                    >
+                      {/* Размерът на иконата се контролира тук (за "Моето пространство" е 22, за останалите е 18) */}
+                      <Icon size={tab.id === 'project' ? 22 : 18} />
+                      {/* Размерът на текста се контролира от Tailwind класа 'text-sm' в бутона горе или директно тук */}
+                      <span className="text-sm">{tab.label}</span>
+                    </button>
+                  )
+                })}
+                <button type="button" onClick={() => setMode('application')} className="mt-2 inline-flex min-h-11 shrink-0 snap-start items-center justify-center rounded-2xl border border-line px-4 py-2.5 text-sm font-medium text-ink transition hover:border-ink lg:w-full">
+                  Стани партньор
+                </button>
+              </nav>
+              <div className="mt-3 hidden border-t border-line pt-4 lg:block">
+                <div className="px-2">
+                  <div className="text-xs uppercase tracking-[0.14em] text-muted">Попълване</div>
+                  <div className="mt-2 flex items-end justify-between gap-3">
+                    <div className="font-display text-4xl leading-none text-ink">{completeness.percent}%</div>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-soft">
+                    <div className="h-full rounded-full bg-accentDeep" style={{ width: `${completeness.percent}%` }} />
+                  </div>
                 </div>
               </div>
-            </div>
-          </aside>
+            </aside>
 
-          <main className="min-w-0 space-y-5">
-            {loadState.status === 'error' && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{loadState.message}</div>
-            )}
+            <main className="min-w-0 space-y-5">
+              {loadState.status === 'error' && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{loadState.message}</div>
+              )}
 
-            {loadState.status === 'loading' && (
-              <div className="rounded-2xl border border-line bg-paper p-5 text-sm text-muted">Зареждаме проекта…</div>
-            )}
+              {loadState.status === 'loading' && (
+                <div className="rounded-2xl border border-line bg-paper p-5 text-sm text-muted">Зареждаме проекта…</div>
+              )}
 
-            {activeTab === 'overview' && (
-              <CustomerOverview
-                account={localAccount}
-                project={project}
-                media={media}
-                completeness={completeness}
-                isAdmin={isAdmin}
-                onSelectTab={setActiveTab}
-                onToggleShare={async (isShareable) => {
-                  if (!project?.id) return
-                  try {
-                    const { toggleClientProjectShare } = await import('../lib/projects.js')
-                    const data = await toggleClientProjectShare(session.user.id, project.id, isShareable)
-                    setProject(prev => ({ ...prev, isShareable: data.is_shareable, publicShareId: data.public_share_id }))
-                  } catch (e) {
-                    console.error(e)
-                    alert('Грешка при споделяне на профила.')
-                  }
-                }}
-              />
-            )}
+              {activeTab === 'overview' && (
+                <CustomerOverview
+                  account={localAccount}
+                  project={project}
+                  media={media}
+                  completeness={completeness}
+                  isAdmin={isAdmin}
+                  onSelectTab={setActiveTab}
+                  onToggleShare={async (isShareable) => {
+                    if (!project?.id) return
+                    try {
+                      const { toggleClientProjectShare } = await import('../lib/projects.js')
+                      const data = await toggleClientProjectShare(session.user.id, project.id, isShareable)
+                      setProject(prev => ({ ...prev, isShareable: data.is_shareable, publicShareId: data.public_share_id }))
+                    } catch (e) {
+                      console.error(e)
+                      alert('Грешка при споделяне на профила.')
+                    }
+                  }}
+                />
+              )}
 
-            {activeTab === 'personal' && (
-              <CustomerPersonal
-                account={localAccount}
-                session={session}
-                onSave={savePersonal}
-              />
-            )}
+              {activeTab === 'personal' && (
+                <CustomerPersonal
+                  account={localAccount}
+                  session={session}
+                  onSave={savePersonal}
+                />
+              )}
 
-            {activeTab === 'preferences' && (
-              <CustomerPreferences
-                account={localAccount}
-                session={session}
-                onSave={savePersonal}
-              />
-            )}
+              {activeTab === 'preferences' && (
+                <CustomerPreferences
+                  account={localAccount}
+                  session={session}
+                  onSave={savePersonal}
+                />
+              )}
 
-            {activeTab === 'project' && (
-              <CustomerProject
-                project={project}
-                pendingBrief={loadState.status === 'ready' ? pendingBrief : null}
-                media={media}
-                onSave={saveProject}
-                onImportPendingBrief={clearPendingBrief}
-                onUploadMedia={uploadProjectMediaRow}
-                onUpdateMedia={updateProjectMediaRow}
-                onDeleteMedia={deleteProjectMediaRow}
-              />
-            )}
+              {activeTab === 'project' && (
+                <CustomerProject
+                  project={project}
+                  pendingBrief={loadState.status === 'ready' ? pendingBrief : null}
+                  media={media}
+                  onSave={saveProject}
+                  onImportPendingBrief={clearPendingBrief}
+                  onUploadMedia={uploadProjectMediaRow}
+                  onUpdateMedia={updateProjectMediaRow}
+                  onDeleteMedia={deleteProjectMediaRow}
+                />
+              )}
 
-            {activeTab === 'activity' && <CustomerActivity account={localAccount} completeness={completeness} />}
-            {activeTab === 'security' && (
-              <div className="space-y-5">
-                <TotpMfaManager session={session} />
-              </div>
-            )}
-          </main>
-        </div>
+              {activeTab === 'activity' && <CustomerActivity account={localAccount} completeness={completeness} />}
+              {activeTab === 'security' && (
+                <div className="space-y-5">
+                  <TotpMfaManager session={session} />
+                </div>
+              )}
+            </main>
+          </div>
         </div>
       </div>
 
@@ -750,7 +734,6 @@ function CustomerProfile({ session, account, refreshAccount }) {
           imageUrl={avatarEditor.imageUrl}
           initialFileName={avatarEditor.fileName}
           title="Редактирай снимка"
-          description="Премести снимката и виж как ще изглежда като аватар."
           aspect={1}
           cropShape="round"
           outputWidth={512}
@@ -923,7 +906,7 @@ function ProEditor({ session, account, refreshAccount }) {
 
 function CenteredCard({ title, children }) {
   return (
-    <section className="section">
+    <section className="section" style={{ paddingTop: 'calc(var(--header-h, 64px) + var(--section-pad-y, 4rem))' }}>
       <div className="container-page max-w-xl">
         <div className="rounded-3xl border border-line bg-paper p-8">
           <h1 className="h-section">{title}</h1>
@@ -1034,7 +1017,7 @@ function ProForm({ profile, userId, onSaved }) {
   }
 
   return (
-    <section className="section bg-soft min-h-screen">
+    <section className="section bg-soft min-h-screen" style={{ paddingTop: 'calc(var(--header-h, 64px) + var(--section-pad-y, 4rem))' }}>
       <div className="container-page">
         <div className="flex flex-wrap items-end justify-between gap-3 mb-8">
           <div>

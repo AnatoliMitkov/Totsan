@@ -62,6 +62,15 @@ function validateBannerFile(file) {
   return ''
 }
 
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('Файлът не може да бъде прочетен.'))
+    reader.readAsDataURL(file)
+  })
+}
+
 const TABS = [
   { id: 'overview', label: 'Преглед', icon: Home },
   { id: 'profile', label: 'Профил', icon: UserRound },
@@ -171,7 +180,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
   const [portfolioState, setPortfolioState] = useState({ status: 'idle', message: '' })
   const [paymentState, setPaymentState] = useState({ status: 'idle', message: '' })
   const [avatarEditor, setAvatarEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'avatar.jpg' })
-  const [bannerEditor, setBannerEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'banner.jpg' })
+  const [bannerEditor, setBannerEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'banner.jpg', positionY: 50 })
 
   function openBannerEditor() {
     if (profileDraft.coverUrl) {
@@ -180,6 +189,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
         file: null,
         imageUrl: profileDraft.coverUrl,
         fileName: profileDraft.name ? `${profileDraft.name}-banner.jpg` : 'banner.jpg',
+        positionY: profileDraft.coverY ?? 50,
       })
       return
     }
@@ -203,12 +213,19 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       file,
       imageUrl: '',
       fileName: file.name || 'banner.jpg',
+      positionY: profileDraft.coverY ?? 50,
     })
   }
 
-  async function saveBanner(croppedFile) {
+  async function saveBanner(payload) {
     closeBannerEditor()
-    await uploadCover(croppedFile)
+    const nextFile = payload?.file || null
+    const nextPositionY = Number.isFinite(Number(payload?.positionY)) ? Number(payload.positionY) : 50
+    if (nextFile) {
+      await uploadCover(nextFile, nextPositionY)
+      return
+    }
+    await saveBannerPosition(nextPositionY)
   }
 
   function openAvatarEditor() {
@@ -240,7 +257,27 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     })
   }
 
-  async function uploadCover(file) {
+  async function saveBannerPosition(positionY) {
+    setSaveState({ status: 'saving', message: 'Запазваме позицията на банера…' })
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ cover_y: positionY })
+        .eq('id', currentProfile.id)
+
+      if (error) throw error
+
+      updateProfile('coverY', positionY)
+      setCurrentProfile((current) => ({ ...current, coverY: positionY }))
+      setSaveState({ status: 'saved', message: 'Позицията на банера е запазена.' })
+      await refreshAccount?.()
+      await onSaved?.()
+    } catch (error) {
+      setSaveState({ status: 'error', message: error.message || 'Позицията на банера не успя да се запази.' })
+    }
+  }
+
+  async function uploadCover(file, positionY = 50) {
     if (!file) return
     setSaveState({ status: 'uploading', message: 'Оптимизираме и качваме банера…' })
     try {
@@ -248,19 +285,20 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       const nextCoverUrl = result.publicUrl || result.signedUrl || ''
       if (!nextCoverUrl) throw new Error('Банерът е качен, но липсва валиден адрес.')
       updateProfile('coverUrl', nextCoverUrl)
-      updateProfile('coverY', 50)
+      updateProfile('coverY', positionY)
       
       // Auto-save to database immediately so it is not lost
       const { error } = await supabase
         .from('profiles')
-        .update({ cover_url: nextCoverUrl, cover_y: 50 })
+        .update({ cover_url: nextCoverUrl, cover_y: positionY })
         .eq('id', currentProfile.id)
       
       if (error) throw error
       
-      setCurrentProfile(current => ({ ...current, coverUrl: nextCoverUrl, coverY: 50 }))
+      setCurrentProfile(current => ({ ...current, coverUrl: nextCoverUrl, coverY: positionY }))
       setSaveState({ status: 'saved', message: 'Банерът е качен и запазен.' })
       await refreshAccount?.()
+      await onSaved?.()
     } catch (error) {
       setSaveState({ status: 'error', message: error.message || 'Качването на банер не успя.' })
     }
@@ -272,9 +310,19 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     event.target.value = ''
   }
 
-  async function saveAvatarAndProfile(croppedFile) {
+  async function saveAvatarAndProfile(croppedFile, cropInfo = {}) {
     closeAvatarEditor()
-    await uploadAvatar(croppedFile)
+    if (cropInfo.originalFile) {
+      await uploadAvatar(cropInfo.originalFile, cropInfo.displayCrop)
+      return
+    }
+
+    if (avatarEditor.imageUrl) {
+      await saveAvatarPosition(cropInfo.displayCrop)
+      return
+    }
+
+    await uploadAvatar(croppedFile, cropInfo.displayCrop)
   }
 
   useEffect(() => {
@@ -413,27 +461,56 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     setPortfolioDraft(current => ({ ...current, [key]: value }))
   }
 
-  async function uploadAvatar(file) {
+  async function saveAvatarPosition(displayCrop = {}) {
+    const nextImageZoom = Number.isFinite(Number(displayCrop?.imageZoom)) ? Number(displayCrop.imageZoom) : 1
+    const nextImageX = Number.isFinite(Number(displayCrop?.imageX)) ? Number(displayCrop.imageX) : 50
+    const nextImageY = Number.isFinite(Number(displayCrop?.imageY)) ? Number(displayCrop.imageY) : 50
+
+    setSaveState({ status: 'saving', message: 'Запазваме позицията на снимката…' })
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ image_zoom: nextImageZoom, image_x: nextImageX, image_y: nextImageY })
+        .eq('id', currentProfile.id)
+
+      if (error) throw error
+
+      updateProfile('imageZoom', nextImageZoom)
+      updateProfile('imageX', nextImageX)
+      updateProfile('imageY', nextImageY)
+      setCurrentProfile(current => ({ ...current, imageZoom: nextImageZoom, imageX: nextImageX, imageY: nextImageY }))
+      setSaveState({ status: 'saved', message: 'Позицията на снимката е запазена.' })
+      await refreshAccount?.()
+      await onSaved?.()
+    } catch (error) {
+      setSaveState({ status: 'error', message: error.message || 'Позицията на снимката не успя да се запази.' })
+    }
+  }
+
+  async function uploadAvatar(file, displayCrop = {}) {
     if (!file) return
     setSaveState({ status: 'uploading', message: 'Оптимизираме и качваме снимката…' })
     try {
+      const nextImageZoom = Number.isFinite(Number(displayCrop?.imageZoom)) ? Number(displayCrop.imageZoom) : 1
+      const nextImageX = Number.isFinite(Number(displayCrop?.imageX)) ? Number(displayCrop.imageX) : 50
+      const nextImageY = Number.isFinite(Number(displayCrop?.imageY)) ? Number(displayCrop.imageY) : 50
       const result = await uploadProfileMedia({ file, target: userId })
       const nextImageUrl = result.publicUrl || result.signedUrl || ''
       if (!nextImageUrl) throw new Error('Снимката е качена, но липсва валиден адрес.')
       updateProfile('imageUrl', nextImageUrl)
-      updateProfile('imageZoom', 1)
-      updateProfile('imageX', 50)
-      updateProfile('imageY', 50)
+      updateProfile('imageZoom', nextImageZoom)
+      updateProfile('imageX', nextImageX)
+      updateProfile('imageY', nextImageY)
       
       // Auto-save to database immediately so it is not lost
       const { error } = await supabase
         .from('profiles')
-        .update({ image_url: nextImageUrl, image_zoom: 1, image_x: 50, image_y: 50 })
+        .update({ image_url: nextImageUrl, image_zoom: nextImageZoom, image_x: nextImageX, image_y: nextImageY })
         .eq('id', currentProfile.id)
       
       if (error) throw error
       
-      setCurrentProfile(current => ({ ...current, imageUrl: nextImageUrl, imageZoom: 1, imageX: 50, imageY: 50 }))
+      setCurrentProfile(current => ({ ...current, imageUrl: nextImageUrl, imageZoom: nextImageZoom, imageX: nextImageX, imageY: nextImageY }))
       setSaveState({ status: 'saved', message: 'Профилната снимка е качена и запазена.' })
       await refreshAccount?.()
     } catch (error) {
@@ -592,7 +669,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
         placeholderLabel="Добавете банер"
         placeholderClassName="hidden md:grid"
       >
-        <div className="absolute right-3 top-3 z-20 md:hidden">
+        <div className="absolute right-3 top-[calc(var(--header-h,64px)+0.75rem)] z-20 md:hidden">
           <button
             type="button"
             onClick={(event) => { event.stopPropagation(); openBannerEditor() }}
@@ -686,11 +763,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
                 hasNameMismatch={hasNameMismatch}
                 onChange={updateProfile}
                 onSubmit={saveProfile}
-                avatarEditor={avatarEditor}
                 onOpenAvatarEditor={openAvatarEditor}
-                onAvatarFile={handleAvatarFile}
-                onCloseAvatarEditor={closeAvatarEditor}
-                onSaveAvatar={saveAvatarAndProfile}
               />
             )}
 
@@ -749,7 +822,190 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
         </div>
         </div>
       </div>
+
+      {bannerEditor.open && (
+        <BannerPositionModal
+          file={bannerEditor.file}
+          imageUrl={bannerEditor.imageUrl}
+          initialFileName={bannerEditor.fileName}
+          initialPositionY={bannerEditor.positionY ?? profileDraft.coverY ?? 50}
+          description={BANNER_DESCRIPTION}
+          onClose={closeBannerEditor}
+          onSelectFile={async (file) => handleBannerFile(file)}
+          onSave={saveBanner}
+        />
+      )}
+
+      {avatarEditor.open && (
+        <ImageCropperModal
+          file={avatarEditor.file}
+          imageUrl={avatarEditor.imageUrl}
+          initialFileName={avatarEditor.fileName}
+          objectFit="contain"
+          initialDisplayCrop={avatarEditor.file ? null : { imageZoom: profileDraft.imageZoom, imageX: profileDraft.imageX, imageY: profileDraft.imageY }}
+          onClose={closeAvatarEditor}
+          onSelectFile={async (file) => handleAvatarFile(file)}
+          onCropSave={saveAvatarAndProfile}
+        />
+      )}
+
+      <input
+        id="partner-avatar-upload"
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) handleAvatarFile(file)
+          event.target.value = ''
+        }}
+      />
     </>
+  )
+}
+
+function BannerPositionModal({
+  file = null,
+  imageUrl = '',
+  initialFileName = 'banner.jpg',
+  initialPositionY = 50,
+  description = '',
+  onClose,
+  onSave,
+  onSelectFile,
+}) {
+  const [imageSrc, setImageSrc] = useState('')
+  const [positionY, setPositionY] = useState(initialPositionY)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+
+    async function prepareSource() {
+      setError('')
+      setPositionY(initialPositionY)
+
+      if (file instanceof File) {
+        try {
+          const nextImageSrc = await readFileAsDataUrl(file)
+          if (!active) return
+          setImageSrc(nextImageSrc)
+        } catch (nextError) {
+          if (!active) return
+          setImageSrc('')
+          setError(nextError.message || 'Файлът не може да бъде прочетен.')
+        }
+        return
+      }
+
+      setImageSrc(imageUrl || '')
+    }
+
+    prepareSource()
+    return () => { active = false }
+  }, [file, imageUrl, initialPositionY])
+
+  async function handleSave() {
+    setIsSaving(true)
+    setError('')
+    try {
+      await onSave?.({ file, positionY })
+      onClose?.()
+    } catch (nextError) {
+      setError(nextError.message || 'Не успяхме да запазим банера.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  async function handleFileChange(event) {
+    const nextFile = event.target.files?.[0]
+    event.target.value = ''
+    if (!nextFile) return
+    await onSelectFile?.(nextFile)
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/60 p-3 backdrop-blur-sm sm:p-6">
+      <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-line bg-paper shadow-2xl">
+        <div className="flex items-center justify-between border-b border-line px-4 py-4 sm:px-6">
+          <div>
+            <h3 className="font-medium text-ink">Редактирай банера</h3>
+            <p className="mt-1 text-sm text-muted">{description}</p>
+          </div>
+          <button type="button" onClick={onClose} disabled={isSaving} className="rounded-full p-2 text-muted transition hover:bg-soft hover:text-ink">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="grid gap-5 overflow-y-auto p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_240px]">
+          <div>
+            <div className="relative overflow-hidden rounded-3xl border border-line bg-soft" style={{ aspectRatio: '1600 / 520' }}>
+              {imageSrc ? (
+                <img src={imageSrc} alt={initialFileName} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: `50% ${positionY}%` }} />
+              ) : (
+                <div className="flex h-full min-h-[20rem] items-center justify-center px-6 text-center text-sm text-muted">
+                  Качи банер, за да го позиционираш.
+                </div>
+              )}
+            </div>
+
+            <label className="mt-4 block text-sm font-medium text-ink">
+              <span className="flex items-center justify-between gap-3">
+                <span>Вертикална позиция</span>
+                <span className="text-xs text-muted">{Math.round(positionY)}%</span>
+              </span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={positionY}
+                onChange={(event) => setPositionY(Number(event.target.value))}
+                className="mt-3 w-full accent-ink"
+                disabled={!imageSrc || isSaving}
+              />
+            </label>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <div className="rounded-3xl border border-line bg-soft/70 p-4">
+              <div className="text-sm font-medium text-ink">Преглед</div>
+              <div className="mt-4 overflow-hidden rounded-2xl border border-line bg-paper" style={{ aspectRatio: '1600 / 520' }}>
+                {imageSrc ? (
+                  <img src={imageSrc} alt="" className="h-full w-full object-cover" style={{ objectPosition: `50% ${positionY}%` }} />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-sm text-muted">Няма снимка</div>
+                )}
+              </div>
+            </div>
+
+            <label className="btn btn-ghost w-full cursor-pointer justify-center">
+              <Camera size={18} />
+              Качи нова
+              <input type="file" accept="image/*" className="sr-only" onChange={handleFileChange} disabled={isSaving} />
+            </label>
+
+            {error && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            <div className="mt-auto flex flex-col gap-3 sm:flex-row">
+              <button type="button" onClick={onClose} disabled={isSaving} className="btn btn-ghost flex-1 justify-center">
+                Отказ
+              </button>
+              <button type="button" onClick={handleSave} disabled={!imageSrc || isSaving} className="btn btn-primary flex-1 justify-center">
+                <Save size={18} />
+                {isSaving ? 'Запазване…' : 'Запази'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -902,13 +1158,9 @@ function ProfileForm({
   preview,
   accountDisplayName,
   hasNameMismatch,
-  avatarEditor,
   onChange,
   onSubmit,
   onOpenAvatarEditor,
-  onAvatarFile,
-  onCloseAvatarEditor,
-  onSaveAvatar,
 }) {
   return (
     <form onSubmit={onSubmit} className="grid gap-5 lg:grid-cols-12">
@@ -962,7 +1214,7 @@ function ProfileForm({
           <Field label="Facebook"><input value={draft.facebook} onChange={event => onChange('facebook', event.target.value)} className={INPUT} /></Field>
         </div>
 
-        <Field label="Ценова бележка"><textarea rows={3} value={draft.pricingNote} onChange={event => onChange('pricingNote', event.target.value)} className={INPUT} placeholder="Напр. Консултация от 80 EUR, проект по оферта." /></Field>
+        <Field label="Ценова бележка"><textarea rows={3} value={draft.pricingNote} onChange={event => onChange('pricingNote', event.target.value)} className={INPUT} placeholder="Напр. Консултация от 80€, проект по оферта." /></Field>
         <label className="flex items-start gap-3 rounded-2xl border border-line bg-soft p-4 text-sm text-muted">
           <input type="checkbox" checked={draft.acceptsRemote} onChange={event => onChange('acceptsRemote', event.target.checked)} className="mt-1 accent-black" />
           <span>Приемам дистанционни консултации.</span>
@@ -989,46 +1241,6 @@ function ProfileForm({
           <button type="button" onClick={onOpenAvatarEditor} className="btn btn-ghost mt-4 w-full cursor-pointer justify-center">
             <Camera size={18} /> {preview.imageUrl ? 'Смени снимката' : 'Добавете снимка'}
           </button>
-          <input id="partner-avatar-upload" type="file" accept="image/*" className="sr-only" onChange={(event) => { 
-            onAvatarFile(event.target.files?.[0]);
-            event.target.value = '' 
-          }} />
-
-          {avatarEditor.open && (
-            <ImageCropperModal
-              file={avatarEditor.file}
-              imageUrl={avatarEditor.imageUrl}
-              initialFileName={avatarEditor.fileName}
-              onClose={onCloseAvatarEditor}
-              onSelectFile={async (file) => onAvatarFile(file)}
-              onCropSave={onSaveAvatar}
-            />
-          )}
-
-          {bannerEditor.open && (
-            <ImageCropperModal
-              file={bannerEditor.file}
-              imageUrl={bannerEditor.imageUrl}
-              initialFileName={bannerEditor.fileName}
-              title="Редактирай банера"
-              description={BANNER_DESCRIPTION}
-              aspect={1600 / 520}
-              cropShape="rect"
-              objectFit="horizontal-cover"
-              outputWidth={1600}
-              outputHeight={520}
-              minZoom={1}
-              maxZoom={4}
-              zoomStep={0.05}
-              previewClassName="w-full rounded-2xl relative"
-              previewStyle={{ aspectRatio: '1600 / 520' }}
-              previewImageClassName="absolute inset-0 h-full w-full object-cover"
-              emptyStateLabel="Качи банер, за да го позиционираш."
-              onClose={closeBannerEditor}
-              onSelectFile={async (file) => handleBannerFile(file)}
-              onCropSave={saveBanner}
-            />
-          )}
         </div>
       </aside>
     </form>
@@ -1077,7 +1289,7 @@ function PortfolioEditor({ items, draft, state, onSelect, onNew, onChange, onSub
         <div className="grid gap-4 md:grid-cols-4">
           <Field label="Град"><input value={draft.city} onChange={event => onChange('city', event.target.value)} className={INPUT} /></Field>
           <Field label="Година"><input type="number" min="1900" max="2100" value={draft.year} onChange={event => onChange('year', event.target.value)} className={INPUT} /></Field>
-          <Field label="Бюджет"><input value={draft.budgetBand} onChange={event => onChange('budgetBand', event.target.value)} className={INPUT} placeholder="5k-10k EUR" /></Field>
+          <Field label="Бюджет"><input value={draft.budgetBand} onChange={event => onChange('budgetBand', event.target.value)} className={INPUT} placeholder="5k-10k €" /></Field>
           <Field label="Ред"><input type="number" value={draft.orderIndex} onChange={event => onChange('orderIndex', event.target.value)} className={INPUT} /></Field>
         </div>
         <Field label="Описание"><textarea rows={5} value={draft.description} onChange={event => onChange('description', event.target.value)} className={INPUT} /></Field>

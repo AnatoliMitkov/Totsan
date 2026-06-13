@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { 
   Palette, 
@@ -51,7 +51,7 @@ export default function WallpapersAndColors() {
 
 function Hero() {
   return (
-    <section className="section relative min-h-[75svh] flex items-center overflow-hidden py-24">
+    <section className="section relative min-h-[75svh] flex items-center overflow-hidden" style={{ paddingTop: 'calc(var(--header-h, 64px) + 6rem)', paddingBottom: '6rem' }}>
       <div className="absolute inset-0 z-0">
         <img 
           src={U('1558882224-dda166733046', 1800)} 

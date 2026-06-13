@@ -1,5 +1,6 @@
 import { slugify } from './profiles.js'
 import { supabase, supabasePublicKey, supabaseUrl } from './supabase.js'
+import { uploadProfileImage, uploadPortfolioImages, uploadServiceImages } from './advanced-image-manager.js'
 
 const MB = 1024 * 1024
 const PRECOMPRESS_THRESHOLD_BYTES = 3.5 * MB
@@ -211,17 +212,54 @@ export async function uploadMediaViaEdge({ file, target = '', purpose = 'profile
 }
 
 export async function uploadProfileMedia({ file, target = '' }) {
-  return uploadMediaViaEdge({ file, target, purpose: 'profile' })
+  const { data } = await supabase.auth.getSession()
+  const userId = data.session?.user?.id
+  const result = await uploadProfileImage(file, target || userId, userId, 'profile')
+  return { 
+    publicUrl: result.main.publicUrl,
+    path: result.main.path,
+    bucket: 'profile-images'
+  }
 }
 
 export async function uploadProfileCover({ file, target = '' }) {
-  return uploadMediaViaEdge({ file, target, purpose: 'profile', kind: 'cover' })
+  const { data } = await supabase.auth.getSession()
+  const userId = data.session?.user?.id
+  const result = await uploadProfileImage(file, target || userId, userId, 'banner')
+  return { 
+    publicUrl: result.main.publicUrl,
+    path: result.main.path,
+    bucket: 'profile-images'
+  }
 }
 
 export async function uploadPortfolioMedia({ file, target = '', kind = 'photo' }) {
-  return uploadMediaViaEdge({ file, target, purpose: 'portfolio', kind })
+  const { data } = await supabase.auth.getSession()
+  const userId = data.session?.user?.id
+  
+  // Use a temporary ID since it's uploaded before saving the portfolio item
+  const tempPortfolioId = `temp_${Date.now()}`
+  const results = await uploadPortfolioImages([file], target || userId, tempPortfolioId, userId)
+  const uploaded = results[0]
+  
+  return { 
+    publicUrl: uploaded.publicUrl,
+    path: uploaded.path,
+    bucket: 'profile-images'
+  }
 }
 
 export async function uploadServiceMedia({ file, target = '', kind = 'service' }) {
-  return uploadMediaViaEdge({ file, target, purpose: 'service', kind })
+  const { data } = await supabase.auth.getSession()
+  const userId = data.session?.user?.id
+  
+  const tempServiceId = `temp_${Date.now()}`
+  const results = await uploadServiceImages([file], target || userId, tempServiceId, userId)
+  const uploaded = results[0]
+
+  return { 
+    publicUrl: uploaded.publicUrl,
+    path: uploaded.path,
+    bucket: 'profile-images'
+  }
 }

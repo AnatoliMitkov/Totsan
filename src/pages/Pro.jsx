@@ -611,7 +611,7 @@ function InquiryBox({ proName, title, layerSlug, targetSlug, clientId }) {
     e.preventDefault()
     if (!form.name.trim() || !form.contact.trim() || !form.message.trim()) return
     setStatus('sending')
-    const { error } = await supabase.from('inquiries').insert({
+    const { data: newInquiry, error } = await supabase.from('inquiries').insert({
       name: form.name.trim(),
       contact: form.contact.trim(),
       layer_slug: layerSlug,
@@ -619,9 +619,13 @@ function InquiryBox({ proName, title, layerSlug, targetSlug, clientId }) {
       source: 'pro_inquiry',
       target_slug: targetSlug || proName,
       client_id: clientId || null,
-    })
+    }).select().single()
     setStatus(error ? 'error' : 'sent')
     if (!error) {
+      supabase.functions.invoke('notify-inquiry', {
+        body: { record: newInquiry }
+      }).catch(err => console.error('[pro] failed to notify:', err))
+
       trackEvent('submit_inquiry', {
         source: 'pro_profile',
         target_slug: targetSlug || undefined,

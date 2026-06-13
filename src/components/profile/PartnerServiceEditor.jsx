@@ -734,7 +734,7 @@ function PriceSection({ item, onChange, onFeatureChange, onAddFeature, onRemoveF
         </Field>
         <Field label="Стартова цена" hint="По-добре ориентир, отколкото празно поле.">
           <div className="relative">
-            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted">EUR</span>
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted">€</span>
             <input type="number" min="0" value={item.priceAmount} onChange={event => onChange('priceAmount', event.target.value)} className={`${INPUT} pl-14`} placeholder="250" />
           </div>
         </Field>

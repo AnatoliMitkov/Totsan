@@ -8,13 +8,33 @@ import Avatar from './Avatar.jsx'
 
 const BLOCKED_ACCOUNT_STATUSES = new Set(['banned', 'blocked'])
 
+const PAGES_WITH_HERO = [
+  '/',
+  '/moy-profil',
+  '/pro',
+  '/gradina-i-dvor',
+  '/tapeti-i-cvetove',
+  '/dekorativni-akcenti',
+  '/terasi-i-vunshni-zoni',
+  '/kuhni',
+  '/spalnya-i-dnevna',
+  '/banya',
+  '/osvetlenie-i-tekstil'
+]
+
+function hasHeroBanner(pathname) {
+  if (PAGES_WITH_HERO.includes(pathname)) return true
+  if (pathname.startsWith('/sloy/') || pathname.startsWith('/profil/') || pathname.startsWith('/proekt/')) return true
+  return false
+}
+
 export default function Layout() {
   const { pathname } = useLocation()
   const { account } = useAccount()
   const isAuthPage = pathname === '/login'
-  const isHomePage = pathname === '/'
   const isInboxPage = pathname === '/inbox' || pathname.startsWith('/inbox/')
   const isBlockedAccount = BLOCKED_ACCOUNT_STATUSES.has(account?.account_status)
+  const isHeroPage = hasHeroBanner(pathname)
 
   // На всяка смяна на страница: скрол нагоре + ново наблюдение за reveal анимациите
   useEffect(() => {
@@ -71,8 +91,8 @@ export default function Layout() {
     <div className={isInboxPage ? 'flex h-[100dvh] min-h-0 flex-col overflow-hidden' : 'min-h-screen flex flex-col'}>
       <Header />
       <main
-        className={isInboxPage ? 'h-[100dvh] min-h-0 flex-none overflow-hidden' : `flex-1 min-h-0 ${isHomePage ? 'homepage-main' : ''}`}
-        style={{ paddingTop: isHomePage ? '0px' : 'var(--header-h, 64px)' }}>
+        className={isInboxPage ? 'h-[100dvh] min-h-0 flex-none overflow-hidden' : `flex-1 min-h-0 ${isHeroPage ? 'homepage-main' : ''}`}
+        style={{ paddingTop: isHeroPage ? '0px' : 'var(--header-h, 64px)' }}>
         <Outlet />
       </main>
       {!isInboxPage && <Footer isAuthPage={isAuthPage || isBlockedAccount} />}
@@ -146,59 +166,59 @@ function Header() {
     <>
       <header className={`site-header fixed inset-x-0 top-0 z-40 border-b ${headerSurfaceClass} ${open ? 'site-header--menu-open' : ''}`}>
         <div className="container-header grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 py-4 px-4 sm:px-6 lg:px-8 xl:gap-4 2xl:gap-12">
-          <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 ${isTopOverlayMode ? 'text-paper [text-shadow:0_10px_28px_rgba(0,0,0,0.48)]' : 'text-ink'}`} onClick={close}>Totsan</Link>
+          <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 [text-shadow:0_10px_28px_rgba(0,0,0,0.48)] ${isTopOverlayMode ? 'text-paper' : 'text-ink'}`} onClick={close}>Totsan</Link>
 
-        <div className="min-w-0 flex justify-center">
-          <nav aria-label="Основна навигация" className="hidden min-w-0 xl:flex xl:flex-nowrap xl:items-center xl:gap-1.5 2xl:gap-3">
-            {LAYERS.map(l => (
-              <NavLink key={l.slug} to={`/sloy/${l.slug}`}
-                className={({isActive}) => desktopNavClassName(isActive, isTopOverlayMode)}>
-                {l.number} · {l.title.split(' ')[0]}
-              </NavLink>
-            ))}
-          </nav>
-        </div>
+          <div className="min-w-0 flex justify-center">
+            <nav aria-label="Основна навигация" className="hidden min-w-0 xl:flex xl:flex-nowrap xl:items-center xl:gap-1.5 2xl:gap-3">
+              {LAYERS.map(l => (
+                <NavLink key={l.slug} to={`/sloy/${l.slug}`}
+                  className={({ isActive }) => desktopNavClassName(isActive, isTopOverlayMode)}>
+                  {l.number} · {l.title.split(' ')[0]}
+                </NavLink>
+              ))}
+            </nav>
+          </div>
 
-        <div className="flex min-w-0 shrink-0 items-center justify-end gap-2 xl:gap-3">
-          <DesktopMoreMenu
-            isOpen={isMoreOpen}
-            setIsOpen={setIsMoreOpen}
-            isHomeHeroMode={isTopOverlayMode}
-            isServicesActive={isServicesActive}
-            isCatalogActive={isCatalogActive}
-            isProActive={isProActive}
-            isVisualizationActive={isVisualizationActive}
-          />
-          {loading ? null : canShowPrivateHeader ? (
-            <Link to="/inbox" className={desktopUtilityLinkClassName(isTopOverlayMode)}>
-              <MessageCircle size={17} />
-              <span className="hidden 2xl:inline">Съобщения</span>
-              {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accentDeep px-1.5 text-[11px] font-medium text-paper">{unreadCount}</span>}
-            </Link>
-          ) : null}
-          {loading ? (
-            <div className="hidden sm:flex items-center gap-2 rounded-full border border-transparent px-2 py-1.5">
-              <div className="h-7 w-7 rounded-full bg-line/50 animate-pulse"></div>
-              <div className="hidden xl:block h-4 w-20 bg-line/50 animate-pulse rounded"></div>
-            </div>
-          ) : canShowPrivateHeader ? (
-            <UserMenu session={session} account={account} isAdmin={isAdmin} />
-          ) : (
-            <>
-              <Link to={loginHref} className={`mobile-header-auth xl:hidden ${isTopOverlayMode ? 'mobile-header-auth-on-dark' : ''}`}>Вход</Link>
-              <Link to={loginHref} className={`desktop-header-auth ${isTopOverlayMode ? 'desktop-header-auth-on-dark' : ''}`}>Вход</Link>
-            </>
-          )}
-          <button
-            aria-label="Меню"
-            onClick={() => setOpen(o => !o)}
-            aria-expanded={open}
-            aria-controls="mobile-navigation"
-            className={`mobile-menu-toggle xl:hidden ${open ? 'is-open' : ''} ${isTopOverlayMode ? 'mobile-menu-toggle-on-dark' : ''}`}>
-            <span className="mobile-menu-toggle__icon mobile-menu-toggle__icon--menu" aria-hidden="true"><Menu size={18}/></span>
-            <span className="mobile-menu-toggle__icon mobile-menu-toggle__icon--close" aria-hidden="true"><X size={18}/></span>
-          </button>
-        </div>
+          <div className="flex min-w-0 shrink-0 items-center justify-end gap-2 xl:gap-3">
+            <DesktopMoreMenu
+              isOpen={isMoreOpen}
+              setIsOpen={setIsMoreOpen}
+              isHomeHeroMode={isTopOverlayMode}
+              isServicesActive={isServicesActive}
+              isCatalogActive={isCatalogActive}
+              isProActive={isProActive}
+              isVisualizationActive={isVisualizationActive}
+            />
+            {loading ? null : canShowPrivateHeader ? (
+              <Link to="/inbox" className={desktopUtilityLinkClassName(isTopOverlayMode)}>
+                <MessageCircle size={17} />
+                <span className="hidden 2xl:inline">Съобщения</span>
+                {unreadCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accentDeep px-1.5 text-[11px] font-medium text-paper">{unreadCount}</span>}
+              </Link>
+            ) : null}
+            {loading ? (
+              <div className="hidden sm:flex items-center gap-2 rounded-full border border-transparent px-2 py-1.5">
+                <div className="h-7 w-7 rounded-full bg-line/50 animate-pulse"></div>
+                <div className="hidden xl:block h-4 w-20 bg-line/50 animate-pulse rounded"></div>
+              </div>
+            ) : canShowPrivateHeader ? (
+              <UserMenu session={session} account={account} isAdmin={isAdmin} />
+            ) : (
+              <>
+                <Link to={loginHref} className={`mobile-header-auth xl:hidden ${isTopOverlayMode ? 'mobile-header-auth-on-dark' : ''}`}>Вход</Link>
+                <Link to={loginHref} className={`desktop-header-auth ${isTopOverlayMode ? 'desktop-header-auth-on-dark' : ''}`}>Вход</Link>
+              </>
+            )}
+            <button
+              aria-label="Меню"
+              onClick={() => setOpen(o => !o)}
+              aria-expanded={open}
+              aria-controls="mobile-navigation"
+              className={`mobile-menu-toggle xl:hidden ${open ? 'is-open' : ''} ${isTopOverlayMode ? 'mobile-menu-toggle-on-dark' : ''}`}>
+              <span className="mobile-menu-toggle__icon mobile-menu-toggle__icon--menu" aria-hidden="true"><Menu size={18} /></span>
+              <span className="mobile-menu-toggle__icon mobile-menu-toggle__icon--close" aria-hidden="true"><X size={18} /></span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -207,55 +227,55 @@ function Header() {
           <div className="mobile-nav-backdrop" aria-hidden="true" />
           <div className="mobile-nav-panel">
             <div className="container-page mobile-nav-scroll px-[var(--pad-x)] pb-8 text-sm">
-            <div className="mobile-nav-group">
-              <div className="grid gap-3 mb-3">
-                <NavLink to="/start" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}>
-                  <span>Започни проект</span>
-                  <span className="mobile-nav-arrow">→</span>
-                </NavLink>
-              </div>
-              <div className="mobile-nav-group__label">Петте слоя</div>
-              <div className="grid gap-3">
-                {LAYERS.map(l => (
-                  <NavLink
-                    key={l.slug}
-                    to={`/sloy/${l.slug}`}
-                    onClick={close}
-                    className={({ isActive }) => mobileNavClassName(isActive)}
-                  >
-                    <span>{l.number} · {l.title}</span>
+              <div className="mobile-nav-group">
+                <div className="grid gap-3 mb-3">
+                  <NavLink to="/start" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}>
+                    <span>Започни проект</span>
                     <span className="mobile-nav-arrow">→</span>
                   </NavLink>
-                ))}
-              </div>
-            </div>
-
-            <div className="mobile-nav-group">
-              <div className="mobile-nav-group__label">Разгледай</div>
-              <div className="grid gap-3">
-                <NavLink to="/uslugi" onClick={close} className={() => mobileNavClassName(isServicesActive)}><span>Услуги</span><span className="mobile-nav-arrow">→</span></NavLink>
-                <NavLink to="/katalog" onClick={close} className={() => mobileNavClassName(isCatalogActive)}><span>Каталог</span><span className="mobile-nav-arrow">→</span></NavLink>
-                <NavLink to="/pro" onClick={close} className={() => mobileNavClassName(isProActive)}><span>Totsan Pro</span><span className="mobile-nav-arrow">→</span></NavLink>
-                <NavLink to="/kak-raboti" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Как работи Totsan</span><span className="mobile-nav-arrow">→</span></NavLink>
-                <NavLink to="/za-nas" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>За нас</span><span className="mobile-nav-arrow">→</span></NavLink>
-                <NavLink to="/kontakt" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Контакт</span><span className="mobile-nav-arrow">→</span></NavLink>
-              </div>
-            </div>
-
-            {canShowPrivateHeader && !loading ? (
-              <div className="mobile-nav-group">
-                <div className="mobile-nav-group__label">Профил</div>
+                </div>
+                <div className="mobile-nav-group__label">Петте слоя</div>
                 <div className="grid gap-3">
-                  {isAdmin && (
-                    <NavLink to="/admin" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Админ</span><span className="mobile-nav-arrow">→</span></NavLink>
-                  )}
-                  <NavLink to="/inbox" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Съобщения{unreadCount > 0 ? ` (${unreadCount})` : ''}</span><span className="mobile-nav-arrow">→</span></NavLink>
-                  <NavLink to="/porachki" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Поръчки</span><span className="mobile-nav-arrow">→</span></NavLink>
-                  <NavLink to="/moy-profil" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Моят профил</span><span className="mobile-nav-arrow">→</span></NavLink>
-                  <button onClick={() => { close(); signOutAndRedirect(session?.user?.id) }} className="mobile-nav-item text-left text-muted hover:text-ink">Изход</button>
+                  {LAYERS.map(l => (
+                    <NavLink
+                      key={l.slug}
+                      to={`/sloy/${l.slug}`}
+                      onClick={close}
+                      className={({ isActive }) => mobileNavClassName(isActive)}
+                    >
+                      <span>{l.number} · {l.title}</span>
+                      <span className="mobile-nav-arrow">→</span>
+                    </NavLink>
+                  ))}
                 </div>
               </div>
-            ) : null}
+
+              <div className="mobile-nav-group">
+                <div className="mobile-nav-group__label">Разгледай</div>
+                <div className="grid gap-3">
+                  <NavLink to="/uslugi" onClick={close} className={() => mobileNavClassName(isServicesActive)}><span>Услуги</span><span className="mobile-nav-arrow">→</span></NavLink>
+                  <NavLink to="/katalog" onClick={close} className={() => mobileNavClassName(isCatalogActive)}><span>Каталог</span><span className="mobile-nav-arrow">→</span></NavLink>
+                  <NavLink to="/pro" onClick={close} className={() => mobileNavClassName(isProActive)}><span>Totsan Pro</span><span className="mobile-nav-arrow">→</span></NavLink>
+                  <NavLink to="/kak-raboti" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Как работи Totsan</span><span className="mobile-nav-arrow">→</span></NavLink>
+                  <NavLink to="/za-nas" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>За нас</span><span className="mobile-nav-arrow">→</span></NavLink>
+                  <NavLink to="/kontakt" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Контакт</span><span className="mobile-nav-arrow">→</span></NavLink>
+                </div>
+              </div>
+
+              {canShowPrivateHeader && !loading ? (
+                <div className="mobile-nav-group">
+                  <div className="mobile-nav-group__label">Профил</div>
+                  <div className="grid gap-3">
+                    {isAdmin && (
+                      <NavLink to="/admin" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Админ</span><span className="mobile-nav-arrow">→</span></NavLink>
+                    )}
+                    <NavLink to="/inbox" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Съобщения{unreadCount > 0 ? ` (${unreadCount})` : ''}</span><span className="mobile-nav-arrow">→</span></NavLink>
+                    <NavLink to="/porachki" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Поръчки</span><span className="mobile-nav-arrow">→</span></NavLink>
+                    <NavLink to="/moy-profil" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Моят профил</span><span className="mobile-nav-arrow">→</span></NavLink>
+                    <button onClick={() => { close(); signOutAndRedirect(session?.user?.id) }} className="mobile-nav-item text-left text-muted hover:text-ink">Изход</button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -393,14 +413,14 @@ function UserMenu({ session, account, isAdmin }) {
         <div className="absolute right-0 top-full pt-2">
           <div id="user-menu" role="menu" className="w-56 rounded-2xl border border-line bg-paper shadow-lg overflow-hidden">
             <div className="px-4 py-3 border-b border-line">
-            <div className="text-xs text-muted">Влязъл като</div>
-            <div className="text-sm truncate">{displayName}</div>
-            {email && <div className="mt-0.5 text-xs text-muted truncate">{email}</div>}
-          </div>
-          {isAdmin && <Link to="/admin" onClick={() => setOpen(false)} className="block px-4 py-2.5 text-sm hover:bg-soft">Админ панел</Link>}
-          <Link to="/porachki" onClick={() => setOpen(false)} className="block px-4 py-2.5 text-sm hover:bg-soft">Поръчки</Link>
-          <Link to="/moy-profil" onClick={() => setOpen(false)} className="block px-4 py-2.5 text-sm hover:bg-soft">Моят профил</Link>
-          <button onClick={() => { setOpen(false); signOutAndRedirect(session?.user?.id) }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-t border-line">Изход</button>
+              <div className="text-xs text-muted">Влязъл като</div>
+              <div className="text-sm truncate">{displayName}</div>
+              {email && <div className="mt-0.5 text-xs text-muted truncate">{email}</div>}
+            </div>
+            {isAdmin && <Link to="/admin" onClick={() => setOpen(false)} className="block px-4 py-2.5 text-sm hover:bg-soft">Админ панел</Link>}
+            <Link to="/porachki" onClick={() => setOpen(false)} className="block px-4 py-2.5 text-sm hover:bg-soft">Поръчки</Link>
+            <Link to="/moy-profil" onClick={() => setOpen(false)} className="block px-4 py-2.5 text-sm hover:bg-soft">Моят профил</Link>
+            <button onClick={() => { setOpen(false); signOutAndRedirect(session?.user?.id) }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-soft border-t border-line">Изход</button>
           </div>
         </div>
       )}

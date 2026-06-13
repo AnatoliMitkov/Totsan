@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { CheckCircle2 } from 'lucide-react'
 import { LAYERS } from '../data/layers.js'
@@ -6,6 +6,15 @@ import { supabase, brand } from '../lib/supabase.js'
 import { useAccount } from '../lib/account.js'
 import { trackEvent } from '../lib/analytics.js'
 import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
+import TotsanSelect from '../components/ui/TotsanSelect.jsx'
+import { Turnstile } from '@marsidev/react-turnstile'
+
+const INQUIRY_TYPES = [
+  { value: 'question', label: 'Въпрос' },
+  { value: 'offer', label: 'Запитване за оферта' },
+  { value: 'problem', label: 'Проблем / Техническа помощ' },
+  { value: 'specific', label: 'Специфична нужда' }
+]
 
 export default function Contact() {
   useSeo({
@@ -19,32 +28,62 @@ export default function Contact() {
   })
 
   const { state } = useLocation()
-  const { session } = useAccount()
+  const { session, account } = useAccount()
   const subject = state?.subject || ''
-  const [form, setForm] = useState({ name: '', contact: '', layer: '', message: subject ? `${subject}\n\n` : '' })
+  
+  const [form, setForm] = useState({ 
+    name: '', 
+    contact: '', 
+    layer: '', 
+    inquiryType: '',
+    message: subject ? `${subject}\n\n` : '' 
+  })
+  
   const [status, setStatus] = useState('idle') // idle | sending | sent | error
   const [errorMsg, setErrorMsg] = useState('')
+  const [captchaToken, setCaptchaToken] = useState('')
+
+  // Testing site key for local dev if real key isn't provided in .env
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'
+
+  useEffect(() => {
+    if (account) {
+      setForm(f => ({
+        ...f,
+        name: f.name || account.full_name || account.display_name || '',
+        contact: f.contact || account.phone || account.email || session?.user?.email || ''
+      }))
+    }
+  }, [account, session])
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
 
   async function onSubmit(e) {
     e.preventDefault()
-    if (!form.name.trim() || !form.contact.trim() || !form.message.trim()) {
-      setErrorMsg('Моля попълни име, контакт и съобщение.')
+    if (!form.name.trim() || !form.contact.trim() || !form.message.trim() || !form.inquiryType) {
+      setErrorMsg('Моля попълни всички задължителни полета.')
+      setStatus('error')
+      return
+    }
+    if (!captchaToken) {
+      setErrorMsg('Моля, потвърди, че не си робот.')
       setStatus('error')
       return
     }
     setStatus('sending')
     setErrorMsg('')
 
-    const { error } = await supabase.from('inquiries').insert({
+    const inquiryLabel = INQUIRY_TYPES.find(t => t.value === form.inquiryType)?.label || form.inquiryType
+    const finalMessage = `[Тип: ${inquiryLabel}]\n\n${form.message.trim()}`
+
+    const { data: newInquiry, error } = await supabase.from('inquiries').insert({
       name: form.name.trim(),
       contact: form.contact.trim(),
       layer_slug: form.layer || null,
-      message: form.message.trim(),
+      message: finalMessage,
       source: 'contact_form',
-      client_id: session?.user?.id || null,  // Auto-link to user if logged in
-    })
+      client_id: session?.user?.id || null,
+    }).select().single()
 
     if (error) {
       console.error('[contact] insert error:', error)
@@ -52,14 +91,22 @@ export default function Contact() {
       setStatus('error')
       return
     }
+
+    // Trigger email notification (fire and forget)
+    supabase.functions.invoke('notify-inquiry', {
+      body: { record: newInquiry }
+    }).catch(err => console.error('[contact] failed to notify:', err))
+
     setStatus('sent')
     trackEvent('submit_inquiry', {
       source: 'contact_form',
       layer: form.layer || undefined,
+      inquiry_type: form.inquiryType,
       user_id: session?.user?.id || undefined,
       is_authenticated: Boolean(session),
     })
-    setForm({ name: '', contact: '', layer: '', message: '' })
+    setForm({ name: '', contact: '', layer: '', inquiryType: '', message: '' })
+    setCaptchaToken('')
   }
 
   return (
@@ -86,30 +133,53 @@ export default function Contact() {
               </div>
             ) : (
               <>
-                <div className="eyebrow">Кратко запитване</div>
+                <div className="eyebrow">Запитване</div>
                 <div className="mt-5 grid sm:grid-cols-2 gap-4">
                   <Field label="Твоето име" value={form.name} onChange={set('name')} placeholder="Иван Иванов" />
                   <Field label="Телефон или имейл" value={form.contact} onChange={set('contact')} placeholder="+359 88 …" />
                 </div>
                 <div className="mt-4">
-                  <label className="text-xs text-muted">Кой слой те интересува?</label>
-                  <select value={form.layer} onChange={set('layer')} className="mt-2 w-full px-4 py-3 rounded-xl border border-line focus:border-ink outline-none text-sm">
-                    <option value="">Не съм сигурен — насочете ме</option>
-                    {LAYERS.map(l => <option key={l.slug} value={l.slug}>{l.number} · {l.title}</option>)}
-                  </select>
+                  <TotsanSelect
+                    label="От какво имаш нужда?"
+                    value={form.inquiryType}
+                    onChange={(val) => setForm(f => ({ ...f, inquiryType: val }))}
+                    options={[
+                      { value: '', label: 'Избери тип запитване...' },
+                      ...INQUIRY_TYPES
+                    ]}
+                  />
                 </div>
                 <div className="mt-4">
-                  <label className="text-xs text-muted">Какво ти трябва?</label>
+                  <TotsanSelect
+                    label="Свързано ли е с конкретен слой? (Незадължително)"
+                    value={form.layer}
+                    onChange={(val) => setForm(f => ({ ...f, layer: val }))}
+                    options={[
+                      { value: '', label: 'Не съм сигурен — насочете ме' },
+                      ...LAYERS.map(l => ({ value: l.slug, label: `${l.number} · ${l.title}` }))
+                    ]}
+                  />
+                </div>
+                <div className="mt-4">
+                  <label className="text-xs text-muted">Описание на запитването</label>
                   <textarea value={form.message} onChange={set('message')} rows={6}
                     placeholder="Например: Имам апартамент 75 м² в София, искам да го преобразувам — нямам идея откъде да започна."
                     className="mt-2 w-full px-4 py-3 rounded-xl border border-line focus:border-ink outline-none text-sm"></textarea>
+                </div>
+
+                <div className="mt-6 flex justify-center sm:justify-start">
+                  <Turnstile 
+                    siteKey={turnstileSiteKey} 
+                    onSuccess={(token) => setCaptchaToken(token)}
+                    onError={() => setErrorMsg('Неуспешна верификация. Опитай отново.')}
+                  />
                 </div>
 
                 {status === 'error' && (
                   <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">{errorMsg}</div>
                 )}
 
-                <button disabled={status === 'sending'} className="btn btn-primary mt-6 disabled:opacity-50">
+                <button disabled={status === 'sending' || !captchaToken} className="btn btn-primary mt-6 disabled:opacity-50">
                   {status === 'sending' ? 'Изпраща се…' : 'Изпрати запитване'}
                 </button>
                 <div className="mt-3 text-xs text-muted">
@@ -133,6 +203,9 @@ export default function Contact() {
             <div className="border border-line rounded-2xl p-6 bg-soft">
               <div className="font-display text-xl">Спешно?</div>
               <p className="text-sm text-muted mt-2">За проектите, които вече текат с наши партньори, имаме отделна линия за поддръжка — намираш я в профила си.</p>
+              <Link to={session ? "/moy-profil?tab=inbox" : "/login?next=/moy-profil"} className="btn btn-ghost !border-line hover:!border-ink mt-5 w-full justify-center">
+                Към моя профил
+              </Link>
             </div>
           </aside>
         </div>

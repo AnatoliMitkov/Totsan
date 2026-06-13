@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowRight,
@@ -82,7 +82,7 @@ export default function DecorativeAccents() {
 
 function Hero() {
   return (
-    <section className="section relative min-h-[72svh] overflow-hidden py-24">
+    <section className="section relative min-h-[72svh] overflow-hidden" style={{ paddingTop: 'calc(var(--header-h, 64px) + 6rem)', paddingBottom: '6rem' }}>
       <div className="absolute inset-0 z-0">
         <img src={DECOR_IMAGES.hero} alt="Декоративни акценти" className="img-cover decor-hero-bg" />
         <div className="absolute inset-0 bg-gradient-to-r from-ink/90 via-ink/65 to-ink/35" />

@@ -241,13 +241,13 @@ export default function Start() {
       ...result.steps.map((item, index) => `${index + 1}. ${item}`),
     ].join('\n')
 
-    const { error } = await supabase.from('inquiries').insert({
+    const { data: newInquiry, error } = await supabase.from('inquiries').insert({
       name: leadForm.name.trim(),
       contact: leadForm.contact.trim(),
       layer_slug: result.layer.slug,
       message,
       source: 'start_brief',
-    })
+    }).select().single()
 
     if (error) {
       console.error('[start] inquiry insert error:', error)
@@ -255,6 +255,10 @@ export default function Start() {
       setLeadStatus('error')
       return
     }
+
+    supabase.functions.invoke('notify-inquiry', {
+      body: { record: newInquiry }
+    }).catch(err => console.error('[start] failed to notify:', err))
 
     setLeadStatus('sent')
     trackEvent('submit_inquiry', {

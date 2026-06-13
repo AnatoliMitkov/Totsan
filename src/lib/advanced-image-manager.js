@@ -578,13 +578,20 @@ async function hashFile(url) {
 }
 
 async function logCleanupAction(profileSlug, action, path, reason, freedBytes = 0) {
-  await supabase.from('image_cleanup_log').insert({
-    profile_id: profileSlug,
-    action,
-    path,
-    reason,
-    freed_bytes: freedBytes
-  }).catch(err => console.error('Cleanup log failed:', err))
+  try {
+    const { error } = await supabase.from('image_cleanup_log').insert({
+      profile_id: profileSlug,
+      action,
+      path,
+      reason,
+      freed_bytes: freedBytes
+    })
+    if (error) {
+      console.error('Cleanup log failed:', error)
+    }
+  } catch (err) {
+    console.error('Cleanup log failed:', err)
+  }
 }
 
 // ============================================================================

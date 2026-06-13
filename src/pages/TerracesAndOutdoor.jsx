@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Check,
@@ -94,7 +94,7 @@ export default function TerracesAndOutdoor() {
 // ─────────── Hero ─────────────────────────────────────────────────────────────
 function Hero() {
   return (
-    <section className="section relative min-h-[74svh] overflow-hidden py-24 flex items-center">
+    <section className="section relative min-h-[74svh] overflow-hidden flex items-center" style={{ paddingTop: 'calc(var(--header-h, 64px) + 6rem)', paddingBottom: '6rem' }}>
       <div className="absolute inset-0 z-0">
         <img
           src={IMG.terrace}

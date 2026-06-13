@@ -212,6 +212,27 @@ export default function UsersManager({ globalQuery = '', account: currentAccount
     }
   }
 
+  async function deleteProfile(entity) {
+    if (!entity?.profile?.id) return
+    if (!window.confirm('Сигурни ли сте, че искате да изтриете този профил? Акаунтът ще остане, но профилът ще бъде премахнат.')) return
+
+    const actionId = entity.account ? `acc_${entity.account.id}` : `prof_${entity.profile.id}`
+    setActionState({ id: actionId, message: 'Изтриваме профила...', tone: 'neutral' })
+    setError('')
+
+    try {
+      const { error: deleteError } = await supabase.from('profiles').delete().eq('id', entity.profile.id)
+      if (deleteError) throw deleteError
+
+      setProfiles((current) => current.filter((profile) => profile.id !== entity.profile.id))
+      setEditingEntity((current) => current?.profile?.id === entity.profile.id ? null : current)
+      setActionState({ id: actionId, message: 'Профилът е изтрит.', tone: 'success' })
+      setTimeout(() => setActionState({ id: '', message: '', tone: 'neutral' }), 3000)
+    } catch (deleteError) {
+      setActionState({ id: actionId, message: deleteError.message || 'Профилът не можа да бъде изтрит.', tone: 'danger' })
+    }
+  }
+
   if (status === 'loading') return <Panel title="Зареждаме потребителите и профилите..." />
   if (status === 'error') {
     return (
@@ -247,6 +268,7 @@ export default function UsersManager({ globalQuery = '', account: currentAccount
             currentAccount={currentAccount}
             busyMessage={actionState.id === (entity.account ? `acc_${entity.account.id}` : `prof_${entity.profile.id}`) ? actionState.message : ''}
             onEdit={() => setEditingEntity(entity)}
+            onDeleteProfile={() => deleteProfile(entity)}
           />
         ))}
         {pageData.rows.length === 0 && <Empty text="Няма намерени резултати по това търсене." />}
@@ -268,7 +290,7 @@ export default function UsersManager({ globalQuery = '', account: currentAccount
   )
 }
 
-function UserCard({ entity, currentAccount, busyMessage, onEdit }) {
+function UserCard({ entity, currentAccount, busyMessage, onEdit, onDeleteProfile }) {
   const { account, profile, type, application } = entity
   const isSelf = account && account.id === currentAccount?.id
   const accountStatusValue = getAccountStatusValue(account)
@@ -289,7 +311,7 @@ function UserCard({ entity, currentAccount, busyMessage, onEdit }) {
               <h3 className="truncate font-display text-2xl text-ink">{displayName(account, profile)}</h3>
               <AccountStatusBadge value={accountStatusValue} />
               <RolePill value={roleValue} />
-              {type === 'profile' && <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900">Осиротял профил</span>}
+              {type === 'profile' && <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900">Изтрит от Supabase</span>}
             </div>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
               {account?.email && <span className="truncate">{account.email}</span>}
@@ -328,6 +350,9 @@ function UserCard({ entity, currentAccount, busyMessage, onEdit }) {
           )}
           <button type="button" onClick={onEdit} className="btn btn-primary !py-2 text-sm">
             <Edit3 size={16} /> Редактирай
+          </button>
+          <button type="button" onClick={onDeleteProfile} disabled={!profile} className="btn btn-ghost !py-2 text-sm text-red-700 hover:text-red-800 disabled:opacity-50">
+            <X size={16} /> Изтрий профила
           </button>
         </div>
       </div>

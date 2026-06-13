@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Check, CheckCircle2, ArrowRight,
@@ -69,7 +69,7 @@ export default function LightingAndTextiles() {
 
 function Hero() {
   return (
-    <section className="section relative min-h-[74svh] overflow-hidden py-24 flex items-center">
+    <section className="section relative min-h-[74svh] overflow-hidden py-24 flex items-center" style={{ paddingTop: 'calc(var(--header-h, 64px) + 6rem)' }}>
       <div className="absolute inset-0 z-0">
         <img src={IMG.hero} alt="Осветление и текстил" className="img-cover light-hero-bg" />
         <div className="absolute inset-0 bg-ink/55" />

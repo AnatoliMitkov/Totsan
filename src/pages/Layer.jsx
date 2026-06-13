@@ -81,7 +81,7 @@ function Hero({ layer }) {
   const isFurnishingLayer = layer.slug === 'obzavezhdane'
   const isDecorationLayer = layer.slug === 'dekoraciya'
   return (
-    <section className="section relative overflow-hidden">
+    <section className="section relative overflow-hidden" style={{ paddingTop: 'calc(var(--header-h, 64px) + var(--section-pad-y, 4rem))' }}>
       <div className="absolute inset-0">
         <img src={heroImg} alt="" className="img-cover" loading="eager" />
         <div className="hero-overlay"></div>

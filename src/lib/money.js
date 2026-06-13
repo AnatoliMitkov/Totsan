@@ -38,9 +38,7 @@ function formatNumber(value) {
 }
 
 export function currencySymbol(currency = DEFAULT_CURRENCY) {
-  if (currency === 'EUR') return '€'
-  if (currency === 'BGN') return 'лв.'
-  return currency || ''
+  return '€'
 }
 
 export function normalizeMoneyValue(value) {
@@ -51,7 +49,7 @@ export function formatMoney(amount, currency = DEFAULT_CURRENCY) {
   const numeric = toNumber(amount)
   if (numeric === null) return '—'
   const symbol = currencySymbol(currency)
-  return symbol ? `${formatNumber(numeric)} ${symbol}` : formatNumber(numeric)
+  return symbol ? `${formatNumber(numeric)}${symbol}` : formatNumber(numeric)
 }
 
 export function formatMoneyRange(min, max, currency = DEFAULT_CURRENCY) {

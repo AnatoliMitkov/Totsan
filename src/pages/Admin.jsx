@@ -53,6 +53,7 @@ const AuditLogSection = lazy(() => import('../components/admin/AuditLog.jsx'))
 const PartnerServicesManagerSection = lazy(() => import('../components/admin/PartnerServicesManager.jsx'))
 const OrdersManagerSection = lazy(() => import('../components/admin/OrdersManager.jsx'))
 const ReviewsManagerSection = lazy(() => import('../components/admin/ReviewsManager.jsx'))
+const MigrationDashboardSection = lazy(() => import('../components/admin/MigrationDashboard.jsx'))
 
 const ADMIN_SECTIONS = [
   { id: 'dashboard', label: 'Обзор', hint: 'KPI и последни събития', icon: BarChart3, Component: DashboardSection },
@@ -63,6 +64,7 @@ const ADMIN_SECTIONS = [
   { id: 'orders', label: 'Поръчки', hint: 'Плащания, статуси, спорове', icon: CreditCard, Component: OrdersManagerSection },
   { id: 'reviews', label: 'Отзиви', hint: 'Verified отзиви и сигнали', icon: Star, Component: ReviewsManagerSection },
   { id: 'audit', label: 'Audit log', hint: 'Админ действия', icon: ScrollText, Component: AuditLogSection },
+  { id: 'image-migration', label: 'Изображения', hint: 'Миграция и оптимизация', icon: FolderKanban, Component: MigrationDashboardSection },
 ]
 
 export default function Admin() {
@@ -209,21 +211,21 @@ function AdminWorkspace({ session, account }) {
 
       {/* Mobile nav (visible only below lg) */}
       <div className="w-full lg:hidden rounded-[2rem] border border-line bg-paper p-3 mb-4">
-         <div className="px-3 py-3 overflow-hidden whitespace-nowrap">
-             <div className="eyebrow">Навигация</div>
-         </div>
-         <nav className="mt-1 flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
-            {ADMIN_SECTIONS.map((section) => {
-              const Icon = section.icon
-              const isActive = section.id === activeSection
-              return (
-                <button key={section.id} type="button" onClick={() => openSection(section.id)} className={`flex items-center gap-2 rounded-2xl p-3 whitespace-nowrap transition ${isActive ? 'bg-soft text-ink' : 'text-muted hover:bg-soft/70 hover:text-ink'}`}>
-                  <Icon size={18} className="shrink-0" />
-                  <span className="text-sm font-medium">{section.label}</span>
-                </button>
-              )
-            })}
-         </nav>
+        <div className="px-3 py-3 overflow-hidden whitespace-nowrap">
+          <div className="eyebrow">Навигация</div>
+        </div>
+        <nav className="mt-1 flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+          {ADMIN_SECTIONS.map((section) => {
+            const Icon = section.icon
+            const isActive = section.id === activeSection
+            return (
+              <button key={section.id} type="button" onClick={() => openSection(section.id)} className={`flex items-center gap-2 rounded-2xl p-3 whitespace-nowrap transition ${isActive ? 'bg-soft text-ink' : 'text-muted hover:bg-soft/70 hover:text-ink'}`}>
+                <Icon size={18} className="shrink-0" />
+                <span className="text-sm font-medium">{section.label}</span>
+              </button>
+            )
+          })}
+        </nav>
       </div>
 
       <main className="min-w-0 flex-1 space-y-5 lg:min-h-[calc(100vh-8rem)]">
@@ -639,50 +641,50 @@ function LoginPanel() {
                 </label>
               </div>
             )}
-            
+
             {!isRecoveryMode && !showPartnerRedirect && (
-            <label className="block text-sm font-medium text-ink">
-              Имейл
-              <input
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                type="email"
-                autoComplete="email"
-                placeholder="name@email.com"
-                className={INPUT_CLASS}
-              />
-            </label>
+              <label className="block text-sm font-medium text-ink">
+                Имейл
+                <input
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  type="email"
+                  autoComplete="email"
+                  placeholder="name@email.com"
+                  className={INPUT_CLASS}
+                />
+              </label>
             )}
 
             {!showPartnerRedirect && (
-            <label className="block text-sm font-medium text-ink">
-              <div className="flex justify-between">
-                <span>Парола</span>
-                {isLogin && !isRecoveryMode && <button type="button" onClick={handleForgotPassword} className={subtleButtonClass}>Забравена парола?</button>}
-              </div>
-              <div className="relative mt-2">
-                <input
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete={isRecoveryMode ? 'new-password' : isLogin ? 'current-password' : 'new-password'}
-                  placeholder="Въведи парола"
-                  className={`${INPUT_CLASS} mt-0 pr-12`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(value => !value)}
-                  aria-label={showPassword ? 'Скрий паролата' : 'Покажи паролата'}
-                  aria-pressed={showPassword}
-                  className="group absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted transition-all duration-300 hover:scale-110 hover:bg-soft hover:text-accent active:scale-95 active:rotate-6"
-                >
-                  <span className="relative inline-flex h-5 w-5 items-center justify-center">
-                    <Eye className={`absolute h-5 w-5 transition-all duration-300 ${showPassword ? 'scale-75 rotate-[-16deg] opacity-0' : 'scale-100 rotate-0 opacity-100'}`} />
-                    <EyeOff className={`absolute h-5 w-5 transition-all duration-300 ${showPassword ? 'scale-100 rotate-0 opacity-100' : 'scale-75 rotate-[16deg] opacity-0'}`} />
-                  </span>
-                </button>
-              </div>
-            </label>
+              <label className="block text-sm font-medium text-ink">
+                <div className="flex justify-between">
+                  <span>Парола</span>
+                  {isLogin && !isRecoveryMode && <button type="button" onClick={handleForgotPassword} className={subtleButtonClass}>Забравена парола?</button>}
+                </div>
+                <div className="relative mt-2">
+                  <input
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete={isRecoveryMode ? 'new-password' : isLogin ? 'current-password' : 'new-password'}
+                    placeholder="Въведи парола"
+                    className={`${INPUT_CLASS} mt-0 pr-12`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(value => !value)}
+                    aria-label={showPassword ? 'Скрий паролата' : 'Покажи паролата'}
+                    aria-pressed={showPassword}
+                    className="group absolute right-2 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted transition-all duration-300 hover:scale-110 hover:bg-soft hover:text-accent active:scale-95 active:rotate-6"
+                  >
+                    <span className="relative inline-flex h-5 w-5 items-center justify-center">
+                      <Eye className={`absolute h-5 w-5 transition-all duration-300 ${showPassword ? 'scale-75 rotate-[-16deg] opacity-0' : 'scale-100 rotate-0 opacity-100'}`} />
+                      <EyeOff className={`absolute h-5 w-5 transition-all duration-300 ${showPassword ? 'scale-100 rotate-0 opacity-100' : 'scale-75 rotate-[16deg] opacity-0'}`} />
+                    </span>
+                  </button>
+                </div>
+              </label>
             )}
 
             {!isLogin && !isRecoveryMode && !showPartnerRedirect && password && (
@@ -996,11 +998,10 @@ function Dashboard() {
                       <div className="text-sm text-muted">{app.company || 'Без фирма'} · {app.email}</div>
                       {app.phone && <div className="text-sm text-muted">{app.phone}</div>}
                     </div>
-                    <span className={`shrink-0 rounded-full px-3 py-1 text-xs ${
-                      app.status === 'approved' ? 'bg-green-100 text-green-800'
-                      : app.status === 'rejected' ? 'bg-red-100 text-red-800'
-                      : 'bg-amber-100 text-amber-900'
-                    }`}>
+                    <span className={`shrink-0 rounded-full px-3 py-1 text-xs ${app.status === 'approved' ? 'bg-green-100 text-green-800'
+                        : app.status === 'rejected' ? 'bg-red-100 text-red-800'
+                          : 'bg-amber-100 text-amber-900'
+                      }`}>
                       {app.status === 'approved' ? 'Одобрен' : app.status === 'rejected' ? 'Отхвърлен' : 'Чака'}
                     </span>
                   </div>

@@ -538,7 +538,7 @@ export default function Portfolio() {
                   </div>
 
                   <div>
-                    <label className="block text-xs uppercase text-[#212E02]/60 font-semibold mb-2">Budget Target (EUR)</label>
+                    <label className="block text-xs uppercase text-[#212E02]/60 font-semibold mb-2">Budget Target (€)</label>
                     <select 
                       value={formState.budget}
                       onChange={e => setFormState({...formState, budget: e.target.value})}

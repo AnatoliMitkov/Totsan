@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Camera, CheckCircle2, ImagePlus, Play, Save, Trash2, UploadCloud } from 'lucide-react'
+import {
+  Camera, CheckCircle2, ImagePlus, Play, Save, Trash2, UploadCloud,
+  Edit3, MapPin, Home, Banknote, Calendar, AlignLeft, Layers, Sparkles
+} from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
 import { DEFAULT_PROJECT, PROJECT_MEDIA_KINDS, PROPERTY_TYPES, mergeQuizAnswer, isMeaningfulProject } from '../../lib/projects.js'
 import TotsanSelect from '../ui/TotsanSelect.jsx'
 
-const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
+const INPUT = 'mt-2 w-full rounded-2xl border border-line/75 bg-soft/30 px-4 py-3.5 text-sm outline-none transition-all duration-200 focus:bg-paper focus:border-accentDeep focus:shadow-sm'
+const TEXTAREA = 'mt-2 w-full rounded-2xl border border-line/75 bg-soft/30 px-4 py-3.5 text-sm outline-none transition-all duration-200 focus:bg-paper focus:border-accentDeep focus:shadow-sm resize-none'
 
 const QUIZ_CONFIG_LOADERS = {
   paint: () => import('../quiz/paint-config.js').then(module => module.paintConfig),
@@ -24,6 +28,30 @@ function makeDraft(project) {
   }
 }
 
+function CustomSpaceIcon({ size = 14, className = '' }) {
+  return (
+    <svg
+      id="Layer_2"
+      data-name="Layer 2"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 2639.63 2316.21"
+      width={size}
+      height={size}
+      className={className}
+      fill="currentColor"
+    >
+      <g id="Layer_1-2" data-name="Layer 1">
+        <circle cx="344.77" cy="1598.91" r="47.16"/>
+        <path d="M2337.99,1853.85v333.17l133.65,92.31,5.67,17.47-11.86,17.7-389.92,1.71c-12.4-4.46-18.75-16.6-14.92-29.54l138.32-99.65v-333.17h-324.48v223.08c0,23.29-45.58,49.73-46.46,53.34-5.52,22.67,13.24,84.76-15.55,93.24-13.27,3.91-82.52,3.49-92.1-4.07-16.27-12.83-4.79-66.38-8.13-87.47h-648.96c-3.34,21.09,8.13,74.65-8.13,87.47-9.58,7.55-78.83,7.98-92.1,4.07-28.79-8.49-10.03-70.58-15.55-93.24-.88-3.61-46.46-30.05-46.46-53.34v-223.08h-136.16L17.64,2271.18l-17.64-11.75L2.46,425.12,759.36,0l1871.79,4.93,8.47,26.3-3.32,1810.95c-1.28,2.74-10.5,11.68-11.5,11.68h-286.82ZM2592.94,46.05H785.13v1761.45h121.68c3.03-34.34,34.14-55.96,64.08-67.35,5.24-71.7-29.78-178.27,71.86-187.82,223.43,12.23,462.65-15.5,684.19-.02,109,7.61,72.14,110.23,77.63,187.84,29.94,11.39,61.05,33.01,64.08,67.35h330.27v-370.83h-147.75c-18.5,0-11.97-32.38-8.92-43.72,28.53-106.38,100.7-222.97,132.37-331.14l12.7-16.27c9.52-4.55,137.94-5.73,153.44-2.76,8.01,1.53,13.23,4.48,17.32,11.65l164.4,351.81c6.91,40.64-41.48,29.63-68.62,30.43v162.24h-46.35v-162.24h-69.53v370.83h254.95V46.05ZM576.54,1906l162.24-89.81V63.43L43.47,451.64v1755.66l162.48-90.78,2.61-900.08,333.01-194.51c9.36-8.48,34.96,4.36,34.96,12.03v872.03ZM252.06,2091.42l278.12-159.34v-848.86l-278.12,156.44v851.75ZM2094.63,1390.31h365.04l-141.73-301.73c-22.28,4.65-91.64-7.38-104.7,6.05l-118.61,295.68ZM2291.64,1436.67h-46.35v773.53l-81.12,60.84h208.59l-81.12-60.84v-773.53ZM1364.56,1598.9h-333.17c-25.14,0-10.56,119.58-14.83,141.24,50.42,17.22,76.87,60.51,69.85,113.73,82.02,6.57,177.51-8.95,257.87-.03,16.23,1.8,41.28,16.86,45.23,16.28,8.38-1.23,21.36-14.02,41.68-16.28,80.34-8.94,175.87,6.61,257.87.03-7.02-53.22,19.43-96.51,69.85-113.73-4.27-21.67,10.31-141.24-14.83-141.24h-333.17v162.24h-46.35v-162.24ZM980.55,1785.46c-20.73,4.53-31.01,22.36-33.31,42.19-2.96,25.49-2.4,235.31,3,246.41,2.36,4.85,7.6,8.87,12.78,10.39l853.51-1.7,10.39-12.78c-5.9-75.38,12.14-175.28.82-247.64-6.01-38.47-55.67-52.02-80.91-23.65-25.36,28.51-3.77,131.92-11.62,173.8-1.78,9.51-6,16.09-15.49,19.28l-668.1-1.7c-39.63-19.27,36.38-228.04-71.09-204.58ZM1364.56,1946.56c3.4-11.01-2.18-46.35-14.49-46.35h-263.64v46.35h278.12ZM1689.03,1900.21h-263.64c-12.31,0-17.88,35.35-14.49,46.35h278.12v-46.35ZM1016.94,2131.92l-23.3.03.06,46.44,23.3-.03-.06-46.44ZM1781.78,2131.92l-23.3.03.06,46.44,23.3-.03-.06-46.44ZM2106.48,138.35l.07,881.4-881.33.07-.07-881.4,881.33-.07ZM2059.87,185.11h-788.02v788.02h788.02V185.11Z"/>
+        <path d="M1642.94,231.05l.08,325.15-325.15.08-.08-325.15,325.15-.08ZM1364.56,277.82v231.77h231.77v-231.77h-231.77Z"/>
+        <path d="M2013.77,231.05l.08,325.15-325.15.08-.08-325.15,325.15-.08ZM1735.39,277.82v231.77h231.77v-231.77h-231.77Z"/>
+        <path d="M1643.02,601.96v325.15h-325.15v-325.15h325.15ZM1364.56,648.65v231.77h231.77v-231.77h-231.77Z"/>
+        <path d="M2013.84,601.95l.08,325.08-325.22.08-.08-325.08,325.22-.08ZM1735.39,648.65v231.77h231.77v-231.77h-231.77Z"/>
+      </g>
+    </svg>
+  )
+}
+
 export default function CustomerProject({ project, pendingBrief, media, onSave, onImportPendingBrief, onUploadMedia, onUpdateMedia, onDeleteMedia }) {
   const [draft, setDraft] = useState(() => makeDraft(project))
   const [saveStatus, setSaveStatus] = useState({ type: 'idle', message: '' })
@@ -35,8 +63,15 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
   const quizRef = useRef(null)
   const draftRef = useRef(draft)
 
+  // UX View Mode State
+  const hasMeaningfulContent = Boolean(project?.title || project?.ideaDescription || project?.addressCity)
+  const [isEditing, setIsEditing] = useState(!hasMeaningfulContent)
+
   useEffect(() => {
     setDraft(makeDraft(project))
+    if (project?.title || project?.ideaDescription) {
+      setIsEditing(false)
+    }
   }, [project?.id, project?.updatedAt])
 
   const [conflictModal, setConflictModal] = useState(false)
@@ -61,6 +96,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
         quizAnswers: { ...(current.quizAnswers || {}), ...(pendingBrief.quizAnswers || {}) },
       }))
       setSaveStatus({ type: 'idle', message: 'Импортирахме резултата от началния quiz. Прегледай и запази проекта.' })
+      setIsEditing(true)
       onImportPendingBrief?.()
     } else {
       handledBriefRef.current = briefKey
@@ -77,6 +113,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
       quizAnswers: { ...(current.quizAnswers || {}), ...(pendingBrief.quizAnswers || {}) },
     }))
     setConflictModal(false)
+    setIsEditing(true)
     setSaveStatus({ type: 'idle', message: 'Брифът е добавен към текущия проект. Запази, за да потвърдиш.' })
     onImportPendingBrief?.()
   }
@@ -94,6 +131,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
     try {
       await onSave(nextDraft, { createNew: true })
       setSaveStatus({ type: 'saved', message: 'Новият проект е създаден.' })
+      setIsEditing(false)
       onImportPendingBrief?.()
     } catch (error) {
       setSaveStatus({ type: 'error', message: error.message || 'Създаването не успя.' })
@@ -177,7 +215,10 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
     if (!options.silent) setSaveStatus({ type: 'saving', message: 'Запазваме проекта…' })
     const savedProject = await onSave(draft, options)
     setDraft(makeDraft(savedProject))
-    if (!options.silent) setSaveStatus({ type: 'saved', message: 'Проектът е запазен.' })
+    if (!options.silent) {
+      setSaveStatus({ type: 'saved', message: 'Проектът е запазен успешно.' })
+      setIsEditing(false)
+    }
     return savedProject
   }
 
@@ -191,9 +232,9 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
   }
 
   async function handleUploadFiles(fileList) {
-    const files = Array.from(fileList || []).filter(file => file.type.startsWith('image/'))
+    const files = Array.from(fileList || []).filter(file => file.type.startsWith('image/') || file.type === 'application/pdf')
     if (files.length === 0) {
-      setUploadStatus({ type: 'error', message: 'Избери поне една снимка.' })
+      setUploadStatus({ type: 'error', message: 'Избери поне една снимка или PDF.' })
       return
     }
 
@@ -225,7 +266,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-12">
+    <div className="grid gap-6 lg:grid-cols-12">
       {conflictModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4" role="dialog" aria-modal="true">
           <div className="w-full max-w-md rounded-3xl bg-paper p-6 md:p-8 shadow-2xl">
@@ -239,130 +280,323 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
           </div>
         </div>
       )}
-      <form onSubmit={submit} className="lg:col-span-8 rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-7 space-y-6">
-        <div>
-          <div className="eyebrow">Моят проект</div>
-          <h2 className="mt-2 font-display text-3xl text-ink">Проект-паспорт</h2>
-        </div>
 
-        {saveStatus.message && (
-          <div className={`rounded-2xl border p-4 text-sm ${saveStatus.type === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-line bg-soft text-muted'}`}>
-            {saveStatus.message}
+      {/* Main Project Passport Area */}
+      <div className="lg:col-span-8 space-y-6">
+        <div className="rounded-3xl border border-line bg-paper p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-8">
+
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+            <div>
+              <div className="eyebrow flex items-center gap-2">
+                <CustomSpaceIcon size={18} className="text-accentDeep" /> Моето пространство
+              </div>
+            </div>
+            {!isEditing && (
+              <button onClick={() => setIsEditing(true)} className="btn border border-line bg-paper text-ink hover:border-ink">
+                <Edit3 size={16} className="text-muted" /> Редактирай
+              </button>
+            )}
           </div>
-        )}
 
-        <label className="block text-sm font-medium text-ink">Заглавие<input value={draft.title} onChange={event => update('title', event.target.value)} className={INPUT} placeholder="Двустаен в Лозенец" /></label>
+          {saveStatus.message && (
+            <div className={`mb-6 rounded-2xl p-4 text-sm font-medium flex items-center gap-3 ${saveStatus.type === 'error' ? 'border border-red-200 bg-red-50 text-red-700' : 'bg-trustGreen/10 text-trustGreen'}`}>
+              <CheckCircle2 size={18} />
+              {saveStatus.message}
+            </div>
+          )}
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <TotsanSelect label="Тип помещение" value={draft.propertyType} onChange={(value) => update('propertyType', value)} placeholder="Избери" options={[{ value: '', label: 'Избери' }, ...PROPERTY_TYPES]} />
-          <label className="block text-sm font-medium text-ink">Кв.м.<input value={draft.areaSqm} onChange={event => update('areaSqm', event.target.value)} type="number" min="0" step="0.1" className={INPUT} /></label>
-          <label className="block text-sm font-medium text-ink">Стаи<input value={draft.roomsCount} onChange={event => update('roomsCount', event.target.value)} type="number" min="0" className={INPUT} /></label>
+          {isEditing ? (
+            <form onSubmit={submit} className="space-y-8 animate-in fade-in duration-300">
+
+              {/* Zone 1: Basic Info */}
+              <div className="space-y-4">
+                <div className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-2 mb-2">
+                  <AlignLeft size={16} /> Основна информация
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-ink">Заглавие</label>
+                  <input value={draft.title} onChange={e => update('title', e.target.value)} className={INPUT} placeholder="Двустаен в Лозенец" autoFocus />
+                </div>
+                <div>
+                  <TotsanSelect
+                    label="Текущ слой на изпълнение"
+                    value={draft.currentLayerSlug}
+                    onChange={(val) => update('currentLayerSlug', val)}
+                    options={LAYERS.map(l => ({ value: l.slug, label: `Слой ${l.number} · ${l.title}` }))}
+                  />
+                </div>
+              </div>
+
+              {/* Zone 2: Property Parameters */}
+              <div className="space-y-4 rounded-2xl bg-soft/50 p-5 border border-line/50">
+                <div className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-2 mb-2">
+                  <Home size={16} /> Параметри на имота
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <TotsanSelect label="Тип помещение" value={draft.propertyType} onChange={(val) => update('propertyType', val)} options={[{ value: '', label: 'Избери...' }, ...PROPERTY_TYPES]} />
+                  <div>
+                    <label className="block text-sm font-medium text-ink">Квадратура (кв.м)</label>
+                    <input value={draft.areaSqm} onChange={e => update('areaSqm', e.target.value)} type="number" min="0" step="0.1" className={INPUT} placeholder="напр. 82.5" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-ink">Брой стаи</label>
+                    <input value={draft.roomsCount} onChange={e => update('roomsCount', e.target.value)} type="number" min="0" className={INPUT} placeholder="напр. 3" />
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-ink">Град</label>
+                    <input value={draft.addressCity} onChange={e => update('addressCity', e.target.value)} className={INPUT} placeholder="София" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-ink">Район / Квартал</label>
+                    <input value={draft.addressRegion} onChange={e => update('addressRegion', e.target.value)} className={INPUT} placeholder="Младост 1" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Zone 3: Financials & Timeline */}
+              <div className="space-y-4 rounded-2xl bg-soft/50 p-5 border border-line/50">
+                <div className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-2 mb-2">
+                  <Banknote size={16} /> Бюджет и Срокове
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-ink">Бюджет от (€)</label>
+                    <input value={draft.budgetMin} onChange={e => update('budgetMin', e.target.value)} type="number" min="0" className={INPUT} placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-ink">Бюджет до (€)</label>
+                    <input value={draft.budgetMax} onChange={e => update('budgetMax', e.target.value)} type="number" min="0" className={INPUT} placeholder="100000" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-ink">Желан старт на проекта</label>
+                  <input value={draft.desiredStartDate} onChange={e => update('desiredStartDate', e.target.value)} type="date" className={INPUT} />
+                </div>
+              </div>
+
+              {/* Zone 4: Vision & Details */}
+              <div className="space-y-4">
+                <div className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-2 mb-2">
+                  <AlignLeft size={16} /> Идея и визия
+                </div>
+                <div>
+                  <textarea
+                    value={draft.ideaDescription}
+                    onChange={e => update('ideaDescription', e.target.value)}
+                    rows={6}
+                    className={TEXTAREA}
+                    placeholder="Опиши как искаш да изглежда пространството, какво те притеснява и какъв резултат търсиш."
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6">
+                <button type="button" onClick={() => hasMeaningfulContent && setIsEditing(false)} className="btn btn-ghost text-muted hover:text-ink">
+                  Отказ
+                </button>
+                <button type="submit" className="btn btn-primary px-8 py-3.5" disabled={saveStatus.type === 'saving'}>
+                  <Save size={18} />
+                  {saveStatus.type === 'saving' ? 'Запазва се…' : 'Запази'}
+                </button>
+              </div>
+
+            </form>
+          ) : (
+            /* Read-Only Passport View */
+            <div className="space-y-8 animate-in fade-in duration-300">
+
+              {/* Headings */}
+              <div>
+                <h3 className="font-display text-4xl text-ink font-semibold">{draft.title || 'Безименен проект'}</h3>
+                <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-accentDeep/20 bg-accentSoft/30 px-4 py-1.5 text-sm font-medium text-accentDeep">
+                  <Layers size={16} /> Слой {currentLayer.number} · {currentLayer.title}
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-6">
+                {/* Specs Card */}
+                <div className="rounded-2xl border border-line/60 bg-soft/30 p-6 transition hover:shadow-sm">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-2 mb-4">
+                    <Home size={14} /> Параметри
+                  </div>
+                  <ul className="space-y-3">
+                    <li className="flex justify-between items-center text-sm border-b border-line/50 pb-2">
+                      <span className="text-muted">Тип имот</span>
+                      <span className="font-medium text-ink">{PROPERTY_TYPES.find(p => p.value === draft.propertyType)?.label || 'Не е посочен'}</span>
+                    </li>
+                    <li className="flex justify-between items-center text-sm border-b border-line/50 pb-2">
+                      <span className="text-muted">Квадратура</span>
+                      <span className="font-medium text-ink">{draft.areaSqm ? `${draft.areaSqm} кв.м` : '-'}</span>
+                    </li>
+                    <li className="flex justify-between items-center text-sm border-b border-line/50 pb-2">
+                      <span className="text-muted">Брой стаи</span>
+                      <span className="font-medium text-ink">{draft.roomsCount || '-'}</span>
+                    </li>
+                    <li className="flex justify-between items-center text-sm">
+                      <span className="text-muted">Локация</span>
+                      <span className="font-medium text-ink">{[draft.addressCity, draft.addressRegion].filter(Boolean).join(', ') || 'Не е посочена'}</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Logistics Card */}
+                <div className="rounded-2xl border border-line/60 bg-soft/30 p-6 transition hover:shadow-sm">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-2 mb-4">
+                    <Banknote size={14} /> Бюджет и срокове
+                  </div>
+                  <ul className="space-y-3">
+                    <li className="flex justify-between items-center text-sm border-b border-line/50 pb-2">
+                      <span className="text-muted">Бюджет</span>
+                      <span className="font-semibold text-accentDeep">
+                        {draft.budgetMin || draft.budgetMax
+                          ? `${draft.budgetMin ? Number(draft.budgetMin).toLocaleString('en-US') + '€' : '0€'} - ${draft.budgetMax ? Number(draft.budgetMax).toLocaleString('en-US') + '€' : 'без таван'}`
+                          : 'Не е посочен'}
+                      </span>
+                    </li>
+                    <li className="flex justify-between items-center text-sm">
+                      <span className="text-muted">Желан старт</span>
+                      <span className="font-medium text-ink flex items-center gap-1.5">
+                        <Calendar size={14} className="text-muted" />
+                        {draft.desiredStartDate ? new Date(draft.desiredStartDate).toLocaleDateString('bg-BG') : 'Не е посочен'}
+                      </span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Vision Card */}
+              {draft.ideaDescription && (
+                <div className="rounded-2xl border border-line/60 bg-soft/30 p-6 transition hover:shadow-sm">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-2 mb-3">
+                    <AlignLeft size={14} /> Описание на идеята
+                  </div>
+                  <p className="text-sm leading-relaxed text-ink whitespace-pre-line font-sans" style={{ fontSize: 'var(--step-sm)' }}>
+                    {draft.ideaDescription}
+                  </p>
+                </div>
+              )}
+
+            </div>
+          )}
         </div>
+      </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="block text-sm font-medium text-ink">Град<input value={draft.addressCity} onChange={event => update('addressCity', event.target.value)} className={INPUT} /></label>
-          <label className="block text-sm font-medium text-ink">Район<input value={draft.addressRegion} onChange={event => update('addressRegion', event.target.value)} className={INPUT} /></label>
-        </div>
+      {/* Sidebar Areas */}
+      <aside className="lg:col-span-4 space-y-6">
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <TotsanSelect className="md:col-span-2" label="Текущ слой" value={draft.currentLayerSlug} onChange={(value) => update('currentLayerSlug', value)} options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} />
-          <label className="block text-sm font-medium text-ink">Бюджет от<input value={draft.budgetMin} onChange={event => update('budgetMin', event.target.value)} type="number" min="0" className={INPUT} /></label>
-          <label className="block text-sm font-medium text-ink">Бюджет до<input value={draft.budgetMax} onChange={event => update('budgetMax', event.target.value)} type="number" min="0" className={INPUT} /></label>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <TotsanSelect label="Валута" value={draft.budgetCurrency} onChange={(value) => update('budgetCurrency', value)} options={[{ value: 'EUR', label: 'EUR' }, { value: 'BGN', label: 'BGN' }]} />
-          <label className="block text-sm font-medium text-ink">Желан старт<input value={draft.desiredStartDate} onChange={event => update('desiredStartDate', event.target.value)} type="date" className={INPUT} /></label>
-        </div>
-
-        <label className="block text-sm font-medium text-ink">Идея за проекта<textarea value={draft.ideaDescription} onChange={event => update('ideaDescription', event.target.value)} rows={7} className={INPUT} placeholder="Опиши как искаш да изглежда пространството, какво те притеснява и какъв резултат търсиш." /></label>
-
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
-          <div className={`text-sm ${saveStatus.type === 'error' ? 'text-red-700' : 'text-muted'}`}>{saveStatus.message || 'Запази проекта, когато си готов.'}</div>
-          <button className="btn btn-primary" disabled={saveStatus.type === 'saving'}>
-            <Save size={18} />
-            {saveStatus.type === 'saving' ? 'Запазва се…' : 'Запази проекта'}
-          </button>
-        </div>
-      </form>
-
-      <aside className="lg:col-span-4 space-y-5">
-        <div className="rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-6">
-          <div className="eyebrow">Медии</div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-            <TotsanSelect label="Тип файл" value={uploadKind} onChange={setUploadKind} options={PROJECT_MEDIA_KINDS} />
-          </div>
+        {/* Media Block */}
+        <div className="rounded-3xl border border-line bg-paper p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+          <div className="eyebrow flex items-center gap-2 mb-4"><Camera size={14} /> Медии</div>
+          <TotsanSelect label="Тип файл" value={uploadKind} onChange={setUploadKind} options={PROJECT_MEDIA_KINDS} />
           <label
-            className={`mt-4 flex min-h-[12rem] cursor-pointer flex-col items-center justify-center rounded-3xl border border-dashed p-5 text-center transition ${dragOver ? 'border-ink bg-cloud' : 'border-line bg-soft'}`}
+            className={`mt-4 flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed p-6 text-center transition-all duration-200 ${dragOver ? 'border-accent bg-accentSoft/30 scale-[1.02]' : 'border-line/80 bg-soft/50 hover:bg-soft hover:border-line'}`}
             onDragOver={(event) => { event.preventDefault(); setDragOver(true) }}
             onDragLeave={() => setDragOver(false)}
             onDrop={(event) => { event.preventDefault(); setDragOver(false); handleUploadFiles(event.dataTransfer.files) }}
           >
-            <UploadCloud size={28} className="text-accentDeep" />
-            <span className="mt-3 text-sm font-medium text-ink">Качи снимки или планове</span>
-            <span className="mt-1 text-xs text-muted">Drag & drop или избор от устройство</span>
-            <input type="file" accept="image/*" multiple className="sr-only" onChange={event => { handleUploadFiles(event.target.files); event.target.value = '' }} />
+            <UploadCloud size={32} className="text-accentDeep mb-3" strokeWidth={1.5} />
+            <span className="text-sm font-semibold text-ink">Добави файлове</span>
+            <span className="mt-1 text-xs text-muted max-w-[180px]">Drag & drop или кликни за да избереш</span>
+            <input type="file" accept="image/*, application/pdf" multiple className="sr-only" onChange={event => { handleUploadFiles(event.target.files); event.target.value = '' }} />
           </label>
-          <div className={`mt-3 text-sm ${uploadStatus.type === 'error' ? 'text-red-700' : 'text-muted'}`}>{uploadStatus.message || `${media.length} качени файла`}</div>
+          <div className={`mt-4 text-xs font-medium text-center ${uploadStatus.type === 'error' ? 'text-red-700' : 'text-muted'}`}>{uploadStatus.message || `${media.length} качени файла`}</div>
         </div>
 
-        <div className="rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-6">
-          <div className="flex items-center justify-between gap-3">
+        {/* Quizzes Block */}
+        <div className="rounded-3xl border border-line bg-paper p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+          <div className="flex items-center justify-between gap-3 mb-4">
             <div>
-              <div className="eyebrow">Quiz</div>
-              <div className="mt-1 text-sm text-muted">Слой {currentLayer.number} · {currentLayer.title}</div>
+              <div className="eyebrow">Конфигуратор (Quiz)</div>
+              <div className="mt-1 text-xs text-muted">Слой {currentLayer.number}</div>
             </div>
-            {savedQuizKeys.length > 0 && <CheckCircle2 size={20} className="text-accentDeep" />}
+            {savedQuizKeys.length > 0 && <CheckCircle2 size={24} className="text-trustGreen" strokeWidth={1.5} />}
           </div>
 
-          <div className="mt-4 grid gap-2">
+          <div className="grid gap-2.5">
             {visibleQuizzes.map(item => (
-              <button key={item.quizSlug} type="button" onClick={() => { setActiveQuizSlug(item.quizSlug); setQuizStatus({ type: 'idle', message: '' }) }} className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left text-sm transition ${activeQuizSlug === item.quizSlug ? 'border-ink bg-soft' : 'border-line hover:border-ink/40'}`}>
+              <button key={item.quizSlug} type="button" onClick={() => { setActiveQuizSlug(item.quizSlug); setQuizStatus({ type: 'idle', message: '' }) }} className={`group flex items-center justify-between rounded-2xl border px-4 py-3.5 text-left text-sm transition-all duration-200 ${activeQuizSlug === item.quizSlug ? 'border-accent bg-accentSoft/20 text-accentDeep font-medium' : 'border-line/75 hover:border-ink hover:shadow-sm text-ink'}`}>
                 <span>{item.title}</span>
-                <Play size={16} />
+                <Play size={16} className={`transition-transform duration-200 ${activeQuizSlug === item.quizSlug ? 'text-accentDeep' : 'text-muted group-hover:text-ink'}`} />
               </button>
             ))}
           </div>
 
           {activeQuizSlug && (
-            <div className="mt-5">
+            <div className="mt-6 rounded-2xl border border-line/60 bg-soft/30 p-4">
               <material-decision-quiz ref={quizRef}></material-decision-quiz>
             </div>
           )}
 
-          <div className={`mt-3 text-sm ${quizStatus.type === 'error' ? 'text-red-700' : 'text-muted'}`}>{quizStatus.message || (savedQuizKeys.length ? `Записани quiz-ове: ${savedQuizKeys.length}` : 'Резултатът се записва при завършване.')}</div>
+          <div className={`mt-4 text-xs font-medium text-center ${quizStatus.type === 'error' ? 'text-red-700' : 'text-muted'}`}>{quizStatus.message || (savedQuizKeys.length ? `${savedQuizKeys.length} завършени теста` : 'Избери и попълни, за да събереш повече детайли.')}</div>
         </div>
       </aside>
 
-      <div className="lg:col-span-12 rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-7">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+      {/* Gallery Section */}
+      <div className="lg:col-span-12 mt-4 rounded-3xl border border-line bg-paper p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-8">
+        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line/60 pb-5 mb-6">
           <div>
-            <div className="eyebrow">Галерия</div>
-            <h2 className="mt-2 font-display text-3xl text-ink">Снимки и планове</h2>
+            <div className="eyebrow flex items-center gap-2"><Camera size={14} /> Галерия</div>
+            <h2 className="mt-2 font-display text-3xl font-semibold text-ink">Снимки, планове и документи</h2>
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted"><Camera size={18} />{media.length} файла</div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-line bg-soft px-3 py-1.5 text-xs font-semibold text-ink">
+            Общо {media.length}
+          </div>
         </div>
 
         {media.length === 0 ? (
-          <div className="mt-5 rounded-2xl border border-line bg-soft p-6 text-sm text-muted">Още няма качени медии към проекта.</div>
+          <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-line/80 bg-soft/30 py-16 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-paper shadow-sm text-muted mb-4">
+              <ImagePlus size={32} strokeWidth={1.5} />
+            </div>
+            <h3 className="font-display text-xl font-semibold text-ink mb-2">Тук е малко празно</h3>
+            <p className="text-sm text-muted max-w-md">Добави снимки, скици, PDF планове или вдъхновения в панела горе, за да придобие проектът ти ясен облик.</p>
+          </div>
         ) : (
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {media.map(item => (
-              <article key={item.id} className="overflow-hidden rounded-2xl border border-line bg-paper">
-                <div className="aspect-[4/3] bg-soft">
-                  {item.url ? <img src={item.url} alt={item.caption || 'Проектна медия'} className="img-cover" /> : <div className="flex h-full w-full items-center justify-center text-muted"><ImagePlus size={24} /></div>}
-                </div>
-                <div className="p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-xs uppercase tracking-[0.14em] text-muted">{PROJECT_MEDIA_KINDS.find(kind => kind.value === item.kind)?.label || 'Медия'}</span>
-                    <button type="button" onClick={() => onDeleteMedia(item.id)} className="rounded-full border border-line p-2 text-muted transition hover:border-ink hover:text-ink" aria-label="Изтрий медия">
-                      <Trash2 size={15} />
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {media.map(item => {
+              const isPdf = item.url?.toLowerCase().endsWith('.pdf');
+              return (
+                <article key={item.id} className="group overflow-hidden rounded-2xl border border-line/80 bg-paper transition-shadow duration-300 hover:shadow-md">
+                  <div className="relative aspect-[4/3] bg-soft overflow-hidden">
+                    {isPdf ? (
+                      <a href={item.url} target="_blank" rel="noopener noreferrer" className="flex flex-col h-full w-full items-center justify-center text-accentDeep hover:bg-accentSoft/30 transition-colors">
+                        <div className="rounded-xl bg-paper p-4 shadow-sm border border-line">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /><path d="M10 13v6" /><path d="M10 16h2" /><path d="M14 13v6" /><path d="M14 13h2a2 2 0 0 1 0 4h-2" /><path d="M6 13v6" /><path d="M6 13h2a2 2 0 0 1 0 4H6" /></svg>
+                        </div>
+                        <span className="mt-3 text-xs font-semibold">Отвори PDF документа</span>
+                      </a>
+                    ) : item.url ? (
+                      <img src={item.url} alt={item.caption || 'Проектна медия'} className="img-cover transition-transform duration-500 group-hover:scale-105" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-muted"><ImagePlus size={24} /></div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onDeleteMedia(item.id)}
+                      className="absolute top-3 right-3 rounded-full bg-paper/90 backdrop-blur border border-line p-2 text-muted transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                      aria-label="Изтрий медия"
+                    >
+                      <Trash2 size={16} />
                     </button>
+                    <div className="absolute bottom-3 left-3 rounded-md bg-ink/70 backdrop-blur px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-paper">
+                      {PROJECT_MEDIA_KINDS.find(kind => kind.value === item.kind)?.label || 'Медия'}
+                    </div>
                   </div>
-                  <label className="mt-3 block text-sm font-medium text-ink">Описание<textarea defaultValue={item.caption} onBlur={event => saveMediaCaption(item, event.target.value)} rows={2} className={INPUT} /></label>
-                </div>
-              </article>
-            ))}
+                  <div className="p-5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-muted mb-2">Описание</label>
+                    <textarea
+                      defaultValue={item.caption}
+                      onBlur={event => saveMediaCaption(item, event.target.value)}
+                      rows={2}
+                      className={TEXTAREA}
+                      placeholder="Добави бележка..."
+                    />
+                  </div>
+                </article>
+              )
+            })}
           </div>
         )}
       </div>
