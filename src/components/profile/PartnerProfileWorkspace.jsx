@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   BriefcaseBusiness,
   Camera,
@@ -16,9 +16,11 @@ import {
   MessagesSquare,
   Plus,
   Save,
+  Send,
   Tags,
   Trash2,
   UserRound,
+  X,
 } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
 import { uploadProfileMedia, uploadProfileCover } from '../../lib/profile-media-upload-client.js'
@@ -37,10 +39,12 @@ import {
   uploadPortfolioImage,
 } from '../../lib/portfolio.js'
 import { createConnectOnboarding, getConnectStatus } from '../../lib/payments.js'
+import { loadPartnerInquiries, loadInquiryProjects } from '../../lib/partner-inquiries.js'
+import { loadPartnerServicesForProfile } from '../../lib/partner-services.js'
+import { formatMoneyRange } from '../../lib/money.js'
 import PortfolioGallery from './PortfolioGallery.jsx'
 import ImageCropperModal from './ImageCropperModal.jsx'
 import Avatar from '../Avatar.jsx'
-import PartnerStats from './PartnerStats.jsx'
 import PublicProfileBanner from './PublicProfileBanner.jsx'
 import PublicProfileAvatar from './PublicProfileAvatar.jsx'
 import PublicProfilePanel from './PublicProfilePanel.jsx'
@@ -71,6 +75,28 @@ function readFileAsDataUrl(file) {
     reader.onerror = () => reject(new Error('Файлът не може да бъде прочетен.'))
     reader.readAsDataURL(file)
   })
+}
+
+function stripCacheBust(url) {
+  if (!url) return ''
+
+  try {
+    const parsed = new URL(url)
+    parsed.searchParams.delete('v')
+    return parsed.toString()
+  } catch {
+    return String(url).replace(/([?&])v=\d+(&?)/, (_, prefix, suffix) => {
+      if (prefix === '?' && suffix) return '?'
+      return suffix ? prefix : ''
+    }).replace(/[?&]$/, '')
+  }
+}
+
+function withCacheBust(url) {
+  const cleanUrl = stripCacheBust(url)
+  if (!cleanUrl) return ''
+  const separator = cleanUrl.includes('?') ? '&' : '?'
+  return `${cleanUrl}${separator}v=${Date.now()}`
 }
 
 const TABS = [
@@ -172,11 +198,13 @@ function paymentMessageFromStripe(result) {
 }
 
 export default function PartnerProfileWorkspace({ profile, userId, account, session, refreshAccount, onSaved }) {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('overview')
   const [currentProfile, setCurrentProfile] = useState(profile)
   const [profileDraft, setProfileDraft] = useState(() => makeProfileDraft(profile))
   const [portfolio, setPortfolio] = useState([])
   const [stats, setStats] = useState(null)
+  const [dashboardState, setDashboardState] = useState({ status: 'loading', inquiries: [], inquiryProjects: {}, services: [], message: '' })
   const [portfolioDraft, setPortfolioDraft] = useState(() => makePortfolioDraft(null, profile))
   const [saveState, setSaveState] = useState({ status: 'idle', message: '' })
   const [portfolioState, setPortfolioState] = useState({ status: 'idle', message: '' })
@@ -210,14 +238,8 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     })
   }
 
-  async function saveBanner(payload) {
-    const nextFile = payload?.file || null
-    const nextPositionY = Number.isFinite(Number(payload?.positionY)) ? Number(payload.positionY) : 50
-    if (nextFile) {
-      await uploadCover(nextFile, nextPositionY)
-      return
-    }
-    await saveBannerPosition(nextPositionY)
+  async function saveBanner(croppedFile) {
+    await uploadCover(croppedFile, 50)
   }
 
   function openAvatarEditor() {
@@ -279,7 +301,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     setSaveState({ status: 'uploading', message: 'Оптимизираме и качваме банера…' })
     try {
       const result = await uploadProfileCover({ file, target: userId })
-      const nextCoverUrl = result.publicUrl || result.signedUrl || ''
+      const nextCoverUrl = withCacheBust(result.publicUrl || result.signedUrl || '')
       if (!nextCoverUrl) throw new Error('Банерът е качен, но липсва валиден адрес.')
       updateProfile('coverUrl', nextCoverUrl)
       updateProfile('coverY', positionY)
@@ -350,6 +372,45 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     load()
     return () => { active = false }
   }, [profile?.id])
+
+  useEffect(() => {
+    if (!profile?.id) return undefined
+
+    let active = true
+    async function loadDashboardData() {
+      setDashboardState(current => ({ ...current, status: 'loading', message: '' }))
+      try {
+        const [inquiryResult, serviceResult] = await Promise.allSettled([
+          profile.slug ? loadPartnerInquiries(profile.slug) : Promise.resolve([]),
+          loadPartnerServicesForProfile(profile.id),
+        ])
+
+        const inquiries = inquiryResult.status === 'fulfilled' ? inquiryResult.value : []
+        const services = serviceResult.status === 'fulfilled' ? serviceResult.value : []
+        const clientIds = [...new Set(inquiries.map(item => item.client_id).filter(Boolean))]
+        const projects = clientIds.length ? await loadInquiryProjects(clientIds) : []
+        const inquiryProjects = projects.reduce((map, project) => {
+          if (project?.user_id) map[project.user_id] = project
+          return map
+        }, {})
+
+        if (!active) return
+        setDashboardState({
+          status: inquiryResult.status === 'rejected' || serviceResult.status === 'rejected' ? 'partial' : 'ready',
+          inquiries,
+          inquiryProjects,
+          services,
+          message: '',
+        })
+      } catch (error) {
+        if (!active) return
+        setDashboardState({ status: 'error', inquiries: [], inquiryProjects: {}, services: [], message: error.message || 'Работното табло не успя да зареди всички данни.' })
+      }
+    }
+
+    loadDashboardData()
+    return () => { active = false }
+  }, [profile?.id, profile?.slug])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -443,6 +504,26 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
 
   function updateProfile(key, value) {
     setProfileDraft(current => ({ ...current, [key]: value }))
+  }
+
+  function openWorkspaceTarget(target = 'profile', options = {}) {
+    if (target === 'inbox') {
+      navigate('/inbox')
+      return
+    }
+
+    setActiveTab(target)
+    if (!options.focusId) return
+
+    window.setTimeout(() => {
+      const element = document.getElementById(options.focusId)
+      if (!element) return
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      const focusable = element.matches('input, textarea, button, select, a[href]')
+        ? element
+        : element.querySelector('input, textarea, button, select, a[href]')
+      focusable?.focus?.({ preventScroll: true })
+    }, 120)
   }
 
   function updateLayer01(key, value) {
@@ -749,7 +830,8 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
                 stats={stats}
                 portfolio={portfolio}
                 completion={profileCompletion}
-                onTabChange={setActiveTab}
+                dashboardState={dashboardState}
+                onAction={openWorkspaceTarget}
               />
             )}
 
@@ -823,15 +905,24 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       </div>
 
       {bannerEditor.open && (
-        <BannerPositionModal
+        <ImageCropperModal
           file={bannerEditor.file}
           imageUrl={bannerEditor.imageUrl}
           initialFileName={bannerEditor.fileName}
-          initialPositionY={bannerEditor.positionY ?? profileDraft.coverY ?? 50}
+          title="Редактирай банера"
           description={BANNER_DESCRIPTION}
+          aspect={1600 / 520}
+          cropShape="rect"
+          objectFit="horizontal-cover"
+          outputWidth={1600}
+          outputHeight={520}
+          minZoom={1}
+          maxZoom={4}
+          zoomStep={0.05}
+          emptyStateLabel="Качи банер, за да го позиционираш."
           onClose={closeBannerEditor}
           onSelectFile={async (file) => handleBannerFile(file)}
-          onSave={saveBanner}
+          onCropSave={saveBanner}
         />
       )}
 
@@ -1083,58 +1174,294 @@ function WorkspaceSidebar({ tabs, activeTab, profile, completion, portfolioCount
   )
 }
 
-function OverviewDashboard({ preview, stats, portfolio, completion, onTabChange }) {
-  const missing = completion.missing.slice(0, 4)
+function OverviewDashboard({ preview, stats, portfolio, completion, dashboardState, onAction }) {
+  const safePreview = preview || {}
+  const safeCompletion = completion || { percent: 0, done: 0, total: 1, missing: [] }
+  const safePortfolio = Array.isArray(portfolio) ? portfolio : []
+  const inquiries = Array.isArray(dashboardState?.inquiries) ? dashboardState.inquiries : []
+  const services = Array.isArray(dashboardState?.services) ? dashboardState.services : []
+  const inquiryProjects = dashboardState?.inquiryProjects || {}
+  const activeInquiries = inquiries.filter(item => item.status === 'new' || item.status === 'seen')
+  const newInquiries = inquiries.filter(item => item.status === 'new')
+  const latestInquiry = inquiries[0] || null
+  const latestProject = latestInquiry?.client_id ? inquiryProjects[latestInquiry.client_id] : null
+  const reviewCount = Number(stats?.reviews_count || 0)
+  const rating = Number(stats?.avg_rating || 0)
+  const publishedServices = services.filter(item => item.isPublished || item.is_published)
+  const nextSteps = getDashboardNextSteps({ preview: safePreview, completion: safeCompletion, portfolio: safePortfolio, services }).slice(0, 3)
+  const heroMessage = getDashboardHeroMessage(safePreview, safeCompletion, safePortfolio)
+
+  const kpis = [
+    {
+      label: 'Нови заявки',
+      value: String(newInquiries.length),
+      detail: activeInquiries.length ? `${activeInquiries.length} активни общо` : 'Няма нови заявки',
+      icon: Mail,
+      tone: 'bg-accent/10 text-accentDeep',
+      onClick: () => onAction('inquiries'),
+    },
+    {
+      label: 'Активни разговори',
+      value: '0',
+      detail: 'Ще се отчита от реални чатове',
+      icon: MessagesSquare,
+      tone: 'bg-[#E9F1FF] text-[#16468F]',
+      onClick: () => onAction('inbox'),
+    },
+    {
+      label: 'Изпратени оферти',
+      value: '0',
+      detail: 'Скоро',
+      icon: Send,
+      tone: 'bg-[#EEF7F1] text-[#207246]',
+      disabled: true,
+    },
+    {
+      label: 'Активна работа',
+      value: '0',
+      detail: 'Скоро',
+      icon: BriefcaseBusiness,
+      tone: 'bg-[#F7F1E8] text-[#8A5B18]',
+      disabled: true,
+    },
+  ]
 
   return (
     <div className="space-y-5">
-      <section className="rounded-3xl border border-line bg-paper p-5 md:p-7">
-        <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-          <div className="max-w-3xl">
-            <div className="eyebrow">Преглед</div>
-            <h2 className="mt-2 font-display text-3xl text-ink">Работно табло</h2>
-            <p className="mt-3 text-muted">{preview.descriptionLong || preview.bio || 'Добави кратко описание, за да е по-ясно как помагаш на клиентите.'}</p>
+      <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.95),rgba(236,244,253,0.88)_42%,rgba(255,255,255,0.78)),linear-gradient(135deg,rgba(13,35,64,0.08),rgba(255,255,255,0))] p-5 shadow-[0_24px_70px_rgba(13,35,64,0.08)] md:p-7">
+        <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-accent/10 blur-3xl" />
+        <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_21rem] xl:items-stretch">
+          <div>
+            <div className="eyebrow">Totsan Pro workspace</div>
+            <h2 className="mt-3 max-w-3xl font-display text-[clamp(2.2rem,5vw,4.4rem)] leading-[0.9] tracking-tight text-ink">
+              Здравей, {safePreview.name || 'партньор'}.
+            </h2>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-muted md:text-lg">{heroMessage}</p>
+            <div className="mt-6 flex flex-wrap gap-2">
+              <StatusPill label={safePreview.isPublished ? 'Published' : 'Hidden'} value={safePreview.isPublished ? 'Профилът е видим' : 'Профилът е скрит'} strong={safePreview.isPublished} />
+              <StatusPill label="Каталог" value={safePreview.isPublished ? 'Видим в каталога' : 'Не се показва'} strong={safePreview.isPublished} />
+              <StatusPill label="Готовност" value={`${safeCompletion.percent}%`} strong={safeCompletion.percent >= 80} />
+            </div>
           </div>
-          <div className="w-full rounded-2xl border border-line bg-soft p-4 xl:w-72">
-            <div className="flex items-end justify-between gap-3">
+
+          <div className="rounded-[1.75rem] border border-white/80 bg-paper/80 p-5 shadow-[0_18px_50px_rgba(13,35,64,0.08)] backdrop-blur">
+            <div className="flex items-end justify-between gap-4">
               <div>
-                <div className="text-xs uppercase tracking-[0.14em] text-muted">Готовност</div>
-                <div className="mt-2 font-display text-4xl leading-none text-ink">{completion.percent}%</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">Следваща стъпка</div>
+                <div className="mt-3 font-display text-5xl leading-none text-ink">{safeCompletion.percent}%</div>
               </div>
-              <div className="pb-1 text-sm text-muted">{completion.done}/{completion.total}</div>
+              <div className="pb-1 text-sm font-medium text-muted">{safeCompletion.done}/{safeCompletion.total}</div>
             </div>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-paper">
-              <div className="h-full rounded-full bg-accentDeep" style={{ width: `${completion.percent}%` }} />
+            <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-soft">
+              <div className="h-full rounded-full bg-ink shadow-[0_0_24px_rgba(13,35,64,0.28)]" style={{ width: `${safeCompletion.percent}%` }} />
             </div>
-            {missing.length > 0 && <p className="mt-3 text-xs text-muted">Липсва: {missing.join(', ')}</p>}
+            <p className="mt-4 text-sm leading-6 text-muted">{nextSteps[0]?.description || 'Профилът изглежда готов. Следи заявките и поддържай портфолиото актуално.'}</p>
+            <button type="button" onClick={() => onAction(nextSteps[0]?.tab || 'profile', nextSteps[0])} className="btn btn-primary mt-5 w-full justify-center">
+              {nextSteps[0]?.cta || 'Подобри профила'}
+            </button>
           </div>
         </div>
-
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <InfoTile label="Езици" value={preview.languages.join(', ') || 'bg'} />
-          <InfoTile label="Райони" value={preview.serviceAreas.join(', ') || preview.city || 'Не е посочено'} />
-          <InfoTile label="Цени" value={preview.pricingNote || 'Не е посочено'} />
-          <InfoTile label="Портфолио" value={`${portfolio.length} проекта`} />
-        </div>
-
-
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-12">
-        <div className="lg:col-span-5">
-          <PartnerStats profile={preview} stats={stats} />
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {kpis.map(item => <DashboardKpi key={item.label} {...item} />)}
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
+        <LatestInquiryCard inquiry={latestInquiry} project={latestProject} status={dashboardState?.status} onOpen={() => onAction('inquiries')} onImprove={() => onAction('profile')} />
+
+        <div className="space-y-5">
+          <TrustCard
+            preview={safePreview}
+            completion={safeCompletion}
+            portfolioCount={safePortfolio.length}
+            serviceCount={services.length}
+            publishedServiceCount={publishedServices.length}
+            rating={rating}
+            reviewCount={reviewCount}
+            accountStatus={safePreview.isPublished ? 'Одобрен профил' : 'Скрит профил'}
+          />
+          <NextStepsCard steps={nextSteps} onAction={onAction} />
         </div>
-        <section className="rounded-3xl border border-line bg-paper p-5 md:p-7 lg:col-span-7">
-          <div className="eyebrow">Публичен профил</div>
-          <h3 className="mt-2 font-display text-3xl text-ink">{preview.name}</h3>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <InfoTile label="Позициониране" value={preview.headline || preview.tag || 'Не е посочено'} />
-            <InfoTile label="Формат" value={preview.acceptsRemote ? 'На място и дистанционно' : 'На място'} />
-            <InfoTile label="Опит" value={`${preview.yearsExperience || Math.max(0, new Date().getFullYear() - preview.since)} г.`} />
-            <InfoTile label="Статус" value={preview.isPublished ? 'Публичен' : 'Скрит'} />
-          </div>
-        </section>
       </div>
+    </div>
+  )
+}
+
+function getDashboardHeroMessage(preview, completion, portfolio) {
+  if (!preview.isPublished) return 'Профилът е скрит — довърши липсващите полета, за да го публикуваш уверено.'
+  if (!portfolio.length) return 'Профилът е видим. Добави портфолио, за да повишиш доверието преди първата оферта.'
+  if (completion.percent < 80) return 'Профилът е видим, но има още няколко детайла, които ще помогнат на клиентите да изберат теб.'
+  return 'Профилът е видим — готов си да получаваш повече запитвания и да работиш от едно място.'
+}
+
+function getDashboardNextSteps({ preview, completion, portfolio, services }) {
+  const steps = []
+  const hasContact = Boolean(preview.phone || preview.emailPublic || preview.website)
+
+  if (!preview.isPublished) {
+    steps.push({ title: 'Публикувай профила', description: 'Профилът е скрит и не се вижда в каталога.', cta: 'Редактирай профила', tab: 'profile' })
+  }
+  if (!hasContact) {
+    steps.push({ title: 'Добави контакт', description: 'Контактът помага на клиента да ти се довери преди разговор.', cta: 'Добави контакт', tab: 'profile', focusId: 'partner-contact-fields' })
+  }
+  if (!preview.serviceAreas?.length) {
+    steps.push({ title: 'Добави райони', description: 'Посочи къде работиш, за да получаваш по-точни заявки.', cta: 'Добави райони', tab: 'profile', focusId: 'partner-service-areas-field' })
+  }
+  if (!preview.pricingNote && services.length === 0) {
+    steps.push({ title: 'Добави цени или услуга', description: 'Ясните услуги и ценови насоки намаляват празните разговори.', cta: 'Добави услуги', tab: 'services' })
+  }
+  if (!portfolio.length) {
+    steps.push({ title: 'Добави портфолио', description: 'Проектите са най-бързият начин да покажеш качество.', cta: 'Добави проект', tab: 'portfolio' })
+  }
+  if (completion.percent >= 90 && steps.length === 0) {
+    steps.push({ title: 'Следи заявките', description: 'Профилът е в добра форма. Следващата работа ще се появи в заявките.', cta: 'Виж заявки', tab: 'inquiries' })
+  }
+
+  return steps
+}
+
+function DashboardKpi({ label, value, detail, icon: Icon, tone, onClick, disabled = false }) {
+  const isClickable = typeof onClick === 'function' && !disabled
+  const Component = isClickable ? 'button' : 'article'
+  const interactiveClass = isClickable
+    ? 'cursor-pointer text-left hover:-translate-y-0.5 hover:border-ink/20 hover:shadow-[0_20px_55px_rgba(13,35,64,0.09)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 focus-visible:ring-offset-2 focus-visible:ring-offset-soft'
+    : 'cursor-default opacity-85'
+
+  return (
+    <Component type={isClickable ? 'button' : undefined} onClick={isClickable ? onClick : undefined} className={`group w-full rounded-[1.65rem] border border-white/70 bg-paper/88 p-5 shadow-[0_14px_42px_rgba(13,35,64,0.06)] transition ${interactiveClass}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${tone}`}>
+          <Icon size={20} />
+        </div>
+        <div className="font-display text-4xl leading-none text-ink">{value}</div>
+      </div>
+      <div className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-muted">{label}</div>
+      <div className="mt-1 text-sm text-ink/75">{detail}</div>
+    </Component>
+  )
+}
+
+function LatestInquiryCard({ inquiry, project, status, onOpen, onImprove }) {
+  if (!inquiry) {
+    return (
+      <section className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_18px_55px_rgba(13,35,64,0.05)] md:p-7">
+        <div className="eyebrow">Последен клиентски контекст</div>
+        <div className="mt-8 rounded-[1.75rem] border border-dashed border-line bg-soft/70 p-7 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-paper text-accentDeep shadow-sm">
+            <Mail size={24} />
+          </div>
+          <h3 className="mt-4 font-display text-3xl text-ink">Първата подходяща заявка ще се появи тук.</h3>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted">
+            {status === 'loading' ? 'Проверяваме за реални заявки...' : 'Няма да показваме примерни клиенти или измислени бюджети.'}
+          </p>
+          <button type="button" onClick={onImprove} className="btn btn-primary mt-6 justify-center">Подобри профила</button>
+        </div>
+      </section>
+    )
+  }
+
+  const city = project?.address_city || project?.city || ''
+  const budget = project?.budget_min ? formatMoneyRange(project.budget_min, project.budget_max, project.budget_currency) : ''
+  const context = project?.idea_description || inquiry.message || ''
+  const title = project?.title || inquiry.name || 'Клиентска заявка'
+
+  return (
+    <section className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_18px_55px_rgba(13,35,64,0.05)] md:p-7">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="eyebrow">Последна заявка</div>
+          <h3 className="mt-2 break-words font-display text-3xl text-ink">{title}</h3>
+        </div>
+        {inquiry.status === 'new' && <span className="inline-flex w-fit rounded-full bg-accent px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white">Ново</span>}
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <MiniFact label="Град" value={city || 'Не е посочен'} />
+        <MiniFact label="Бюджет" value={budget || 'Не е посочен'} />
+        <MiniFact label="Статус" value={inquiry.status || 'получена'} />
+      </div>
+
+      {context && (
+        <div className="mt-5 rounded-3xl border border-line bg-soft/70 p-4">
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Контекст</div>
+          <p className="mt-2 line-clamp-4 text-sm leading-6 text-ink">{context}</p>
+        </div>
+      )}
+
+      <button type="button" onClick={onOpen} className="btn btn-primary mt-6 justify-center">
+        Виж заявката
+      </button>
+    </section>
+  )
+}
+
+function TrustCard({ preview, completion, portfolioCount, serviceCount, publishedServiceCount, rating, reviewCount, accountStatus }) {
+  const items = [
+    { label: 'Готовност', value: `${completion.percent}%`, ok: completion.percent >= 80 },
+    { label: 'Портфолио', value: portfolioCount ? `${portfolioCount} проекта` : 'Няма още', ok: portfolioCount > 0 },
+    { label: 'Услуги', value: serviceCount ? `${publishedServiceCount}/${serviceCount} видими` : 'Няма още', ok: publishedServiceCount > 0 },
+    { label: 'Каталог', value: preview.isPublished ? 'Видим' : 'Скрит', ok: preview.isPublished },
+    { label: 'Оценка', value: reviewCount ? `${rating.toFixed(1)} (${reviewCount})` : 'Няма още', ok: reviewCount > 0 },
+    { label: 'Статус', value: accountStatus, ok: preview.isPublished },
+  ]
+
+  return (
+    <section className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_18px_55px_rgba(13,35,64,0.05)] md:p-6">
+      <div className="eyebrow">Доверие</div>
+      <h3 className="mt-2 font-display text-3xl text-ink">Профилна готовност</h3>
+      <div className="mt-5 grid gap-2">
+        {items.map(item => (
+          <div key={item.label} className="flex items-center justify-between gap-3 rounded-2xl bg-soft/75 px-4 py-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${item.ok ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+              <span className="truncate text-sm font-medium text-ink">{item.label}</span>
+            </div>
+            <span className="max-w-[55%] truncate text-right text-sm text-muted">{item.value}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function NextStepsCard({ steps, onAction }) {
+  return (
+    <section className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_18px_55px_rgba(13,35,64,0.05)] md:p-6">
+      <div className="eyebrow">Следващи действия</div>
+      <div className="mt-4 space-y-3">
+        {steps.length ? steps.map((step, index) => (
+          <button key={`${step.title}-${index}`} type="button" onClick={() => onAction(step.tab, step)} className="group w-full rounded-3xl border border-line bg-soft/65 p-4 text-left transition hover:-translate-y-0.5 hover:border-ink/25 hover:bg-paper hover:shadow-[0_12px_35px_rgba(13,35,64,0.06)]">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="font-medium text-ink">{step.title}</div>
+                <p className="mt-1 text-sm leading-5 text-muted">{step.description}</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-paper px-3 py-1 text-xs font-semibold text-accentDeep shadow-sm transition group-hover:bg-ink group-hover:text-paper">{step.cta}</span>
+            </div>
+          </button>
+        )) : (
+          <div className="rounded-3xl border border-dashed border-line bg-soft p-5 text-sm leading-6 text-muted">Няма критични липси. Поддържай заявките и портфолиото актуални.</div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function StatusPill({ label, value, strong = false }) {
+  return (
+    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] ${strong ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-line bg-paper/80 text-muted'}`}>
+      <span className={`h-2 w-2 rounded-full ${strong ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+      <span className="normal-case tracking-normal">{label}: {value}</span>
+    </span>
+  )
+}
+
+function MiniFact({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-line bg-soft px-4 py-3">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">{label}</div>
+      <div className="mt-1 truncate text-sm font-medium text-ink">{value}</div>
     </div>
   )
 }
@@ -1202,10 +1529,10 @@ function ProfileForm({
 
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Езици"><input value={draft.languagesText} onChange={event => onChange('languagesText', event.target.value)} className={INPUT} placeholder="bg, en" /></Field>
-          <Field label="Райони на работа"><input value={draft.serviceAreasText} onChange={event => onChange('serviceAreasText', event.target.value)} className={INPUT} placeholder="София, Пловдив" /></Field>
+          <Field label="Райони на работа"><input id="partner-service-areas-field" value={draft.serviceAreasText} onChange={event => onChange('serviceAreasText', event.target.value)} className={INPUT} placeholder="София, Пловдив" /></Field>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div id="partner-contact-fields" className="grid gap-4 md:grid-cols-3 scroll-mt-28">
           <Field label="Телефон"><input value={draft.phone} onChange={event => onChange('phone', event.target.value)} type="tel" className={INPUT} /></Field>
           <Field label="Публичен имейл"><input value={draft.emailPublic} onChange={event => onChange('emailPublic', event.target.value)} type="email" className={INPUT} /></Field>
           <Field label="Сайт"><input value={draft.website} onChange={event => onChange('website', event.target.value)} className={INPUT} placeholder="https://" /></Field>
