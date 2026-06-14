@@ -1,6 +1,6 @@
 import { slugify } from './profiles.js'
 import { supabase, supabasePublicKey, supabaseUrl } from './supabase.js'
-import { uploadProfileImage, uploadPortfolioImages, uploadServiceImages } from './advanced-image-manager.js'
+import { uploadPortfolioImages, uploadServiceImages } from './advanced-image-manager.js'
 
 const MB = 1024 * 1024
 const IMAGE_MAX_BYTES = 10 * MB
@@ -275,22 +275,28 @@ export async function uploadMediaViaEdge({ file, target = '', purpose = 'profile
 export async function uploadProfileMedia({ file, target = '' }) {
   const { data } = await supabase.auth.getSession()
   const userId = data.session?.user?.id
-  const result = await uploadProfileImage(file, target || userId, userId, 'profile')
+  const result = await uploadMediaViaEdge({ file, target: target || userId, purpose: 'profile' })
+  if (result.bucket !== 'profile-images') {
+    throw new Error('Profile media upload endpoint is not up to date. Redeploy profile-media-upload.')
+  }
   return {
-    publicUrl: result.main.publicUrl,
-    path: result.main.path,
-    bucket: 'profile-images'
+    publicUrl: result.publicUrl,
+    path: result.path,
+    bucket: result.bucket,
   }
 }
 
 export async function uploadProfileCover({ file, target = '' }) {
   const { data } = await supabase.auth.getSession()
   const userId = data.session?.user?.id
-  const result = await uploadProfileImage(file, target || userId, userId, 'banner')
+  const result = await uploadMediaViaEdge({ file, target: target || userId, purpose: 'banner' })
+  if (result.bucket !== 'profile-images') {
+    throw new Error('Profile media upload endpoint is not up to date. Redeploy profile-media-upload.')
+  }
   return {
-    publicUrl: result.main.publicUrl,
-    path: result.main.path,
-    bucket: 'profile-images'
+    publicUrl: result.publicUrl,
+    path: result.path,
+    bucket: result.bucket,
   }
 }
 

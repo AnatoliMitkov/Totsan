@@ -1,5 +1,5 @@
 // supabase/functions/profile-media-upload/index.ts
-// Edge Function for authenticated project media uploads via multipart FormData
+// Edge Function for authenticated profile/project media uploads via multipart FormData
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
@@ -48,9 +48,12 @@ function sanitizeSegment(value: string, fallback: string) {
 }
 
 function inferExtension(fileName: string, contentType: string) {
+  const supportedExtension = SUPPORTED_TYPES.get(contentType)?.extension
+  if (supportedExtension) return supportedExtension
+
   const fileExtensionMatch = String(fileName || "").toLowerCase().match(/\.([a-z0-9]+)$/)
   if (fileExtensionMatch?.[1]) return fileExtensionMatch[1]
-  return SUPPORTED_TYPES.get(contentType)?.extension || "bin"
+  return "bin"
 }
 
 serve(async (req: Request) => {
@@ -103,23 +106,44 @@ serve(async (req: Request) => {
     const kind = sanitizeSegment(String(formData.get("kind") || "photo"), "photo")
     const target = sanitizeSegment(String(formData.get("target") || userData.user.id), sanitizeSegment(userData.user.id, "user"))
 
-    const timestamp = Date.now()
-    const randomId = Math.random().toString(36).slice(2, 9)
-    const extension = inferExtension(fileEntry.name, fileEntry.type)
-    const filename = `${timestamp}-${randomId}.${extension}`
-    const pathSegments = purpose === "project"
-      ? ["projects", target, projectId || "draft", kind]
-      : [purpose, target]
-    const path = `${pathSegments.map((segment) => sanitizeSegment(segment, "upload")).join("/")}/${filename}`
+    const isProfileImagePurpose = purpose === "profile" || purpose === "banner"
+    if (isProfileImagePurpose && !fileEntry.type.startsWith("image/")) {
+      return jsonResponse({ error: "Profile uploads only support image files." }, 400)
+    }
 
-    const bucket = "project-media"
+    const authenticatedUserSegment = sanitizeSegment(userData.user.id, "user")
+    if (isProfileImagePurpose && target !== authenticatedUserSegment) {
+      return jsonResponse({ error: "You can only upload profile media to your own folder." }, 403)
+    }
+
+    const extension = inferExtension(fileEntry.name, fileEntry.type)
+    let bucket = "project-media"
+    let filename = ""
+    let path = ""
+    let upsert = false
+
+    if (isProfileImagePurpose) {
+      bucket = "profile-images"
+      filename = `main.${extension}`
+      path = `${target}/${purpose}/${filename}`
+      upsert = true
+    } else {
+      const timestamp = Date.now()
+      const randomId = Math.random().toString(36).slice(2, 9)
+      filename = `${timestamp}-${randomId}.${extension}`
+      const pathSegments = purpose === "project"
+        ? ["projects", target, projectId || "draft", kind]
+        : [purpose, target]
+      path = `${pathSegments.map((segment) => sanitizeSegment(segment, "upload")).join("/")}/${filename}`
+    }
+
     const fileBuffer = await fileEntry.arrayBuffer()
     const { data, error } = await supabase.storage
       .from(bucket)
       .upload(path, fileBuffer, {
         contentType: fileEntry.type,
         cacheControl: "3600",
-        upsert: false,
+        upsert,
       })
 
     if (error) {

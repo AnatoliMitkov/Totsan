@@ -208,6 +208,7 @@ export default function ImageCropperModal({
 
     setIsSaving(true)
     setError('')
+    let shouldClose = false
     try {
       const croppedBlob = await createCroppedImageBlob(imageSrc, croppedAreaPixels, outputWidth, outputHeight)
       const croppedFile = new File([croppedBlob], fileName || 'avatar.jpg', { type: 'image/jpeg' })
@@ -217,11 +218,12 @@ export default function ImageCropperModal({
         naturalSize,
         displayCrop: buildDisplayCrop(croppedAreaPixels, naturalSize),
       })
-      onClose()
+      shouldClose = true
     } catch (nextError) {
       setError(nextError.message === RECROP_MESSAGE ? RECROP_MESSAGE : SAVE_ERROR_MESSAGE)
     } finally {
       setIsSaving(false)
+      if (shouldClose) onClose()
     }
   }
 
@@ -277,7 +279,7 @@ export default function ImageCropperModal({
             <label className="btn btn-ghost w-full cursor-pointer justify-center sm:w-auto">
               <Upload size={18} />
               Качи нова
-              <input type="file" accept="image/*" className="sr-only" onChange={handleFileChange} disabled={isSaving} />
+              <input type="file" accept=".jpg,.jpeg,.png,.webp" className="sr-only" onChange={handleFileChange} disabled={isSaving} />
             </label>
 
             {error && (

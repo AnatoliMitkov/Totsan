@@ -53,9 +53,11 @@ import TotsanSelect from '../ui/TotsanSelect.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const MAX_BANNER_BYTES = 12 * 1024 * 1024
+const SUPPORTED_PROFILE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const BANNER_DESCRIPTION = 'Широк банер работи най-добре около 3:1. Препоръчваме 1600 x 520 px за най-чист резултат.'
 
 function validateBannerFile(file) {
+  if (file && !SUPPORTED_PROFILE_IMAGE_TYPES.has(file.type)) return 'Моля, избери JPG, PNG или WEBP изображение за банера.'
   if (!file) return 'Липсва файл.'
   if (!file.type.startsWith('image/')) return 'Моля, избери изображение за банера.'
   if (file.size > MAX_BANNER_BYTES) return 'Банерът трябва да е до 12 MB.'
@@ -183,16 +185,6 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
   const [bannerEditor, setBannerEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'banner.jpg', positionY: 50 })
 
   function openBannerEditor() {
-    if (profileDraft.coverUrl) {
-      setBannerEditor({
-        open: true,
-        file: null,
-        imageUrl: profileDraft.coverUrl,
-        fileName: profileDraft.name ? `${profileDraft.name}-banner.jpg` : 'banner.jpg',
-        positionY: profileDraft.coverY ?? 50,
-      })
-      return
-    }
     const input = document.getElementById('partner-cover-upload')
     if (input) input.click()
   }
@@ -208,6 +200,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       setSaveState({ status: 'error', message: error })
       return
     }
+    setSaveState({ status: 'idle', message: '' })
     setBannerEditor({
       open: true,
       file,
@@ -218,7 +211,6 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
   }
 
   async function saveBanner(payload) {
-    closeBannerEditor()
     const nextFile = payload?.file || null
     const nextPositionY = Number.isFinite(Number(payload?.positionY)) ? Number(payload.positionY) : 50
     if (nextFile) {
@@ -248,6 +240,10 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
 
   function handleAvatarFile(file) {
     if (!file) return
+    if (!SUPPORTED_PROFILE_IMAGE_TYPES.has(file.type)) {
+      setSaveState({ status: 'error', message: 'Моля, избери JPG, PNG или WEBP изображение.' })
+      return
+    }
     if (!file.type.startsWith('image/')) return
     setAvatarEditor({
       open: true,
@@ -274,6 +270,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       await onSaved?.()
     } catch (error) {
       setSaveState({ status: 'error', message: error.message || 'Позицията на банера не успя да се запази.' })
+      throw error
     }
   }
 
@@ -301,6 +298,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       await onSaved?.()
     } catch (error) {
       setSaveState({ status: 'error', message: error.message || 'Качването на банер не успя.' })
+      throw error
     }
   }
 
@@ -691,14 +689,15 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
             </div>
           </div>
         </div>
-        <input
-          id="partner-cover-upload"
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleCoverFileChange}
-        />
       </PublicProfileBanner>
+      {/* Keep the file input outside the clickable banner to avoid recursive input.click() bubbling. */}
+      <input
+        id="partner-cover-upload"
+        type="file"
+        accept=".jpg,.jpeg,.png,.webp"
+        className="hidden"
+        onChange={handleCoverFileChange}
+      />
       <div className="relative z-10 flex flex-col bg-soft pb-16 md:pb-24">
         <div className="container-page -mt-10 w-full space-y-5 px-4 sm:-mt-12 md:-mt-24 md:px-6">
         <PublicProfilePanel className="transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.04)]">
@@ -852,7 +851,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       <input
         id="partner-avatar-upload"
         type="file"
-        accept="image/*"
+        accept=".jpg,.jpeg,.png,.webp"
         className="hidden"
         onChange={(event) => {
           const file = event.target.files?.[0]
@@ -909,13 +908,15 @@ function BannerPositionModal({
   async function handleSave() {
     setIsSaving(true)
     setError('')
+    let shouldClose = false
     try {
       await onSave?.({ file, positionY })
-      onClose?.()
+      shouldClose = true
     } catch (nextError) {
       setError(nextError.message || 'Не успяхме да запазим банера.')
     } finally {
       setIsSaving(false)
+      if (shouldClose) onClose?.()
     }
   }
 
@@ -984,7 +985,7 @@ function BannerPositionModal({
             <label className="btn btn-ghost w-full cursor-pointer justify-center">
               <Camera size={18} />
               Качи нова
-              <input type="file" accept="image/*" className="sr-only" onChange={handleFileChange} disabled={isSaving} />
+              <input type="file" accept=".jpg,.jpeg,.png,.webp" className="sr-only" onChange={handleFileChange} disabled={isSaving} />
             </label>
 
             {error && (

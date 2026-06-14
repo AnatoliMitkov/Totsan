@@ -36,6 +36,7 @@ import {
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const MAX_BANNER_BYTES = 12 * 1024 * 1024
+const SUPPORTED_PROFILE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const BANNER_RATIO_TEXT = 'Препоръчителен размер: 1600 x 520 px'
 const BANNER_DESCRIPTION = 'Широк банер работи най-добре около 3:1. Препоръчваме 1600 x 520 px за най-чист резултат.'
 
@@ -75,6 +76,7 @@ const CUSTOMER_TABS = [
 
 const MAX_AVATAR_BYTES = 10 * 1024 * 1024
 function validateAvatarFile(file) {
+  if (file && !SUPPORTED_PROFILE_IMAGE_TYPES.has(file.type)) return 'Моля, избери JPG, PNG или WEBP изображение.'
   if (!file) return 'Липсва файл.'
   if (!file.type.startsWith('image/')) return 'Моля, избери изображение.'
   if (file.size > MAX_AVATAR_BYTES) return 'Снимката трябва да е до 10 MB.'
@@ -122,6 +124,7 @@ function getApplicationSelfPhotoUrl(row) {
 }
 
 function validateBannerFile(file) {
+  if (file && !SUPPORTED_PROFILE_IMAGE_TYPES.has(file.type)) return 'Моля, избери JPG, PNG или WEBP изображение за банера.'
   if (!file) return 'Липсва файл.'
   if (!file.type.startsWith('image/')) return 'Моля, избери изображение за банера.'
   if (file.size > MAX_BANNER_BYTES) return 'Банерът трябва да е до 12 MB.'
@@ -413,16 +416,6 @@ function CustomerProfile({ session, account, refreshAccount }) {
   }
 
   function openBannerEditor() {
-    if (localAccount?.cover_url) {
-      setBannerEditor({
-        open: true,
-        file: null,
-        imageUrl: stripCacheBust(localAccount.cover_url),
-        fileName: displayName ? `${displayName}-banner.jpg` : 'banner.jpg',
-      })
-      return
-    }
-
     const input = document.getElementById('customer-banner-upload')
     if (input) input.click()
   }
@@ -669,7 +662,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
       <input
         id="customer-banner-upload"
         type="file"
-        accept="image/*"
+        accept=".jpg,.jpeg,.png,.webp"
         className="sr-only"
         onChange={(event) => {
           const file = event.target.files?.[0]
@@ -681,7 +674,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
       <input
         id="customer-avatar-upload"
         type="file"
-        accept="image/*"
+        accept=".jpg,.jpeg,.png,.webp"
         className="sr-only"
         onChange={(event) => {
           const file = event.target.files?.[0]

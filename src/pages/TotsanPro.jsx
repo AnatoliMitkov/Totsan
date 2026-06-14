@@ -113,6 +113,8 @@ const plans = [
   },
 ]
 
+const HERO_TEXT_OFFSET = '5vw'
+
 export default function TotsanPro() {
   useSeo({
     canonicalPath: '/pro',
@@ -132,33 +134,36 @@ export default function TotsanPro() {
     <>
       {/* ── Hero ── */}
       <section className="relative flex flex-col justify-center min-h-[100dvh] lg:h-screen lg:min-h-[720px] overflow-hidden bg-[#020b18] text-paper pt-[var(--header-h,64px)] z-10">
-        {/* Background Image Layer */}
-        <div className="absolute right-0 top-0 bottom-0 w-full lg:w-[68%] z-0 select-none pointer-events-none overflow-hidden">
+        
+        {/* Full-width hero visual rendered as the original asset, without cropping. */}
+        <div className="absolute inset-x-0 top-0 z-0 select-none pointer-events-none">
           <img
             src="/Images/totsan-pro-hero-visual.png"
             alt=""
-            className="w-full h-full object-cover object-center lg:object-right opacity-30 lg:opacity-100 transition-opacity duration-300"
+            className="block w-full h-auto max-w-none opacity-100"
           />
-          {/* Subtle localized left-to-right fade gradient to blend the image edge with the left background */}
-          <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-[#020b18] to-transparent z-10 hidden lg:block" />
-          {/* Vertical overlay scrim for mobile viewports */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#020b18]/95 via-[#020b18]/80 to-[#020b18]/95 lg:hidden z-10" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#020b18] via-[#020b18]/28 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#020b18]/12 via-transparent to-[#020b18]/72" />
         </div>
 
-        {/* Content Container */}
-        <div className="container-page w-full flex-1 flex flex-col justify-center relative z-10 px-[var(--pad-x)] py-8 lg:py-16">
-          <div className="w-full lg:w-[42%] reveal flex flex-col justify-center">
+        {/* Content & Layout Container */}
+        <div className="w-full flex-1 flex flex-col lg:flex-row lg:items-center relative z-10 pt-2 lg:pt-4 pb-8 lg:pb-16">
+          
+          {/* Left Side: Text Column */}
+          <div
+            className="w-full lg:w-[52%] xl:w-[48%] reveal flex flex-col justify-center z-10"
+            style={{ marginLeft: HERO_TEXT_OFFSET }}
+          >
             <div className="eyebrow !text-paper/55">TOTSAN PRO</div>
-            <h1 className="h-display mt-4 text-[clamp(2.25rem,1.8rem+2.2vw,3.75rem)] leading-[1.05] tracking-tight">
-              Работно място за<br className="hidden lg:inline" />
-              добрите майстори,<br className="hidden lg:inline" />
-              студиа и марки.
+            <h1 className="font-display font-medium mt-4 text-[clamp(2rem,1.35rem+1.8vw,3.25rem)] lg:text-[65px] leading-[1.05] tracking-[-0.02em] text-balance">
+              Работно място за<br className="hidden lg:inline" /> добрите майстори,<br className="hidden lg:inline" /> студиа и марки.
             </h1>
-            <p className="mt-5 max-w-lg text-base sm:text-lg leading-relaxed text-paper/70 font-sans">
-              Профил, услуги, заявки и чат — всичко на едно място.<br className="hidden sm:inline" />
+            <p className="mt-4 max-w-lg text-base sm:text-lg leading-relaxed text-paper/70 font-sans">
+              Профил, услуги, заявки и чат — всичко на едно място.{" "}
+              <br className="hidden sm:inline" />
               Безплатен вход за мотивирани професионалисти.
             </p>
-            <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+            <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
               <Link
                 to={PRO_SIGNUP_URL}
                 onClick={() => trackPartnerApplicationStart('totsan_pro_hero')}
@@ -175,7 +180,7 @@ export default function TotsanPro() {
             </div>
 
             {/* Trust Indicators Bar */}
-            <div className="border-t border-paper/10 mt-8 pt-5 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-paper/85">
+            <div className="border-t border-paper/10 mt-6 pt-4 flex flex-wrap items-center gap-x-6 gap-y-3 text-[16px] leading-6 text-paper/85 max-w-[570px]">
               <span className="inline-flex items-center gap-2.5">
                 <CheckCircle2 size={16} className="text-accent shrink-0" /> Безплатен вход
               </span>
@@ -187,6 +192,7 @@ export default function TotsanPro() {
               </span>
             </div>
           </div>
+
         </div>
       </section>
 

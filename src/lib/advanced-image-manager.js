@@ -4,6 +4,18 @@
 import { supabase } from './supabase.js'
 import { ImageStoragePath } from './image-storage-schema.js'
 
+const SUPPORTED_PROFILE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const UNSUPPORTED_PROFILE_IMAGE_MESSAGE = 'Моля, избери JPG, PNG или WEBP изображение.'
+
+function validateProfileImageFile(file) {
+  if (!(file instanceof File)) {
+    throw new Error('Липсва файл за качване.')
+  }
+  if (!SUPPORTED_PROFILE_IMAGE_TYPES.has(file.type)) {
+    throw new Error(UNSUPPORTED_PROFILE_IMAGE_MESSAGE)
+  }
+}
+
 // ============================================================================
 // COMPRESSION & VARIANT GENERATION
 // ============================================================================
@@ -96,6 +108,8 @@ async function compressImage(file, options = {}) {
 // ============================================================================
 
 export async function uploadProfileImage(file, profileSlug, userId, category) {
+  validateProfileImageFile(file)
+
   const path = new ImageStoragePath(profileSlug)
   const variants = await generateImageVariants(file, category)
 
