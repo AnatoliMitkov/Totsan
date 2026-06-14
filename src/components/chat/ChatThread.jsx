@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { LoaderCircle, ShieldCheck } from 'lucide-react'
 import MessageBubble from './MessageBubble.jsx'
 import Avatar from '../Avatar.jsx'
-import { compactSystemText, getConversationTitle, getOtherParticipant, getOtherParticipantRole, getRoleLabel } from '../../lib/chat.js'
+import { compactSystemText, getConversationTitle, getOtherParticipant, getOtherParticipantRole, getParticipantPublicHref, getRoleLabel } from '../../lib/chat.js'
 
 const ACTIVE_ORDER_STATUSES = new Set(['paid', 'in_progress'])
 const BOTTOM_STICK_THRESHOLD = 96
@@ -221,12 +222,17 @@ export default function ChatThread({
   const displayName = getConversationTitle(conversation, userId)
   const roleLabel = getRoleLabel(getOtherParticipantRole(conversation, userId))
   const statusLine = compactOrderStatusLine(orderStatus)
+  const participantHref = getParticipantPublicHref(conversation, userId)
+  const IdentityTag = participantHref ? Link : 'div'
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-3xl border border-line bg-paper shadow-[0_18px_50px_-42px_rgba(15,23,42,0.28)]">
       <div className="shrink-0 border-b border-line px-4 py-3 md:px-5">
         <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,48%)] lg:items-start">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
+          <IdentityTag
+            {...(participantHref ? { to: participantHref } : {})}
+            className={`flex min-w-0 flex-1 items-center gap-3 rounded-2xl p-1.5 -m-1.5 transition ${participantHref ? 'hover:bg-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accentDeep/25' : ''}`}
+          >
             <Avatar src={avatarUrl} srcCandidates={avatarCandidates} name={displayName} size={48} />
             <div className="min-w-0 flex-1">
               <h1 className="truncate font-display text-xl leading-tight text-ink md:text-2xl">{displayName}</h1>
@@ -236,7 +242,7 @@ export default function ChatThread({
               </div>
               {statusLine && <div className="mt-2 break-words text-sm text-muted">{statusLine}</div>}
             </div>
-          </div>
+          </IdentityTag>
           <div className="flex min-w-0 flex-col gap-2">
             <div className="flex min-w-0 items-start gap-2 rounded-2xl border border-line bg-soft/90 px-3 py-2 text-sm text-muted backdrop-blur-sm">
               <ShieldCheck size={17} className="mt-0.5 shrink-0 text-accentDeep" />

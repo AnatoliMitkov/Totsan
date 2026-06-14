@@ -19,45 +19,7 @@ export async function generateImageVariants(file, category) {
 
   variants.main = baseVariant
 
-  // Generate thumbnail
-  if (category === 'profile') {
-    variants.thumb = await compressImage(file, {
-      quality: 80,
-      maxWidth: 50,
-      maxHeight: 50
-    })
-
-    // Generate OG image (1200x630)
-    variants.og = await compressImage(file, {
-      quality: 80,
-      maxWidth: 1200,
-      maxHeight: 630,
-      aspectRatio: '1200:630'
-    })
-  }
-
-  // Generate blur placeholder
-  if (category === 'banner') {
-    variants.blur = await compressImage(file, {
-      quality: 30,
-      maxWidth: 100,
-      maxHeight: 25
-    })
-
-    // Tablet variant
-    variants.tablet = await compressImage(file, {
-      quality: 82,
-      maxWidth: 1000,
-      maxHeight: 250
-    })
-
-    // Mobile variant
-    variants.mobile = await compressImage(file, {
-      quality: 82,
-      maxWidth: 500,
-      maxHeight: 200
-    })
-  }
+  // Profile/banner derivative variants stay disabled until the frontend consumes them.
 
   return variants
 }
@@ -157,76 +119,17 @@ export async function uploadProfileImage(file, profileSlug, userId, category) {
     )
     uploads.push(mainResult)
 
-    // Archive old version
-    if (currentVersionNum > 0) {
-      const oldVersionPath = category === 'profile'
-        ? path.profilePictureVersion(currentVersionNum)
-        : mainPath // For banner, just overwrite
-
-      // Move current main to version history
-      if (category === 'profile') {
-        const currentMain = await getCurrentImagePath(profileSlug, category)
-        if (currentMain) {
-          await archiveAsVersion(
-            profileSlug,
-            currentMain,
-            currentVersionNum,
-            category
-          )
-        }
+    // Keep profile history bounded; banners continue to overwrite main.jpg only.
+    if (category === 'profile' && currentVersionNum > 0) {
+      const currentMain = await getCurrentImagePath(profileSlug, category)
+      if (currentMain) {
+        await archiveAsVersion(
+          profileSlug,
+          currentMain,
+          currentVersionNum,
+          category
+        )
       }
-    }
-
-    // Upload thumbnails/variants
-    if (variants.thumb) {
-      const thumbPath = path.profilePicture('thumb')
-      const thumbResult = await uploadImageFile(
-        variants.thumb.file,
-        thumbPath,
-        'profile-images'
-      )
-      uploads.push(thumbResult)
-    }
-
-    if (variants.og) {
-      const ogPath = path.profilePicture('og')
-      const ogResult = await uploadImageFile(
-        variants.og.file,
-        ogPath,
-        'profile-images'
-      )
-      uploads.push(ogResult)
-    }
-
-    // Upload banner variants
-    if (variants.blur) {
-      const blurPath = path.banner('blur')
-      const blurResult = await uploadImageFile(
-        variants.blur.file,
-        blurPath,
-        'profile-images'
-      )
-      uploads.push(blurResult)
-    }
-
-    if (variants.tablet) {
-      const tabletPath = path.banner('tablet')
-      const tabletResult = await uploadImageFile(
-        variants.tablet.file,
-        tabletPath,
-        'profile-images'
-      )
-      uploads.push(tabletResult)
-    }
-
-    if (variants.mobile) {
-      const mobilePath = path.banner('mobile')
-      const mobileResult = await uploadImageFile(
-        variants.mobile.file,
-        mobilePath,
-        'profile-images'
-      )
-      uploads.push(mobileResult)
     }
 
     // Track in database
@@ -243,6 +146,10 @@ export async function uploadProfileImage(file, profileSlug, userId, category) {
 
     // Log cleanup action
     await logCleanupAction(userId, 'upload_new_version', mainResult.path, `Version ${nextVersionNum}`)
+
+    if (category === 'profile') {
+      await cleanupOldVersions(profileSlug, category, 5)
+    }
 
     return {
       success: true,

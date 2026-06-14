@@ -3,15 +3,70 @@ import { supabase, supabasePublicKey, supabaseUrl } from './supabase.js'
 import { uploadProfileImage, uploadPortfolioImages, uploadServiceImages } from './advanced-image-manager.js'
 
 const MB = 1024 * 1024
+const IMAGE_MAX_BYTES = 10 * MB
+const DOCUMENT_MAX_BYTES = 20 * MB
 const PRECOMPRESS_THRESHOLD_BYTES = 3.5 * MB
 const PRECOMPRESS_MAX_EDGE = 2200
 const PRECOMPRESS_QUALITY = 0.86
+const SUPPORTED_IMAGE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+])
+const SUPPORTED_DOCUMENT_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+])
 const PRECOMPRESSABLE_TYPES = new Set([
   'image/jpeg',
   'image/png',
   'image/webp',
   'image/bmp',
 ])
+const SUPPORTED_PROJECT_UPLOAD_TYPES = new Set([
+  ...SUPPORTED_IMAGE_TYPES,
+  ...SUPPORTED_DOCUMENT_TYPES,
+])
+const UNSUPPORTED_PROJECT_FILE_MESSAGE = 'Този тип файл не се поддържа. Можете да качите JPG, PNG, WEBP, PDF, DOC, DOCX, XLS или XLSX.'
+
+function isImageUpload(file) {
+  return SUPPORTED_IMAGE_TYPES.has(file?.type || '')
+}
+
+function isDocumentUpload(file) {
+  return SUPPORTED_DOCUMENT_TYPES.has(file?.type || '')
+}
+
+function shouldVerifyStoredUpload({ file, preparedUpload, payload, verificationUrl }) {
+  if (!verificationUrl || isDocumentUpload(file)) return false
+
+  return (
+    isImageUpload(file) &&
+    preparedUpload.precompressed &&
+    preparedUpload.file.type === 'image/webp' &&
+    String(payload?.type || '').startsWith('image/')
+  )
+}
+
+function validateUploadFile(file, purpose) {
+  if (!(file instanceof File)) {
+    throw new Error('Липсва файл за качване.')
+  }
+
+  if (purpose !== 'project') return
+
+  if (!SUPPORTED_PROJECT_UPLOAD_TYPES.has(file.type)) {
+    throw new Error(UNSUPPORTED_PROJECT_FILE_MESSAGE)
+  }
+
+  const limit = isDocumentUpload(file) ? DOCUMENT_MAX_BYTES : IMAGE_MAX_BYTES
+  if (file.size > limit) {
+    throw new Error(isDocumentUpload(file) ? 'Документите трябва да са до 20 MB.' : 'Снимките трябва да са до 10 MB.')
+  }
+}
 
 function constrainSize(width, height, maxEdge) {
   const largestEdge = Math.max(width, height)
@@ -154,9 +209,7 @@ export function resolveProfileUploadTarget({ userId = '', slug = '', name = '' }
 }
 
 export async function uploadMediaViaEdge({ file, target = '', purpose = 'profile', projectId = '', kind = 'photo' }) {
-  if (!(file instanceof File)) {
-    throw new Error('Липсва файл за качване.')
-  }
+  validateUploadFile(file, purpose)
 
   const { data } = await supabase.auth.getSession()
   const accessToken = data.session?.access_token
@@ -164,7 +217,15 @@ export async function uploadMediaViaEdge({ file, target = '', purpose = 'profile
     throw new Error('Трябва да си влязъл в акаунта си, за да качваш снимки.')
   }
 
-  const preparedUpload = await maybePrecompressImage(file)
+  const preparedUpload = isImageUpload(file)
+    ? await maybePrecompressImage(file)
+    : {
+        file,
+        precompressed: false,
+        originalBytes: file.size,
+        uploadBytes: file.size,
+      }
+
   const formData = new FormData()
   formData.append('file', preparedUpload.file)
   formData.append('purpose', purpose)
@@ -198,7 +259,7 @@ export async function uploadMediaViaEdge({ file, target = '', purpose = 'profile
 
   const verificationUrl = payload.publicUrl || payload.signedUrl || ''
   let storedBytes = null
-  if (verificationUrl) {
+  if (shouldVerifyStoredUpload({ file, preparedUpload, payload, verificationUrl })) {
     storedBytes = await verifyStoredUpload(verificationUrl)
   }
 
@@ -215,7 +276,7 @@ export async function uploadProfileMedia({ file, target = '' }) {
   const { data } = await supabase.auth.getSession()
   const userId = data.session?.user?.id
   const result = await uploadProfileImage(file, target || userId, userId, 'profile')
-  return { 
+  return {
     publicUrl: result.main.publicUrl,
     path: result.main.path,
     bucket: 'profile-images'
@@ -226,7 +287,7 @@ export async function uploadProfileCover({ file, target = '' }) {
   const { data } = await supabase.auth.getSession()
   const userId = data.session?.user?.id
   const result = await uploadProfileImage(file, target || userId, userId, 'banner')
-  return { 
+  return {
     publicUrl: result.main.publicUrl,
     path: result.main.path,
     bucket: 'profile-images'
@@ -236,13 +297,13 @@ export async function uploadProfileCover({ file, target = '' }) {
 export async function uploadPortfolioMedia({ file, target = '', kind = 'photo' }) {
   const { data } = await supabase.auth.getSession()
   const userId = data.session?.user?.id
-  
+
   // Use a temporary ID since it's uploaded before saving the portfolio item
   const tempPortfolioId = `temp_${Date.now()}`
   const results = await uploadPortfolioImages([file], target || userId, tempPortfolioId, userId)
   const uploaded = results[0]
-  
-  return { 
+
+  return {
     publicUrl: uploaded.publicUrl,
     path: uploaded.path,
     bucket: 'profile-images'
@@ -252,12 +313,12 @@ export async function uploadPortfolioMedia({ file, target = '', kind = 'photo' }
 export async function uploadServiceMedia({ file, target = '', kind = 'service' }) {
   const { data } = await supabase.auth.getSession()
   const userId = data.session?.user?.id
-  
+
   const tempServiceId = `temp_${Date.now()}`
   const results = await uploadServiceImages([file], target || userId, tempServiceId, userId)
   const uploaded = results[0]
 
-  return { 
+  return {
     publicUrl: uploaded.publicUrl,
     path: uploaded.path,
     bucket: 'profile-images'

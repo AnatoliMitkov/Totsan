@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Camera, CheckCircle2, ImagePlus, Play, Save, Trash2, UploadCloud,
+  Camera, CheckCircle2, FileSpreadsheet, FileText, FileType, ImagePlus, Play, Save, Trash2, UploadCloud,
   Edit3, MapPin, Home, Banknote, Calendar, AlignLeft, Layers, Sparkles
 } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
@@ -9,6 +9,73 @@ import TotsanSelect from '../ui/TotsanSelect.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line/75 bg-soft/30 px-4 py-3.5 text-sm outline-none transition-all duration-200 focus:bg-paper focus:border-accentDeep focus:shadow-sm'
 const TEXTAREA = 'mt-2 w-full rounded-2xl border border-line/75 bg-soft/30 px-4 py-3.5 text-sm outline-none transition-all duration-200 focus:bg-paper focus:border-accentDeep focus:shadow-sm resize-none'
+const PROJECT_UPLOAD_ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx'
+const PROJECT_UPLOAD_ERROR = 'Този тип файл не се поддържа. Можете да качите JPG, PNG, WEBP, PDF, DOC, DOCX, XLS или XLSX.'
+const SUPPORTED_PROJECT_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+])
+const PROJECT_UPLOAD_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx'])
+
+function getExtension(fileName = '') {
+  const match = String(fileName).toLowerCase().match(/\.([a-z0-9]+)$/)
+  return match?.[1] || ''
+}
+
+function getMediaUrl(item) {
+  return item?.url || item?.publicUrl || item?.signedUrl || ''
+}
+
+function isImageMedia(item) {
+  return String(item?.type || '').startsWith('image/') || ['jpg', 'jpeg', 'png', 'webp'].includes(getExtension(item?.fileName || item?.path || getMediaUrl(item)))
+}
+
+function isDocumentMedia(item) {
+  return !isImageMedia(item)
+}
+
+function isImageFile(file) {
+  return String(file?.type || '').startsWith('image/') || ['jpg', 'jpeg', 'png', 'webp'].includes(getExtension(file?.name || ''))
+}
+
+function getDocumentTypeLabel(item) {
+  const extension = getExtension(item?.fileName || item?.path || getMediaUrl(item))
+  return extension ? extension.toUpperCase() : 'FILE'
+}
+
+function getDocumentIcon(item) {
+  const typeLabel = getDocumentTypeLabel(item)
+  if (typeLabel === 'DOC' || typeLabel === 'DOCX') return FileType
+  if (typeLabel === 'XLS' || typeLabel === 'XLSX') return FileSpreadsheet
+  return FileText
+}
+
+function getDisplayFileName(item) {
+  if (item?.fileName) return item.fileName
+  const source = item?.path || getMediaUrl(item)
+  const lastSegment = String(source).split('/').pop() || ''
+  return decodeURIComponent(lastSegment.split('?')[0] || '')
+}
+
+function formatFileSize(size) {
+  const bytes = Number(size)
+  if (!Number.isFinite(bytes) || bytes <= 0) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function isSupportedProjectFile(file) {
+  if (!file) return false
+  const extension = getExtension(file.name)
+  return SUPPORTED_PROJECT_MIME_TYPES.has(file.type) || PROJECT_UPLOAD_EXTENSIONS.has(extension)
+}
 
 const QUIZ_CONFIG_LOADERS = {
   paint: () => import('../quiz/paint-config.js').then(module => module.paintConfig),
@@ -57,7 +124,6 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
   const [saveStatus, setSaveStatus] = useState({ type: 'idle', message: '' })
   const [uploadStatus, setUploadStatus] = useState({ type: 'idle', message: '' })
   const [dragOver, setDragOver] = useState(false)
-  const [uploadKind, setUploadKind] = useState('photo')
   const [activeQuizSlug, setActiveQuizSlug] = useState('')
   const [quizStatus, setQuizStatus] = useState({ type: 'idle', message: '' })
   const quizRef = useRef(null)
@@ -232,20 +298,26 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
   }
 
   async function handleUploadFiles(fileList) {
-    const files = Array.from(fileList || []).filter(file => file.type.startsWith('image/') || file.type === 'application/pdf')
-    if (files.length === 0) {
-      setUploadStatus({ type: 'error', message: 'Избери поне една снимка или PDF.' })
+    const allFiles = Array.from(fileList || [])
+    const files = allFiles
+    if (allFiles.length === 0) {
+      setUploadStatus({ type: 'error', message: 'Избери поне един файл.' })
       return
     }
 
     setUploadStatus({ type: 'uploading', message: `Качваме ${files.length} файла…` })
+    if (allFiles.some(file => !isSupportedProjectFile(file))) {
+      setUploadStatus({ type: 'error', message: PROJECT_UPLOAD_ERROR })
+      return
+    }
+
     try {
       const savedProject = await saveDraft({ silent: true })
       for (const [index, file] of files.entries()) {
         await onUploadMedia({
           file,
           projectId: savedProject.id,
-          kind: uploadKind,
+          kind: isImageFile(file) ? 'photo' : 'document',
           caption: '',
           orderIndex: media.length + index,
         })
@@ -264,6 +336,9 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
       setUploadStatus({ type: 'error', message: error.message || 'Описанието не се запази.' })
     }
   }
+
+  const imageMedia = media.filter(isImageMedia)
+  const documentMedia = media.filter(isDocumentMedia)
 
   return (
     <div className="grid gap-6 lg:grid-cols-12">
@@ -488,8 +563,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
 
         {/* Media Block */}
         <div className="rounded-3xl border border-line bg-paper p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-          <div className="eyebrow flex items-center gap-2 mb-4"><Camera size={14} /> Медии</div>
-          <TotsanSelect label="Тип файл" value={uploadKind} onChange={setUploadKind} options={PROJECT_MEDIA_KINDS} />
+          <div className="eyebrow flex items-center gap-2 mb-4"><Camera size={14} /> Медии и документи</div>
           <label
             className={`mt-4 flex min-h-[160px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed p-6 text-center transition-all duration-200 ${dragOver ? 'border-accent bg-accentSoft/30 scale-[1.02]' : 'border-line/80 bg-soft/50 hover:bg-soft hover:border-line'}`}
             onDragOver={(event) => { event.preventDefault(); setDragOver(true) }}
@@ -499,9 +573,51 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
             <UploadCloud size={32} className="text-accentDeep mb-3" strokeWidth={1.5} />
             <span className="text-sm font-semibold text-ink">Добави файлове</span>
             <span className="mt-1 text-xs text-muted max-w-[180px]">Drag & drop или кликни за да избереш</span>
-            <input type="file" accept="image/*, application/pdf" multiple className="sr-only" onChange={event => { handleUploadFiles(event.target.files); event.target.value = '' }} />
+            <input type="file" accept={PROJECT_UPLOAD_ACCEPT} multiple className="sr-only" onChange={event => { handleUploadFiles(event.target.files); event.target.value = '' }} />
           </label>
           <div className={`mt-4 text-xs font-medium text-center ${uploadStatus.type === 'error' ? 'text-red-700' : 'text-muted'}`}>{uploadStatus.message || `${media.length} качени файла`}</div>
+          {documentMedia.length > 0 && (
+            <div className="mt-5 space-y-2">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted">Документи</div>
+              <div className="space-y-2">
+                {documentMedia.map(item => {
+                  const mediaUrl = getMediaUrl(item)
+                  const fileName = getDisplayFileName(item) || 'Документ'
+                  const fileType = getDocumentTypeLabel(item)
+                  const fileSize = formatFileSize(item?.size)
+                  const DocumentIcon = getDocumentIcon(item)
+
+                  return (
+                    <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-line/75 bg-soft/35 px-3 py-3 shadow-[0_8px_20px_rgb(0,0,0,0.02)]">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line bg-paper text-accentDeep">
+                        <DocumentIcon size={20} strokeWidth={1.7} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-semibold text-ink" title={fileName}>{fileName}</div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-muted">
+                          <span>{fileType}</span>
+                          {fileSize ? <span>{fileSize}</span> : null}
+                        </div>
+                      </div>
+                      {mediaUrl ? (
+                        <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-full border border-line bg-paper px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-accentDeep hover:text-accentDeep">
+                          Отвори
+                        </a>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => onDeleteMedia(item.id)}
+                        className="shrink-0 rounded-full border border-line bg-paper p-2 text-muted transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                        aria-label="Изтрий документ"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Quizzes Block */}
@@ -538,14 +654,14 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
         <div className="flex flex-wrap items-end justify-between gap-4 border-b border-line/60 pb-5 mb-6">
           <div>
             <div className="eyebrow flex items-center gap-2"><Camera size={14} /> Галерия</div>
-            <h2 className="mt-2 font-display text-3xl font-semibold text-ink">Снимки, планове и документи</h2>
+            <h2 className="mt-2 font-display text-3xl font-semibold text-ink">Снимки</h2>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-line bg-soft px-3 py-1.5 text-xs font-semibold text-ink">
-            Общо {media.length}
+            Общо {imageMedia.length}
           </div>
         </div>
 
-        {media.length === 0 ? (
+        {imageMedia.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-line/80 bg-soft/30 py-16 text-center">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-paper shadow-sm text-muted mb-4">
               <ImagePlus size={32} strokeWidth={1.5} />
@@ -555,15 +671,31 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
           </div>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {media.map(item => {
-              const isPdf = item.url?.toLowerCase().endsWith('.pdf');
+            {imageMedia.map(item => {
+              const mediaUrl = getMediaUrl(item)
+              const isImage = isImageMedia(item)
+              const isPdf = !isImage && Boolean(mediaUrl)
+              const fileName = getDisplayFileName(item) || 'Документ'
+              const fileType = getDocumentTypeLabel(item)
+              const fileSize = formatFileSize(item?.size)
+              const DocumentIcon = getDocumentIcon(item)
               return (
                 <article key={item.id} className="group overflow-hidden rounded-2xl border border-line/80 bg-paper transition-shadow duration-300 hover:shadow-md">
                   <div className="relative aspect-[4/3] bg-soft overflow-hidden">
                     {isPdf ? (
-                      <a href={item.url} target="_blank" rel="noopener noreferrer" className="flex flex-col h-full w-full items-center justify-center text-accentDeep hover:bg-accentSoft/30 transition-colors">
-                        <div className="rounded-xl bg-paper p-4 shadow-sm border border-line">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" /><polyline points="14 2 14 8 20 8" /><path d="M10 13v6" /><path d="M10 16h2" /><path d="M14 13v6" /><path d="M14 13h2a2 2 0 0 1 0 4h-2" /><path d="M6 13v6" /><path d="M6 13h2a2 2 0 0 1 0 4H6" /></svg>
+                      <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="flex h-full w-full flex-col justify-between bg-[linear-gradient(160deg,rgba(224,232,226,0.95),rgba(244,238,228,0.95))] p-5 text-ink transition-colors hover:bg-[linear-gradient(160deg,rgba(216,227,218,0.98),rgba(241,233,219,0.98))]">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-paper/70 bg-paper/80 text-accentDeep shadow-sm">
+                            <DocumentIcon size={24} strokeWidth={1.75} />
+                          </div>
+                          <span className="rounded-full border border-ink/10 bg-paper/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-muted">{fileType}</span>
+                        </div>
+                        <div className="mt-4 space-y-2">
+                          <div className="line-clamp-2 break-words text-sm font-semibold text-ink">{fileName}</div>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+                            <span>{fileType}</span>
+                            {fileSize ? <span>{fileSize}</span> : null}
+                          </div>
                         </div>
                         <span className="mt-3 text-xs font-semibold">Отвори PDF документа</span>
                       </a>

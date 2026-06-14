@@ -6,6 +6,7 @@ import ComposeBar from '../components/chat/ComposeBar.jsx'
 import OfferComposer from '../components/chat/OfferComposer.jsx'
 import { useAccount } from '../lib/account.js'
 import {
+  archiveConversation,
   conversationRole,
   getMessageCursor,
   loadConversation,
@@ -557,6 +558,25 @@ export default function Inbox() {
     }
   }
 
+  const handleArchiveConversation = useCallback(async (conversation) => {
+    if (!conversation || !userId) return
+    try {
+      await archiveConversation(conversation, userId)
+      
+      const nextConversations = conversationsRef.current.filter((c) => c.id !== conversation.id)
+      setConversations(nextConversations)
+      
+      if (conversation.id === selectedConversationId) {
+        const nextId = nextConversations[0]?.id || ''
+        setSelectedConversationId(nextId)
+        window.history.replaceState(window.history.state, '', buildInboxPath(nextId))
+      }
+    } catch (err) {
+      setError(err.message || 'Грешка при архивиране на разговора.')
+    }
+  }, [userId, selectedConversationId])
+
+
   if (loading) return <InboxShell><Panel title="Зареждаме..." /></InboxShell>
 
   if (!session) {
@@ -592,6 +612,7 @@ export default function Inbox() {
               setSelectedConversationId(id)
               window.history.pushState(window.history.state, '', buildInboxPath(id))
             }}
+            onArchive={handleArchiveConversation}
           />
           <div className="flex min-h-0 min-w-0 flex-col gap-2.5 overflow-hidden lg:gap-3">
             <ChatThread

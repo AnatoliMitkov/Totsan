@@ -1365,6 +1365,8 @@ create table if not exists public.conversations (
   last_message_preview text,
   is_read_by_client boolean not null default true,
   is_read_by_partner boolean not null default true,
+  hidden_by_client_at timestamptz,
+  hidden_by_partner_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check (client_id <> partner_id)
@@ -2121,3 +2123,28 @@ $$;
 
 revoke execute on function public.get_shared_client_project(uuid) from public, anon, authenticated;
 grant execute on function public.get_shared_client_project(uuid) to anon, authenticated;
+
+-- ============================================================================
+-- Trigger to un-hide conversations when a new message is inserted
+-- ============================================================================
+create or replace function public.handle_conversation_message_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.conversations
+  set hidden_by_client_at = null,
+      hidden_by_partner_at = null
+  where id = new.conversation_id;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_message_inserted_reappear on public.messages;
+create trigger on_message_inserted_reappear
+  after insert on public.messages
+  for each row
+  execute function public.handle_conversation_message_insert();
+

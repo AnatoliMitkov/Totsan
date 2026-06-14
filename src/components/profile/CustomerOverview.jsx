@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { ArrowRight, Camera, Home, MessageCircle, Sparkles, Share2, Link as LinkIcon, CheckCircle2 } from 'lucide-react'
+import { ArrowRight, Camera, ExternalLink, Home, MessageCircle, Sparkles, Share2, Link as LinkIcon, CheckCircle2 } from 'lucide-react'
 import CompletenessBar from './CompletenessBar.jsx'
 import { LAYERS } from '../../data/layers.js'
 import { loadConversations } from '../../lib/chat.js'
@@ -12,13 +12,32 @@ export default function CustomerOverview({ account, project, media, completeness
   const nextChecks = completeness?.nextChecks || []
   const [conversationCount, setConversationCount] = useState(null)
   const [copied, setCopied] = useState(false)
+  const shareUrl = project?.publicShareId ? `${window.location.origin}/proekt/${project.publicShareId}` : ''
 
   async function copyShareLink() {
-    if (!project?.publicShareId) return
-    const url = `${window.location.origin}/proekt/${project.publicShareId}`
-    await navigator.clipboard.writeText(url)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    if (!shareUrl) return
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl)
+      } else {
+        const input = document.createElement('textarea')
+        input.value = shareUrl
+        input.setAttribute('readonly', '')
+        input.style.position = 'fixed'
+        input.style.opacity = '0'
+        document.body.appendChild(input)
+        input.select()
+        document.execCommand('copy')
+        document.body.removeChild(input)
+      }
+
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (error) {
+      console.error('Project share link copy failed:', error)
+      window.prompt('Копирай линка към проекта:', shareUrl)
+    }
   }
 
   async function handleToggleShare() {
@@ -135,10 +154,16 @@ export default function CustomerOverview({ account, project, media, completeness
               {project?.isShareable ? 'Изключи споделянето' : 'Включи споделянето'}
             </button>
             {project?.isShareable && project?.publicShareId && (
-              <button type="button" onClick={copyShareLink} className="btn btn-primary w-full justify-center">
-                {copied ? <CheckCircle2 size={18} /> : <LinkIcon size={18} />}
-                {copied ? 'Копирано!' : 'Копирай линка'}
-              </button>
+              <>
+                <button type="button" onClick={copyShareLink} className="btn btn-primary w-full justify-center">
+                  {copied ? <CheckCircle2 size={18} /> : <LinkIcon size={18} />}
+                  {copied ? 'Копирано!' : 'Копирай линка'}
+                </button>
+                <Link to={`/proekt/${project.publicShareId}`} target="_blank" rel="noopener noreferrer" className="btn w-full justify-center border border-line bg-paper text-ink hover:border-ink">
+                  <ExternalLink size={18} />
+                  Виж как те виждат специалистите
+                </Link>
+              </>
             )}
           </div>
         </div>

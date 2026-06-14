@@ -122,6 +122,7 @@ begin
   return json_build_object(
     'project', json_build_object(
       'id', v_project.id,
+      'user_id', v_project.user_id,
       'title', v_project.title,
       'property_type', v_project.property_type,
       'area_sqm', v_project.area_sqm,

@@ -131,58 +131,60 @@ export default function TotsanPro() {
   return (
     <>
       {/* ── Hero ── */}
-      <section className="section relative overflow-hidden bg-ink text-paper" style={{ paddingTop: 'calc(var(--header-h, 64px) + var(--section-pad-y, 4rem))' }}>
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute left-[-6rem] top-[-6rem] h-[22rem] w-[22rem] rounded-full bg-accent/20 blur-3xl" />
-          <div className="absolute bottom-[-8rem] right-[-5rem] h-[24rem] w-[24rem] rounded-full bg-trustGreen/15 blur-3xl" />
+      <section className="relative flex flex-col justify-center min-h-[100dvh] lg:h-screen lg:min-h-[720px] overflow-hidden bg-[#020b18] text-paper pt-[var(--header-h,64px)] z-10">
+        {/* Background Image Layer */}
+        <div className="absolute right-0 top-0 bottom-0 w-full lg:w-[68%] z-0 select-none pointer-events-none overflow-hidden">
+          <img
+            src="/Images/totsan-pro-hero-visual.png"
+            alt=""
+            className="w-full h-full object-cover object-center lg:object-right opacity-30 lg:opacity-100 transition-opacity duration-300"
+          />
+          {/* Subtle localized left-to-right fade gradient to blend the image edge with the left background */}
+          <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-[#020b18] to-transparent z-10 hidden lg:block" />
+          {/* Vertical overlay scrim for mobile viewports */}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#020b18]/95 via-[#020b18]/80 to-[#020b18]/95 lg:hidden z-10" />
         </div>
 
-        <div className="container-page relative grid gap-12 lg:grid-cols-2 lg:items-center">
-          <div className="reveal">
-            <div className="eyebrow !text-paper/55">Totsan Pro</div>
-            <h1 className="h-display mt-4">
-              Работно място за добрите майстори, студиа и марки.
+        {/* Content Container */}
+        <div className="container-page w-full flex-1 flex flex-col justify-center relative z-10 px-[var(--pad-x)] py-8 lg:py-16">
+          <div className="w-full lg:w-[42%] reveal flex flex-col justify-center">
+            <div className="eyebrow !text-paper/55">TOTSAN PRO</div>
+            <h1 className="h-display mt-4 text-[clamp(2.25rem,1.8rem+2.2vw,3.75rem)] leading-[1.05] tracking-tight">
+              Работно място за<br className="hidden lg:inline" />
+              добрите майстори,<br className="hidden lg:inline" />
+              студиа и марки.
             </h1>
-            <p className="mt-5 max-w-xl text-base leading-7 text-paper/70">
-              Профил, услуги, заявки и чат — всичко на едно място. Безплатен вход за пилотния кръг.
+            <p className="mt-5 max-w-lg text-base sm:text-lg leading-relaxed text-paper/70 font-sans">
+              Профил, услуги, заявки и чат — всичко на едно място.<br className="hidden sm:inline" />
+              Безплатен вход за мотивирани професионалисти.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link to={PRO_SIGNUP_URL} onClick={() => trackPartnerApplicationStart('totsan_pro_hero')} className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">
+            <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+              <Link
+                to={PRO_SIGNUP_URL}
+                onClick={() => trackPartnerApplicationStart('totsan_pro_hero')}
+                className="btn btn-primary btn-shine !bg-accent !text-paper hover:!bg-accentDeep justify-center shrink-0"
+              >
                 Кандидатствай безплатно <ArrowRight size={18} />
               </Link>
-              <a href="#pro-plans" className="btn btn-ghost !border-paper/25 !bg-paper/10 !text-paper hover:!border-paper/50">
-                Виж плановете
+              <a
+                href="#pro-plans"
+                className="btn btn-ghost btn-fill !border-paper/25 !bg-paper/10 !text-paper hover:!border-paper/50 justify-center shrink-0"
+              >
+                Виж повече
               </a>
             </div>
-          </div>
 
-          {/* Cockpit preview */}
-          <div className="reveal rounded-[2rem] border border-paper/15 bg-paper/8 p-5 backdrop-blur shadow-[0_30px_80px_-45px_rgba(0,0,0,0.65)]">
-            <div className="rounded-[1.5rem] bg-paper p-5 text-ink">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="eyebrow">Cockpit</div>
-                  <p className="mt-1 font-display text-2xl">Какво вижда партньорът</p>
-                </div>
-                <span className="rounded-2xl bg-accentSoft p-3 text-accentDeep"><Sparkles size={20} /></span>
-              </div>
-              <div className="mt-5 grid gap-2.5">
-                {[
-                  { label: 'Нов клиент от quiz', color: 'bg-trustGreen' },
-                  { label: 'Оферта за баня до 6 000 лв.', color: 'bg-accent' },
-                  { label: 'Непрочетен чат', color: 'bg-accent' },
-                  { label: 'Отзив чака потвърждение', color: 'bg-accent/60' },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center justify-between rounded-2xl border border-line bg-soft px-4 py-2.5">
-                    <span className="text-sm font-medium text-ink">{item.label}</span>
-                    <span className={`h-2.5 w-2.5 rounded-full ${item.color}`} />
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 rounded-2xl bg-ink p-4 text-paper">
-                <div className="text-[11px] uppercase tracking-[0.16em] text-paper/50">Фокус за днес</div>
-                <div className="mt-1.5 font-display text-xl leading-snug">Отговори на 2 заявки преди конкурента.</div>
-              </div>
+            {/* Trust Indicators Bar */}
+            <div className="border-t border-paper/10 mt-8 pt-5 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-paper/85">
+              <span className="inline-flex items-center gap-2.5">
+                <CheckCircle2 size={16} className="text-accent shrink-0" /> Безплатен вход
+              </span>
+              <span className="inline-flex items-center gap-2.5">
+                <UserCheck size={16} className="text-accent shrink-0" /> Проверени клиенти
+              </span>
+              <span className="inline-flex items-center gap-2.5">
+                <ShieldCheck size={16} className="text-accent shrink-0" /> Сигурни плащания
+              </span>
             </div>
           </div>
         </div>
@@ -193,7 +195,7 @@ export default function TotsanPro() {
         <div className="container-page">
           <div className="reveal text-center">
             <div className="eyebrow">Заслужава ли си?</div>
-            <h2 className="h-section mt-3">С Totsan Pro и без него.</h2>
+            <h2 className="h-section mt-3">Чрез Totsan Pro или без него.</h2>
             <p className="mx-auto mt-3 max-w-xl text-muted">
               Ясна разлика между това как изглежда работата сега и как може да изглежда.
             </p>

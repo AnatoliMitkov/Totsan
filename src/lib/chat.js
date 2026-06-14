@@ -12,6 +12,8 @@ export const CONVERSATION_SELECT = `
   last_message_preview,
   is_read_by_client,
   is_read_by_partner,
+  hidden_by_client_at,
+  hidden_by_partner_at,
   created_at,
   updated_at
 `
@@ -43,12 +45,14 @@ export const MESSAGE_SELECT = `
   offer:offers(*)
 `
 
-const PROFILE_SELECT = 'user_id, name, image_url'
+const PROFILE_SELECT = 'user_id, name, slug, city, image_url'
 const ACCOUNT_AVATAR_SELECT = 'id, full_name, display_name, avatar_url, email'
 const LEGACY_MESSAGE_PREVIEW_SELECT = 'id, conversation_id, sender_id, kind, body, offer_id, created_at'
 const MESSAGE_PREVIEW_SELECT = 'id, conversation_id, sender_id, kind, body, offer_id, reply_to_message_id, created_at'
 const REACTION_SELECT = 'id, message_id, user_id, emoji, created_at'
 export const MESSAGE_PAGE_SIZE = 30
+const SHARED_PROJECT_CONTEXT_KEY = 'totsan.chatSharedProjectContext.v1'
+const SHARED_PROJECT_CONTEXT_LIMIT = 50
 const chatFeatureSupport = {
   replies: null,
   reactions: null,
@@ -177,7 +181,7 @@ export function getOtherParticipantRole(conversation, userId) {
 }
 
 export function getParticipantDisplayName(participant, fallback = 'Потребител') {
-  return participant?.display_name || participant?.full_name || fallback
+  return participant?.display_name || participant?.full_name || participant?.name || fallback
 }
 
 export function getConversationTitle(conversation, userId, fallback = 'Потребител') {
@@ -197,6 +201,129 @@ export function getRoleLabel(role) {
   if (role === 'client') return 'Клиент'
   if (role === 'partner') return 'Партньор'
   return 'Потребител'
+}
+
+export function getParticipantPublicHref(conversation, userId) {
+  const role = getOtherParticipantRole(conversation, userId)
+  const participant = getOtherParticipant(conversation, userId)
+
+  if (role === 'client' && conversation?.sharedProject?.shareId) {
+    return `/proekt/${conversation.sharedProject.shareId}`
+  }
+
+  if (role === 'partner' && participant?.slug) {
+    return `/profil/${participant.slug}`
+  }
+
+  return ''
+}
+
+function canUseStorage() {
+  return typeof window !== 'undefined' && Boolean(window.localStorage)
+}
+
+function readSharedProjectContexts() {
+  if (!canUseStorage()) return []
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(SHARED_PROJECT_CONTEXT_KEY) || '[]')
+    return Array.isArray(parsed) ? parsed.filter((item) => item && typeof item === 'object') : []
+  } catch {
+    return []
+  }
+}
+
+function writeSharedProjectContexts(contexts) {
+  if (!canUseStorage()) return
+  try {
+    window.localStorage.setItem(
+      SHARED_PROJECT_CONTEXT_KEY,
+      JSON.stringify(contexts.slice(0, SHARED_PROJECT_CONTEXT_LIMIT)),
+    )
+  } catch {
+    // Chat identity is still usable without the optional local project context.
+  }
+}
+
+function normalizeSharedProjectContext(context = {}) {
+  const shareId = String(context.shareId || context.publicShareId || '').trim()
+  const projectId = String(context.projectId || '').trim()
+  const clientId = String(context.clientId || '').trim()
+  if (!shareId || !projectId || !clientId) return null
+
+  const displayName = String(context.clientDisplayName || context.displayName || '').trim()
+  const fullName = String(context.clientFullName || context.fullName || displayName).trim()
+  const avatarUrl = String(context.clientAvatarUrl || context.avatarUrl || '').trim()
+  const city = String(context.clientCity || context.city || '').trim()
+  const projectTitle = String(context.projectTitle || '').trim()
+
+  return {
+    conversationId: String(context.conversationId || '').trim(),
+    projectId,
+    shareId,
+    clientId,
+    projectTitle,
+    client: {
+      display_name: displayName || fullName || '',
+      full_name: fullName || displayName || '',
+      name: displayName || fullName || '',
+      city,
+      avatar_url: avatarUrl,
+      avatar_candidates: avatarUrl ? [avatarUrl] : [],
+    },
+    updatedAt: Date.now(),
+  }
+}
+
+export function cacheSharedProjectConversationContext(conversation, context = {}) {
+  const conversationId = String(conversation?.id || context.conversationId || '').trim()
+  if (!conversationId) return
+
+  const normalized = normalizeSharedProjectContext({
+    ...context,
+    conversationId,
+    projectId: context.projectId || conversation?.project_id || '',
+  })
+  if (!normalized) return
+
+  const current = readSharedProjectContexts()
+  const next = [
+    normalized,
+    ...current.filter((item) => item.conversationId !== conversationId && item.projectId !== normalized.projectId),
+  ]
+  writeSharedProjectContexts(next)
+}
+
+function findSharedProjectContext(conversation) {
+  if (!conversation) return null
+  const contexts = readSharedProjectContexts()
+  return contexts.find((item) => (
+    (item.conversationId && item.conversationId === conversation.id)
+    || (item.projectId && item.projectId === conversation.project_id)
+  )) || null
+}
+
+function mergeParticipantWithFallback(participant, fallback) {
+  if (!fallback) return participant || null
+  if (!participant) return fallback
+
+  const displayName = participant.display_name || participant.full_name || participant.name || ''
+  const fallbackName = fallback.display_name || fallback.full_name || fallback.name || ''
+  const avatarUrl = participant.avatar_url || fallback.avatar_url || ''
+  const avatarCandidates = [
+    ...(Array.isArray(participant.avatar_candidates) ? participant.avatar_candidates : []),
+    ...(Array.isArray(fallback.avatar_candidates) ? fallback.avatar_candidates : []),
+    avatarUrl,
+  ].filter(Boolean)
+
+  return {
+    ...fallback,
+    ...participant,
+    display_name: displayName || fallbackName,
+    full_name: participant.full_name || fallback.full_name || displayName || fallbackName,
+    name: participant.name || fallback.name || displayName || fallbackName,
+    avatar_url: avatarUrl,
+    avatar_candidates: [...new Set(avatarCandidates)],
+  }
 }
 
 function conversationSubjectName(subject = '') {
@@ -390,8 +517,11 @@ async function loadProfilesByUserIds(ids = []) {
     const accountAvatarUrl = account.avatar_url || ''
     const avatarCandidates = [row.image_url, accountAvatarUrl, avatarFor(row.name || '')].filter(Boolean)
     return [row.user_id, {
+      slug: row.slug || '',
       display_name: row.name || account.display_name || account.full_name || '',
       full_name: row.name || account.full_name || '',
+      name: row.name || account.display_name || account.full_name || '',
+      city: row.city || '',
       avatar_url: avatarCandidates[0] || '',
       avatar_candidates: avatarCandidates,
     }]
@@ -407,6 +537,7 @@ async function loadProfilesByUserIds(ids = []) {
     profilesByUserId.set(userId, {
       display_name: name,
       full_name: account.full_name || name,
+      name,
       avatar_url: avatarCandidates[0] || '',
       avatar_candidates: avatarCandidates,
     })
@@ -417,9 +548,18 @@ async function loadProfilesByUserIds(ids = []) {
 
 function normalizeConversation(conversation, profilesByUserId) {
   if (!conversation) return null
+  const sharedProject = findSharedProjectContext(conversation)
+  const clientFallback = sharedProject?.clientId === conversation.client_id ? sharedProject.client : null
   return {
     ...conversation,
-    client: profilesByUserId.get(conversation.client_id) || null,
+    sharedProject: sharedProject
+      ? {
+        shareId: sharedProject.shareId,
+        projectId: sharedProject.projectId,
+        title: sharedProject.projectTitle || '',
+      }
+      : null,
+    client: mergeParticipantWithFallback(profilesByUserId.get(conversation.client_id) || null, clientFallback),
     partner: profilesByUserId.get(conversation.partner_id) || null,
   }
 }
@@ -481,13 +621,26 @@ async function invokeChatAction(action, payload = {}) {
 }
 
 export async function loadConversations() {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const userId = sessionData.session?.user?.id
+
   const { data, error } = await supabase
     .from('conversations')
     .select(CONVERSATION_SELECT)
     .order('last_message_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
   if (error) throw error
-  return enrichConversations(sortConversations(data || []))
+
+  let rows = data || []
+  if (userId) {
+    rows = rows.filter((conversation) => {
+      if (conversation.client_id === userId && conversation.hidden_by_client_at) return false
+      if (conversation.partner_id === userId && conversation.hidden_by_partner_at) return false
+      return true
+    })
+  }
+
+  return enrichConversations(sortConversations(rows))
 }
 
 export async function loadConversation(conversationId) {
@@ -618,13 +771,16 @@ async function findOpenConversation({ clientId, partnerId, projectId = '' }) {
   return data || null
 }
 
-export async function createConversationWithClient({ clientId, partnerId, projectId = '', subject = '' }) {
+export async function createConversationWithClient({ clientId, partnerId, projectId = '', subject = '', sharedProjectContext = null }) {
   if (!clientId || !partnerId) {
     throw new Error('Липсва клиент или партньор за създаване на чат.')
   }
 
   const existing = await findOpenConversation({ clientId, partnerId, projectId })
-  if (existing) return existing
+  if (existing) {
+    cacheSharedProjectConversationContext(existing, sharedProjectContext || {})
+    return existing
+  }
 
   const insertPayload = {
     client_id: clientId,
@@ -649,6 +805,7 @@ export async function createConversationWithClient({ clientId, partnerId, projec
     throw error
   }
 
+  cacheSharedProjectConversationContext(data, sharedProjectContext || {})
   return data
 }
 
@@ -721,4 +878,27 @@ export function subscribeToConversation(conversationId, onChange) {
     .subscribe()
 
   return () => { supabase.removeChannel(channel) }
+}
+
+export async function archiveConversation(conversation, userId) {
+  if (!conversation?.id || !userId) return null
+  
+  const patch = {}
+  if (isClient(conversation, userId)) {
+    patch.hidden_by_client_at = new Date().toISOString()
+  } else if (isPartner(conversation, userId)) {
+    patch.hidden_by_partner_at = new Date().toISOString()
+  } else {
+    throw new Error('Нямате достъп до този разговор.')
+  }
+
+  const { data, error } = await supabase
+    .from('conversations')
+    .update(patch)
+    .eq('id', conversation.id)
+    .select(CONVERSATION_SELECT)
+    .single()
+
+  if (error) throw error
+  return data
 }

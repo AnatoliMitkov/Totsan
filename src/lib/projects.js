@@ -128,6 +128,7 @@ export function normalizeProject(row) {
   return {
     id: row.id || '',
     userId: row.user_id || '',
+    user_id: row.user_id || '',
     title: row.title || '',
     propertyType: row.property_type || '',
     areaSqm: row.area_sqm ?? '',
@@ -163,6 +164,9 @@ export function normalizeProjectMedia(row) {
     url: row.signed_url || row.signedUrl || row.public_url || '',
     kind: row.kind || 'photo',
     caption: row.caption || '',
+    fileName: row.file_name || row.fileName || '',
+    size: row.file_size ?? row.size ?? null,
+    type: row.mime_type || row.content_type || row.type || '',
     orderIndex: row.order_index ?? 0,
     createdAt: row.created_at || '',
   }
@@ -190,7 +194,7 @@ function projectToDb(project, userId) {
 
 async function withSignedMediaUrls(rows = []) {
   return Promise.all(rows.map(async (row) => {
-    if (row.public_url || !row.path) return normalizeProjectMedia(row)
+    if (!row.path) return normalizeProjectMedia(row)
 
     const { data, error } = await supabase.storage
       .from(row.bucket || 'project-media')
@@ -346,7 +350,7 @@ export async function uploadClientProjectMedia({ file, userId, projectId, kind =
       user_id: userId,
       bucket: upload.bucket || 'project-media',
       path: upload.path,
-      public_url: upload.publicUrl || null,
+      public_url: null,
       kind,
       caption: cleanText(caption),
       order_index: orderIndex,
@@ -355,7 +359,17 @@ export async function uploadClientProjectMedia({ file, userId, projectId, kind =
     .single()
 
   if (error) throw error
-  return normalizeProjectMedia({ ...data, signed_url: upload.signedUrl || '' })
+  const { data: signedData } = await supabase.storage
+    .from(upload.bucket || 'project-media')
+    .createSignedUrl(upload.path, 60 * 60)
+
+  return normalizeProjectMedia({
+    ...data,
+    signed_url: upload.signedUrl || signedData?.signedUrl || '',
+    file_name: upload.filename || file.name,
+    file_size: upload.size ?? file.size,
+    mime_type: upload.type || file.type,
+  })
 }
 
 export async function updateClientProjectMedia(mediaId, updates) {
