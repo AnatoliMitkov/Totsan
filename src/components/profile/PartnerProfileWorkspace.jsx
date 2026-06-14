@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   BriefcaseBusiness,
@@ -7,19 +7,23 @@ import {
   CreditCard,
   Eye,
   FolderKanban,
+  GripVertical,
   Globe2,
   Home,
   ImagePlus,
+  Link2,
   Lock,
   LogOut,
   Mail,
   MessagesSquare,
+  PlayCircle,
   Plus,
   Save,
   Send,
   Tags,
   Trash2,
   UserRound,
+  Video,
   X,
 } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
@@ -42,7 +46,6 @@ import { createConnectOnboarding, getConnectStatus } from '../../lib/payments.js
 import { loadPartnerInquiries, loadInquiryProjects } from '../../lib/partner-inquiries.js'
 import { loadPartnerServicesForProfile } from '../../lib/partner-services.js'
 import { formatMoneyRange } from '../../lib/money.js'
-import PortfolioGallery from './PortfolioGallery.jsx'
 import ImageCropperModal from './ImageCropperModal.jsx'
 import Avatar from '../Avatar.jsx'
 import PublicProfileBanner from './PublicProfileBanner.jsx'
@@ -665,13 +668,18 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     onSaved?.()
   }
 
-  async function uploadPortfolioFile(file) {
-    if (!file) return
-    setPortfolioState({ status: 'uploading', message: 'Качваме снимка към портфолиото…' })
+  async function uploadPortfolioFile(files) {
+    const isFileList = typeof FileList !== 'undefined' && files instanceof FileList
+    const fileList = Array.from(isFileList ? files : (Array.isArray(files) ? files : [files])).filter(Boolean)
+    if (!fileList.length) return
+    setPortfolioState({ status: 'uploading', message: fileList.length > 1 ? 'Качваме снимките към портфолиото…' : 'Качваме снимка към портфолиото…' })
     try {
-      const upload = await uploadPortfolioImage({ file, target: userId, kind: 'portfolio' })
-      setPortfolioDraft(current => appendPortfolioMedia(current, upload))
-      setPortfolioState({ status: 'uploaded', message: 'Снимката е добавена. Натисни „Запази проекта“.' })
+      const uploads = []
+      for (const file of fileList) {
+        uploads.push(await uploadPortfolioImage({ file, target: userId, kind: 'portfolio' }))
+      }
+      setPortfolioDraft(current => uploads.reduce((next, upload) => appendPortfolioMedia(next, upload), current))
+      setPortfolioState({ status: 'uploaded', message: fileList.length > 1 ? 'Снимките са добавени. Подреди ги и натисни „Запази“.' : 'Снимката е добавена. Натисни „Запази“.' })
     } catch (error) {
       setPortfolioState({ status: 'error', message: error.message || 'Качването не успя.' })
     }
@@ -685,8 +693,10 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       setPortfolio(current => [saved, ...current.filter(item => item.id !== saved.id)].sort((left, right) => left.orderIndex - right.orderIndex))
       setPortfolioDraft(makePortfolioDraft(saved, currentProfile))
       setPortfolioState({ status: 'saved', message: 'Портфолио проектът е запазен.' })
+      return true
     } catch (error) {
       setPortfolioState({ status: 'error', message: error.message || 'Записът не успя.' })
+      return false
     }
   }
 
@@ -1576,84 +1586,643 @@ function ProfileForm({
 }
 
 function PortfolioEditor({ items, draft, state, onSelect, onNew, onChange, onSubmit, onUpload, onDelete }) {
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const sortedItems = Array.isArray(items) ? items : []
+
+  function openNewProject() {
+    onNew()
+    setIsModalOpen(true)
+  }
+
+  function openProject(item) {
+    onSelect(item)
+    setIsModalOpen(true)
+  }
+
+  async function handleDelete() {
+    if (!draft.id) return
+    await onDelete(draft.id)
+    setIsModalOpen(false)
+  }
+
+  async function handleSubmit(event) {
+    const didSave = await onSubmit(event)
+    if (didSave) setIsModalOpen(false)
+  }
+
   return (
-    <div className="grid gap-5 lg:grid-cols-12">
-      <aside className="lg:col-span-4 xl:col-span-3">
-        <div className="rounded-3xl border border-line bg-paper p-4">
-          <button type="button" onClick={onNew} className="btn btn-primary w-full justify-center"><Plus size={18} /> Нов проект</button>
-          <div className="mt-4 max-h-[34rem] space-y-2 overflow-auto pr-1">
-            {items.map(item => (
-              <button key={item.id} type="button" onClick={() => onSelect(item)} className={`w-full rounded-2xl border p-3 text-left transition ${draft.id === item.id ? 'border-ink bg-soft' : 'border-line hover:border-ink/40'}`}>
-                <div className="flex gap-3">
-                  <div className="h-14 w-14 overflow-hidden rounded-xl bg-soft">
-                    {item.coverUrl ? <img src={item.coverUrl} alt={item.title} className="img-cover" /> : null}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium text-ink">{item.title || 'Проект'}</div>
-                    <div className="mt-1 text-xs text-muted">{item.city || 'Локация'} · {item.year || 'година'}</div>
-                    {!item.isPublished && <div className="mt-1 text-xs text-amber-700">Скрит</div>}
-                  </div>
-                </div>
-              </button>
-            ))}
-            {items.length === 0 && <div className="rounded-2xl border border-dashed border-line p-5 text-center text-sm text-muted">Още няма портфолио.</div>}
-          </div>
-        </div>
-      </aside>
-
-      <form onSubmit={onSubmit} className="lg:col-span-8 xl:col-span-9 rounded-3xl border border-line bg-paper p-5 md:p-7 space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
+    <div className="space-y-5">
+      <section className="rounded-[2rem] border border-white/70 bg-paper/90 p-5 shadow-[0_18px_55px_rgba(13,35,64,0.05)] md:p-7">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="max-w-2xl">
             <div className="eyebrow">Портфолио</div>
-            <h2 className="mt-2 font-display text-3xl text-ink">Проект от практиката</h2>
+            <h2 className="mt-2 font-display text-4xl leading-none text-ink md:text-5xl">Проекти като продуктови карти</h2>
+            <p className="mt-3 text-sm leading-6 text-muted">
+              Покажи най-важното първо: снимка, заглавие, слой, град, година и силен акцент. Детайлите се отварят в popup.
+            </p>
           </div>
-          {draft.id && <button type="button" onClick={() => onDelete(draft.id)} className="btn btn-ghost"><Trash2 size={18} /> Изтрий</button>}
+          <div className="rounded-2xl border border-line bg-soft px-4 py-3 text-sm text-muted">
+            {sortedItems.length ? `${sortedItems.length} проекта` : 'Още няма проекти'}
+          </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Заглавие"><input value={draft.title} onChange={event => onChange('title', event.target.value)} className={INPUT} placeholder="Апартамент 90 м2" /></Field>
-          <Field label="Слой"><TotsanSelect value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} /></Field>
-        </div>
-        <div className="grid gap-4 md:grid-cols-4">
-          <Field label="Град"><input value={draft.city} onChange={event => onChange('city', event.target.value)} className={INPUT} /></Field>
-          <Field label="Година"><input type="number" min="1900" max="2100" value={draft.year} onChange={event => onChange('year', event.target.value)} className={INPUT} /></Field>
-          <Field label="Бюджет"><input value={draft.budgetBand} onChange={event => onChange('budgetBand', event.target.value)} className={INPUT} placeholder="5k-10k €" /></Field>
-          <Field label="Ред"><input type="number" value={draft.orderIndex} onChange={event => onChange('orderIndex', event.target.value)} className={INPUT} /></Field>
-        </div>
-        <Field label="Описание"><textarea rows={5} value={draft.description} onChange={event => onChange('description', event.target.value)} className={INPUT} /></Field>
-        <Field label="Cover URL"><input value={draft.coverUrl} onChange={event => onChange('coverUrl', event.target.value)} className={INPUT} /></Field>
-
-        <label className="btn btn-ghost cursor-pointer justify-center">
-          <ImagePlus size={18} /> Качи снимка към проекта
-          <input type="file" accept="image/*" className="sr-only" onChange={async (event) => { await onUpload(event.target.files?.[0]); event.target.value = '' }} />
-        </label>
-
-        {draft.media.length > 0 && (
-          <div className="grid gap-3 sm:grid-cols-3">
-            {draft.media.map((media, index) => (
-              <div key={`${media.url}-${index}`} className="overflow-hidden rounded-2xl border border-line bg-soft">
-                <div className="aspect-square"><img src={media.url} alt={media.caption || draft.title} className="img-cover" /></div>
+        <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <button
+            type="button"
+            onClick={openNewProject}
+            className="group flex min-h-[24rem] flex-col justify-between overflow-hidden rounded-[1.75rem] border border-dashed border-accent/45 bg-[linear-gradient(135deg,rgba(244,248,252,0.92),rgba(255,255,255,0.72))] p-5 text-left shadow-[0_14px_44px_rgba(13,35,64,0.04)] transition duration-300 hover:-translate-y-1 hover:scale-[1.015] hover:border-accent/70 hover:shadow-[0_26px_70px_rgba(13,35,64,0.1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+          >
+            <div className="flex aspect-[4/3] items-center justify-center rounded-[1.35rem] border border-white/80 bg-paper/80 text-accentDeep shadow-inner">
+              <div className="text-center">
+                <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-ink text-paper shadow-lg transition group-hover:scale-105">
+                  <Plus size={26} />
+                </span>
+                <div className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-muted">Нов проект</div>
               </div>
-            ))}
+            </div>
+            <div className="pt-5">
+              <h3 className="font-display text-3xl leading-none text-ink">Добави портфолио проект</h3>
+              <p className="mt-2 text-sm leading-6 text-muted">Бърза карта с основна снимка, заглавие, град, слой и кратко описание.</p>
+              <span className="mt-4 inline-flex rounded-full bg-ink px-4 py-2 text-sm font-semibold text-paper">Създай карта</span>
+            </div>
+          </button>
+
+          {sortedItems.map(item => (
+            <PortfolioProjectCard key={item.id} item={item} onOpen={() => openProject(item)} />
+          ))}
+        </div>
+      </section>
+
+      {isModalOpen && (
+        <PortfolioProjectModal
+          draft={draft}
+          state={state}
+          onClose={() => setIsModalOpen(false)}
+          onChange={onChange}
+          onSubmit={handleSubmit}
+          onUpload={onUpload}
+          onDelete={handleDelete}
+        />
+      )}
+    </div>
+  )
+}
+
+function getPortfolioLayer(item = {}) {
+  return LAYERS.find(layer => layer.slug === item.layerSlug || layer.slug === item.layer_slug) || null
+}
+
+function isVideoMedia(item = {}) {
+  return item.type === 'video' || item.provider === 'youtube' || item.kind === 'video'
+}
+
+function getYoutubeVideoId(url = '') {
+  const value = String(url || '').trim()
+  if (!value) return ''
+
+  try {
+    const parsed = new URL(value)
+    if (parsed.hostname.includes('youtu.be')) return parsed.pathname.replace('/', '').split(/[?&]/)[0]
+    if (parsed.hostname.includes('youtube.com')) {
+      if (parsed.pathname.startsWith('/shorts/')) return parsed.pathname.split('/')[2] || ''
+      if (parsed.pathname.startsWith('/embed/')) return parsed.pathname.split('/')[2] || ''
+      return parsed.searchParams.get('v') || ''
+    }
+  } catch {
+    const match = value.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&/\s]+)/)
+    return match?.[1] || ''
+  }
+
+  return ''
+}
+
+function normalizeVideoUrl(url = '') {
+  const value = String(url || '').trim()
+  if (!value) return ''
+  const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`
+  try {
+    const parsed = new URL(candidate)
+    return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : ''
+  } catch {
+    return ''
+  }
+}
+
+function getYoutubeThumbnail(url = '') {
+  const id = getYoutubeVideoId(url)
+  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : ''
+}
+
+function getYoutubeEmbedUrl(url = '') {
+  const id = getYoutubeVideoId(url)
+  return id ? `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&enablejsapi=1` : ''
+}
+
+function getMediaPreviewUrl(item = {}) {
+  if (!item) return ''
+  if (isVideoMedia(item)) return item.thumbnail || getYoutubeThumbnail(item.url) || ''
+  return item.url || ''
+}
+
+function getCoverFromMedia(media = []) {
+  const firstVisual = media.find(item => getMediaPreviewUrl(item))
+  return firstVisual ? getMediaPreviewUrl(firstVisual) : ''
+}
+
+function getPortfolioImage(item = {}) {
+  const media = Array.isArray(item.media) ? item.media : []
+  return getCoverFromMedia(media) || item.coverUrl || item.cover_url || ''
+}
+
+function getMediaSortKey(item = {}, index = 0) {
+  return item.path || item.url || item.thumbnail || item.caption || `${item.provider || item.type || 'media'}-${index}`
+}
+
+function getPortfolioMeta(item = {}) {
+  return [item.city, item.year].filter(Boolean).join(' · ')
+}
+
+function PortfolioProjectCard({ item, onOpen }) {
+  const image = getPortfolioImage(item)
+  const layer = getPortfolioLayer(item)
+  const meta = getPortfolioMeta(item)
+  const accent = item.budgetBand || item.budget_band || 'Проект от практиката'
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group overflow-hidden rounded-[1.75rem] border border-white/75 bg-paper text-left shadow-[0_14px_44px_rgba(13,35,64,0.06)] transition duration-300 hover:-translate-y-1 hover:scale-[1.015] hover:border-ink/15 hover:shadow-[0_28px_75px_rgba(13,35,64,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+    >
+      <div className="relative aspect-[4/3] overflow-hidden bg-soft">
+        {image ? (
+          <img src={image} alt={item.title || 'Портфолио проект'} className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.06]" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,rgba(217,230,244,0.86),rgba(255,255,255,0.82))] text-sm text-muted">
+            Няма снимка
           </div>
         )}
-
-        <label className="flex items-start gap-3 rounded-2xl border border-line bg-soft p-4 text-sm text-muted">
-          <input type="checkbox" checked={draft.isPublished} onChange={event => onChange('isPublished', event.target.checked)} className="mt-1 accent-black" />
-          <span>Публикуван проект.</span>
-        </label>
-
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
-          <div className={`text-sm ${state.status === 'error' ? 'text-red-700' : 'text-muted'}`}>{state.message || 'Запази проекта, за да се появи в публичния профил.'}</div>
-          <button className="btn btn-primary" disabled={state.status === 'saving'}><Save size={18} /> {state.status === 'saving' ? 'Запазва се…' : 'Запази проекта'}</button>
-        </div>
-      </form>
-
-      <div className="lg:col-span-12 rounded-3xl border border-line bg-paper p-5 md:p-7">
-        <div className="eyebrow">Публичен изглед</div>
-        <h2 className="mt-2 font-display text-3xl text-ink">Галерия</h2>
-        <div className="mt-5"><PortfolioGallery items={items.filter(item => item.isPublished)} /></div>
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-ink/58 to-transparent" />
+        <span className={`absolute left-4 top-4 rounded-full px-3 py-1 text-xs font-semibold shadow-sm ${item.isPublished ? 'bg-white/90 text-ink' : 'bg-amber-100 text-amber-800'}`}>
+          {item.isPublished ? 'Публичен' : 'Скрит'}
+        </span>
+        <span className="absolute bottom-4 left-4 right-4 truncate rounded-full bg-white/88 px-3 py-1.5 text-xs font-semibold text-ink shadow-sm backdrop-blur">
+          {accent}
+        </span>
       </div>
+
+      <div className="p-5">
+        <h3 className="line-clamp-2 font-display text-2xl leading-none text-ink">{item.title || 'Проект без заглавие'}</h3>
+        <p className="mt-3 line-clamp-2 min-h-[2.75rem] text-sm leading-6 text-muted">
+          {item.description || 'Добави кратко описание: проблем, роля, решение и резултат.'}
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {layer && <span className="rounded-full bg-soft px-3 py-1 text-xs font-semibold text-accentDeep">Слой {layer.number} · {layer.title}</span>}
+          {meta && <span className="rounded-full border border-line px-3 py-1 text-xs font-semibold text-muted">{meta}</span>}
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUpload, onDelete }) {
+  const media = Array.isArray(draft.media) ? draft.media : []
+  const image = getPortfolioImage(draft)
+  const layer = getPortfolioLayer(draft)
+  const meta = getPortfolioMeta(draft)
+  const [videoUrl, setVideoUrl] = useState('')
+  const [videoError, setVideoError] = useState('')
+  const [dragIndex, setDragIndex] = useState(null)
+  const [dragOverIndex, setDragOverIndex] = useState(null)
+  const dragIndexRef = useRef(null)
+  const mediaListRef = useRef(null)
+
+  function captureMediaRects() {
+    const list = mediaListRef.current
+    if (!list) return null
+    return new Map(
+      Array.from(list.querySelectorAll('[data-media-key]')).map((node) => [
+        node.dataset.mediaKey,
+        node.getBoundingClientRect(),
+      ]),
+    )
+  }
+
+  function animateMediaList(snapshot) {
+    if (!snapshot) return
+    window.requestAnimationFrame(() => {
+      const list = mediaListRef.current
+      if (!list) return
+      const nodes = Array.from(list.querySelectorAll('[data-media-key]'))
+      nodes.forEach((node) => {
+        const before = snapshot.get(node.dataset.mediaKey)
+        if (!before) return
+        const after = node.getBoundingClientRect()
+        const deltaX = before.left - after.left
+        const deltaY = before.top - after.top
+        if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) return
+
+        node.style.transition = 'none'
+        node.style.transform = `translate(${deltaX}px, ${deltaY}px)`
+        node.style.zIndex = '2'
+
+        window.requestAnimationFrame(() => {
+          node.style.transition = 'transform 240ms cubic-bezier(0.22, 1, 0.36, 1)'
+          node.style.transform = ''
+          window.setTimeout(() => {
+            node.style.transition = ''
+            node.style.zIndex = ''
+          }, 260)
+        })
+      })
+    })
+  }
+
+  function updateMedia(nextMedia, options = {}) {
+    const snapshot = options.animate ? captureMediaRects() : null
+    onChange('media', nextMedia)
+    onChange('coverUrl', getCoverFromMedia(nextMedia))
+    animateMediaList(snapshot)
+  }
+
+  function handleReorder(fromIndex, toIndex) {
+    const from = Number(fromIndex)
+    const to = Number(toIndex)
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from === to || from < 0 || to < 0) return
+    const nextMedia = [...media]
+    const [moved] = nextMedia.splice(from, 1)
+    if (!moved) return
+    nextMedia.splice(to, 0, moved)
+    updateMedia(nextMedia, { animate: true })
+  }
+
+  function handleDragPreview(event) {
+    const node = event.currentTarget.closest('[data-media-key]') || event.currentTarget
+    if (!node || !event.dataTransfer) return
+    const preview = node.cloneNode(true)
+    preview.style.position = 'fixed'
+    preview.style.top = '-1000px'
+    preview.style.left = '-1000px'
+    preview.style.width = `${node.offsetWidth}px`
+    preview.style.pointerEvents = 'none'
+    preview.style.transform = 'scale(1.04)'
+    preview.style.opacity = '0.94'
+    preview.style.boxShadow = '0 28px 70px rgba(13,35,64,0.22)'
+    preview.style.borderRadius = '20px'
+    document.body.appendChild(preview)
+    event.dataTransfer.setDragImage(preview, Math.min(44, node.offsetWidth / 2), Math.min(34, node.offsetHeight / 2))
+    window.setTimeout(() => preview.remove(), 0)
+  }
+
+  function handleDragEnter(index) {
+    const currentDragIndex = dragIndexRef.current
+    if (currentDragIndex === null || currentDragIndex === index) return
+    handleReorder(currentDragIndex, index)
+    dragIndexRef.current = index
+    setDragIndex(index)
+    setDragOverIndex(index)
+  }
+
+  function handleRemoveMedia(index) {
+    updateMedia(media.filter((_, itemIndex) => itemIndex !== index), { animate: true })
+  }
+
+  function handleAddVideo() {
+    const cleanUrl = normalizeVideoUrl(videoUrl)
+    if (!cleanUrl) {
+      setVideoError('Добави валиден YouTube или видео линк.')
+      return
+    }
+    const youtubeId = getYoutubeVideoId(cleanUrl)
+    updateMedia([
+      ...media,
+      {
+        type: 'video',
+        provider: youtubeId ? 'youtube' : 'link',
+        url: cleanUrl,
+        thumbnail: youtubeId ? getYoutubeThumbnail(cleanUrl) : '',
+      },
+    ])
+    setVideoError('')
+    setVideoUrl('')
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] overflow-y-auto bg-ink/60 p-3 backdrop-blur-sm sm:p-6">
+      <div className="mx-auto flex min-h-full max-w-6xl items-center">
+        <div className="relative w-full overflow-hidden rounded-[2rem] border border-line bg-paper shadow-2xl">
+          <div className="flex items-center justify-between gap-4 border-b border-line px-4 py-4 sm:px-6">
+            <div>
+              <div className="eyebrow">Portfolio Project v1</div>
+              <h3 className="mt-1 font-display text-3xl leading-none text-ink">{draft.id ? 'Редактирай проект' : 'Нов портфолио проект'}</h3>
+            </div>
+            <button type="button" onClick={onClose} className="rounded-full p-2 text-muted transition hover:bg-soft hover:text-ink" aria-label="Затвори">
+              <X size={22} />
+            </button>
+          </div>
+
+          <div className="grid max-h-[calc(100dvh-7rem)] overflow-y-auto lg:grid-cols-[minmax(0,1.05fr)_minmax(25rem,0.95fr)]">
+            <section className="bg-soft/60 p-4 sm:p-6">
+              <div className="overflow-hidden rounded-[1.65rem] border border-white/80 bg-paper shadow-[0_18px_55px_rgba(13,35,64,0.08)]">
+                <div className="aspect-[16/10] bg-soft">
+                  {image ? (
+                    <img src={image} alt={draft.title || 'Портфолио проект'} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-muted">Качи основна снимка, за да продава картата визуално.</div>
+                  )}
+                </div>
+                <div className="p-5">
+                  <div className="flex flex-wrap gap-2">
+                    {layer && <span className="rounded-full bg-soft px-3 py-1 text-xs font-semibold text-accentDeep">Слой {layer.number} · {layer.title}</span>}
+                    {draft.budgetBand && <span className="rounded-full bg-ink px-3 py-1 text-xs font-semibold text-paper">{draft.budgetBand}</span>}
+                    {!draft.isPublished && <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">Скрит</span>}
+                  </div>
+                  <h4 className="mt-4 font-display text-4xl leading-none text-ink">{draft.title || 'Заглавие на проекта'}</h4>
+                  <p className="mt-3 text-sm leading-6 text-muted">{draft.description || 'Опиши накратко: какъв беше проблемът, каква беше твоята роля, какво решение даде и какъв е резултатът.'}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <MiniFact label="Локация" value={draft.city || 'Не е посочена'} />
+                <MiniFact label="Година" value={draft.year || 'Не е посочена'} />
+                <MiniFact label="Акцент" value={draft.budgetBand || 'Добави силен акцент'} />
+              </div>
+
+              {media.length > 0 && (
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {media.map((item, index) => (
+                    <div key={`${item.url}-${index}`} className="overflow-hidden rounded-2xl border border-line bg-paper">
+                      <div className="aspect-[4/3] bg-soft">
+                        {isVideoMedia(item) ? (
+                          <LazyVideoEmbed item={item} title={draft.title || 'Видео към портфолио проект'} />
+                        ) : (
+                          <img src={getMediaPreviewUrl(item)} alt={item.caption || draft.title || 'Портфолио'} className="img-cover" />
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs font-semibold text-muted">
+                        <span className="truncate">{index === 0 ? 'Основна медия' : `Медия ${index + 1}`}</span>
+                        {isVideoMedia(item) && <span className="rounded-full bg-ink px-2 py-0.5 text-paper">Видео</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {meta && <p className="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-muted">{meta}</p>}
+            </section>
+
+            <form onSubmit={onSubmit} className="space-y-5 p-4 sm:p-6">
+              <div className="rounded-3xl border border-line bg-soft/70 p-4">
+                <div className="text-sm font-semibold text-ink">Бърза формула</div>
+                <p className="mt-1 text-sm leading-6 text-muted">Проблем → Роля → Решение → Резултат. Достатъчно е кратко, но конкретно.</p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Заглавие"><input value={draft.title} onChange={event => onChange('title', event.target.value)} className={INPUT} placeholder="Модерна баня в Русе" /></Field>
+                <Field label="Слой"><TotsanSelect value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} /></Field>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-4">
+                <Field label="Град"><input value={draft.city} onChange={event => onChange('city', event.target.value)} className={INPUT} placeholder="Русе" /></Field>
+                <Field label="Година"><input type="number" min="1900" max="2100" value={draft.year} onChange={event => onChange('year', event.target.value)} className={INPUT} /></Field>
+                <Field label="Силен акцент"><input value={draft.budgetBand} onChange={event => onChange('budgetBand', event.target.value)} className={INPUT} placeholder="Преди/След · 6 кв.м." /></Field>
+                <Field label="Ред"><input type="number" value={draft.orderIndex} onChange={event => onChange('orderIndex', event.target.value)} className={INPUT} /></Field>
+              </div>
+
+              <Field label="Кратко описание"><textarea rows={5} value={draft.description} onChange={event => onChange('description', event.target.value)} className={INPUT} placeholder="Проблем → роля → решение → резултат" /></Field>
+
+              <label className="btn btn-ghost w-full cursor-pointer justify-center">
+                <ImagePlus size={18} /> Качи снимки към проекта
+                <input type="file" accept="image/*" multiple className="sr-only" onChange={async (event) => { await onUpload(event.target.files); event.target.value = '' }} />
+              </label>
+
+              <div className="rounded-3xl border border-line bg-soft/70 p-4">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-paper text-accentDeep shadow-sm">
+                    <Video size={18} />
+                  </span>
+                  <div>
+                    <div className="text-sm font-semibold text-ink">Добави видео с линк</div>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    type="text"
+                    inputMode="url"
+                    value={videoUrl}
+                    onChange={(event) => {
+                      setVideoUrl(event.target.value)
+                      if (videoError) setVideoError('')
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        handleAddVideo()
+                      }
+                    }}
+                    className="min-w-0 flex-1 rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink"
+                    placeholder="youtube.com/watch?v=..."
+                  />
+                  <button type="button" onClick={handleAddVideo} disabled={!videoUrl.trim()} className="btn btn-ghost justify-center sm:w-auto">
+                    <Link2 size={18} /> Добави
+                  </button>
+                </div>
+                {videoError && <div className="mt-2 text-sm text-red-700">{videoError}</div>}
+              </div>
+
+              {media.length > 0 && (
+                <div className="rounded-3xl border border-line bg-paper/80 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-semibold text-ink">Медии към проекта</div>
+                      <p className="mt-1 text-sm leading-6 text-muted">Първата позиция е основната снимка/визия. Хвани ред и го премести нагоре или надолу.</p>
+                    </div>
+                    <span className="rounded-full bg-soft px-3 py-1 text-xs font-semibold text-muted">{media.length}</span>
+                  </div>
+                  <div ref={mediaListRef} className="mt-4 space-y-2">
+                    {media.map((item, index) => (
+                      <PortfolioMediaManagerItem
+                        key={getMediaSortKey(item, index)}
+                        mediaKey={getMediaSortKey(item, index)}
+                        item={item}
+                        index={index}
+                        isDragging={dragIndex === index}
+                        isDragTarget={dragOverIndex === index && dragIndex !== index}
+                        onDragStart={(event) => {
+                          dragIndexRef.current = index
+                          setDragIndex(index)
+                          setDragOverIndex(index)
+                          document.body.style.cursor = 'grabbing'
+                          event.dataTransfer.effectAllowed = 'move'
+                          event.dataTransfer.setData('text/plain', String(index))
+                          handleDragPreview(event)
+                        }}
+                        onDragEnter={(event) => {
+                          event.preventDefault()
+                          handleDragEnter(index)
+                        }}
+                        onDragOver={(event) => {
+                          event.preventDefault()
+                          event.dataTransfer.dropEffect = 'move'
+                          setDragOverIndex(index)
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault()
+                          dragIndexRef.current = null
+                          document.body.style.cursor = ''
+                          setDragIndex(null)
+                          setDragOverIndex(null)
+                        }}
+                        onDragEnd={() => {
+                          dragIndexRef.current = null
+                          document.body.style.cursor = ''
+                          setDragIndex(null)
+                          setDragOverIndex(null)
+                        }}
+                        onRemove={() => handleRemoveMedia(index)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <label className="flex items-start gap-3 rounded-2xl border border-line bg-soft p-4 text-sm text-muted">
+                <input type="checkbox" checked={draft.isPublished} onChange={event => onChange('isPublished', event.target.checked)} className="mt-1 accent-black" />
+                <span>Публикуван проект в публичното портфолио.</span>
+              </label>
+
+              <div className="flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className={`text-sm ${state.status === 'error' ? 'text-red-700' : 'text-muted'}`}>{state.message || 'Запази проекта, за да се появи като продуктова карта.'}</div>
+                <div className="flex shrink-0 gap-2">
+                  {draft.id && <button type="button" onClick={onDelete} className="btn btn-ghost"><Trash2 size={18} /> Изтрий</button>}
+                  <button className="btn btn-primary" disabled={state.status === 'saving'}><Save size={18} /> {state.status === 'saving' ? 'Запазва се…' : 'Запази'}</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PortfolioMediaManagerItem({ item, index, mediaKey, isDragging, isDragTarget, onDragStart, onDragEnter, onDragOver, onDrop, onDragEnd, onRemove }) {
+  const isVideo = isVideoMedia(item)
+  const preview = getMediaPreviewUrl(item)
+  const label = isVideo ? (item.provider === 'youtube' ? 'YouTube видео' : 'Видео линк') : 'Снимка'
+  const source = item.caption || item.url || item.thumbnail || 'Медия към проекта'
+  const stateClass = isDragging
+    ? 'relative z-10 scale-[1.035] -translate-y-0.5 rotate-[0.25deg] border-accentDeep bg-paper shadow-[0_22px_60px_rgba(13,35,64,0.18)] ring-4 ring-accent/20'
+    : isDragTarget
+      ? 'scale-[0.985] border-accent/50 bg-accent/10 shadow-inner'
+      : 'border-line bg-soft/65 hover:-translate-y-0.5 hover:border-ink/15 hover:bg-paper hover:shadow-[0_12px_30px_rgba(13,35,64,0.07)]'
+
+  return (
+    <div
+      data-media-key={mediaKey}
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      className={`group flex transform-gpu items-center gap-3 rounded-2xl border p-2 will-change-transform transition-[transform,box-shadow,border-color,background-color,opacity] duration-200 ease-out ${stateClass}`}
+    >
+      <span
+        role="button"
+        tabIndex={0}
+        draggable
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        className={`flex h-12 w-9 shrink-0 cursor-grab select-none items-center justify-center rounded-2xl transition active:cursor-grabbing ${isDragging ? 'bg-ink text-paper shadow-sm' : 'text-muted group-hover:bg-paper group-hover:text-ink'}`}
+        aria-label="Премести медия"
+      >
+        <GripVertical size={19} />
+      </span>
+      <div className={`relative h-14 w-16 shrink-0 overflow-hidden rounded-xl border bg-paper transition ${isDragging ? 'border-accentDeep shadow-sm' : 'border-line'}`}>
+        {preview ? (
+          <img src={preview} alt="" className="img-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-muted">
+            <Video size={18} />
+          </div>
+        )}
+        {isVideo && (
+          <span className="absolute inset-0 flex items-center justify-center bg-ink/28 text-paper">
+            <PlayCircle size={17} />
+          </span>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${index === 0 ? 'bg-ink text-paper' : 'bg-paper text-muted'}`}>
+            {index === 0 ? 'Основна' : `#${index + 1}`}
+          </span>
+          <span className="text-sm font-semibold text-ink">{label}</span>
+        </div>
+        <div className="mt-1 truncate text-xs text-muted">{source}</div>
+      </div>
+      <button type="button" onClick={onRemove} className="rounded-full p-2 text-muted transition hover:bg-red-50 hover:text-red-700" aria-label="Премахни медия">
+        <Trash2 size={16} />
+      </button>
+    </div>
+  )
+}
+
+function LazyVideoEmbed({ item, title }) {
+  const containerRef = useRef(null)
+  const [isVisible, setIsVisible] = useState(false)
+  const embedUrl = getYoutubeEmbedUrl(item.url)
+  const thumbnail = getMediaPreviewUrl(item)
+  const safeUrl = normalizeVideoUrl(item.url)
+
+  useEffect(() => {
+    const node = containerRef.current
+    if (!node) return undefined
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsVisible(true)
+      return undefined
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsVisible(Boolean(entry?.isIntersecting)),
+      { threshold: 0.35 },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
+
+  if (!embedUrl) {
+    return (
+      <div ref={containerRef} className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[linear-gradient(135deg,rgba(13,35,64,0.92),rgba(25,84,143,0.72))] p-4 text-center text-paper">
+        <Video size={26} />
+        <div className="text-sm font-semibold">Видео линк</div>
+        {safeUrl && (
+          <a href={safeUrl} target="_blank" rel="noreferrer" className="rounded-full bg-white/16 px-3 py-1 text-xs font-semibold transition hover:bg-white/24">
+            Отвори
+          </a>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div ref={containerRef} className="relative h-full w-full overflow-hidden bg-ink">
+      {isVisible ? (
+        <iframe
+          key={embedUrl}
+          src={embedUrl}
+          title={title}
+          className="absolute inset-0 h-full w-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          loading="lazy"
+        />
+      ) : (
+        <div className="relative h-full w-full">
+          {thumbnail ? <img src={thumbnail} alt="" className="img-cover opacity-75" /> : <div className="h-full w-full bg-ink" />}
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-ink/35 text-paper">
+            <PlayCircle size={34} />
+            <span className="text-xs font-semibold uppercase tracking-[0.16em]">Видео</span>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
