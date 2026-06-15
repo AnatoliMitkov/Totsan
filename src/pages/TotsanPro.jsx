@@ -73,8 +73,8 @@ const plans = [
     cta: 'Кандидатствай безплатно',
     to: PRO_SIGNUP_URL,
     imageWidth: '18rem',
-    imageRight: '-4.5rem',
-    imageBottom: '-5rem',
+    imageRight: '-1rem',
+    imageBottom: '3rem',
     imageOpacity: 0.7,
   },
   {
@@ -87,8 +87,8 @@ const plans = [
     cta: 'Научи повече',
     to: PRO_SIGNUP_URL,
     imageWidth: '18rem',
-    imageRight: '-4.5rem',
-    imageBottom: '-5rem',
+    imageRight: '-1rem',
+    imageBottom: '3rem',
     imageOpacity: 0.7,
   },
   {
@@ -101,8 +101,8 @@ const plans = [
     cta: 'Говори с нас',
     to: '/kontakt',
     imageWidth: '18rem',
-    imageRight: '-4.5rem',
-    imageBottom: '-5rem',
+    imageRight: '-1rem',
+    imageBottom: '3rem',
     imageOpacity: 0.7,
   },
 ]
