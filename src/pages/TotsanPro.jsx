@@ -72,6 +72,10 @@ const plans = [
     highlighted: false,
     cta: 'Кандидатствай безплатно',
     to: PRO_SIGNUP_URL,
+    imageWidth: '18rem',
+    imageRight: '-4.5rem',
+    imageBottom: '-5rem',
+    imageOpacity: 0.7,
   },
   {
     name: 'Pro Growth',
@@ -82,6 +86,10 @@ const plans = [
     highlighted: true,
     cta: 'Научи повече',
     to: PRO_SIGNUP_URL,
+    imageWidth: '18rem',
+    imageRight: '-4.5rem',
+    imageBottom: '-5rem',
+    imageOpacity: 0.7,
   },
   {
     name: 'Studio / Brand',
@@ -92,6 +100,10 @@ const plans = [
     highlighted: false,
     cta: 'Говори с нас',
     to: '/kontakt',
+    imageWidth: '18rem',
+    imageRight: '-4.5rem',
+    imageBottom: '-5rem',
+    imageOpacity: 0.7,
   },
 ]
 
@@ -464,8 +476,12 @@ function PlanCard({ plan, onTrack }) {
         src={plan.image}
         alt=""
         loading="lazy"
-        className="absolute bottom-[-5rem] right-[-4.5rem] z-0 w-[18rem] opacity-70"
+        className="absolute z-0"
         style={{
+          width: plan.imageWidth,
+          right: plan.imageRight,
+          bottom: plan.imageBottom,
+          opacity: plan.imageOpacity,
           WebkitMaskImage: 'radial-gradient(circle at 52% 44%, black 0%, black 48%, transparent 76%)',
           maskImage: 'radial-gradient(circle at 52% 44%, black 0%, black 48%, transparent 76%)',
         }}
