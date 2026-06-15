@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import {
   ArrowRight,
+  Building2,
+  Check,
   CheckCircle2,
   ClipboardList,
   MessageCircle,
@@ -10,60 +12,109 @@ import {
   UserCheck,
   Users,
   Wrench,
-  Building2,
   X,
-  Check,
 } from 'lucide-react'
 import { trackEvent } from '../lib/analytics.js'
 import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
 
-const comparison = [
+const PRO_SIGNUP_URL = '/pro/start'
+const PRO_ASSET_BASE = '/Images/images-for-pro-page'
+
+const assets = {
+  hero: `${PRO_ASSET_BASE}/01-totsan-pro-hero-visual.png`,
+  without: `${PRO_ASSET_BASE}/02-without-totsan-pro.png`,
+  with: `${PRO_ASSET_BASE}/03-with-totsan-pro.png`,
+  pilot: `${PRO_ASSET_BASE}/04-pilot.png`,
+  growth: `${PRO_ASSET_BASE}/05-pro-growth.png`,
+  studio: `${PRO_ASSET_BASE}/06-studio-brand.png`,
+  createProfile: `${PRO_ASSET_BASE}/07-create-profile.png`,
+  publishServices: `${PRO_ASSET_BASE}/08-publish-services.png`,
+  getOffers: `${PRO_ASSET_BASE}/09-get-offers.png`,
+  workers: `${PRO_ASSET_BASE}/10-workers.png`,
+  designers: `${PRO_ASSET_BASE}/11-designers.png`,
+  brands: `${PRO_ASSET_BASE}/12-store-and-brands.png`,
+}
+
+const comparisonPanels = [
   {
-    topic: 'Видимост пред клиенти',
-    without: 'Намират те по случайност — Facebook, препоръки, Viber групи.',
-    with: 'Профил в каталога, видим за хора, търсещи точно твоята специалност.',
+    label: 'Без Totsan Pro',
+    tone: 'red',
+    image: assets.without,
+    intro: 'Работата идва от разпръснати разговори, неясни въпроси и изгубена история.',
+    points: [
+      'Запитванията са в чатове, телефон и социални мрежи.',
+      'Трудно се следят оферти, условия и уговорки.',
+      'Доверието зависи от случайни препоръки.',
+      'Пропускаш клиенти, които не знаят как да те намерят.',
+    ],
   },
   {
-    topic: 'Качество на заявките',
-    without: 'Обаждания без бюджет, без срок, без ясна идея.',
-    with: 'Заявки с описание, местоположение, бюджет и прикачени снимки.',
-  },
-  {
-    topic: 'Комуникация',
-    without: 'Разпръснато по WhatsApp, Viber, телефон и имейл.',
-    with: 'Чат, оферта и поръчка на едно място. Историята не се губи.',
-  },
-  {
-    topic: 'Доверие и репутация',
-    without: 'Трудно доказуемо. Разчиташ само на устни препоръки.',
-    with: 'Verified отзиви, рейтинг и одобрен профил — видимо за всеки клиент.',
-  },
-  {
-    topic: 'Цена за влизане',
-    without: '—',
-    with: 'Безплатно за одобрените пилотни партньори.',
+    label: 'С Totsan Pro',
+    tone: 'green',
+    image: assets.with,
+    intro: 'Профилът, услугите, запитванията и офертите живеят на едно място.',
+    points: [
+      'Получаваш заявки по дейност, район и реален клиентски контекст.',
+      'Виждаш снимки, бюджет, локация и важните детайли преди разговор.',
+      'Изпращаш оферта, която изглежда подредено и професионално.',
+      'Профилът изгражда доверие преди клиентът да пише.',
+    ],
   },
 ]
 
-const PRO_SIGNUP_URL = '/pro/start'
+const plans = [
+  {
+    name: 'Pilot',
+    price: '0 лв./месец',
+    note: 'за стартови професионалисти',
+    image: assets.pilot,
+    features: ['Публичен профил', 'До 5 услуги', 'Чат с клиенти', 'Verified отметка'],
+    highlighted: false,
+    cta: 'Кандидатствай безплатно',
+    to: PRO_SIGNUP_URL,
+  },
+  {
+    name: 'Pro Growth',
+    price: 'след пилота',
+    note: 'за активни професионалисти',
+    image: assets.growth,
+    features: ['Приоритет в каталога', 'Неограничени услуги', 'Оферти и поръчки', 'Месечни отчети'],
+    highlighted: true,
+    cta: 'Научи повече',
+    to: PRO_SIGNUP_URL,
+  },
+  {
+    name: 'Studio / Brand',
+    price: 'по договоряне',
+    note: 'за студиа, брандове и магазини',
+    image: assets.studio,
+    features: ['Брандов профил', 'Продуктов каталог', 'Партньорски кампании', 'Отделен мениджър'],
+    highlighted: false,
+    cta: 'Говори с нас',
+    to: '/kontakt',
+  },
+]
 
 const steps = [
   {
     n: '01',
     title: 'Създай профил',
-    text: 'Попълваш специалност, град и портфолио. Ние одобряваме.',
+    text: 'Попълваш специалност, град, снимки и портфолио. Одобряваме само реални професионалисти.',
+    image: assets.createProfile,
     icon: UserCheck,
   },
   {
     n: '02',
     title: 'Публикувай услуги',
-    text: 'Добавяш пакетирани оферти с ясна цена и обхват.',
+    text: 'Описваш услугите си с цени, обхват и условия, за да те намират точните клиенти.',
+    image: assets.publishServices,
     icon: ClipboardList,
   },
   {
     n: '03',
     title: 'Получавай заявки',
-    text: 'Клиенти те намират, пишат и поръчват — всичко на едно място.',
+    text: 'Отговаряш на запитвания, изпращаш оферти и печелиш доверие от едно работно място.',
+    image: assets.getOffers,
     icon: MessageCircle,
   },
 ]
@@ -71,49 +122,30 @@ const steps = [
 const audiences = [
   {
     label: 'Майстори и бригади',
-    text: 'Ясни заявки с бюджет, город и срок. Без безсмислени разговори.',
+    text: 'Видими строителни, ремонтни и довършителни услуги. Без безсмислени разговори.',
+    image: assets.workers,
     icon: Wrench,
   },
   {
     label: 'Архитекти и дизайнери',
-    text: 'Профил, портфолио и pipeline от клиенти, готови да работят.',
+    text: 'Показваш портфолио и се свързваш с клиенти, готови за реализация.',
+    image: assets.designers,
     icon: Building2,
   },
   {
     label: 'Магазини и марки',
-    text: 'Продукти и услуги, вързани към реални проекти.',
+    text: 'Представяш продукти, материали и решения пред точната аудитория.',
+    image: assets.brands,
     icon: Users,
   },
 ]
 
-const plans = [
-  {
-    name: 'Pilot',
-    price: '0 лв.',
-    note: 'за одобрени партньори',
-    features: ['Публичен профил', 'До 3 услуги', 'Чат и заявки', 'Verified отзиви'],
-    highlighted: false,
-    cta: 'Кандидатствай',
-  },
-  {
-    name: 'Pro Growth',
-    price: 'след пилота',
-    note: 'за активни партньори',
-    features: ['Приоритет в каталога', 'Неограничени услуги', 'Оферти и поръчки', 'Месечен отчет'],
-    highlighted: true,
-    cta: 'Научи повече',
-  },
-  {
-    name: 'Studio / Brand',
-    price: 'по договорка',
-    note: 'за студиа, фирми и марки',
-    features: ['Екипен профил', 'Продуктови линии', 'Партньорски кампании', 'Отделна отчетност'],
-    highlighted: false,
-    cta: 'Говори с нас',
-  },
+const workspaceFeatures = [
+  { icon: UserCheck, title: 'Профил, който продава доверие', text: 'Показва опит, сертификати, услуги и реални проекти.' },
+  { icon: ClipboardList, title: 'Услуги с цени и оферти', text: 'Създаваш ясни предложения, които клиентът разбира бързо.' },
+  { icon: MessageCircle, title: 'Чат, заявки и поръчки', text: 'Разговорът и следващата стъпка остават в едно място.' },
+  { icon: ShieldCheck, title: 'Проверка и рейтинг', text: 'Одобрен профил и обратна връзка, която носи доверие.' },
 ]
-
-const HERO_TEXT_OFFSET = '5vw'
 
 export default function TotsanPro() {
   useSeo({
@@ -132,289 +164,412 @@ export default function TotsanPro() {
 
   return (
     <>
-      {/* ── Hero ── */}
-      <section className="relative flex flex-col justify-center min-h-[100dvh] lg:h-screen lg:min-h-[720px] overflow-hidden bg-[#020b18] text-paper pt-[var(--header-h,64px)] z-10">
-        
-        {/* Full-width hero visual rendered as the original asset, without cropping. */}
-        <div className="absolute inset-x-0 top-0 z-0 select-none pointer-events-none">
+      <section className="relative isolate overflow-hidden bg-[#020b18] text-paper">
+        <div className="absolute inset-0 hidden md:block">
           <img
-            src="/Images/totsan-pro-hero-visual.png"
+            src={assets.hero}
             alt=""
-            className="block w-full h-auto max-w-none opacity-100"
+            className="h-full w-full object-cover opacity-95"
+            style={{ objectPosition: '58% center' }}
+            fetchpriority="high"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#020b18] via-[#020b18]/28 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#020b18]/12 via-transparent to-[#020b18]/72" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_68%_34%,rgba(44,111,232,0.12),transparent_34%),linear-gradient(90deg,#020b18_0%,rgba(2,11,24,0.95)_18%,rgba(2,11,24,0.62)_42%,rgba(2,11,24,0.12)_76%)]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#020b18]/40 via-transparent to-[#020b18]" />
         </div>
 
-        {/* Content & Layout Container */}
-        <div className="w-full flex-1 flex flex-col lg:flex-row lg:items-center relative z-10 pt-2 lg:pt-4 pb-8 lg:pb-16">
-          
-          {/* Left Side: Text Column */}
-          <div
-            className="w-full lg:w-[52%] xl:w-[48%] reveal flex flex-col justify-center z-10"
-            style={{ marginLeft: HERO_TEXT_OFFSET }}
-          >
-            <div className="eyebrow !text-paper/55">TOTSAN PRO</div>
-            <h1 className="font-display font-medium mt-4 text-[clamp(2rem,1.35rem+1.8vw,3.25rem)] lg:text-[65px] leading-[1.05] tracking-[-0.02em] text-balance">
-              Работно място за<br className="hidden lg:inline" /> добрите майстори,<br className="hidden lg:inline" /> студиа и марки.
-            </h1>
-            <p className="mt-4 max-w-lg text-base sm:text-lg leading-relaxed text-paper/70 font-sans">
-              Профил, услуги, заявки и чат — всичко на едно място.{" "}
-              <br className="hidden sm:inline" />
-              Безплатен вход за мотивирани професионалисти.
-            </p>
-            <div className="mt-5 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-              <Link
-                to={PRO_SIGNUP_URL}
-                onClick={() => trackPartnerApplicationStart('totsan_pro_hero')}
-                className="btn btn-primary btn-shine !bg-accent !text-paper hover:!bg-accentDeep justify-center shrink-0"
-              >
-                Кандидатствай безплатно <ArrowRight size={18} />
-              </Link>
-              <a
-                href="#pro-plans"
-                className="btn btn-ghost btn-fill !border-paper/25 !bg-paper/10 !text-paper hover:!border-paper/50 justify-center shrink-0"
-              >
-                Виж повече
-              </a>
+        <div className="section relative z-10 flex min-h-[calc(100svh+1px)] items-center pt-[calc(var(--header-h,64px)+3rem)] md:min-h-[760px] md:pt-[calc(var(--header-h,64px)+2rem)]">
+          <div className="container-page grid items-center gap-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
+            <div className="max-w-[40rem]">
+              <div className="eyebrow !text-paper/55">Totsan Pro</div>
+              <h1 className="mt-4 max-w-full font-display text-[2.35rem] font-medium leading-none text-paper sm:text-[3.6rem] lg:text-[5.35rem]">
+                Работно място за добрите майстори, студиа и марки.
+              </h1>
+              <p className="mt-5 max-w-xl text-base leading-relaxed text-paper/78 sm:text-lg">
+                Профил, услуги, заявки и чат — всичко на едно място. Безплатен вход за мотивирани професионалисти.
+              </p>
+              <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Link
+                  to={PRO_SIGNUP_URL}
+                  onClick={() => trackPartnerApplicationStart('totsan_pro_hero')}
+                  className="btn btn-primary btn-shine justify-center !bg-accent !text-sm !text-paper hover:!bg-accentDeep sm:!text-base"
+                >
+                  Кандидатствай безплатно <ArrowRight size={18} />
+                </Link>
+                <a
+                  href="#pro-plans"
+                  className="btn btn-ghost btn-fill justify-center !border-paper/25 !bg-paper/10 !text-paper hover:!border-paper/50"
+                >
+                  Виж повече
+                </a>
+              </div>
+              <div className="mt-8 flex flex-wrap gap-3 text-sm text-paper/82">
+                <TrustPill icon={CheckCircle2} label="Безплатен вход" />
+                <TrustPill icon={UserCheck} label="Проверени клиенти" />
+                <TrustPill icon={ShieldCheck} label="Сигурни плащания" />
+              </div>
             </div>
 
-            {/* Trust Indicators Bar */}
-            <div className="border-t border-paper/10 mt-6 pt-4 flex flex-wrap items-center gap-x-6 gap-y-3 text-[16px] leading-6 text-paper/85 max-w-[570px]">
-              <span className="inline-flex items-center gap-2.5">
-                <CheckCircle2 size={16} className="text-accent shrink-0" /> Безплатен вход
-              </span>
-              <span className="inline-flex items-center gap-2.5">
-                <UserCheck size={16} className="text-accent shrink-0" /> Проверени клиенти
-              </span>
-              <span className="inline-flex items-center gap-2.5">
-                <ShieldCheck size={16} className="text-accent shrink-0" /> Сигурни плащания
-              </span>
+            <div className="relative -mx-5 overflow-hidden md:hidden">
+              <div className="absolute inset-x-4 bottom-0 h-20 rounded-full bg-accent/20 blur-3xl" />
+              <img
+                src={assets.hero}
+                alt=""
+                className="relative mx-auto w-full origin-center scale-[1.28]"
+                style={{
+                  WebkitMaskImage: 'linear-gradient(180deg, black 72%, transparent 100%)',
+                  maskImage: 'linear-gradient(180deg, black 72%, transparent 100%)',
+                }}
+              />
             </div>
           </div>
-
         </div>
       </section>
 
-      {/* ── Comparison: с Pro vs. без Pro ── */}
       <section className="section bg-paper">
         <div className="container-page">
-          <div className="reveal text-center">
-            <div className="eyebrow">Заслужава ли си?</div>
-            <h2 className="h-section mt-3">Чрез Totsan Pro или без него.</h2>
-            <p className="mx-auto mt-3 max-w-xl text-muted">
-              Ясна разлика между това как изглежда работата сега и как може да изглежда.
-            </p>
-          </div>
+          <SectionIntro
+            eyebrow="Заслужава ли си?"
+            title="С Totsan Pro и без него."
+            text="Ясно се вижда разликата между разпиляната работа днес и подреденото работно място утре."
+          />
 
-          {/* Column headers */}
-          <div className="mt-10 reveal">
-            <div className="grid grid-cols-[1fr_1fr_1fr] gap-0 overflow-hidden rounded-3xl border border-line text-sm font-semibold">
-              <div className="border-r border-line bg-soft px-5 py-3.5 text-muted">Аспект</div>
-              <div className="flex items-center gap-2 border-r border-line bg-red-50 px-5 py-3.5 text-red-500">
-                <X size={15} strokeWidth={2.5} />
-                Без Pro
-              </div>
-              <div className="flex items-center gap-2 bg-green-50 px-5 py-3.5 text-trustGreen">
-                <Check size={15} strokeWidth={2.5} />
-                С Totsan Pro
-              </div>
-            </div>
-
-            <div className="divide-y divide-line overflow-hidden rounded-b-3xl border-x border-b border-line">
-              {comparison.map((row, i) => (
-                <div
-                  key={row.topic}
-                  className={`grid grid-cols-[1fr_1fr_1fr] gap-0 transition-colors ${i % 2 === 0 ? 'bg-paper' : 'bg-soft/40'}`}
-                >
-                  <div className="border-r border-line px-5 py-4 text-sm font-medium text-ink">
-                    {row.topic}
-                  </div>
-                  <div className="border-r border-line px-5 py-4 text-sm leading-relaxed text-muted">
-                    {row.without === '—' ? (
-                      <span className="text-line">—</span>
-                    ) : (
-                      <span className="flex gap-2">
-                        <X size={15} className="mt-0.5 shrink-0 text-red-400" />
-                        {row.without}
-                      </span>
-                    )}
-                  </div>
-                  <div className="px-5 py-4 text-sm leading-relaxed text-ink">
-                    <span className="flex gap-2">
-                      <Check size={15} className="mt-0.5 shrink-0 text-trustGreen" />
-                      {row.with}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="reveal mt-8 flex justify-center">
-            <Link to={PRO_SIGNUP_URL} onClick={() => trackPartnerApplicationStart('totsan_pro_comparison')} className="btn btn-primary">
-              Кандидатствай безплатно <ArrowRight size={18} />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Plans ── (moved up right after comparison) */}
-      <section id="pro-plans" className="section bg-ink text-paper">
-        <div className="container-page">
-          <div className="text-center reveal">
-            <div className="eyebrow !text-paper/55">Планове</div>
-            <h2 className="h-section mt-3">Влизаш безплатно, плащаш когато Totsan носи работа.</h2>
-          </div>
-
-          <div className="mt-12 grid gap-5 lg:grid-cols-3">
-            {plans.map((plan) => (
-              <article
-                key={plan.name}
-                className={`reveal flex flex-col rounded-[2rem] border p-7 transition-all duration-300
-                  ${plan.highlighted
-                    ? 'border-accent bg-paper text-ink shadow-[0_30px_90px_-55px_rgba(44,111,232,0.8)] hover:scale-[1.03] hover:shadow-[0_0_55px_-10px_rgba(44,111,232,0.55)]'
-                    : 'border-paper/15 bg-paper/10 hover:scale-[1.02] hover:border-paper/35 hover:shadow-[0_0_40px_-10px_rgba(255,255,255,0.12)]'
-                  }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-display text-2xl">{plan.name}</h3>
-                    <p className={`mt-1 text-xs ${plan.highlighted ? 'text-muted' : 'text-paper/55'}`}>{plan.note}</p>
-                  </div>
-                  {plan.highlighted ? <Star className="text-accent shrink-0" size={20} /> : <CheckCircle2 className="text-trustGreen shrink-0" size={20} />}
-                </div>
-
-                <div className="mt-5 font-display text-4xl">{plan.price}</div>
-
-                <ul className="mt-6 grow space-y-2.5 text-sm">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2.5">
-                      <CheckCircle2 size={16} className={`shrink-0 ${plan.highlighted ? 'text-accentDeep' : 'text-trustGreen'}`} />
-                      <span className={plan.highlighted ? 'text-ink/80' : 'text-paper/75'}>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <Link
-                  to={plan.name === 'Studio / Brand' ? '/kontakt' : PRO_SIGNUP_URL}
-                  onClick={() => {
-                    if (plan.name !== 'Studio / Brand') trackPartnerApplicationStart(`totsan_pro_plan_${plan.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`)
-                  }}
-                  className={`mt-7 btn justify-center ${plan.highlighted ? 'btn-primary' : 'btn-ghost !border-paper/25 !bg-paper/10 !text-paper hover:!border-paper/45'}`}
-                >
-                  {plan.cta} <ArrowRight size={16} />
-                </Link>
-              </article>
+          <div className="mt-10 grid gap-5 lg:grid-cols-2">
+            {comparisonPanels.map((panel) => (
+              <ComparisonCard key={panel.label} panel={panel} />
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── How it works ── */}
-      <section className="section bg-soft">
+      <section id="pro-plans" className="section bg-soft">
         <div className="container-page">
-          <div className="text-center reveal">
-            <div className="eyebrow">Как работи</div>
-            <h2 className="h-section mt-3">Три стъпки до първата поръчка.</h2>
-          </div>
+          <SectionIntro
+            eyebrow="Избери своя план"
+            title="Планове, създадени за вашия растеж."
+            text="Започваш леко, доказваш профила си и надграждаш когато Totsan започне да носи реална работа."
+          />
 
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
-            {steps.map((step) => {
-              const Icon = step.icon
-              return (
-                <article key={step.n} className="reveal relative rounded-3xl border border-line bg-paper p-7">
-                  <div className="flex items-start justify-between">
-                    <span className="font-display text-4xl text-line">{step.n}</span>
-                    <span className="rounded-2xl bg-accentSoft p-3 text-accentDeep"><Icon size={20} /></span>
-                  </div>
-                  <h3 className="mt-5 font-display text-2xl text-ink">{step.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted">{step.text}</p>
-                </article>
-              )
-            })}
+          <div className="mt-10 grid gap-5 lg:grid-cols-3">
+            {plans.map((plan) => (
+              <PlanCard
+                key={plan.name}
+                plan={plan}
+                onTrack={() => {
+                  if (plan.to === PRO_SIGNUP_URL) {
+                    trackPartnerApplicationStart(`totsan_pro_plan_${plan.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`)
+                  }
+                }}
+              />
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ── For whom ── */}
       <section className="section bg-paper">
         <div className="container-page">
-          <div className="text-center reveal">
-            <div className="eyebrow">За кого</div>
-            <h2 className="h-section mt-3">Правилните хора на правилното място.</h2>
-          </div>
+          <SectionIntro
+            eyebrow="Започни лесно"
+            title="Три стъпки до първата поръчка."
+            text="Профилът ти не стои сам. Той води към услуги, заявки, оферти и реална работа."
+          />
 
-          <div className="mt-12 grid gap-5 md:grid-cols-3">
-            {audiences.map((audience) => {
-              const Icon = audience.icon
-              return (
-                <article key={audience.label} className="reveal rounded-3xl border border-line bg-soft p-7">
-                  <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-paper text-accentDeep shadow-sm">
-                    <Icon size={22} />
-                  </span>
-                  <h3 className="mt-5 font-display text-2xl text-ink">{audience.label}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted">{audience.text}</p>
-                </article>
-              )
-            })}
+          <div className="mt-10 grid gap-5 lg:grid-cols-3">
+            {steps.map((step) => (
+              <StepCard key={step.n} step={step} />
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ── What's included ── */}
       <section className="section bg-soft">
         <div className="container-page">
-          <div className="text-center reveal">
-            <div className="eyebrow">Какво включва</div>
-            <h2 className="h-section mt-3">Не само профил — система за работа.</h2>
-          </div>
+          <SectionIntro
+            eyebrow="За кого"
+            title="Правилните хора на правилното място."
+            text="Totsan Pro е за професионалисти и брандове, които искат работата им да изглежда толкова добре, колкото я изпълняват."
+          />
 
-          <div className="mt-12 grid gap-4 md:grid-cols-2">
-            {[
-              { icon: UserCheck, title: 'Профил, който продава доверие', text: 'Карта с портфолио, отзиви и видими услуги. Не визитка, а доказателство.' },
-              { icon: ClipboardList, title: 'Услуги с цена и обхват', text: 'Пакетирани оферти — клиентът разбира точно какво купува.' },
-              { icon: MessageCircle, title: 'Чат, заявки и поръчки', text: 'Разговорът и плащането остават в Totsan, не се губят по телефони.' },
-              { icon: ShieldCheck, title: 'Проверка и рейтинг', text: 'Одобрение, verified отзиви и история. Добрите изпъкват.' },
-            ].map((item) => {
-              const Icon = item.icon
-              return (
-                <article key={item.title} className="reveal flex gap-5 rounded-3xl border border-line bg-paper p-6">
-                  <span className="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accentSoft text-accentDeep">
-                    <Icon size={20} />
-                  </span>
-                  <div>
-                    <h3 className="font-display text-xl text-ink">{item.title}</h3>
-                    <p className="mt-1.5 text-sm leading-relaxed text-muted">{item.text}</p>
-                  </div>
-                </article>
-              )
-            })}
+          <div className="mt-10 grid gap-5 lg:grid-cols-3">
+            {audiences.map((audience) => (
+              <AudienceCard key={audience.label} audience={audience} />
+            ))}
           </div>
         </div>
       </section>
 
-
-      {/* ── CTA ── */}
-      <section className="section bg-soft">
-        <div className="container-page rounded-[2rem] border border-line bg-paper p-8 text-center md:p-14">
-          <div className="reveal mx-auto max-w-2xl">
-            <div className="eyebrow">Следваща стъпка</div>
-            <h2 className="h-section mt-3">Готов ли си да станеш Pro партньор?</h2>
-            <p className="mt-4 text-muted">
-              Майстори, дизайнери, архитекти, фирми и марки с реално качество — кандидатствайте за пилотния кръг.
+      <section className="section bg-paper">
+        <div className="container-page grid items-center gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+          <div className="reveal">
+            <div className="eyebrow">Повече от профил</div>
+            <h2 className="h-section mt-3 text-ink">Система за работа, не само страница в каталог.</h2>
+            <p className="mt-4 max-w-2xl text-muted">
+              Totsan Pro събира доверието, заявките, офертите и клиентската комуникация в един спокоен работен ритъм.
             </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <Link to={PRO_SIGNUP_URL} onClick={() => trackPartnerApplicationStart('totsan_pro_cta')} className="btn btn-primary">
-                Кандидатствай безплатно <ArrowRight size={18} />
-              </Link>
-              <Link to="/kontakt" className="btn btn-ghost">
-                Говори с екипа
-              </Link>
+            <div className="mt-7 grid gap-4 sm:grid-cols-2">
+              {workspaceFeatures.map((feature) => (
+                <WorkspaceFeature key={feature.title} feature={feature} />
+              ))}
+            </div>
+          </div>
+
+          <div className="reveal overflow-hidden rounded-[2rem] border border-line bg-soft shadow-[0_28px_90px_-64px_rgba(13,35,64,0.7)]">
+            <div className="grid min-h-[25rem] grid-cols-[8.5rem_minmax(0,1fr)] bg-[linear-gradient(135deg,#07162d_0%,#0d2340_34%,#f8fbff_34%,#f8fbff_100%)]">
+              <div className="p-5 text-paper">
+                <div className="eyebrow !text-paper/50">Totsan Pro</div>
+                <nav className="mt-8 space-y-3 text-sm text-paper/70">
+                  {['Табло', 'Заявки', 'Чат', 'Оферти', 'Услуги', 'Профил'].map((item, index) => (
+                    <div key={item} className={`rounded-2xl px-3 py-2 ${index === 1 ? 'bg-paper/12 text-paper' : ''}`}>{item}</div>
+                  ))}
+                </nav>
+              </div>
+              <div className="min-w-0 p-5 sm:p-7">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="eyebrow">Активни заявки</div>
+                    <h3 className="mt-2 font-display text-3xl text-ink">Днес има какво да се свърши.</h3>
+                  </div>
+                  <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-trustGreen">3 нови</span>
+                </div>
+                <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
+                  <div className="space-y-3">
+                    {['Ремонт на баня', 'Изграждане на тераса', 'Проектиране на кухня'].map((item, index) => (
+                      <div key={item} className="rounded-3xl border border-line bg-paper p-4 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h4 className="font-semibold text-ink">{item}</h4>
+                            <p className="mt-1 text-sm text-muted">{index === 0 ? '6 000 лв. · София' : index === 1 ? '12 500 лв. · Варна' : 'по договаряне · Пловдив'}</p>
+                          </div>
+                          <span className="rounded-full bg-accentSoft px-3 py-1 text-xs font-semibold text-accentDeep">{index === 1 ? 'В процес' : 'Нова'}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="rounded-3xl border border-line bg-paper p-5 shadow-sm">
+                    <div className="eyebrow">Информация за клиента</div>
+                    <h4 className="mt-4 font-display text-2xl text-ink">Иван Петров</h4>
+                    <p className="mt-2 text-sm text-muted">Търси обновяване на баня, с бюджет и снимки към заявката.</p>
+                    <Link to={PRO_SIGNUP_URL} onClick={() => trackPartnerApplicationStart('totsan_pro_workspace_mockup')} className="btn btn-primary mt-6 w-full justify-center">
+                      Отвори чат
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section bg-soft">
+        <div className="container-page">
+          <div className="relative isolate overflow-hidden rounded-[2rem] bg-[#06152b] p-7 text-paper shadow-[0_28px_90px_-60px_rgba(13,35,64,0.9)] md:p-12">
+            <img
+              src={assets.pilot}
+              alt=""
+              loading="lazy"
+              className="absolute bottom-[-16rem] right-[-8rem] z-0 hidden w-[34rem] opacity-50 mix-blend-screen md:block"
+              style={{
+                WebkitMaskImage: 'radial-gradient(circle at 50% 42%, black 0%, black 48%, transparent 74%)',
+                maskImage: 'radial-gradient(circle at 50% 42%, black 0%, black 48%, transparent 74%)',
+              }}
+            />
+            <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_78%_42%,rgba(44,111,232,0.32),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_42%)]" />
+            <div className="relative z-10 max-w-3xl reveal">
+              <div className="eyebrow !text-paper/55">Следваща стъпка</div>
+              <h2 className="mt-3 font-display text-[clamp(2.25rem,1.55rem+2.7vw,4.6rem)] leading-none">
+                Готов ли си да станеш Pro партньор?
+              </h2>
+              <p className="mt-4 max-w-2xl text-paper/72">
+                Създай доверен профил, покажи услугите си и започни да получаваш по-качествени заявки от клиенти, които вече знаят какво търсят.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link to={PRO_SIGNUP_URL} onClick={() => trackPartnerApplicationStart('totsan_pro_cta')} className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep justify-center">
+                  Кандидатствай безплатно <ArrowRight size={18} />
+                </Link>
+                <Link to="/kontakt" className="btn btn-ghost justify-center !border-paper/25 !bg-paper/10 !text-paper hover:!border-paper/50">
+                  Говори с екипа
+                </Link>
+              </div>
             </div>
           </div>
         </div>
       </section>
     </>
+  )
+}
+
+function SectionIntro({ eyebrow, title, text }) {
+  return (
+    <div className="reveal mx-auto max-w-3xl text-center">
+      <div className="eyebrow">{eyebrow}</div>
+      <h2 className="h-section mt-3 text-ink">{title}</h2>
+      {text && <p className="mx-auto mt-3 max-w-2xl text-muted">{text}</p>}
+    </div>
+  )
+}
+
+function TrustPill({ icon: Icon, label }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border border-paper/12 bg-paper/8 px-3.5 py-2">
+      <Icon size={16} className="text-accent" />
+      {label}
+    </span>
+  )
+}
+
+function ComparisonCard({ panel }) {
+  const isPositive = panel.tone === 'green'
+  const Icon = isPositive ? Check : X
+  return (
+    <article className={`reveal overflow-hidden rounded-[2rem] border bg-paper shadow-[0_24px_80px_-64px_rgba(13,35,64,0.75)] ${isPositive ? 'border-green-200' : 'border-red-100'}`}>
+      <div className="grid min-h-full gap-0 md:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
+        <div className={`relative min-h-[21rem] overflow-hidden ${isPositive ? 'bg-green-50' : 'bg-red-50'}`}>
+          <img
+            src={panel.image}
+            alt=""
+            loading="lazy"
+            className={`absolute inset-0 h-full w-full ${isPositive ? 'object-cover' : 'object-contain p-4'}`}
+            style={{
+              objectPosition: isPositive ? '34% center' : 'center center',
+              WebkitMaskImage: 'linear-gradient(90deg, black 76%, transparent 100%)',
+              maskImage: 'linear-gradient(90deg, black 76%, transparent 100%)',
+            }}
+          />
+        </div>
+        <div className="p-6 md:p-7">
+          <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${isPositive ? 'bg-green-100 text-trustGreen' : 'bg-red-100 text-red-600'}`}>
+            <Icon size={14} />
+            {panel.label}
+          </div>
+          <p className="mt-4 text-sm leading-relaxed text-muted">{panel.intro}</p>
+          <ul className="mt-5 space-y-3 text-sm text-ink">
+            {panel.points.map((point) => (
+              <li key={point} className="flex gap-3">
+                <span className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${isPositive ? 'bg-green-100 text-trustGreen' : 'bg-red-100 text-red-500'}`}>
+                  <Icon size={13} />
+                </span>
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function PlanCard({ plan, onTrack }) {
+  return (
+    <article className={`reveal relative flex min-h-[27rem] flex-col overflow-hidden rounded-[2rem] border p-6 shadow-[0_24px_80px_-66px_rgba(13,35,64,0.8)] ${plan.highlighted ? 'border-accent bg-paper ring-2 ring-accent/20' : 'border-line bg-paper'}`}>
+      <img
+        src={plan.image}
+        alt=""
+        loading="lazy"
+        className="absolute bottom-[-5rem] right-[-4.5rem] z-0 w-[18rem] opacity-70"
+        style={{
+          WebkitMaskImage: 'radial-gradient(circle at 52% 44%, black 0%, black 48%, transparent 76%)',
+          maskImage: 'radial-gradient(circle at 52% 44%, black 0%, black 48%, transparent 76%)',
+        }}
+      />
+      <div className="relative z-10">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="font-display text-3xl text-ink">{plan.name}</h3>
+            <p className="mt-1 text-xs text-muted">{plan.note}</p>
+          </div>
+          <span className={`rounded-2xl p-2 ${plan.highlighted ? 'bg-accent text-paper' : 'bg-accentSoft text-accentDeep'}`}>
+            {plan.highlighted ? <Star size={18} /> : <CheckCircle2 size={18} />}
+          </span>
+        </div>
+        <div className="mt-6 font-display text-4xl text-ink">{plan.price}</div>
+        <ul className="mt-6 space-y-2.5 text-sm text-ink/82">
+          {plan.features.map((feature) => (
+            <li key={feature} className="flex items-center gap-2.5">
+              <CheckCircle2 size={16} className="shrink-0 text-trustGreen" />
+              {feature}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className="relative z-10 mt-auto pt-7">
+        <Link to={plan.to} onClick={onTrack} className={`btn w-full justify-center ${plan.highlighted ? 'btn-primary' : 'btn-ghost bg-paper/75'}`}>
+          {plan.cta} <ArrowRight size={16} />
+        </Link>
+      </div>
+    </article>
+  )
+}
+
+function StepCard({ step }) {
+  const Icon = step.icon
+  return (
+    <article className="reveal overflow-hidden rounded-[2rem] border border-line bg-paper shadow-[0_22px_70px_-62px_rgba(13,35,64,0.72)]">
+      <div className="relative h-48 overflow-hidden bg-soft">
+        <img
+          src={step.image}
+          alt=""
+          loading="lazy"
+          className="h-full w-full object-cover"
+          style={{
+            objectPosition: step.n === '01' ? 'center 38%' : 'center center',
+            WebkitMaskImage: 'linear-gradient(180deg, black 66%, transparent 100%)',
+            maskImage: 'linear-gradient(180deg, black 66%, transparent 100%)',
+          }}
+        />
+      </div>
+      <div className="p-6">
+        <div className="flex items-center justify-between gap-4">
+          <span className="font-display text-4xl text-line">{step.n}</span>
+          <span className="rounded-2xl bg-accentSoft p-3 text-accentDeep"><Icon size={20} /></span>
+        </div>
+        <h3 className="mt-5 font-display text-2xl text-ink">{step.title}</h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted">{step.text}</p>
+      </div>
+    </article>
+  )
+}
+
+function AudienceCard({ audience }) {
+  const Icon = audience.icon
+  return (
+    <article className="reveal overflow-hidden rounded-[2rem] border border-line bg-paper shadow-[0_22px_70px_-62px_rgba(13,35,64,0.72)]">
+      <div className="relative h-48 overflow-hidden bg-soft">
+        <img
+          src={audience.image}
+          alt=""
+          loading="lazy"
+          className="h-full w-full object-cover"
+          style={{
+            objectPosition: 'center 48%',
+            WebkitMaskImage: 'linear-gradient(180deg, black 70%, transparent 100%)',
+            maskImage: 'linear-gradient(180deg, black 70%, transparent 100%)',
+          }}
+        />
+      </div>
+      <div className="p-6">
+        <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-accentSoft text-accentDeep">
+          <Icon size={21} />
+        </span>
+        <h3 className="mt-5 font-display text-2xl text-ink">{audience.label}</h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted">{audience.text}</p>
+        <Link to={PRO_SIGNUP_URL} className="btn btn-ghost mt-5 !py-2 text-sm">
+          Към профила <ArrowRight size={15} />
+        </Link>
+      </div>
+    </article>
+  )
+}
+
+function WorkspaceFeature({ feature }) {
+  const Icon = feature.icon
+  return (
+    <article className="flex gap-4 rounded-3xl border border-line bg-soft p-4">
+      <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-paper text-accentDeep shadow-sm">
+        <Icon size={19} />
+      </span>
+      <div>
+        <h3 className="font-semibold text-ink">{feature.title}</h3>
+        <p className="mt-1 text-sm leading-relaxed text-muted">{feature.text}</p>
+      </div>
+    </article>
   )
 }
