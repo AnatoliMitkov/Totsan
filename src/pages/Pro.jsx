@@ -1,6 +1,21 @@
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, BriefcaseBusiness, CheckCircle2, Globe2, Languages, MapPin } from 'lucide-react'
+import {
+  ArrowRight,
+  BriefcaseBusiness,
+  CheckCircle2,
+  Clock,
+  Euro,
+  FileCheck2,
+  Globe2,
+  Languages,
+  MapPin,
+  MessageCircle,
+  ShieldCheck,
+  Tags,
+  UserCheck,
+  Wrench,
+} from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { LAYER_HEROS } from '../data/images.js'
 import { DELIVERABLES, SPECIALIST_TYPES, SPECIFIC_SERVICES, TARGET_OBJECTS } from '../data/layer01-meta.js'
@@ -10,12 +25,132 @@ import { loadPublicPartnerServicesForProfile, packagePriceLabel } from '../lib/p
 import { useAccount } from '../lib/account.js'
 import { createConversationFromProfile } from '../lib/chat.js'
 import PortfolioGallery from '../components/profile/PortfolioGallery.jsx'
-import PartnerStats from '../components/profile/PartnerStats.jsx'
 import PublicProfileBanner from '../components/profile/PublicProfileBanner.jsx'
 import PublicProfilePanel from '../components/profile/PublicProfilePanel.jsx'
 import ReviewsList from '../components/reviews/ReviewsList.jsx'
 import { getPageLocation, trackEvent, trackPageView } from '../lib/analytics.js'
 import { buildBreadcrumbSchema, buildPersonSchema, useSeo } from '../lib/seo.js'
+
+const CLIENT_PROCESS_STEPS = [
+  {
+    title: 'Описвате задачата',
+    description: 'Казвате какъв е проблемът, обектът или проектът и какъв резултат търсите.',
+  },
+  {
+    title: 'Получавате въпрос или оглед',
+    description: 'Партньорът уточнява обхвата, нужните материали, срокове и условия.',
+  },
+  {
+    title: 'Получавате оферта',
+    description: 'Виждате цена, срок, какво е включено и какви са следващите стъпки.',
+  },
+  {
+    title: 'Работата започва след потвърждение',
+    description: 'Продължавате след уговорка и приемане на условията от двете страни.',
+  },
+]
+
+const GENERIC_TARGETS = {
+  ideya: 'жилища, търговски обекти и проекти в ранен етап',
+  postroyka: 'ремонти, строителни задачи и обекти на място',
+  materiali: 'избор на материали, продукти и обекти с конкретни изисквания',
+  obzavezhdane: 'жилища, кухни, мебели и обзавеждане по проект',
+  dekoraciya: 'финален styling, декорация и завършване на пространства',
+}
+
+function compactText(value = '') {
+  return String(value || '').replace(/\s+/g, ' ').trim()
+}
+
+function uniqueList(values = [], limit = 6) {
+  const seen = new Set()
+  const result = []
+  values.forEach((value) => {
+    const text = compactText(value)
+    const key = text.toLocaleLowerCase('bg')
+    if (!text || seen.has(key)) return
+    seen.add(key)
+    result.push(text)
+  })
+  return result.slice(0, limit)
+}
+
+function splitKeywords(value = '') {
+  return String(value || '')
+    .split(/[,\n;/|]+/)
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
+function getPrimarySpecialization(profile, layer) {
+  return compactText(profile.headline || profile.tag || profile.sub || layer?.title || 'Проверен специалист')
+}
+
+function getServiceKeywords(profile, services, layer) {
+  const serviceTerms = services.flatMap((service) => [
+    service.title,
+    service.subtitle,
+    ...(service.tags || []),
+  ])
+  return uniqueList([
+    ...splitKeywords(profile.headline),
+    ...splitKeywords(profile.tag || profile.sub),
+    ...serviceTerms,
+    layer?.title,
+  ], 7)
+}
+
+function getServiceAreaLabel(profile) {
+  const areas = Array.isArray(profile.serviceAreas) ? profile.serviceAreas.filter(Boolean) : []
+  if (areas.length > 1) return areas.join(', ')
+  if (areas.length === 1 && areas[0] !== profile.city) return `${areas[0]} / регион`
+  if (profile.city) return `${profile.city} / регион`
+  return 'България'
+}
+
+function formatResponseLabel(hours) {
+  const value = Number(hours)
+  if (!Number.isFinite(value) || value <= 0) return 'Отговор до 48 ч.'
+  if (value < 1) return 'Отговор под 1 ч.'
+  return `Отговор до ${Math.round(value)} ч.`
+}
+
+function getPriceGuide(profile, services) {
+  if (profile.pricingNote) return profile.pricingNote
+  const pricedService = services.find((service) => service.lowestPrice)
+  if (pricedService) return `Ориентир от ${packagePriceLabel(pricedService)}`
+  return 'След оглед / по оферта'
+}
+
+function getLayer01Labels(options, values) {
+  if (!Array.isArray(values)) return []
+  return values.map((value) => findLayer01Option(options, value)?.label).filter(Boolean)
+}
+
+function getTargetObjectLabel(layer, layer01Meta) {
+  const objects = getLayer01Labels(TARGET_OBJECTS, layer01Meta?.target_objects)
+  if (objects.length) return objects.join(', ')
+  return GENERIC_TARGETS[layer?.slug] || 'индивидуални запитвания и конкретни обекти'
+}
+
+function getWorkMethodLabel(layer01Process) {
+  if (layer01Process.length) {
+    return layer01Process.slice(0, 3).map(step => compactText(step.title)).filter(Boolean).join(' / ')
+  }
+  return 'запитване / уточнение / оферта'
+}
+
+function getExperienceLabel(profile) {
+  const years = Number(profile.yearsExperience || Math.max(0, new Date().getFullYear() - profile.since))
+  if (!Number.isFinite(years) || years <= 0) return ''
+  return `${Math.round(years)} години`
+}
+
+function getHelpText(profile, primarySpecialization, serviceAreaLabel, targetObjectLabel) {
+  const name = profile.name || 'Този партньор'
+  const specialization = primarySpecialization.toLocaleLowerCase('bg')
+  return `${name} помага с ${specialization}. Подходящ е за ${targetObjectLabel}, когато търсите ясен оглед, професионален съвет и оферта според конкретния обект. Работи в ${serviceAreaLabel}.`
+}
 
 export default function Pro() {
   const location = useLocation()
@@ -30,6 +165,7 @@ export default function Pro() {
   const [services, setServices] = useState([])
   const [chatState, setChatState] = useState({ status: 'idle', message: '' })
   const trackedProfileSlugRef = useRef('')
+  const inquirySectionRef = useRef(null)
   const servicesSectionRef = useRef(null)
   const portfolioSectionRef = useRef(null)
   const reviewsSectionRef = useRef(null)
@@ -180,6 +316,19 @@ export default function Pro() {
     ? layer01Meta.process_steps.filter((step) => step?.title || step?.description || step?.duration)
     : []
   const hasLayer01Details = Object.keys(layer01Meta).length > 0
+  const primarySpecialization = getPrimarySpecialization(item, layer)
+  const serviceKeywords = getServiceKeywords(item, services, layer)
+  const serviceAreaLabel = getServiceAreaLabel(item)
+  const targetObjectLabel = getTargetObjectLabel(layer, layer01Meta)
+  const workMethodLabel = getWorkMethodLabel(layer01Process)
+  const priceGuide = getPriceGuide(item, services)
+  const experienceLabel = getExperienceLabel(item)
+  const helpText = getHelpText(item, primarySpecialization, serviceAreaLabel, targetObjectLabel)
+  const aboutText = compactText(item.descriptionLong || item.bio)
+  const showAboutText = aboutText && compactText(aboutText) !== compactText(helpText)
+  const responseLabel = formatResponseLabel(stats?.response_time_hours ?? item.responseTimeHours)
+  const reviewCount = Number(stats?.reviews_count || 0)
+  const averageRating = Number(stats?.avg_rating || 0)
 
   function scrollToSection(sectionRef) {
     const node = sectionRef.current
@@ -220,27 +369,21 @@ export default function Pro() {
 
   return (
     <>
-      {/* Cover Banner Section */}
       <PublicProfileBanner
         imageSrc={item.coverUrl || LAYER_HEROS[layer.slug]}
         imageAlt=""
         imageStyle={{ objectPosition: `50% ${item.coverY ?? 50}%` }}
       />
 
-      {/* Main Profile Grid Section */}
       <div className="relative z-10 bg-soft flex flex-col pb-16 md:pb-24">
         <div className="container-page w-full px-4 md:px-6 -mt-24">
           <div className="grid lg:grid-cols-12 gap-8 lg:gap-12">
 
-            {/* LEFT COLUMN - Sticky Info, Stats & Inquiry Form */}
             <aside className="lg:col-span-4 reveal">
               <div className="lg:sticky lg:top-24 space-y-6">
 
-                {/* Profile Card */}
                 <PublicProfilePanel className="transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.04)]">
                   <div className="flex flex-col items-center text-center">
-
-                    {/* Squircle Double Border Profile Image */}
                     <div className="relative group">
                       <div className="w-32 h-32 rounded-3xl overflow-hidden border-4 border-paper bg-paper shadow-md transition-transform duration-300 group-hover:scale-[1.02]">
                         <img src={getProfileImage(item)} alt={item.name} className="img-cover" style={getProfileImageStyle(item)} />
@@ -253,127 +396,109 @@ export default function Pro() {
                     </div>
 
                     <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight text-ink">{item.name}</h1>
-                    <p className="mt-2 text-sm font-medium text-ink/75 max-w-[280px] leading-relaxed">{item.headline || item.sub}</p>
+                    <p className="mt-2 max-w-[300px] text-base font-semibold leading-relaxed text-ink/85">{primarySpecialization}</p>
 
                     <div className="mt-3 flex items-center gap-1.5 text-xs text-muted font-medium">
                       <MapPin size={14} className="text-accent" />
-                      <span>{item.city}</span>
+                      <span>{serviceAreaLabel}</span>
                       <span className="text-line">•</span>
-                      <span>от {item.since} г.</span>
+                      <span>{responseLabel}</span>
                     </div>
                   </div>
 
-                  {/* Stats tiles */}
-                  <div className="mt-8 border-t border-line/60 pt-6">
-                    <PartnerStats
-                      profile={item}
-                      stats={stats}
-                      serviceCount={services.length}
-                      projectCount={portfolio.length}
-                      onServicesClick={() => scrollToSection(servicesSectionRef)}
-                      onProjectsClick={() => scrollToSection(portfolioSectionRef)}
-                      onReviewsClick={() => scrollToSection(reviewsSectionRef)}
-                      onResponseClick={startChat}
-                      responseDisabled={isOwnProfile || (!item.id && !partnerUserId) || chatState.status === 'loading'}
-                      responseLabel={isOwnProfile ? 'Не можеш да започнеш чат със собствения си профил' : `Започни чат с ${item.name}`}
-                    />
+                  {serviceKeywords.length > 0 && (
+                    <div className="mt-6 flex flex-wrap justify-center gap-2">
+                      {serviceKeywords.slice(0, 5).map((keyword) => (
+                        <span key={keyword} className="rounded-full border border-line bg-soft px-3 py-1 text-xs font-medium text-ink">
+                          {keyword}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <ProfileTrustSignals
+                    profile={item}
+                    responseLabel={responseLabel}
+                    serviceAreaLabel={serviceAreaLabel}
+                    serviceCount={services.length}
+                    projectCount={portfolio.length}
+                    reviewCount={reviewCount}
+                    averageRating={averageRating}
+                    onServicesClick={() => scrollToSection(servicesSectionRef)}
+                    onProjectsClick={() => scrollToSection(portfolioSectionRef)}
+                    onReviewsClick={() => scrollToSection(reviewsSectionRef)}
+                  />
+
+                  <div className="mt-7 grid gap-3">
+                    <button type="button" onClick={() => scrollToSection(inquirySectionRef)} className="btn btn-primary w-full justify-center">
+                      Изпрати запитване
+                    </button>
+                    <button
+                      type="button"
+                      onClick={startChat}
+                      disabled={isOwnProfile || (!item.id && !partnerUserId) || chatState.status === 'loading'}
+                      className="btn btn-ghost w-full justify-center disabled:opacity-50"
+                    >
+                      <MessageCircle size={18} />
+                      {chatState.status === 'loading' ? 'Отваряме чат…' : 'Започни разговор'}
+                    </button>
                   </div>
                 </PublicProfilePanel>
 
-                {/* Inquiry Box Form */}
-                <InquiryBox
-                  proName={item.name}
-                  title={item.name ? `Изпрати запитване до ${item.name}` : 'Опиши проекта си'}
-                  layerSlug={item.layerSlug || item.layer}
-                  targetSlug={item.slug}
-                  clientId={session?.user?.id}
-                />
+                <div ref={inquirySectionRef} className="scroll-mt-24">
+                  <InquiryBox
+                    proName={item.name}
+                    title={item.name ? `Изпрати запитване до ${item.name}` : 'Опиши проекта си'}
+                    layerSlug={item.layerSlug || item.layer}
+                    targetSlug={item.slug}
+                    clientId={session?.user?.id}
+                  />
+                </div>
 
                 <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-widest text-muted">
                   <span className="h-px flex-1 bg-line/80" />или чат след запитване<span className="h-px flex-1 bg-line/80" />
                 </div>
 
-                {/* Chat Action Card */}
                 <ContactCard onStartChat={startChat} chatState={chatState} />
 
               </div>
             </aside>
 
-            {/* RIGHT COLUMN - Main Content Sections */}
             <div className="lg:col-span-8 reveal lg:pt-6 space-y-12">
 
-              {/* Back Link & Biography */}
-              <div className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+              <div>
                 <Link to="/katalog" className="group inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted hover:text-ink transition-colors duration-200 mb-6">
                   <span className="transition-transform duration-200 group-hover:-translate-x-1">←</span> Обратно в каталога
                 </Link>
-
-                <div className="eyebrow mb-2">Биография & Професионален опит</div>
-                <h2 className="font-display text-2xl font-semibold text-ink mb-4">За {item.name}</h2>
-                <p className="whitespace-pre-line text-ink/80 leading-relaxed font-sans" style={{ fontSize: 'var(--step-sm)' }}>
-                  {item.descriptionLong || item.bio}
-                </p>
-
-                {/* Core Parameters Grid */}
-                <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <MetaTile icon={MapPin} label="Работи в" value={item.serviceAreas?.length ? item.serviceAreas.join(', ') : item.city} />
-                  <MetaTile icon={Languages} label="Езици" value={item.languages?.length ? item.languages.join(', ') : 'Български'} />
-                  <MetaTile icon={Globe2} label="Формат" value={item.acceptsRemote ? 'На място / Дистанционно' : 'На място'} />
-                  <MetaTile icon={CheckCircle2} label="Опит" value={`${item.yearsExperience || Math.max(0, new Date().getFullYear() - item.since)} години`} />
-                </div>
-
-                {/* Pricing Banner */}
-                {item.pricingNote && (
-                  <div className="mt-6 rounded-2xl bg-accentSoft/30 border border-accentSoft/60 p-5 flex items-start gap-4 transition-all duration-300 hover:bg-accentSoft/40">
-                    <div className="text-2xl mt-0.5 select-none">💳</div>
-                    <div>
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-accentDeep">Бюджет & Ценови условия</div>
-                      <p className="mt-1 text-sm font-semibold text-ink/90">{item.pricingNote}</p>
-                    </div>
-                  </div>
-                )}
+                <QuickOverviewSection
+                  serviceAreaLabel={serviceAreaLabel}
+                  serviceKeywords={serviceKeywords}
+                  targetObjectLabel={targetObjectLabel}
+                  workMethodLabel={workMethodLabel}
+                  priceGuide={priceGuide}
+                  experienceLabel={experienceLabel}
+                />
               </div>
 
-              {/* Services & Offers */}
-              <ProfileServicesSection ref={servicesSectionRef} services={services} profile={item} />
+              <HelpSection
+                helpText={helpText}
+                aboutText={showAboutText ? aboutText : ''}
+                serviceKeywords={serviceKeywords}
+                formatLabel={item.acceptsRemote ? 'На място / дистанционно' : 'На място'}
+                languagesLabel={item.languages?.length ? item.languages.join(', ') : 'Български'}
+              />
 
-              {/* Specialist Extra Details */}
+              <ProfileServicesSection
+                ref={servicesSectionRef}
+                services={services}
+                profile={item}
+                onInquiryClick={() => scrollToSection(inquirySectionRef)}
+              />
+
               {hasLayer01Details && <Layer01ProfileDetails meta={layer01Meta} />}
 
-              {/* Stepper Timeline */}
-              <div className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                <div className="eyebrow mb-2">Методология</div>
-                <h3 className="font-display text-3xl font-semibold text-ink mb-6">Как протича процесът</h3>
+              <WorkProcessSection steps={layer01Process.length > 0 ? layer01Process : CLIENT_PROCESS_STEPS} />
 
-                {layer01Process.length > 0 ? (
-                  <div className="relative border-l-2 border-line/60 ml-3 pl-6 space-y-6 py-2">
-                    {layer01Process.map((step, index) => (
-                      <div key={`${step.title}-${index}`} className="relative group">
-                        {/* Stepper Dot */}
-                        <div className="absolute -left-[2.05rem] top-1.5 flex h-4.5 w-4.5 items-center justify-center rounded-full border-2 border-accentDeep bg-paper transition-colors duration-200 group-hover:bg-accentDeep" />
-
-                        <div className="flex flex-wrap items-baseline justify-between gap-3">
-                          <div className="font-display text-xl font-semibold text-ink group-hover:text-accentDeep transition-colors duration-200">{step.title || `Стъпка ${index + 1}`}</div>
-                          {step.duration && <div className="text-[10px] font-bold uppercase tracking-wider text-accentDeep bg-accentSoft px-2 py-0.5 rounded-md">{step.duration}</div>}
-                        </div>
-                        {step.description && <p className="mt-1.5 text-sm text-muted leading-relaxed">{step.description}</p>}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {layer.process.map(p => (
-                      <div key={p.n} className="group relative border border-line bg-soft/30 rounded-2xl p-5 transition-all duration-300 hover:bg-soft hover:shadow-[0_8px_25px_rgba(0,0,0,0.02)]">
-                        <div className="absolute top-4 right-4 font-display text-2xl font-bold text-accent/20 transition-colors duration-200 group-hover:text-accent">{p.n}</div>
-                        <div className="font-display text-lg font-bold text-ink pr-8">{p.t}</div>
-                        <p className="text-sm text-muted mt-2 leading-relaxed">{p.d}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Consultation Info */}
               {hasLayer01Details && Number.isFinite(Number(layer01Meta.consultation_fee)) && (
                 <div className="rounded-3xl border border-line/60 bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-wrap items-center justify-between gap-6">
                   <div>
@@ -390,7 +515,6 @@ export default function Pro() {
                 </div>
               )}
 
-              {/* Portfolio Grid */}
               <div
                 ref={portfolioSectionRef}
                 id="profile-projects"
@@ -399,14 +523,15 @@ export default function Pro() {
                 <div className="eyebrow mb-2">Портфолио</div>
                 <h2 className="font-display text-3xl font-semibold text-ink mb-6">Реални реализирани проекти</h2>
                 <div>
-                  <PortfolioGallery items={portfolio} emptyText="Този партньор още не е публикувал свои проекти." />
+                  <PortfolioGallery items={portfolio} emptyText="Портфолиото ще се появи тук, когато партньорът добави реализирани проекти." />
                 </div>
               </div>
 
-              {/* Reviews List */}
               <div ref={reviewsSectionRef} id="profile-reviews" className="scroll-mt-24">
-                <ReviewsList partnerId={partnerUserId} title={`Отзиви за ${item.name}`} emptyText="Все още няма публични отзиви." />
+                <ReviewsList partnerId={partnerUserId} title={`Отзиви за ${item.name}`} emptyText="Отзивите ще се появят тук след завършени Totsan проекти." />
               </div>
+
+              <TrustVerificationBlock />
 
             </div>
           </div>
@@ -427,6 +552,167 @@ function MetaTile({ icon: Icon, label, value }) {
         <div className="mt-0.5 text-sm font-semibold text-ink line-clamp-1">{value}</div>
       </div>
     </div>
+  )
+}
+
+function countLabel(count, singular, plural) {
+  const value = Number(count || 0)
+  if (!value) return ''
+  return `${value} ${value === 1 ? singular : plural}`
+}
+
+function ProfileTrustSignals({
+  responseLabel,
+  serviceAreaLabel,
+  serviceCount,
+  projectCount,
+  reviewCount,
+  averageRating,
+  onServicesClick,
+  onProjectsClick,
+  onReviewsClick,
+}) {
+  const signals = [
+    { key: 'verified', label: 'Проверен профил', icon: ShieldCheck },
+    { key: 'area', label: `Работи в ${serviceAreaLabel}`, icon: MapPin },
+    { key: 'response', label: responseLabel, icon: Clock },
+    serviceCount > 0 ? { key: 'services', label: countLabel(serviceCount, 'услуга', 'услуги'), icon: BriefcaseBusiness, onClick: onServicesClick } : null,
+    projectCount > 0 ? { key: 'projects', label: countLabel(projectCount, 'проект в портфолиото', 'проекта в портфолиото'), icon: FileCheck2, onClick: onProjectsClick } : null,
+    reviewCount > 0 ? { key: 'reviews', label: `${Number(averageRating || 0).toFixed(1)} оценка от ${countLabel(reviewCount, 'отзив', 'отзива')}`, icon: UserCheck, onClick: onReviewsClick } : null,
+  ].filter(Boolean)
+
+  return (
+    <div className="mt-7 border-t border-line/60 pt-6">
+      <div className="grid gap-2">
+        {signals.map((signal) => {
+          const Icon = signal.icon
+          const className = 'flex w-full items-center gap-3 rounded-2xl bg-soft/55 px-3.5 py-3 text-left text-sm font-semibold text-ink transition hover:bg-soft'
+          const content = (
+            <>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-paper text-accentDeep shadow-sm">
+                <Icon size={16} />
+              </span>
+              <span>{signal.label}</span>
+            </>
+          )
+
+          if (signal.onClick) {
+            return (
+              <button key={signal.key} type="button" onClick={signal.onClick} className={className}>
+                {content}
+              </button>
+            )
+          }
+
+          return <div key={signal.key} className={className}>{content}</div>
+        })}
+      </div>
+    </div>
+  )
+}
+
+function QuickOverviewSection({
+  serviceAreaLabel,
+  serviceKeywords,
+  targetObjectLabel,
+  workMethodLabel,
+  priceGuide,
+  experienceLabel,
+}) {
+  const servicesLabel = serviceKeywords.length ? serviceKeywords.slice(0, 4).join(', ') : 'Индивидуални запитвания'
+  const items = [
+    { icon: MapPin, label: 'Работи в', value: serviceAreaLabel },
+    { icon: Tags, label: 'Услуги', value: servicesLabel },
+    { icon: UserCheck, label: 'Подходящ за', value: targetObjectLabel },
+    { icon: FileCheck2, label: 'Начин на работа', value: workMethodLabel },
+    { icon: Euro, label: 'Ценови ориентир', value: priceGuide },
+    experienceLabel ? { icon: CheckCircle2, label: 'Опит', value: experienceLabel } : null,
+  ].filter(Boolean)
+
+  return (
+    <section className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+      <div className="eyebrow mb-2">Бърз преглед</div>
+      <h2 className="font-display text-3xl font-semibold text-ink">Най-важното преди запитване</h2>
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        {items.map((item) => (
+          <MetaTile key={item.label} icon={item.icon} label={item.label} value={item.value} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function HelpSection({ helpText, aboutText, serviceKeywords, formatLabel, languagesLabel }) {
+  return (
+    <section className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+      <div className="eyebrow mb-2">С какво може да помогне</div>
+      <h2 className="font-display text-3xl font-semibold text-ink">Практична помощ за конкретен проект</h2>
+      <p className="mt-4 text-ink/82 leading-relaxed" style={{ fontSize: 'var(--step-sm)' }}>
+        {helpText}
+      </p>
+
+      {serviceKeywords.length > 0 && (
+        <div className="mt-6 flex flex-wrap gap-2">
+          {serviceKeywords.map((keyword) => (
+            <span key={keyword} className="rounded-full border border-line bg-soft px-3 py-1.5 text-sm font-medium text-ink">
+              {keyword}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-7 grid gap-4 sm:grid-cols-2">
+        <MetaTile icon={Globe2} label="Формат" value={formatLabel} />
+        <MetaTile icon={Languages} label="Езици" value={languagesLabel} />
+      </div>
+
+      {aboutText && (
+        <div className="mt-7 border-t border-line pt-6">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-muted">Повече за профила</div>
+          <p className="mt-3 whitespace-pre-line text-sm leading-7 text-muted">{aboutText}</p>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function WorkProcessSection({ steps }) {
+  return (
+    <section className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+      <div className="eyebrow mb-2">Как протича работата</div>
+      <h3 className="font-display text-3xl font-semibold text-ink mb-6">Ясен път от запитване до старт</h3>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {steps.map((step, index) => (
+          <div key={`${step.title}-${index}`} className="group relative border border-line bg-soft/30 rounded-2xl p-5 transition-all duration-300 hover:bg-soft hover:shadow-[0_8px_25px_rgba(0,0,0,0.02)]">
+            <div className="absolute top-4 right-4 font-display text-2xl font-bold text-accent/20 transition-colors duration-200 group-hover:text-accent">
+              {String(index + 1).padStart(2, '0')}
+            </div>
+            <div className="font-display text-lg font-bold text-ink pr-10">{step.title || `Стъпка ${index + 1}`}</div>
+            {step.duration && <div className="mt-2 inline-flex rounded-full bg-accentSoft px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-accentDeep">{step.duration}</div>}
+            {step.description && <p className="text-sm text-muted mt-3 leading-relaxed">{step.description}</p>}
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function TrustVerificationBlock() {
+  return (
+    <section className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
+      <div className="flex items-start gap-4">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-accentSoft/60 text-accentDeep">
+          <ShieldCheck size={22} />
+        </div>
+        <div>
+          <div className="eyebrow mb-2">Доверие и проверка</div>
+          <h2 className="font-display text-2xl font-semibold text-ink">Проверка от Totsan</h2>
+          <p className="mt-3 text-sm leading-7 text-muted">
+            Този профил е прегледан по основни критерии: контакт, дейност, район на работа и представена информация. Проверката помага за ориентация, без да обещава гарантирано качество извън реалната комуникация и договорка.
+          </p>
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -499,13 +785,19 @@ function findLayer01Options(options, values) {
   return values.map((value) => findLayer01Option(options, value)).filter(Boolean)
 }
 
-const ProfileServicesSection = forwardRef(function ProfileServicesSection({ services, profile }, ref) {
+function serviceFitText(service) {
+  const packageDescription = service.packages?.find((item) => item.description)?.description || ''
+  const features = service.packages?.flatMap((item) => item.features || []).filter(Boolean) || []
+  return compactText(service.subtitle || packageDescription || service.tags?.join(', ') || features.slice(0, 3).join(', ')) || 'Подходящо за конкретно запитване и уточнение според обекта.'
+}
+
+const ProfileServicesSection = forwardRef(function ProfileServicesSection({ services, profile, onInquiryClick }, ref) {
   return (
-    <div ref={ref} id="profile-services" className="mt-10 scroll-mt-24">
+    <div ref={ref} id="profile-services" className="scroll-mt-24 rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-line pb-5">
         <div>
-          <div className="eyebrow">Услуги & оферти</div>
-          <h2 className="mt-2 font-display text-3xl text-ink">Предложения от {profile.name}</h2>
+          <div className="eyebrow">Услуги и пакети</div>
+          <h2 className="mt-2 font-display text-3xl text-ink">Какво конкретно предлага {profile.name}</h2>
         </div>
         <Link to="/uslugi" className="inline-flex items-center gap-2 text-sm font-medium text-ink underline underline-offset-4 hover:text-accentDeep transition-colors duration-200">
           Всички услуги <ArrowRight size={16} />
@@ -518,29 +810,59 @@ const ProfileServicesSection = forwardRef(function ProfileServicesSection({ serv
             <Link
               key={service.id}
               to={`/uslugi/${service.slug}`}
-              className="group flex flex-col justify-between rounded-3xl border border-line/50 bg-paper p-6 transition-all duration-300 hover:-translate-y-1 hover:border-ink/25 hover:shadow-[0_12px_30px_rgba(13,35,64,0.06)]"
+              className="group flex min-h-[22rem] flex-col overflow-hidden rounded-3xl border border-line/60 bg-paper text-left transition-all duration-300 hover:-translate-y-1 hover:border-ink/25 hover:shadow-[0_12px_30px_rgba(13,35,64,0.08)]"
             >
+              <div className="relative aspect-[16/9] bg-soft">
+                {service.coverUrl ? (
+                  <img src={service.coverUrl} alt={service.title} className="img-cover transition duration-700 group-hover:scale-[1.04]" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-soft text-accentDeep">
+                    <Wrench size={32} />
+                  </div>
+                )}
+                <span className="absolute left-4 top-4 rounded-full bg-paper/92 px-3 py-1 text-xs font-bold text-accentDeep shadow-sm">
+                  {packagePriceLabel(service)}
+                </span>
+              </div>
               <div>
-                <div className="flex items-center justify-between gap-4">
+                <div className="p-6">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accentSoft/60 text-accentDeep">
                     <BriefcaseBusiness size={20} />
                   </div>
-                  <span className="rounded-full bg-accentSoft/50 px-3 py-1 text-xs font-bold text-accentDeep border border-accentSoft">
-                    {packagePriceLabel(service)}
-                  </span>
+                  <h3 className="mt-4 font-display text-2xl leading-tight text-ink group-hover:text-accentDeep transition-colors duration-200">{service.title}</h3>
+                  <div className="mt-4">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted">Подходящо за</div>
+                    <p className="mt-1.5 line-clamp-3 text-sm leading-6 text-muted">{serviceFitText(service)}</p>
+                  </div>
+                  {service.tags?.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {service.tags.slice(0, 4).map((tag) => (
+                        <span key={tag} className="rounded-full border border-line bg-soft px-2.5 py-1 text-[11px] font-medium text-ink">{tag}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <h3 className="mt-5 font-display text-2xl leading-tight text-ink group-hover:text-accentDeep transition-colors duration-200">{service.title}</h3>
-                {service.subtitle && <p className="mt-2 line-clamp-2 text-sm text-muted">{service.subtitle}</p>}
               </div>
-              <div className="mt-6 flex items-center gap-2 text-sm font-semibold text-ink group-hover:text-accent transition-colors duration-200">
-                Детайли по офертата <ArrowRight size={16} className="transition-transform duration-200 group-hover:translate-x-1" />
+              <div className="mt-auto border-t border-line px-6 py-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-ink group-hover:text-accent transition-colors duration-200">
+                  Запитай за тази услуга <ArrowRight size={16} className="transition-transform duration-200 group-hover:translate-x-1" />
+                </div>
               </div>
             </Link>
           ))}
         </div>
       ) : (
-        <div className="mt-6 rounded-3xl border border-dashed border-line/80 bg-soft/30 p-6 text-center text-sm text-muted">
-          Този партньор още няма публични услуги. Можеш да започнеш разговор директено от бутона за контакт.
+        <div className="mt-6 rounded-3xl border border-dashed border-line/80 bg-soft/40 p-6 md:p-8 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-paper text-accentDeep shadow-sm">
+            <BriefcaseBusiness size={22} />
+          </div>
+          <h3 className="mt-4 font-display text-2xl font-semibold text-ink">Този партньор още не е публикувал конкретни услуги.</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted">
+            Можете да изпратите запитване с описание на проекта. Партньорът ще уточни обхвата, огледа и офертата според конкретния обект.
+          </p>
+          <button type="button" onClick={onInquiryClick} className="btn btn-primary mt-6 justify-center">
+            Изпрати запитване
+          </button>
         </div>
       )}
     </div>
@@ -552,9 +874,7 @@ function ContactCard({ onStartChat, chatState }) {
     <div className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
       <div className="flex items-center gap-3">
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accentSoft/60 text-accentDeep">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-          </svg>
+          <MessageCircle size={19} />
         </div>
         <div>
           <div className="text-xs font-bold uppercase tracking-wider text-muted">Директна връзка</div>

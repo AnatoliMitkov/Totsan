@@ -1513,7 +1513,7 @@ function ProfileForm({
 
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Име / фирма"><input value={draft.name} onChange={event => onChange('name', event.target.value)} className={INPUT} /></Field>
-          <Field label="Кратко професионално заглавие"><input value={draft.headline} onChange={event => onChange('headline', event.target.value)} className={INPUT} placeholder="Напр. Интериори с точен бюджет и срок" /></Field>
+          <Field label="Основна специализация"><input value={draft.headline} onChange={event => onChange('headline', event.target.value)} className={INPUT} placeholder="Напр. ВиК ремонт и поддръжка" /></Field>
         </div>
         {hasNameMismatch && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -1526,10 +1526,10 @@ function ProfileForm({
           <span>Синхронизирай и името в акаунта</span>
         </label>
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Роля"><input value={draft.tag} onChange={event => onChange('tag', event.target.value)} className={INPUT} /></Field>
+          <Field label="Категория / роля"><input value={draft.tag} onChange={event => onChange('tag', event.target.value)} className={INPUT} placeholder="Напр. специалист, студио, изпълнител" /></Field>
           <Field label="Слой"><TotsanSelect value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} /></Field>
           <div className="md:col-span-2">
-            <LocationCombobox label="Град" value={draft.city} onChange={(value) => onChange('city', value)} required helper="" />
+            <LocationCombobox label="Град и основен район" value={draft.city} onChange={(value) => onChange('city', value)} required helper="" />
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
@@ -1537,8 +1537,8 @@ function ProfileForm({
           <Field label="Проекти"><input type="number" min="0" value={draft.projects} onChange={event => onChange('projects', event.target.value)} className={INPUT} /></Field>
         </div>
 
-        <Field label="Кратко био"><textarea rows={4} value={draft.bio} onChange={event => onChange('bio', event.target.value)} className={INPUT} /></Field>
-        <Field label="Разширено описание"><textarea rows={7} value={draft.descriptionLong} onChange={event => onChange('descriptionLong', event.target.value)} className={INPUT} /></Field>
+        <Field label="Кратко позициониране"><textarea rows={4} value={draft.bio} onChange={event => onChange('bio', event.target.value)} className={INPUT} placeholder="Обяснете с едно-две изречения за какви клиенти и проекти сте най-подходящи." /></Field>
+        <Field label="С какво може да помогнете"><textarea rows={7} value={draft.descriptionLong} onChange={event => onChange('descriptionLong', event.target.value)} className={INPUT} placeholder="Опишете конкретните задачи, услуги и тип обекти, с които помагате." /></Field>
 
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Езици"><input value={draft.languagesText} onChange={event => onChange('languagesText', event.target.value)} className={INPUT} placeholder="bg, en" /></Field>
@@ -1557,7 +1557,7 @@ function ProfileForm({
           <Field label="Facebook"><input value={draft.facebook} onChange={event => onChange('facebook', event.target.value)} className={INPUT} /></Field>
         </div>
 
-        <Field label="Ценова бележка"><textarea rows={3} value={draft.pricingNote} onChange={event => onChange('pricingNote', event.target.value)} className={INPUT} placeholder="Напр. Консултация от 80€, проект по оферта." /></Field>
+        <Field label="Ценови ориентир"><textarea rows={3} value={draft.pricingNote} onChange={event => onChange('pricingNote', event.target.value)} className={INPUT} placeholder="Напр. Консултация от 80€, цена след оглед или проект по оферта." /></Field>
         <label className="flex items-start gap-3 rounded-2xl border border-line bg-soft p-4 text-sm text-muted">
           <input type="checkbox" checked={draft.acceptsRemote} onChange={event => onChange('acceptsRemote', event.target.checked)} className="mt-1 accent-black" />
           <span>Приемам дистанционни консултации.</span>

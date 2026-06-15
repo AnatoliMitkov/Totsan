@@ -101,6 +101,8 @@ export default function PortfolioGallery({ items = [], emptyText = 'Още ня�
           const cover = getProjectCover(item)
           const firstMedia = getPortfolioMedia(item)[0]
           const hasVideo = getPortfolioMedia(item).some(isVideoMedia)
+          const role = item.role || item.partnerRole || item.partner_role || ''
+          const projectType = layerLabel(item.layerSlug).replace(/^Слой\s+\d+\s+·\s+/, '')
 
           return (
             <button
@@ -129,12 +131,16 @@ export default function PortfolioGallery({ items = [], emptyText = 'Още ня�
               </div>
               <div className="p-5">
                 <span className="inline-flex items-center rounded-full bg-soft px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accentDeep">
-                  {layerLabel(item.layerSlug).split(' · ')[0]}
+                  {projectType}
                 </span>
                 <h4 className="mt-2 font-display text-xl font-semibold text-ink group-hover:text-accent transition-colors duration-200 line-clamp-1">{item.title}</h4>
-                <div className="mt-2 flex items-center justify-between text-xs text-muted">
+                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
                   <span>{item.city || 'България'}</span>
-                  <span>{item.year || ''}</span>
+                  {item.year && <span>· {item.year}</span>}
+                  {role && <span>· Роля: {role}</span>}
+                </div>
+                <div className="mt-4 text-sm font-semibold text-ink group-hover:text-accentDeep">
+                  Виж проекта
                 </div>
               </div>
             </button>
@@ -156,8 +162,12 @@ export default function PortfolioGallery({ items = [], emptyText = 'Още ня�
                 <div className="eyebrow">{layerLabel(activeItem.layerSlug)}</div>
                 <h3 className="mt-2 font-display text-4xl leading-tight text-ink">{activeItem.title}</h3>
                 <div className="mt-4 flex flex-wrap gap-2 text-sm text-muted">
+                  {activeItem.layerSlug && <span className="rounded-full border border-line px-3 py-1">{layerLabel(activeItem.layerSlug)}</span>}
                   {activeItem.city && <span className="rounded-full border border-line px-3 py-1">{activeItem.city}</span>}
                   {activeItem.year && <span className="rounded-full border border-line px-3 py-1">{activeItem.year}</span>}
+                  {(activeItem.role || activeItem.partnerRole || activeItem.partner_role) && (
+                    <span className="rounded-full border border-line px-3 py-1">Роля: {activeItem.role || activeItem.partnerRole || activeItem.partner_role}</span>
+                  )}
                   {activeItem.budgetBand && <span className="rounded-full border border-line px-3 py-1">{activeItem.budgetBand}</span>}
                 </div>
                 {activeItem.description && <p className="mt-5 whitespace-pre-wrap text-muted">{activeItem.description}</p>}
