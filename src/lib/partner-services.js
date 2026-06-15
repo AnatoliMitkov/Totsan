@@ -2,6 +2,7 @@ import { uploadServiceMedia } from './profile-media-upload-client.js'
 import { slugify } from './profiles.js'
 import { supabase } from './supabase.js'
 import { formatMoney } from './money.js'
+import { normalizeLocationList } from './locations.js'
 
 export const SERVICE_STATUS_LABELS = {
   draft: 'Чернова',
@@ -129,7 +130,7 @@ export function normalizePartnerService(row = {}, related = {}) {
     coverUrl: row.coverUrl || row.cover_url || '',
     media: jsonArray(row.media),
     tags: textArray(row.tags),
-    deliveryAreas: textArray(row.deliveryAreas || row.delivery_areas),
+    deliveryAreas: normalizeLocationList(row.deliveryAreas || row.delivery_areas),
     isPublished: row.isPublished ?? row.is_published ?? false,
     moderationStatus: row.moderationStatus || row.moderation_status || 'draft',
     moderationNote: row.moderationNote || row.moderation_note || '',
@@ -208,7 +209,7 @@ function servicePayload(profile, draft, status, slugOverride = '') {
     cover_url: cleanText(draft.coverUrl),
     media: jsonArray(draft.media),
     tags: textArray(draft.tagsText),
-    delivery_areas: textArray(draft.deliveryAreasText),
+    delivery_areas: normalizeLocationList(draft.deliveryAreasText),
     is_published: isPublished,
     moderation_status: nextStatus,
     moderation_note: null,

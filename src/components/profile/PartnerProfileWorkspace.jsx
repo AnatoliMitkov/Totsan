@@ -57,6 +57,8 @@ import PartnerOrders from './PartnerOrders.jsx'
 import PartnerInquiries from './PartnerInquiries.jsx'
 import Layer01SpecEditor, { cleanLayer01Draft, makeLayer01Draft } from './Layer01SpecEditor.jsx'
 import TotsanSelect from '../ui/TotsanSelect.jsx'
+import { LocationCombobox, LocationMultiCombobox } from '../ui/LocationCombobox.jsx'
+import { normalizeLocationList, normalizeLocationValue } from '../../lib/locations.js'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const MAX_BANNER_BYTES = 12 * 1024 * 1024
@@ -121,6 +123,11 @@ function csv(value) {
 
 function fromCsv(value, fallback = []) {
   const next = String(value || '').split(',').map(item => item.trim()).filter(Boolean)
+  return next.length ? next : fallback
+}
+
+function fromLocationCsv(value, fallback = []) {
+  const next = normalizeLocationList(value)
   return next.length ? next : fallback
 }
 
@@ -482,7 +489,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     cover_y: profileDraft.coverY,
     description_long: profileDraft.descriptionLong,
     email_public: profileDraft.emailPublic,
-    service_areas: fromCsv(profileDraft.serviceAreasText, []),
+    service_areas: fromLocationCsv(profileDraft.serviceAreasText, []),
     languages: fromCsv(profileDraft.languagesText, ['bg']),
     years_experience: profileDraft.yearsExperience,
     response_time_hours: profileDraft.responseTimeHours,
@@ -609,7 +616,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       name: profileDraft.name.trim(),
       tag: profileDraft.tag.trim(),
       headline: profileDraft.headline.trim() || null,
-      city: profileDraft.city.trim(),
+      city: normalizeLocationValue(profileDraft.city),
       layer_slug: profileDraft.layerSlug,
       since: Number(profileDraft.since),
       years_experience: profileDraft.yearsExperience === '' ? null : Number(profileDraft.yearsExperience),
@@ -628,7 +635,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       instagram: profileDraft.instagram.trim() || null,
       facebook: profileDraft.facebook.trim() || null,
       languages: fromCsv(profileDraft.languagesText, ['bg']),
-      service_areas: fromCsv(profileDraft.serviceAreasText, []),
+      service_areas: fromLocationCsv(profileDraft.serviceAreasText, []),
       response_time_hours: profileDraft.responseTimeHours === '' ? null : Number(profileDraft.responseTimeHours),
       accepts_remote: Boolean(profileDraft.acceptsRemote),
       pricing_note: profileDraft.pricingNote.trim() || null,
@@ -849,12 +856,10 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
               <ProfileForm
                 draft={profileDraft}
                 saveState={saveState}
-                preview={preview}
                 accountDisplayName={accountDisplayName}
                 hasNameMismatch={hasNameMismatch}
                 onChange={updateProfile}
                 onSubmit={saveProfile}
-                onOpenAvatarEditor={openAvatarEditor}
               />
             )}
 
@@ -1493,16 +1498,14 @@ function SavePanel({ state, idleMessage, savingLabel = 'Запазва се…',
 function ProfileForm({
   draft,
   saveState,
-  preview,
   accountDisplayName,
   hasNameMismatch,
   onChange,
   onSubmit,
-  onOpenAvatarEditor,
 }) {
   return (
-    <form onSubmit={onSubmit} className="grid gap-5 lg:grid-cols-12">
-      <div className="lg:col-span-8 rounded-3xl border border-line bg-paper p-5 md:p-7 space-y-5">
+    <form onSubmit={onSubmit} className="grid gap-5">
+      <div className="rounded-3xl border border-line bg-paper p-5 md:p-7 space-y-5">
         <div>
           <div className="eyebrow">Профил</div>
           <h2 className="mt-2 font-display text-3xl text-ink">Основна информация</h2>
@@ -1510,7 +1513,7 @@ function ProfileForm({
 
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Име / фирма"><input value={draft.name} onChange={event => onChange('name', event.target.value)} className={INPUT} /></Field>
-          <Field label="One-liner"><input value={draft.headline} onChange={event => onChange('headline', event.target.value)} className={INPUT} placeholder="Напр. Интериори с точен бюджет и срок" /></Field>
+          <Field label="Кратко професионално заглавие"><input value={draft.headline} onChange={event => onChange('headline', event.target.value)} className={INPUT} placeholder="Напр. Интериори с точен бюджет и срок" /></Field>
         </div>
         {hasNameMismatch && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -1522,16 +1525,16 @@ function ProfileForm({
           <input type="checkbox" checked={draft.syncAccountName} onChange={event => onChange('syncAccountName', event.target.checked)} className="mt-1 accent-black" />
           <span>Синхронизирай и името в акаунта</span>
         </label>
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <Field label="Роля"><input value={draft.tag} onChange={event => onChange('tag', event.target.value)} className={INPUT} /></Field>
-          <Field label="Град"><input value={draft.city} onChange={event => onChange('city', event.target.value)} className={INPUT} /></Field>
           <Field label="Слой"><TotsanSelect value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} /></Field>
+          <div className="md:col-span-2">
+            <LocationCombobox label="Град" value={draft.city} onChange={(value) => onChange('city', value)} required helper="" />
+          </div>
         </div>
-        <div className="grid gap-4 md:grid-cols-4">
-          <Field label="От година"><input type="number" min="1900" max="2100" value={draft.since} onChange={event => onChange('since', event.target.value)} className={INPUT} /></Field>
+        <div className="grid gap-4 md:grid-cols-2">
           <Field label="Години опит"><input type="number" min="0" value={draft.yearsExperience} onChange={event => onChange('yearsExperience', event.target.value)} className={INPUT} /></Field>
           <Field label="Проекти"><input type="number" min="0" value={draft.projects} onChange={event => onChange('projects', event.target.value)} className={INPUT} /></Field>
-          <Field label="Отговор до часове"><input type="number" min="0" value={draft.responseTimeHours} onChange={event => onChange('responseTimeHours', event.target.value)} className={INPUT} /></Field>
         </div>
 
         <Field label="Кратко био"><textarea rows={4} value={draft.bio} onChange={event => onChange('bio', event.target.value)} className={INPUT} /></Field>
@@ -1539,7 +1542,9 @@ function ProfileForm({
 
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Езици"><input value={draft.languagesText} onChange={event => onChange('languagesText', event.target.value)} className={INPUT} placeholder="bg, en" /></Field>
-          <Field label="Райони на работа"><input id="partner-service-areas-field" value={draft.serviceAreasText} onChange={event => onChange('serviceAreasText', event.target.value)} className={INPUT} placeholder="София, Пловдив" /></Field>
+          <div id="partner-service-areas-field">
+            <LocationMultiCombobox label="Райони на работа" value={draft.serviceAreasText} onChange={(value) => onChange('serviceAreasText', value)} />
+          </div>
         </div>
 
         <div id="partner-contact-fields" className="grid gap-4 md:grid-cols-3 scroll-mt-28">
@@ -1563,24 +1568,6 @@ function ProfileForm({
           <button className="btn btn-primary" disabled={saveState.status === 'saving'}><Save size={18} /> {saveState.status === 'saving' ? 'Запазва се…' : 'Запази профила'}</button>
         </div>
       </div>
-
-      <aside className="lg:col-span-4 space-y-5">
-        <div className="rounded-3xl border border-line bg-paper p-5 md:p-6 lg:sticky lg:top-24">
-          <div className="eyebrow">Снимка</div>
-          <div className="group relative mt-4 flex justify-center">
-            <button type="button" onClick={onOpenAvatarEditor} className="relative rounded-full transition hover:ring-2 hover:ring-ink focus:outline-none focus:ring-2 focus:ring-ink" aria-label="Смени снимката">
-              <Avatar src={preview.imageUrl || ''} name={preview.name} size={200} imgStyle={getProfileImageStyle(preview)} />
-              <div className="absolute inset-0 hidden flex-col items-center justify-center rounded-full bg-ink/45 px-5 text-center text-paper opacity-0 transition md:flex md:group-hover:opacity-100 md:group-focus-within:opacity-100">
-                <Camera size={32} />
-                <span className="mt-2 text-sm font-semibold">{preview.imageUrl ? 'Смени снимка' : 'Добавете снимка'}</span>
-              </div>
-            </button>
-          </div>
-          <button type="button" onClick={onOpenAvatarEditor} className="btn btn-ghost mt-4 w-full cursor-pointer justify-center">
-            <Camera size={18} /> {preview.imageUrl ? 'Смени снимката' : 'Добавете снимка'}
-          </button>
-        </div>
-      </aside>
     </form>
   )
 }
@@ -1982,7 +1969,7 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
               </div>
 
               <div className="grid gap-4 md:grid-cols-4">
-                <Field label="Град"><input value={draft.city} onChange={event => onChange('city', event.target.value)} className={INPUT} placeholder="Русе" /></Field>
+                <LocationCombobox label="Град" value={draft.city} onChange={(value) => onChange('city', value)} />
                 <Field label="Година"><input type="number" min="1900" max="2100" value={draft.year} onChange={event => onChange('year', event.target.value)} className={INPUT} /></Field>
                 <Field label="Силен акцент"><input value={draft.budgetBand} onChange={event => onChange('budgetBand', event.target.value)} className={INPUT} placeholder="Преди/След · 6 кв.м." /></Field>
                 <Field label="Ред"><input type="number" value={draft.orderIndex} onChange={event => onChange('orderIndex', event.target.value)} className={INPUT} /></Field>
@@ -2262,7 +2249,7 @@ function InfoTile({ label, value }) {
 }
 
 function Field({ label, children }) {
-  return <label className="block text-sm font-medium text-ink">{label}{children}</label>
+  return <div className="block text-sm font-medium text-ink">{label}{children}</div>
 }
 
 function Range({ label, value, min, max, step, onChange }) {

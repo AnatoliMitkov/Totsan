@@ -17,6 +17,8 @@ import PublicProfileBanner from '../components/profile/PublicProfileBanner.jsx'
 import Avatar from '../components/Avatar.jsx'
 import TotpMfaManager from '../components/auth/TotpMfa.jsx'
 import TotsanSelect from '../components/ui/TotsanSelect.jsx'
+import { LocationCombobox } from '../components/ui/LocationCombobox.jsx'
+import { normalizeLocationValue } from '../lib/locations.js'
 import {
   calculateClientProfileCompleteness,
   deactivateClientProject,
@@ -995,7 +997,7 @@ function ProForm({ profile, userId, onSaved }) {
     const { error } = await supabase.from('profiles').update({
       name: draft.name.trim(),
       tag: draft.tag.trim(),
-      city: draft.city.trim(),
+      city: normalizeLocationValue(draft.city),
       bio: draft.bio.trim(),
       image_url: draft.imageUrl.trim(),
       image_zoom: Number(draft.imageZoom),
@@ -1031,7 +1033,7 @@ function ProForm({ profile, userId, onSaved }) {
               <label className="block text-sm font-medium text-ink">Роля / етикет<input value={draft.tag} onChange={e => update('tag', e.target.value)} className={INPUT} placeholder="Архитект, Майстор..." /></label>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
-              <label className="block text-sm font-medium text-ink">Град<input value={draft.city} onChange={e => update('city', e.target.value)} className={INPUT} /></label>
+              <LocationCombobox label="Град" value={draft.city} onChange={(value) => update('city', value)} required />
               <label className="block text-sm font-medium text-ink">От година<input type="number" min="1900" max="2100" value={draft.since} onChange={e => update('since', e.target.value)} className={INPUT} /></label>
               <TotsanSelect label="Слой" value={draft.layerSlug} onChange={(value) => update('layerSlug', value)} options={LAYERS.map(l => ({ value: l.slug, label: `Слой ${l.number} · ${l.title}` }))} />
             </div>

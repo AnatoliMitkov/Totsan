@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { LAYERS as BASE_LAYERS } from '../data/layers.js'
 import { getStaticProductsForLayer } from './product-metadata.js'
 import { supabase } from './supabase.js'
+import { normalizeLocationList, normalizeLocationValue } from './locations.js'
 
 export const LEGACY_PROFILE_IMAGE_BUCKET = 'profile-images'
 export const PROFILE_IMAGE_BUCKET = 'profile-images-optimized'
@@ -114,7 +115,7 @@ export function normalizeProfile(input = {}, fallback = null) {
   const layer = LAYER_MAP.get(layerSlug)
   const name = String(input.name ?? base.name ?? '').trim()
   const tag = String(input.tag ?? base.tag ?? '').trim()
-  const city = String(input.city ?? base.city ?? '').trim()
+  const city = normalizeLocationValue(input.city ?? base.city ?? '')
   const slug = String(input.slug ?? base.slug ?? slugify(name)).trim() || slugify(name)
   const since = clamp(input.since ?? base.since, 1900, 2100, new Date().getFullYear())
   const rating = clamp(input.rating ?? base.rating, 0, 5, 5)
@@ -135,7 +136,7 @@ export function normalizeProfile(input = {}, fallback = null) {
   const instagram = String(input.instagram ?? base.instagram ?? '').trim()
   const facebook = String(input.facebook ?? base.facebook ?? '').trim()
   const languages = toTextArray(input.languages ?? base.languages, ['bg'])
-  const serviceAreas = toTextArray(input.serviceAreas ?? input.service_areas ?? base.serviceAreas ?? base.service_areas, city ? [city] : [])
+  const serviceAreas = normalizeLocationList(toTextArray(input.serviceAreas ?? input.service_areas ?? base.serviceAreas ?? base.service_areas, city ? [city] : []))
   const yearsExperience = clamp(input.yearsExperience ?? input.years_experience ?? base.yearsExperience ?? base.years_experience, 0, 100, Math.max(0, new Date().getFullYear() - since))
   const responseTimeHours = input.responseTimeHours ?? input.response_time_hours ?? base.responseTimeHours ?? base.response_time_hours ?? null
   const acceptsRemote = input.acceptsRemote ?? input.accepts_remote ?? base.acceptsRemote ?? base.accepts_remote ?? false

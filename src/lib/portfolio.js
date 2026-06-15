@@ -1,5 +1,6 @@
 import { uploadPortfolioMedia } from './profile-media-upload-client.js'
 import { supabase } from './supabase.js'
+import { normalizeLocationValue } from './locations.js'
 
 export const PORTFOLIO_SELECT_COLUMNS = `
   id,
@@ -55,7 +56,7 @@ export function normalizePortfolioItem(row) {
     media: Array.isArray(row.media) ? row.media : [],
     layerSlug: row.layerSlug || row.layer_slug || '',
     year: row.year ?? '',
-    city: row.city || '',
+    city: normalizeLocationValue(row.city),
     budgetBand: row.budgetBand || row.budget_band || '',
     orderIndex: row.orderIndex ?? row.order_index ?? 0,
     isPublished: row.isPublished ?? row.is_published ?? true,
@@ -73,7 +74,7 @@ function toDbPayload(item, profileId) {
     media: Array.isArray(item.media) ? item.media : [],
     layer_slug: cleanText(item.layerSlug),
     year: numberOrNull(item.year),
-    city: cleanText(item.city),
+    city: cleanText(normalizeLocationValue(item.city)),
     budget_band: cleanText(item.budgetBand),
     order_index: numberOrNull(item.orderIndex) ?? 0,
     is_published: item.isPublished !== false,

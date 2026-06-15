@@ -1,6 +1,7 @@
 import { supabase } from './supabase.js'
 import { uploadProjectMedia } from './project-media-upload-client.js'
 import { formatMoneyRange } from './money.js'
+import { normalizeLocationValue } from './locations.js'
 
 export const PROPERTY_TYPES = [
   { value: 'apartment', label: 'Апартамент' },
@@ -133,7 +134,7 @@ export function normalizeProject(row) {
     propertyType: row.property_type || '',
     areaSqm: row.area_sqm ?? '',
     roomsCount: row.rooms_count ?? '',
-    addressCity: row.address_city || '',
+    addressCity: normalizeLocationValue(row.address_city),
     addressRegion: row.address_region || '',
     currentLayerSlug: row.current_layer_slug || 'ideya',
     desiredStartDate: row.desired_start_date || '',
@@ -179,7 +180,7 @@ function projectToDb(project, userId) {
     property_type: cleanText(project.propertyType),
     area_sqm: numberOrNull(project.areaSqm),
     rooms_count: numberOrNull(project.roomsCount),
-    address_city: cleanText(project.addressCity),
+    address_city: cleanText(normalizeLocationValue(project.addressCity)),
     address_region: cleanText(project.addressRegion),
     current_layer_slug: cleanText(project.currentLayerSlug),
     desired_start_date: cleanText(project.desiredStartDate),
@@ -250,7 +251,7 @@ export async function saveCustomerAccountProfile(values) {
     p_phone: values.phone || '',
     p_avatar_url: values.avatarUrl || '',
     p_cover_url: values.coverUrl || '',
-    p_city: values.city || '',
+    p_city: normalizeLocationValue(values.city),
     p_country: values.country || 'BG',
     p_bio: values.bio || '',
     p_locale: values.locale || 'bg',

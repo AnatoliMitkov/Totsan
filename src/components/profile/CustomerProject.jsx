@@ -6,6 +6,7 @@ import {
 import { LAYERS } from '../../data/layers.js'
 import { DEFAULT_PROJECT, PROJECT_MEDIA_KINDS, PROPERTY_TYPES, mergeQuizAnswer, isMeaningfulProject } from '../../lib/projects.js'
 import TotsanSelect from '../ui/TotsanSelect.jsx'
+import { LocationCombobox } from '../ui/LocationCombobox.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line/75 bg-soft/30 px-4 py-3.5 text-sm outline-none transition-all duration-200 focus:bg-paper focus:border-accentDeep focus:shadow-sm'
 const TEXTAREA = 'mt-2 w-full rounded-2xl border border-line/75 bg-soft/30 px-4 py-3.5 text-sm outline-none transition-all duration-200 focus:bg-paper focus:border-accentDeep focus:shadow-sm resize-none'
@@ -419,10 +420,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
                   </div>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 mt-4">
-                  <div>
-                    <label className="block text-sm font-medium text-ink">Град</label>
-                    <input value={draft.addressCity} onChange={e => update('addressCity', e.target.value)} className={INPUT} placeholder="София" />
-                  </div>
+                  <LocationCombobox label="Град" value={draft.addressCity} onChange={(value) => update('addressCity', value)} />
                   <div>
                     <label className="block text-sm font-medium text-ink">Район / Квартал</label>
                     <input value={draft.addressRegion} onChange={e => update('addressRegion', e.target.value)} className={INPUT} placeholder="Младост 1" />

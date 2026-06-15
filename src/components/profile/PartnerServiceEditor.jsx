@@ -36,6 +36,7 @@ import {
 } from '../../lib/partner-services.js'
 import FallbackImage from '../FallbackImage.jsx'
 import TotsanSelect from '../ui/TotsanSelect.jsx'
+import { LocationMultiCombobox } from '../ui/LocationCombobox.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-base font-normal leading-6 outline-none transition focus:border-ink'
 
@@ -714,8 +715,8 @@ function InfoSection({ draft, onChange, onStarter }) {
         <Field label="Тагове" hint="Раздели с запетая. Използват се за търсене.">
           <input value={draft.tagsText} onChange={event => onChange('tagsText', event.target.value)} className={INPUT} placeholder="боя, шпакловка, освежаване" />
         </Field>
-        <Field label="Райони" hint="Градове или квартали, в които работиш.">
-          <input value={draft.deliveryAreasText} onChange={event => onChange('deliveryAreasText', event.target.value)} className={INPUT} placeholder="София, Пловдив" />
+        <Field label="Райони" hint="Градове или населени места, в които работиш.">
+          <LocationMultiCombobox label="Обслужвани места" value={draft.deliveryAreasText} onChange={(value) => onChange('deliveryAreasText', value)} />
         </Field>
       </div>
       <Field label="Описание" hint="Опиши обхвата, процеса и какво трябва да подготви клиентът.">
@@ -899,13 +900,13 @@ function StatTile({ label, value, tone = 'neutral' }) {
 
 function Field({ label, hint, children }) {
   return (
-    <label className="relative block text-base font-semibold text-ink">
+    <div className="relative block text-base font-semibold text-ink">
       <span className="inline-flex items-center gap-2">
         {label}
         {hint && <HelperHint text={hint} />}
       </span>
       {children}
-    </label>
+    </div>
   )
 }
 

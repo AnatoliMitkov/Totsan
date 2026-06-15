@@ -16,8 +16,8 @@ import {
 import { gsap } from 'gsap'
 import { LAYERS } from '../data/layers.js'
 import { HOME_PROJECTS, PARTNER_LOGOS, LAYER_HEROS } from '../data/images.js'
-import { supabase } from '../lib/supabase.js'
 import { trackEvent } from '../lib/analytics.js'
+import { loadHomepageStats } from '../lib/homepage-stats.js'
 import { buildFaqSchema, buildOrganizationSchema, buildWebsiteSchema, useSeo } from '../lib/seo.js'
 
 const HERO_POSTER_SRC = '/Videos/totsan-hero-video-building-layers.webp'
@@ -513,31 +513,9 @@ function TrustPromise() {
 
     async function loadStats() {
       try {
-        const [servicesResult, profilesResult] = await Promise.all([
-          supabase.from('partner_services').select('delivery_areas, profile:profiles(city)', { count: 'exact' }),
-          supabase.from('profiles').select('projects', { count: 'exact' }),
-        ])
-
-        if (servicesResult.error) throw servicesResult.error
-        if (profilesResult.error) throw profilesResult.error
-
-        const services = servicesResult.data || []
-        const profiles = profilesResult.data || []
-        const completedProjects = profiles.reduce((sum, row) => sum + Number(row.projects || 0), 0)
-        const coveredCities = new Set(
-          services.flatMap((row) => [
-            row.profile?.city,
-            ...(Array.isArray(row.delivery_areas) ? row.delivery_areas : []),
-          ]).map((value) => String(value || '').trim()).filter(Boolean)
-        ).size
-
+        const nextStats = await loadHomepageStats()
         if (!active) return
-        setStats({
-          publishedServices: servicesResult.count || 0,
-          completedProjects,
-          verifiedSpecialists: profilesResult.count || 0,
-          coveredCities,
-        })
+        setStats(nextStats)
       } catch (error) {
         console.error('Failed to load homepage stats:', error)
       }
@@ -556,9 +534,9 @@ function TrustPromise() {
           </span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
-          <AnimatedStatCounter key="published-services" end={stats.publishedServices} label="Публични услуги" suffix="+" />
-          <AnimatedStatCounter key="completed-projects" end={stats.completedProjects} label="Завършени обекта" suffix="+" />
-          <AnimatedStatCounter key="verified-specialists" end={stats.verifiedSpecialists} label="Проверени майстори" suffix="+" />
+          <AnimatedStatCounter key="published-services" end={stats.publishedServices} label="Публични услуги" />
+          <AnimatedStatCounter key="completed-projects" end={stats.completedProjects} label="Завършени обекта" />
+          <AnimatedStatCounter key="verified-specialists" end={stats.verifiedSpecialists} label="Проверени майстори" />
           <AnimatedStatCounter key="covered-cities" end={stats.coveredCities} label="Покрити градове" suffix="" />
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">

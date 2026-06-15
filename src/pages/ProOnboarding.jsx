@@ -5,6 +5,8 @@ import { useAccount } from '../lib/account.js'
 import { supabase } from '../lib/supabase.js'
 import { uploadPortfolioMedia, uploadProfileMedia } from '../lib/profile-media-upload-client.js'
 import TotsanSelect from '../components/ui/TotsanSelect.jsx'
+import { LocationCombobox, LocationMultiCombobox } from '../components/ui/LocationCombobox.jsx'
+import { normalizeLocationList, normalizeLocationValue } from '../lib/locations.js'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const DRAFT_KEY_PREFIX = 'totsan.proOnboardingDraft'
@@ -453,7 +455,7 @@ export default function ProOnboarding() {
         selfPhotoPath: draft.selfPhotoPath,
         selfPhotoName: draft.selfPhotoName,
         phone: draft.phone.trim(),
-        city: draft.city.trim(),
+        city: normalizeLocationValue(draft.city),
         worksOutsideCity: draft.worksOutsideCity,
         socialProfiles: {
           website: draft.website.trim(),
@@ -463,7 +465,7 @@ export default function ProOnboarding() {
         },
       },
       partnerType: draft.partnerType,
-      city: draft.city,
+      city: normalizeLocationValue(draft.city),
       worksOutsideCity: draft.worksOutsideCity,
       services: {
         mainCategory: selectedCategory?.label || '',
@@ -472,8 +474,8 @@ export default function ProOnboarding() {
         custom: draft.customService.trim(),
       },
       serviceAreas: {
-        primaryCity: draft.primaryCity.trim(),
-        nearbyPlaces: draft.serviceAreas.trim(),
+        primaryCity: normalizeLocationValue(draft.primaryCity),
+        nearbyPlaces: normalizeLocationList(draft.serviceAreas).join(', '),
         radius: draft.workRadius.trim(),
         limitToSpecificAreas: draft.limitToSpecificAreas,
         acceptsOutsideCity: draft.acceptsOutsideCity,
@@ -710,7 +712,7 @@ function BasicStep({ draft, update, touchedFields, attempted, markTouched, photo
       <SocialProfilesField draft={draft} update={update} attempted={attempted} />
       <div className="grid gap-4 md:grid-cols-2">
         <TextField label="Телефон" value={draft.phone} onChange={event => update('phone', normalizePhone(event.target.value))} onBlur={() => markTouched('phone')} type="tel" inputMode="numeric" pattern="[0-9]*" required valid={isValidPhone} touched={touchedFields.phone} attempted={attempted} helper="Въведете само цифри. Телефонът е нужен за проверка от Totsan." errorText="Добавете валиден телефонен номер." />
-        <TextField label="Град" value={draft.city} onChange={event => update('city', event.target.value)} onBlur={() => markTouched('city')} required touched={touchedFields.city} attempted={attempted} errorText="Добавете град." />
+        <LocationCombobox label="Град" value={draft.city} onChange={(value) => { update('city', value); markTouched('city') }} required />
       </div>
     </div>
   )
@@ -819,7 +821,7 @@ function AreasStep({ draft, update, touchedFields, attempted, markTouched }) {
   const serviceAreasIsValid = !draft.limitToSpecificAreas || Boolean(draft.serviceAreas.trim())
   return (
     <div className="space-y-5">
-      <TextField label="Основен град" value={draft.primaryCity} onChange={event => update('primaryCity', event.target.value)} onBlur={() => markTouched('primaryCity')} required valid={() => cityIsValid} touched={touchedFields.primaryCity} attempted={attempted} errorText="Добавете основен град." />
+      <LocationCombobox label="Основен град" value={draft.primaryCity} onChange={(value) => { update('primaryCity', value); markTouched('primaryCity') }} required />
       <div>
         <div className="text-sm font-medium text-ink">Приемате ли проекти извън града?</div>
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
@@ -833,7 +835,7 @@ function AreasStep({ draft, update, touchedFields, attempted, markTouched }) {
           <TextField label="Радиус на работа" value={draft.workRadius} onChange={event => update('workRadius', event.target.value)} onBlur={() => markTouched('workRadius')} placeholder="Напр. 30 км" required valid={() => radiusIsValid} touched={touchedFields.workRadius} attempted={attempted} errorText="Добавете радиус на работа." />
           <ToggleCard active={draft.limitToSpecificAreas} onClick={() => update('limitToSpecificAreas', !draft.limitToSpecificAreas)} label="Искам да посоча конкретни райони" />
           {draft.limitToSpecificAreas && (
-            <TextField label="Райони / близки населени места" value={draft.serviceAreas} onChange={event => update('serviceAreas', event.target.value)} onBlur={() => markTouched('serviceAreas')} rows={4} placeholder="Русе, Мартен, Басарбово..." required valid={() => serviceAreasIsValid} touched={touchedFields.serviceAreas} attempted={attempted} errorText="Добавете конкретни райони." />
+            <LocationMultiCombobox label="Райони / близки населени места" value={draft.serviceAreas} onChange={(value) => { update('serviceAreas', value); markTouched('serviceAreas') }} />
           )}
         </>
       )}

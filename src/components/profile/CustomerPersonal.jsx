@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Save } from 'lucide-react'
+import { LocationCombobox } from '../ui/LocationCombobox.jsx'
+import { normalizeLocationValue } from '../../lib/locations.js'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 
@@ -60,6 +62,7 @@ export default function CustomerPersonal({ account, session, onSave }) {
       const payload = {
         ...draftRef.current,
         avatarUrl: stripAvatarCacheBust(draftRef.current.avatarUrl),
+        city: normalizeLocationValue(draftRef.current.city),
       }
       const savedAccount = await onSave(payload)
       const nextDraft = makeDraft(savedAccount, session)
@@ -86,7 +89,7 @@ export default function CustomerPersonal({ account, session, onSave }) {
 
         <div className="grid gap-4 md:grid-cols-3">
           <label className="block text-sm font-medium text-ink">Телефон<input value={draft.phone} onChange={event => update('phone', event.target.value)} type="tel" className={INPUT} /></label>
-          <label className="block text-sm font-medium text-ink">Град<input value={draft.city} onChange={event => update('city', event.target.value)} className={INPUT} /></label>
+          <LocationCombobox label="Град" value={draft.city} onChange={(value) => update('city', value)} />
           <label className="block text-sm font-medium text-ink">Държава<input value={draft.country} onChange={event => update('country', event.target.value)} className={INPUT} /></label>
         </div>
 
