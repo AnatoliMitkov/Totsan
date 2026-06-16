@@ -3,6 +3,7 @@ import { slugify } from './profiles.js'
 import { supabase } from './supabase.js'
 import { formatMoney } from './money.js'
 import { normalizeLocationList } from './locations.js'
+import { refreshProfileAiSummary } from './profile-ai-summary.js'
 
 export const SERVICE_STATUS_LABELS = {
   draft: 'Чернова',
@@ -392,6 +393,11 @@ export async function updateAdminPartnerServiceStatus(serviceId, moderationStatu
   }
 
   const [service] = await attachServiceRelations([data])
+  if (data?.profile_id) {
+    refreshProfileAiSummary(data.profile_id).catch((summaryError) => {
+      console.warn('[profile-ai-summary] Refresh skipped:', summaryError?.message || summaryError)
+    })
+  }
   return service
 }
 

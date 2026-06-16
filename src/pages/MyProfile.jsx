@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
-import { Activity, AlertTriangle, CalendarDays, Camera, ClipboardList, FolderKanban, Home, Lock, LogOut, Mail, MessageCircle, ShieldCheck, Settings2, UserRound, Users, X } from 'lucide-react'
+import { Activity, AlertTriangle, CalendarDays, ClipboardList, FolderKanban, Home, Lock, LogOut, Mail, MessageCircle, ShieldCheck, Settings2, UserRound, Users, X } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { getAccountDisplayName, useAccount, signOutAndRedirect } from '../lib/account.js'
 import { uploadProfileCover, uploadProfileMedia } from '../lib/profile-media-upload-client.js'
@@ -518,39 +518,15 @@ function CustomerProfile({ session, account, refreshAccount }) {
       <PublicProfileBanner
         imageSrc={localAccount?.cover_url || ''}
         imageAlt={displayName}
-        heightClass="h-[200px] sm:h-[240px] md:aspect-[1600/520] md:h-auto md:min-h-0"
+        heightClass="h-[clamp(12.5rem,52vw,15rem)] md:aspect-[1600/520] md:h-auto md:min-h-0"
         className="group cursor-pointer focus-within:ring-2 focus-within:ring-ink"
         onClick={openBannerEditor}
         placeholderLabel="Добавете банер"
         placeholderClassName="hidden md:grid"
       >
-        {!localAccount?.cover_url && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center pt-[var(--header-h,64px)] pb-10 md:hidden">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); openBannerEditor() }}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/70 bg-paper/88 text-ink shadow-sm backdrop-blur transition hover:bg-paper"
-              aria-label="Добавете банер"
-            >
-              <Camera size={20} />
-            </button>
-          </div>
-        )}
-        <div className="absolute inset-x-0 bottom-0 z-10 hidden pointer-events-none md:block">
-          <div className="container-page flex justify-end px-6 pb-6 pt-0">
-            <div className="w-auto max-w-xs rounded-3xl border border-white/30 bg-ink/55 p-3 text-paper shadow-lg backdrop-blur-sm transition-all duration-300 pointer-events-auto translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
-              <div className="text-sm font-medium">Снимка на банера</div>
-              <p className="mt-1 text-[11px] leading-4 text-paper/85 sm:text-xs">{BANNER_RATIO_TEXT}</p>
-              <button type="button" onClick={(e) => { e.stopPropagation(); openBannerEditor(); }} className="btn mt-3 w-full justify-center border-0 bg-white/90 text-ink hover:bg-white">
-                <Camera size={18} />
-                {localAccount?.cover_url ? 'Смени банер' : 'Добавете банер'}
-              </button>
-            </div>
-          </div>
-        </div>
       </PublicProfileBanner>
       <div className="relative z-10 flex flex-col bg-soft pb-16 md:pb-24">
-        <div className="container-page -mt-10 w-full space-y-5 px-4 sm:-mt-12 md:-mt-24 md:px-6">
+        <div className="container-page -mt-8 w-full space-y-5 px-4 sm:-mt-12 md:-mt-24 md:px-6">
           <CustomerHeader account={localAccount} displayName={displayName} completeness={completeness} onEditAvatar={openAvatarEditor} onSignOut={() => signOutAndRedirect(session?.user?.id)} />
 
           <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">

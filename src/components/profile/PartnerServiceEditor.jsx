@@ -215,7 +215,7 @@ const SERVICE_STARTERS = [
   },
 ]
 
-export default function PartnerServiceEditor({ profile, userId }) {
+export default function PartnerServiceEditor({ profile, userId, onProfileSummaryRefresh }) {
   const [items, setItems] = useState([])
   const [draft, setDraft] = useState(() => makePartnerServiceDraft(profile))
   const [activeSection, setActiveSection] = useState('info')
@@ -355,6 +355,7 @@ export default function PartnerServiceEditor({ profile, userId }) {
       setItems(current => [saved, ...current.filter(item => item.id !== saved.id)])
       setDraft(makePartnerServiceDraft(profile, saved))
       setState({ status: 'saved', message: publish ? 'Услугата е изпратена за одобрение. Ще стане публична след преглед от Totsan.' : 'Черновата е запазена.' })
+      void onProfileSummaryRefresh?.()
     } catch (error) {
       setState({ status: 'error', message: error.message || 'Записът не успя.' })
     }
@@ -369,6 +370,7 @@ export default function PartnerServiceEditor({ profile, userId }) {
       setItems(next)
       setDraft(makePartnerServiceDraft(profile, next[0] || null))
       setState({ status: 'saved', message: 'Услугата е изтрита.' })
+      void onProfileSummaryRefresh?.()
     } catch (error) {
       setState({ status: 'error', message: error.message || 'Изтриването не успя.' })
     }

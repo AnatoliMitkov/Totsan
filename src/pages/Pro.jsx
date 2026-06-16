@@ -7,8 +7,6 @@ import {
   Clock,
   Euro,
   FileCheck2,
-  Globe2,
-  Languages,
   MapPin,
   MessageCircle,
   ShieldCheck,
@@ -24,31 +22,13 @@ import { loadProfilePortfolio, loadProfileStats } from '../lib/portfolio.js'
 import { loadPublicPartnerServicesForProfile, packagePriceLabel } from '../lib/partner-services.js'
 import { useAccount } from '../lib/account.js'
 import { createConversationFromProfile } from '../lib/chat.js'
+import { normalizeAiFitSummary } from '../lib/profile-ai-summary.js'
 import PortfolioGallery from '../components/profile/PortfolioGallery.jsx'
 import PublicProfileBanner from '../components/profile/PublicProfileBanner.jsx'
 import PublicProfilePanel from '../components/profile/PublicProfilePanel.jsx'
 import ReviewsList from '../components/reviews/ReviewsList.jsx'
 import { getPageLocation, trackEvent, trackPageView } from '../lib/analytics.js'
 import { buildBreadcrumbSchema, buildPersonSchema, useSeo } from '../lib/seo.js'
-
-const CLIENT_PROCESS_STEPS = [
-  {
-    title: 'Описвате задачата',
-    description: 'Казвате какъв е проблемът, обектът или проектът и какъв резултат търсите.',
-  },
-  {
-    title: 'Получавате въпрос или оглед',
-    description: 'Партньорът уточнява обхвата, нужните материали, срокове и условия.',
-  },
-  {
-    title: 'Получавате оферта',
-    description: 'Виждате цена, срок, какво е включено и какви са следващите стъпки.',
-  },
-  {
-    title: 'Работата започва след потвърждение',
-    description: 'Продължавате след уговорка и приемане на условията от двете страни.',
-  },
-]
 
 const GENERIC_TARGETS = {
   ideya: 'жилища, търговски обекти и проекти в ранен етап',
@@ -83,7 +63,7 @@ function splitKeywords(value = '') {
 }
 
 function getPrimarySpecialization(profile, layer) {
-  return compactText(profile.headline || profile.tag || profile.sub || layer?.title || 'Проверен специалист')
+  return compactText(profile.headline || profile.tag || profile.sub || layer?.title)
 }
 
 function getServiceKeywords(profile, services, layer) {
@@ -106,6 +86,14 @@ function getServiceAreaLabel(profile) {
   if (areas.length === 1 && areas[0] !== profile.city) return `${areas[0]} / регион`
   if (profile.city) return `${profile.city} / регион`
   return 'България'
+}
+
+function getExplicitServiceAreaLabel(profile) {
+  const areas = Array.isArray(profile.serviceAreas) ? profile.serviceAreas.filter(Boolean) : []
+  if (areas.length > 1) return areas.join(', ')
+  if (areas.length === 1 && areas[0] !== profile.city) return `${areas[0]} / регион`
+  if (profile.city) return `${profile.city} / регион`
+  return ''
 }
 
 function formatResponseLabel(hours) {
@@ -133,6 +121,12 @@ function getTargetObjectLabel(layer, layer01Meta) {
   return GENERIC_TARGETS[layer?.slug] || 'индивидуални запитвания и конкретни обекти'
 }
 
+function getExplicitTargetObjectLabel(layer, layer01Meta) {
+  const objects = getLayer01Labels(TARGET_OBJECTS, layer01Meta?.target_objects)
+  if (objects.length) return objects.join(', ')
+  return GENERIC_TARGETS[layer?.slug] || ''
+}
+
 function getWorkMethodLabel(layer01Process) {
   if (layer01Process.length) {
     return layer01Process.slice(0, 3).map(step => compactText(step.title)).filter(Boolean).join(' / ')
@@ -146,10 +140,58 @@ function getExperienceLabel(profile) {
   return `${Math.round(years)} години`
 }
 
-function getHelpText(profile, primarySpecialization, serviceAreaLabel, targetObjectLabel) {
-  const name = profile.name || 'Този партньор'
-  const specialization = primarySpecialization.toLocaleLowerCase('bg')
-  return `${name} помага с ${specialization}. Подходящ е за ${targetObjectLabel}, когато търсите ясен оглед, професионален съвет и оферта според конкретния обект. Работи в ${serviceAreaLabel}.`
+function getInquiryStartLabel(layer) {
+  if (layer?.slug === 'ideya') return 'Описание, снимки, размери'
+  if (layer?.slug === 'postroyka') return 'Описание, снимки, оглед'
+  if (layer?.slug === 'materiali') return 'Описание, снимки, мостри'
+  if (layer?.slug === 'obzavezhdane') return 'Размери, снимки, монтаж'
+  if (layer?.slug === 'dekoraciya') return 'Снимки, стил, бюджет'
+  return 'Описание, снимки, уточнение'
+}
+
+function getOfferTimingLabel(layer) {
+  if (['postroyka', 'obzavezhdane'].includes(layer?.slug)) return 'След оглед'
+  return 'След уточнение'
+}
+
+function fitTileIcon(label) {
+  if (label === 'Работи в') return MapPin
+  if (label === 'Подходящ за') return UserCheck
+  if (label === 'Как започва') return FileCheck2
+  if (label === 'Оферта') return Euro
+  return CheckCircle2
+}
+
+function getInquiryGuidance(layer) {
+  if (layer?.slug === 'ideya') return 'За по-точна преценка изпратете кратко описание, снимки, размери и какво искате като концепция, разпределение, 3D визуализации, проект или материали.'
+  if (layer?.slug === 'postroyka') return 'За по-точна преценка изпратете кратко описание, снимки, обхват на ремонта и какво искате да се изпълни на обекта.'
+  if (layer?.slug === 'materiali') return 'За по-точна преценка изпратете кратко описание, снимки, предпочитан ценови клас и дали търсите продукти, мостри или доставка.'
+  if (layer?.slug === 'obzavezhdane') return 'За по-точна преценка изпратете кратко описание, снимки, размери и дали търсите изработка, доставка, монтаж или мебели по поръчка.'
+  if (layer?.slug === 'dekoraciya') return 'За по-точна преценка изпратете кратко описание, снимки и какво искате да се промени чрез стайлинг, текстил, осветление, декорация или финални детайли.'
+  return 'За по-точна преценка изпратете кратко описание, снимки и какво искате да се направи.'
+}
+
+function getHelpText(profile, primarySpecialization, serviceAreaLabel, targetObjectLabel, layer) {
+  const name = profile.name || 'Този специалист'
+  const introParts = []
+  const specialization = compactText(primarySpecialization).toLocaleLowerCase('bg')
+
+  if (specialization) {
+    introParts.push(`${name} е подходящ избор за клиенти, които търсят ${specialization}.`)
+  } else {
+    introParts.push(`${name} е подходящ избор, когато искате конкретна преценка преди запитване.`)
+  }
+
+  if (targetObjectLabel && serviceAreaLabel) {
+    introParts.push(`Работи по ${targetObjectLabel} в ${serviceAreaLabel}.`)
+  } else if (targetObjectLabel) {
+    introParts.push(`Работи по ${targetObjectLabel}.`)
+  } else if (serviceAreaLabel) {
+    introParts.push(`Работи в ${serviceAreaLabel}.`)
+  }
+
+  introParts.push(getInquiryGuidance(layer))
+  return introParts.join(' ')
 }
 
 export default function Pro() {
@@ -319,13 +361,18 @@ export default function Pro() {
   const primarySpecialization = getPrimarySpecialization(item, layer)
   const serviceKeywords = getServiceKeywords(item, services, layer)
   const serviceAreaLabel = getServiceAreaLabel(item)
+  const fitServiceAreaLabel = getExplicitServiceAreaLabel(item)
   const targetObjectLabel = getTargetObjectLabel(layer, layer01Meta)
+  const fitTargetObjectLabel = getExplicitTargetObjectLabel(layer, layer01Meta)
   const workMethodLabel = getWorkMethodLabel(layer01Process)
   const priceGuide = getPriceGuide(item, services)
   const experienceLabel = getExperienceLabel(item)
-  const helpText = getHelpText(item, primarySpecialization, serviceAreaLabel, targetObjectLabel)
+  const helpText = getHelpText(item, primarySpecialization, fitServiceAreaLabel, fitTargetObjectLabel, layer)
+  const inquiryStartLabel = getInquiryStartLabel(layer)
+  const offerTimingLabel = getOfferTimingLabel(layer)
+  const aiFitSummary = normalizeAiFitSummary(item.aiFitSummary)
   const aboutText = compactText(item.descriptionLong || item.bio)
-  const showAboutText = aboutText && compactText(aboutText) !== compactText(helpText)
+  const showAboutText = aboutText && compactText(aboutText) !== compactText(aiFitSummary?.summary || helpText)
   const responseLabel = formatResponseLabel(stats?.response_time_hours ?? item.responseTimeHours)
   const reviewCount = Number(stats?.reviews_count || 0)
   const averageRating = Number(stats?.avg_rating || 0)
@@ -373,10 +420,11 @@ export default function Pro() {
         imageSrc={item.coverUrl || LAYER_HEROS[layer.slug]}
         imageAlt=""
         imageStyle={{ objectPosition: `50% ${item.coverY ?? 50}%` }}
+        heightClass="h-[clamp(12.5rem,52vw,15rem)] md:aspect-[1600/520] md:h-auto md:min-h-0"
       />
 
       <div className="relative z-10 bg-soft flex flex-col pb-16 md:pb-24">
-        <div className="container-page w-full px-4 md:px-6 -mt-24">
+        <div className="container-page -mt-8 w-full px-4 sm:-mt-12 md:-mt-24 md:px-6">
           <div className="grid lg:grid-cols-12 gap-8 lg:gap-12">
 
             <aside className="lg:col-span-4 reveal">
@@ -429,20 +477,6 @@ export default function Pro() {
                     onReviewsClick={() => scrollToSection(reviewsSectionRef)}
                   />
 
-                  <div className="mt-7 grid gap-3">
-                    <button type="button" onClick={() => scrollToSection(inquirySectionRef)} className="btn btn-primary w-full justify-center">
-                      Изпрати запитване
-                    </button>
-                    <button
-                      type="button"
-                      onClick={startChat}
-                      disabled={isOwnProfile || (!item.id && !partnerUserId) || chatState.status === 'loading'}
-                      className="btn btn-ghost w-full justify-center disabled:opacity-50"
-                    >
-                      <MessageCircle size={18} />
-                      {chatState.status === 'loading' ? 'Отваряме чат…' : 'Започни разговор'}
-                    </button>
-                  </div>
                 </PublicProfilePanel>
 
                 <div ref={inquirySectionRef} className="scroll-mt-24">
@@ -481,11 +515,15 @@ export default function Pro() {
               </div>
 
               <HelpSection
+                profileName={item.name}
+                aiFitSummary={aiFitSummary}
                 helpText={helpText}
                 aboutText={showAboutText ? aboutText : ''}
                 serviceKeywords={serviceKeywords}
-                formatLabel={item.acceptsRemote ? 'На място / дистанционно' : 'На място'}
-                languagesLabel={item.languages?.length ? item.languages.join(', ') : 'Български'}
+                serviceAreaLabel={fitServiceAreaLabel}
+                targetObjectLabel={fitTargetObjectLabel}
+                inquiryStartLabel={inquiryStartLabel}
+                offerTimingLabel={offerTimingLabel}
               />
 
               <ProfileServicesSection
@@ -496,8 +534,6 @@ export default function Pro() {
               />
 
               {hasLayer01Details && <Layer01ProfileDetails meta={layer01Meta} />}
-
-              <WorkProcessSection steps={layer01Process.length > 0 ? layer01Process : CLIENT_PROCESS_STEPS} />
 
               {hasLayer01Details && Number.isFinite(Number(layer01Meta.consultation_fee)) && (
                 <div className="rounded-3xl border border-line/60 bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)] flex flex-wrap items-center justify-between gap-6">
@@ -547,9 +583,9 @@ function MetaTile({ icon: Icon, label, value }) {
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accentSoft/60 text-accentDeep">
         <Icon size={20} />
       </div>
-      <div>
+      <div className="min-w-0 flex-1">
         <div className="text-[10px] font-bold uppercase tracking-wider text-muted">{label}</div>
-        <div className="mt-0.5 text-sm font-semibold text-ink line-clamp-1">{value}</div>
+        <div className="mt-0.5 break-words text-sm font-semibold leading-5 text-ink">{value}</div>
       </div>
     </div>
   )
@@ -642,18 +678,43 @@ function QuickOverviewSection({
   )
 }
 
-function HelpSection({ helpText, aboutText, serviceKeywords, formatLabel, languagesLabel }) {
+function HelpSection({
+  profileName,
+  aiFitSummary,
+  helpText,
+  aboutText,
+  serviceKeywords,
+  serviceAreaLabel,
+  targetObjectLabel,
+  inquiryStartLabel,
+  offerTimingLabel,
+}) {
+  const displayName = compactText(profileName) || 'този специалист'
+  const fallbackFitItems = [
+    serviceAreaLabel ? { icon: MapPin, label: 'Работи в', value: serviceAreaLabel } : null,
+    targetObjectLabel ? { icon: UserCheck, label: 'Подходящ за', value: targetObjectLabel } : null,
+    inquiryStartLabel ? { icon: FileCheck2, label: 'Как започва', value: inquiryStartLabel } : null,
+    offerTimingLabel ? { icon: Euro, label: 'Оферта', value: offerTimingLabel } : null,
+  ].filter(Boolean)
+  const fitItems = aiFitSummary?.tiles?.length
+    ? aiFitSummary.tiles.map(tile => ({ ...tile, icon: fitTileIcon(tile.label) }))
+    : fallbackFitItems
+  const chips = aiFitSummary?.chips?.length ? aiFitSummary.chips : serviceKeywords
+  const eyebrow = aiFitSummary?.eyebrow || 'Подходящ за'
+  const heading = aiFitSummary?.heading || `Кога да изберете ${displayName}`
+  const summary = aiFitSummary?.summary || helpText
+
   return (
     <section className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-      <div className="eyebrow mb-2">С какво може да помогне</div>
-      <h2 className="font-display text-3xl font-semibold text-ink">Практична помощ за конкретен проект</h2>
-      <p className="mt-4 text-ink/82 leading-relaxed" style={{ fontSize: 'var(--step-sm)' }}>
-        {helpText}
+      <div className="eyebrow mb-2">{eyebrow}</div>
+      <h2 className="font-display text-3xl font-semibold leading-tight text-ink">{heading}</h2>
+      <p className="mt-4 max-w-3xl text-ink/82 leading-7" style={{ fontSize: 'var(--step-sm)' }}>
+        {summary}
       </p>
 
-      {serviceKeywords.length > 0 && (
+      {chips.length > 0 && (
         <div className="mt-6 flex flex-wrap gap-2">
-          {serviceKeywords.map((keyword) => (
+          {chips.map((keyword) => (
             <span key={keyword} className="rounded-full border border-line bg-soft px-3 py-1.5 text-sm font-medium text-ink">
               {keyword}
             </span>
@@ -661,10 +722,13 @@ function HelpSection({ helpText, aboutText, serviceKeywords, formatLabel, langua
         </div>
       )}
 
-      <div className="mt-7 grid gap-4 sm:grid-cols-2">
-        <MetaTile icon={Globe2} label="Формат" value={formatLabel} />
-        <MetaTile icon={Languages} label="Езици" value={languagesLabel} />
-      </div>
+      {fitItems.length > 0 && (
+        <div className="mt-7 grid gap-4 sm:grid-cols-2">
+          {fitItems.map((item) => (
+            <MetaTile key={item.label} icon={item.icon} label={item.label} value={item.value} />
+          ))}
+        </div>
+      )}
 
       {aboutText && (
         <div className="mt-7 border-t border-line pt-6">
@@ -672,27 +736,6 @@ function HelpSection({ helpText, aboutText, serviceKeywords, formatLabel, langua
           <p className="mt-3 whitespace-pre-line text-sm leading-7 text-muted">{aboutText}</p>
         </div>
       )}
-    </section>
-  )
-}
-
-function WorkProcessSection({ steps }) {
-  return (
-    <section className="rounded-3xl border border-line bg-paper p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-      <div className="eyebrow mb-2">Как протича работата</div>
-      <h3 className="font-display text-3xl font-semibold text-ink mb-6">Ясен път от запитване до старт</h3>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {steps.map((step, index) => (
-          <div key={`${step.title}-${index}`} className="group relative border border-line bg-soft/30 rounded-2xl p-5 transition-all duration-300 hover:bg-soft hover:shadow-[0_8px_25px_rgba(0,0,0,0.02)]">
-            <div className="absolute top-4 right-4 font-display text-2xl font-bold text-accent/20 transition-colors duration-200 group-hover:text-accent">
-              {String(index + 1).padStart(2, '0')}
-            </div>
-            <div className="font-display text-lg font-bold text-ink pr-10">{step.title || `Стъпка ${index + 1}`}</div>
-            {step.duration && <div className="mt-2 inline-flex rounded-full bg-accentSoft px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-accentDeep">{step.duration}</div>}
-            {step.description && <p className="text-sm text-muted mt-3 leading-relaxed">{step.description}</p>}
-          </div>
-        ))}
-      </div>
     </section>
   )
 }
@@ -878,10 +921,9 @@ function ContactCard({ onStartChat, chatState }) {
         </div>
         <div>
           <div className="text-xs font-bold uppercase tracking-wider text-muted">Директна връзка</div>
-          <div className="font-display text-lg font-semibold text-ink">Чат на живо</div>
         </div>
       </div>
-      <p className="mt-4 text-sm text-muted leading-relaxed">Имаш въпрос за наличност, цени или оглед? Пиши директно в чата на Totsan.</p>
+      <p className="mt-4 text-sm text-muted leading-relaxed">Опишете какво искате да направите, изпратете снимки или задайте въпрос за оглед, срок и ориентировъчна оферта.</p>
       <button
         type="button"
         onClick={onStartChat}

@@ -28,10 +28,11 @@ import {
 } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
 import { uploadProfileMedia, uploadProfileCover } from '../../lib/profile-media-upload-client.js'
-import { getProfileImageStyle, isMissingLayer01MetaColumn, normalizeProfile, PROFILE_SELECT_COLUMNS, PROFILE_SELECT_COLUMNS_BASE } from '../../lib/profiles.js'
+import { getProfileImageStyle, isMissingLayer01MetaColumn, normalizeProfile, PROFILE_SELECT_COLUMNS_BASE, PROFILE_SELECT_COLUMNS_WITH_LAYER01 } from '../../lib/profiles.js'
 import { supabase } from '../../lib/supabase.js'
 import { getAccountDisplayName } from '../../lib/account.js'
 import { saveCustomerAccountProfile } from '../../lib/projects.js'
+import { refreshProfileAiSummary } from '../../lib/profile-ai-summary.js'
 import TotpMfaManager from '../auth/TotpMfa.jsx'
 import {
   DEFAULT_PORTFOLIO_ITEM,
@@ -550,6 +551,15 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     setPortfolioDraft(current => ({ ...current, [key]: value }))
   }
 
+  async function refreshAiSummaryQuietly(profileId = currentProfile?.id) {
+    if (!profileId) return
+    try {
+      await refreshProfileAiSummary(profileId)
+    } catch (error) {
+      console.warn('[profile-ai-summary] Refresh skipped:', error?.message || error)
+    }
+  }
+
   async function saveAvatarPosition(displayCrop = {}) {
     const nextImageZoom = Number.isFinite(Number(displayCrop?.imageZoom)) ? Number(displayCrop.imageZoom) : 1
     const nextImageX = Number.isFinite(Number(displayCrop?.imageX)) ? Number(displayCrop.imageX) : 50
@@ -649,7 +659,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       .from('profiles')
       .update(profilePayload)
       .eq('id', currentProfile.id)
-      .select(savesLayer01 ? PROFILE_SELECT_COLUMNS : PROFILE_SELECT_COLUMNS_BASE)
+      .select(savesLayer01 ? PROFILE_SELECT_COLUMNS_WITH_LAYER01 : PROFILE_SELECT_COLUMNS_BASE)
       .single()
 
     if (error) {
@@ -671,6 +681,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     setCurrentProfile(normalized)
     setProfileDraft(makeProfileDraft(normalized))
     setSaveState({ status: 'saved', message: profileDraft.syncAccountName ? 'Профилът е запазен и името в акаунта е синхронизирано.' : 'Профилът е запазен.' })
+    void refreshAiSummaryQuietly(normalized.id)
     if (!profileDraft.syncAccountName) await refreshAccount?.()
     onSaved?.()
   }
@@ -700,6 +711,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       setPortfolio(current => [saved, ...current.filter(item => item.id !== saved.id)].sort((left, right) => left.orderIndex - right.orderIndex))
       setPortfolioDraft(makePortfolioDraft(saved, currentProfile))
       setPortfolioState({ status: 'saved', message: 'Портфолио проектът е запазен.' })
+      void refreshAiSummaryQuietly(currentProfile.id)
       return true
     } catch (error) {
       setPortfolioState({ status: 'error', message: error.message || 'Записът не успя.' })
@@ -716,6 +728,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       setPortfolio(next)
       setPortfolioDraft(makePortfolioDraft(next[0] || null, currentProfile))
       setPortfolioState({ status: 'saved', message: 'Проектът е изтрит.' })
+      void refreshAiSummaryQuietly(currentProfile.id)
     } catch (error) {
       setPortfolioState({ status: 'error', message: error.message || 'Изтриването не успя.' })
     }
@@ -759,34 +772,12 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
         imageSrc={preview.coverUrl || ''}
         imageAlt=""
         imageStyle={{ objectPosition: `50% ${preview.coverY ?? 50}%` }}
-        heightClass="min-h-[clamp(14rem,46vw,18rem)] sm:min-h-[16rem] md:aspect-[1600/520] md:min-h-0"
+        heightClass="h-[clamp(12.5rem,52vw,15rem)] md:aspect-[1600/520] md:h-auto md:min-h-0"
         className="group cursor-pointer focus-within:ring-2 focus-within:ring-ink"
         onClick={openBannerEditor}
         placeholderLabel="Добавете банер"
         placeholderClassName="hidden md:grid"
       >
-        <div className="absolute right-3 top-[calc(var(--header-h,64px)+0.75rem)] z-20 md:hidden">
-          <button
-            type="button"
-            onClick={(event) => { event.stopPropagation(); openBannerEditor() }}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-paper/88 text-ink shadow-sm backdrop-blur transition hover:bg-paper"
-            aria-label={preview.coverUrl ? 'Смени банер' : 'Добавете банер'}
-          >
-            <Camera size={18} />
-          </button>
-        </div>
-        <div className="absolute inset-x-0 bottom-0 z-10 hidden pointer-events-none md:block">
-          <div className="container-page flex justify-end px-6 pb-6 pt-0">
-            <div className="w-auto max-w-xs rounded-3xl border border-white/30 bg-ink/55 p-3 text-paper shadow-lg backdrop-blur-sm transition-all duration-300 pointer-events-auto translate-y-8 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
-              <div className="text-sm font-medium">{preview.coverUrl ? 'Смени банер' : 'Добавете банер'}</div>
-              <p className="mt-1 text-[11px] leading-4 text-paper/85 sm:text-xs">Препоръчителен размер: 1600 × 600 px</p>
-              <button type="button" onClick={(event) => { event.stopPropagation(); openBannerEditor() }} className="btn mt-3 w-full justify-center border-0 bg-white/90 text-ink hover:bg-white">
-                <Camera size={18} />
-                {preview.coverUrl ? 'Смени банер' : 'Добавете банер'}
-              </button>
-            </div>
-          </div>
-        </div>
       </PublicProfileBanner>
       {/* Keep the file input outside the clickable banner to avoid recursive input.click() bubbling. */}
       <input
@@ -797,7 +788,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
         onChange={handleCoverFileChange}
       />
       <div className="relative z-10 flex flex-col bg-soft pb-16 md:pb-24">
-        <div className="container-page -mt-10 w-full space-y-5 px-4 sm:-mt-12 md:-mt-24 md:px-6">
+        <div className="container-page -mt-8 w-full space-y-5 px-4 sm:-mt-12 md:-mt-24 md:px-6">
         <PublicProfilePanel className="transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.04)]">
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex flex-col items-center gap-4 text-center lg:flex-row lg:items-end lg:text-left">
@@ -890,7 +881,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
             )}
 
             {activeTab === 'services' && (
-              <PartnerServiceEditor profile={currentProfile} userId={userId} />
+              <PartnerServiceEditor profile={currentProfile} userId={userId} onProfileSummaryRefresh={() => refreshAiSummaryQuietly(currentProfile.id)} />
             )}
 
             {activeTab === 'materials' && (

@@ -43,8 +43,25 @@ export const PROFILE_SELECT_COLUMNS_BASE = `
   pricing_note
 `
 
-export const PROFILE_SELECT_COLUMNS = `
+export const PROFILE_AI_FIT_SUMMARY_COLUMNS = `
+  ai_fit_summary,
+  ai_fit_summary_status,
+  ai_fit_summary_generated_at,
+  ai_fit_summary_source_hash
+`
+
+export const PROFILE_SELECT_COLUMNS_WITH_AI = `
   ${PROFILE_SELECT_COLUMNS_BASE},
+  ${PROFILE_AI_FIT_SUMMARY_COLUMNS}
+`
+
+export const PROFILE_SELECT_COLUMNS_WITH_LAYER01 = `
+  ${PROFILE_SELECT_COLUMNS_BASE},
+  layer01_meta
+`
+
+export const PROFILE_SELECT_COLUMNS = `
+  ${PROFILE_SELECT_COLUMNS_WITH_AI},
   layer01_meta
 `
 
@@ -101,12 +118,29 @@ export function isMissingLayer01MetaColumn(error) {
   return message.includes('layer01_meta')
 }
 
+function isMissingAiFitSummaryColumn(error) {
+  const message = String(error?.message || error?.details || error?.hint || '').toLowerCase()
+  return message.includes('ai_fit_summary')
+}
+
 export async function runProfileSelectWithLayer01Fallback(buildQuery) {
-  const result = await buildQuery(PROFILE_SELECT_COLUMNS)
-  if (result.error && isMissingLayer01MetaColumn(result.error)) {
-    return buildQuery(PROFILE_SELECT_COLUMNS_BASE)
+  const attempts = [
+    PROFILE_SELECT_COLUMNS,
+    PROFILE_SELECT_COLUMNS_WITH_LAYER01,
+    PROFILE_SELECT_COLUMNS_WITH_AI,
+    PROFILE_SELECT_COLUMNS_BASE,
+  ]
+
+  let lastResult = null
+  for (const columns of attempts) {
+    const result = await buildQuery(columns)
+    if (!result.error) return result
+    lastResult = result
+    if (!isMissingLayer01MetaColumn(result.error) && !isMissingAiFitSummaryColumn(result.error)) {
+      return result
+    }
   }
-  return result
+  return lastResult
 }
 
 export function normalizeProfile(input = {}, fallback = null) {
@@ -144,6 +178,10 @@ export function normalizeProfile(input = {}, fallback = null) {
   const userId = input.userId ?? input.user_id ?? base.userId ?? base.user_id ?? null
   const role = input.role ?? base.role ?? 'pro'
   const layer01Meta = toPlainObject(input.layer01Meta ?? input.layer01_meta ?? base.layer01Meta ?? base.layer01_meta)
+  const aiFitSummary = toPlainObject(input.aiFitSummary ?? input.ai_fit_summary ?? base.aiFitSummary ?? base.ai_fit_summary)
+  const aiFitSummaryStatus = String(input.aiFitSummaryStatus ?? input.ai_fit_summary_status ?? base.aiFitSummaryStatus ?? base.ai_fit_summary_status ?? '').trim()
+  const aiFitSummaryGeneratedAt = input.aiFitSummaryGeneratedAt ?? input.ai_fit_summary_generated_at ?? base.aiFitSummaryGeneratedAt ?? base.ai_fit_summary_generated_at ?? null
+  const aiFitSummarySourceHash = String(input.aiFitSummarySourceHash ?? input.ai_fit_summary_source_hash ?? base.aiFitSummarySourceHash ?? base.ai_fit_summary_source_hash ?? '').trim()
 
   return {
     id: input.id ?? base.id ?? (slug ? `static-${slug}` : ''),
@@ -185,6 +223,10 @@ export function normalizeProfile(input = {}, fallback = null) {
     userId,
     role,
     layer01Meta,
+    aiFitSummary,
+    aiFitSummaryStatus,
+    aiFitSummaryGeneratedAt,
+    aiFitSummarySourceHash,
     createdAt: input.createdAt ?? input.created_at ?? base.createdAt ?? base.created_at ?? null,
     updatedAt: input.updatedAt ?? input.updated_at ?? base.updatedAt ?? base.updated_at ?? null,
   }
@@ -292,6 +334,10 @@ export function buildCatalogWithProfiles(profiles) {
         coverUrl: profile.coverUrl,
         coverY: profile.coverY,
         layer01Meta: profile.layer01Meta,
+        aiFitSummary: profile.aiFitSummary,
+        aiFitSummaryStatus: profile.aiFitSummaryStatus,
+        aiFitSummaryGeneratedAt: profile.aiFitSummaryGeneratedAt,
+        aiFitSummarySourceHash: profile.aiFitSummarySourceHash,
       })
     })
 
