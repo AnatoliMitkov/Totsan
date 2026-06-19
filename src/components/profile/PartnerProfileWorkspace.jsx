@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   BriefcaseBusiness,
   Camera,
+  Check,
+  CircleDot,
   Compass,
   CreditCard,
   Eye,
   FolderKanban,
+  Headphones,
   GripVertical,
   Globe2,
   Home,
@@ -15,6 +18,7 @@ import {
   Lock,
   LogOut,
   Mail,
+  MapPin,
   MessagesSquare,
   PlayCircle,
   Plus,
@@ -33,6 +37,7 @@ import { supabase } from '../../lib/supabase.js'
 import { getAccountDisplayName } from '../../lib/account.js'
 import { saveCustomerAccountProfile } from '../../lib/projects.js'
 import { refreshProfileAiSummary } from '../../lib/profile-ai-summary.js'
+import { deleteStorageRefs, diffStorageRefs, mediaAndCoverStorageRefs } from '../../lib/storage-media-cleanup.js'
 import TotpMfaManager from '../auth/TotpMfa.jsx'
 import {
   DEFAULT_PORTFOLIO_ITEM,
@@ -57,12 +62,17 @@ import PartnerMaterialsEditor from './PartnerMaterialsEditor.jsx'
 import PartnerOrders from './PartnerOrders.jsx'
 import PartnerInquiries from './PartnerInquiries.jsx'
 import Layer01SpecEditor, { cleanLayer01Draft, makeLayer01Draft } from './Layer01SpecEditor.jsx'
+import FloatingSaveBar from './FloatingSaveBar.jsx'
 import TotsanSelect from '../ui/TotsanSelect.jsx'
 import { LocationCombobox, LocationMultiCombobox } from '../ui/LocationCombobox.jsx'
 import { normalizeLocationList, normalizeLocationValue } from '../../lib/locations.js'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
+const COMPACT_INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-3 py-3 text-sm outline-none transition focus:border-ink'
 const MAX_BANNER_BYTES = 12 * 1024 * 1024
+const PROFILE_BIO_LIMIT = 300
+const PROFILE_DESCRIPTION_LIMIT = 500
+const PROFILE_PRICING_LIMIT = 300
 const SUPPORTED_PROFILE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const BANNER_DESCRIPTION = 'Широк банер работи най-добре около 3:1. Препоръчваме 1600 x 520 px за най-чист резултат.'
 
@@ -311,6 +321,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     if (!file) return
     setSaveState({ status: 'uploading', message: 'Оптимизираме и качваме банера…' })
     try {
+      const previousCoverUrl = currentProfile.coverUrl || profileDraft.coverUrl || ''
       const result = await uploadProfileCover({ file, target: userId })
       const nextCoverUrl = withCacheBust(result.publicUrl || result.signedUrl || '')
       if (!nextCoverUrl) throw new Error('Банерът е качен, но липсва валиден адрес.')
@@ -326,6 +337,10 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       if (error) throw error
       
       setCurrentProfile(current => ({ ...current, coverUrl: nextCoverUrl, coverY: positionY }))
+      await deleteStorageRefs(diffStorageRefs(
+        mediaAndCoverStorageRefs({ coverUrl: previousCoverUrl }),
+        mediaAndCoverStorageRefs({ coverUrl: nextCoverUrl }),
+      ))
       setSaveState({ status: 'saved', message: 'Банерът е качен и запазен.' })
       await refreshAccount?.()
       await onSaved?.()
@@ -590,6 +605,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     if (!file) return
     setSaveState({ status: 'uploading', message: 'Оптимизираме и качваме снимката…' })
     try {
+      const previousImageUrl = currentProfile.imageUrl || profileDraft.imageUrl || ''
       const nextImageZoom = Number.isFinite(Number(displayCrop?.imageZoom)) ? Number(displayCrop.imageZoom) : 1
       const nextImageX = Number.isFinite(Number(displayCrop?.imageX)) ? Number(displayCrop.imageX) : 50
       const nextImageY = Number.isFinite(Number(displayCrop?.imageY)) ? Number(displayCrop.imageY) : 50
@@ -610,6 +626,10 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       if (error) throw error
       
       setCurrentProfile(current => ({ ...current, imageUrl: nextImageUrl, imageZoom: nextImageZoom, imageX: nextImageX, imageY: nextImageY }))
+      await deleteStorageRefs(diffStorageRefs(
+        mediaAndCoverStorageRefs({ coverUrl: previousImageUrl }),
+        mediaAndCoverStorageRefs({ coverUrl: nextImageUrl }),
+      ))
       setSaveState({ status: 'saved', message: 'Профилната снимка е качена и запазена.' })
       await refreshAccount?.()
     } catch (error) {
@@ -821,7 +841,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
           </div>
         </PublicProfilePanel>
 
-        <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
+        <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
           <WorkspaceSidebar
             tabs={availableTabs}
             activeTab={activeTab}
@@ -1139,7 +1159,7 @@ function getProfileCompletion(profile, portfolio, layer01Meta) {
 
 function WorkspaceSidebar({ tabs, activeTab, profile, completion, portfolioCount, onTabChange }) {
   return (
-    <aside className="min-w-0 max-w-full overflow-hidden rounded-3xl border border-line bg-paper p-3 shadow-[0_8px_30px_rgb(0,0,0,0.02)] lg:sticky lg:top-24 lg:overflow-visible">
+    <aside className="min-w-0 max-w-full overflow-hidden rounded-[2rem] border border-line bg-paper p-4 shadow-[0_20px_65px_-45px_rgba(13,35,64,0.28)] lg:sticky lg:top-24 lg:overflow-visible">
       <nav className="flex w-full min-w-0 max-w-full gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-col lg:overflow-visible lg:pb-0">
         {tabs.map((tab) => {
           const Icon = tab.icon
@@ -1149,7 +1169,7 @@ function WorkspaceSidebar({ tabs, activeTab, profile, completion, portfolioCount
               key={tab.id}
               type="button"
               onClick={() => onTabChange(tab.id)}
-              className={`inline-flex min-h-11 shrink-0 snap-start items-center gap-3 rounded-2xl px-4 py-2.5 text-left text-sm font-medium transition lg:w-full ${isActive ? 'bg-ink text-paper shadow-sm' : 'text-muted hover:bg-soft hover:text-ink'}`}
+              className={`inline-flex min-h-12 shrink-0 snap-start items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition lg:w-full ${isActive ? 'bg-ink text-paper shadow-[0_16px_35px_-22px_rgba(13,35,64,0.8)]' : 'text-muted hover:bg-soft hover:text-ink'}`}
             >
               <Icon size={18} />
               <span>{tab.label}</span>
@@ -1158,22 +1178,40 @@ function WorkspaceSidebar({ tabs, activeTab, profile, completion, portfolioCount
         })}
       </nav>
 
-      <div className="mt-3 hidden border-t border-line pt-4 lg:block">
-        <div className="px-2">
-          <div className="text-xs uppercase tracking-[0.14em] text-muted">Готовност</div>
-          <div className="mt-2 flex items-end justify-between gap-3">
+      <div className="mt-4 hidden border-t border-line pt-5 lg:block">
+        <div className="rounded-[1.5rem] border border-line bg-soft/70 p-4">
+          <div className="text-xs uppercase tracking-[0.14em] text-muted">Профил завършеност</div>
+          <div className="mt-3 flex items-center justify-between gap-3">
             <div className="font-display text-4xl leading-none text-ink">{completion.percent}%</div>
-            <div className="pb-1 text-xs text-muted">{completion.done}/{completion.total}</div>
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600">
+              <Check size={18} />
+            </div>
           </div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-soft">
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-paper">
             <div className="h-full rounded-full bg-accentDeep" style={{ width: `${completion.percent}%` }} />
           </div>
+          <div className="mt-3 text-sm text-muted">{completion.done}/{completion.total} попълнени секции</div>
         </div>
 
-        <div className="mt-4 grid gap-2">
-          <InfoTile label="Статус" value={profile.isPublished ? 'Публичен' : 'Скрит'} />
-          <InfoTile label="Слой" value={`${profile.layerNumber} · ${profile.layerTitle}`} />
-          <InfoTile label="Проекти" value={portfolioCount} />
+        <div className="mt-4 grid gap-3">
+          <InfoTile label="Статус" value={profile.isPublished ? 'Публичен' : 'Скрит'} icon={CircleDot} tone={profile.isPublished ? 'success' : 'neutral'} />
+          <InfoTile label="Слой" value={`${profile.layerNumber} · ${profile.layerTitle}`} icon={Compass} />
+          <InfoTile label="Проекти" value={portfolioCount} icon={FolderKanban} />
+        </div>
+
+        <div className="mt-4 rounded-[1.5rem] border border-line bg-paper p-4">
+          <div className="flex items-start gap-3">
+            <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-soft text-accentDeep">
+              <Headphones size={18} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-ink">Нуждаете се от помощ?</div>
+              <p className="mt-1 text-sm leading-6 text-muted">Контактните полета и публичната информация могат да се редактират директно от този екран.</p>
+              <button type="button" onClick={() => onTabChange('contact')} className="btn btn-ghost mt-3 w-full justify-center">
+                Към контактите
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </aside>
@@ -1494,50 +1532,77 @@ function ProfileForm({
   onChange,
   onSubmit,
 }) {
-  return (
-    <form onSubmit={onSubmit} className="grid gap-5">
-      <div className="rounded-3xl border border-line bg-paper p-5 md:p-7 space-y-5">
-        <div>
-          <div className="eyebrow">Профил</div>
-          <h2 className="mt-2 font-display text-3xl text-ink">Основна информация</h2>
-        </div>
+  const bioLength = String(draft.bio || '').length
+  const descriptionLength = String(draft.descriptionLong || '').length
+  const pricingLength = String(draft.pricingNote || '').length
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Име / фирма"><input value={draft.name} onChange={event => onChange('name', event.target.value)} className={INPUT} /></Field>
-          <Field label="Основна специализация"><input value={draft.headline} onChange={event => onChange('headline', event.target.value)} className={INPUT} placeholder="Напр. ВиК ремонт и поддръжка" /></Field>
-        </div>
-        {hasNameMismatch && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            Името в акаунта и името в публичния профил са различни.
-            {accountDisplayName && <span className="mt-1 block text-xs text-amber-800">Име в акаунта: {accountDisplayName}</span>}
+  function updateLimitedText(key, value, limit) {
+    onChange(key, String(value || '').slice(0, limit))
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="grid gap-5 pb-28">
+      <ProfileIntroCard />
+
+      <ProfileSection number="1" icon={UserRound} title="Основна информация" className="scroll-mt-28">
+        <div className="grid gap-4 xl:grid-cols-12">
+          <div className="xl:col-span-4">
+            <Field label="Име / фирма"><input value={draft.name} onChange={event => onChange('name', event.target.value)} className={INPUT} /></Field>
           </div>
-        )}
-        <label className="flex items-start gap-3 rounded-2xl border border-line bg-soft p-4 text-sm text-muted">
-          <input type="checkbox" checked={draft.syncAccountName} onChange={event => onChange('syncAccountName', event.target.checked)} className="mt-1 accent-black" />
-          <span>Синхронизирай и името в акаунта</span>
-        </label>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Категория / роля"><input value={draft.tag} onChange={event => onChange('tag', event.target.value)} className={INPUT} placeholder="Напр. специалист, студио, изпълнител" /></Field>
-          <Field label="Слой"><TotsanSelect value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} /></Field>
-          <div className="md:col-span-2">
+          <div className="xl:col-span-4">
+            <Field label="Основна специализация"><input value={draft.headline} onChange={event => onChange('headline', event.target.value)} className={INPUT} placeholder="Напр. ВиК ремонт и поддръжка" /></Field>
+          </div>
+          <div className="xl:col-span-4">
+            <Field label="Категория / роля"><input value={draft.tag} onChange={event => onChange('tag', event.target.value)} className={INPUT} placeholder="Напр. специалист, студио, изпълнител" /></Field>
+          </div>
+
+          {hasNameMismatch && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 xl:col-span-8">
+              Името в акаунта и името в публичния профил са различни.
+              {accountDisplayName && <span className="mt-1 block text-xs text-amber-800">Име в акаунта: {accountDisplayName}</span>}
+            </div>
+          )}
+          <label className={`flex items-start gap-3 rounded-2xl border border-line bg-soft p-4 text-sm text-muted ${hasNameMismatch ? 'xl:col-span-4' : 'xl:col-span-12'}`}>
+            <input type="checkbox" checked={draft.syncAccountName} onChange={event => onChange('syncAccountName', event.target.checked)} className="mt-1 accent-black" />
+            <span>Синхронизирай и името в акаунта</span>
+          </label>
+
+          <div className="xl:col-span-3">
+            <Field label="Слой"><TotsanSelect value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} /></Field>
+          </div>
+          <div className="xl:col-span-5">
             <LocationCombobox label="Град и основен район" value={draft.city} onChange={(value) => onChange('city', value)} required helper="" />
           </div>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Години опит"><input type="number" min="0" value={draft.yearsExperience} onChange={event => onChange('yearsExperience', event.target.value)} className={INPUT} /></Field>
-          <Field label="Проекти"><input type="number" min="0" value={draft.projects} onChange={event => onChange('projects', event.target.value)} className={INPUT} /></Field>
+          <div className="sm:max-xl:max-w-40 xl:col-span-2">
+            <Field label="Години опит"><input type="number" min="0" max="100" inputMode="numeric" value={draft.yearsExperience} onChange={event => onChange('yearsExperience', event.target.value)} className={COMPACT_INPUT} /></Field>
+          </div>
+          <div className="sm:max-xl:max-w-40 xl:col-span-2">
+            <Field label="Проекти"><input type="number" min="0" inputMode="numeric" value={draft.projects} onChange={event => onChange('projects', event.target.value)} className={COMPACT_INPUT} /></Field>
+          </div>
         </div>
 
-        <Field label="Кратко позициониране"><textarea rows={4} value={draft.bio} onChange={event => onChange('bio', event.target.value)} className={INPUT} placeholder="Обяснете с едно-две изречения за какви клиенти и проекти сте най-подходящи." /></Field>
-        <Field label="С какво може да помогнете"><textarea rows={7} value={draft.descriptionLong} onChange={event => onChange('descriptionLong', event.target.value)} className={INPUT} placeholder="Опишете конкретните задачи, услуги и тип обекти, с които помагате." /></Field>
+        <div className="grid gap-4 xl:grid-cols-2">
+          <Field label={<FieldLabelWithCounter label="Кратко позициониране" count={bioLength} limit={PROFILE_BIO_LIMIT} />}>
+            <textarea rows={4} maxLength={PROFILE_BIO_LIMIT} value={draft.bio} onChange={event => updateLimitedText('bio', event.target.value, PROFILE_BIO_LIMIT)} className={`${INPUT} min-h-32 resize-y`} placeholder="Обяснете с едно-две изречения за какви клиенти и проекти сте най-подходящи." />
+          </Field>
+          <Field label={<FieldLabelWithCounter label="С какво може да помогнете" count={descriptionLength} limit={PROFILE_DESCRIPTION_LIMIT} />}>
+            <textarea rows={4} maxLength={PROFILE_DESCRIPTION_LIMIT} value={draft.descriptionLong} onChange={event => updateLimitedText('descriptionLong', event.target.value, PROFILE_DESCRIPTION_LIMIT)} className={`${INPUT} min-h-32 resize-y`} placeholder="Опишете конкретните задачи, услуги и тип обекти, с които помагате." />
+          </Field>
+        </div>
+      </ProfileSection>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Езици"><input value={draft.languagesText} onChange={event => onChange('languagesText', event.target.value)} className={INPUT} placeholder="bg, en" /></Field>
-          <div id="partner-service-areas-field">
+      <ProfileSection number="2" icon={MapPin} title="Локация и покритие">
+        <div className="grid gap-4 xl:grid-cols-12">
+          <div className="xl:col-span-3">
+            <Field label="Езици"><input value={draft.languagesText} onChange={event => onChange('languagesText', event.target.value)} className={INPUT} placeholder="Български, Английски" /></Field>
+          </div>
+          <div id="partner-service-areas-field" className="xl:col-span-9">
             <LocationMultiCombobox label="Райони на работа" value={draft.serviceAreasText} onChange={(value) => onChange('serviceAreasText', value)} />
           </div>
         </div>
+      </ProfileSection>
 
+      <ProfileSection number="3" icon={Link2} title="Контакти и линкове">
         <div id="partner-contact-fields" className="grid gap-4 md:grid-cols-3 scroll-mt-28">
           <Field label="Телефон"><input value={draft.phone} onChange={event => onChange('phone', event.target.value)} type="tel" className={INPUT} /></Field>
           <Field label="Публичен имейл"><input value={draft.emailPublic} onChange={event => onChange('emailPublic', event.target.value)} type="email" className={INPUT} /></Field>
@@ -1547,18 +1612,28 @@ function ProfileForm({
           <Field label="Instagram"><input value={draft.instagram} onChange={event => onChange('instagram', event.target.value)} className={INPUT} /></Field>
           <Field label="Facebook"><input value={draft.facebook} onChange={event => onChange('facebook', event.target.value)} className={INPUT} /></Field>
         </div>
-
-        <Field label="Ценови ориентир"><textarea rows={3} value={draft.pricingNote} onChange={event => onChange('pricingNote', event.target.value)} className={INPUT} placeholder="Напр. Консултация от 80€, цена след оглед или проект по оферта." /></Field>
-        <label className="flex items-start gap-3 rounded-2xl border border-line bg-soft p-4 text-sm text-muted">
-          <input type="checkbox" checked={draft.acceptsRemote} onChange={event => onChange('acceptsRemote', event.target.checked)} className="mt-1 accent-black" />
-          <span>Приемам дистанционни консултации.</span>
-        </label>
-
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
-          <div className={`text-sm ${saveState.status === 'error' ? 'text-red-700' : 'text-muted'}`}>{saveState.message || 'Промените се пазят след запазване.'}</div>
-          <button className="btn btn-primary" disabled={saveState.status === 'saving'}><Save size={18} /> {saveState.status === 'saving' ? 'Запазва се…' : 'Запази профила'}</button>
+        <div className="rounded-2xl border border-line bg-soft/65 px-4 py-3 text-sm text-muted">
+          Тези данни са публични и ще помогнат на клиентите да се свържат с Вас по-лесно.
         </div>
-      </div>
+      </ProfileSection>
+
+      <ProfileSection number="4" icon={CreditCard} title="Ценови ориентир и допълнителни настройки">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(18rem,1fr)]">
+          <Field label={<FieldLabelWithCounter label="Ценови ориентир" count={pricingLength} limit={PROFILE_PRICING_LIMIT} />}>
+            <textarea rows={3} maxLength={PROFILE_PRICING_LIMIT} value={draft.pricingNote} onChange={event => updateLimitedText('pricingNote', event.target.value, PROFILE_PRICING_LIMIT)} className={`${INPUT} min-h-28 resize-y`} placeholder="Напр. Консултация от 80€, цена след оглед или проект по оферта." />
+          </Field>
+          <label className="flex items-start gap-3 rounded-2xl border border-line bg-soft p-4 text-sm text-muted">
+            <input type="checkbox" checked={draft.acceptsRemote} onChange={event => onChange('acceptsRemote', event.target.checked)} className="mt-1 accent-black" />
+            <span>Приемам дистанционни консултации и онлайн запитвания.</span>
+          </label>
+        </div>
+      </ProfileSection>
+
+      <FloatingSaveBar
+        state={saveState}
+        idleMessage="Промените се пазят след запазване."
+        saveLabel="Запази профила"
+      />
     </form>
   )
 }
@@ -1770,10 +1845,30 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
   const meta = getPortfolioMeta(draft)
   const [videoUrl, setVideoUrl] = useState('')
   const [videoError, setVideoError] = useState('')
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false)
   const [dragIndex, setDragIndex] = useState(null)
   const [dragOverIndex, setDragOverIndex] = useState(null)
   const dragIndexRef = useRef(null)
+  const dragOverIndexRef = useRef(null)
+  const dragPointerIdRef = useRef(null)
+  const isDraggingRef = useRef(false)
   const mediaListRef = useRef(null)
+  const requiredChecks = getPortfolioRequiredChecks(draft, media)
+  const missingRequired = requiredChecks.filter(item => !item.done)
+
+  useEffect(() => {
+    function handleEscape(event) {
+      if (event.key === 'Escape' && !isDraggingRef.current) onClose()
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+      removePointerDragListeners()
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [onClose])
 
   function captureMediaRects() {
     const list = mediaListRef.current
@@ -1830,39 +1925,89 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
     const nextMedia = [...media]
     const [moved] = nextMedia.splice(from, 1)
     if (!moved) return
-    nextMedia.splice(to, 0, moved)
+    const insertionIndex = from < to ? to - 1 : to
+    nextMedia.splice(insertionIndex, 0, moved)
     updateMedia(nextMedia, { animate: true })
   }
 
-  function handleDragPreview(event) {
-    const node = event.currentTarget.closest('[data-media-key]') || event.currentTarget
-    if (!node || !event.dataTransfer) return
-    const preview = node.cloneNode(true)
-    preview.style.position = 'fixed'
-    preview.style.top = '-1000px'
-    preview.style.left = '-1000px'
-    preview.style.width = `${node.offsetWidth}px`
-    preview.style.pointerEvents = 'none'
-    preview.style.transform = 'scale(1.04)'
-    preview.style.opacity = '0.94'
-    preview.style.boxShadow = '0 28px 70px rgba(13,35,64,0.22)'
-    preview.style.borderRadius = '20px'
-    document.body.appendChild(preview)
-    event.dataTransfer.setDragImage(preview, Math.min(44, node.offsetWidth / 2), Math.min(34, node.offsetHeight / 2))
-    window.setTimeout(() => preview.remove(), 0)
+  function updateDropIndex(index) {
+    if (dragIndexRef.current === null) return
+    dragOverIndexRef.current = index
+    setDragOverIndex(index)
   }
 
-  function handleDragEnter(index) {
-    const currentDragIndex = dragIndexRef.current
-    if (currentDragIndex === null || currentDragIndex === index) return
-    handleReorder(currentDragIndex, index)
+  function getDropIndex(clientY) {
+    const rows = Array.from(mediaListRef.current?.querySelectorAll('[data-media-key]') || [])
+    if (!rows.length) return 0
+
+    const targetIndex = rows.findIndex((node) => {
+      const rect = node.getBoundingClientRect()
+      return clientY < rect.top + rect.height / 2
+    })
+    return targetIndex === -1 ? rows.length : targetIndex
+  }
+
+  function handlePointerDragStart(event, index) {
+    if (event.button !== undefined && event.button !== 0) return
+    event.preventDefault()
     dragIndexRef.current = index
+    dragOverIndexRef.current = index
+    dragPointerIdRef.current = event.pointerId
+    isDraggingRef.current = true
     setDragIndex(index)
     setDragOverIndex(index)
+    document.body.style.cursor = 'grabbing'
+    document.body.style.userSelect = 'none'
+    window.addEventListener('pointermove', handlePointerDragMove)
+    window.addEventListener('pointerup', handlePointerDragEnd)
+    window.addEventListener('pointercancel', handlePointerDragEnd)
+  }
+
+  function handlePointerDragMove(event) {
+    if (!isDraggingRef.current) return
+    if (dragPointerIdRef.current !== null && event.pointerId !== dragPointerIdRef.current) return
+    event.preventDefault()
+    updateDropIndex(getDropIndex(event.clientY))
+  }
+
+  function handlePointerDragEnd(event) {
+    if (!isDraggingRef.current) return
+    if (dragPointerIdRef.current !== null && event.pointerId !== dragPointerIdRef.current) return
+    event.preventDefault()
+    commitDrop(dragOverIndexRef.current ?? dragIndexRef.current)
+  }
+
+  function removePointerDragListeners() {
+    window.removeEventListener('pointermove', handlePointerDragMove)
+    window.removeEventListener('pointerup', handlePointerDragEnd)
+    window.removeEventListener('pointercancel', handlePointerDragEnd)
   }
 
   function handleRemoveMedia(index) {
     updateMedia(media.filter((_, itemIndex) => itemIndex !== index), { animate: true })
+  }
+
+  function finishDrag() {
+    removePointerDragListeners()
+    dragIndexRef.current = null
+    dragOverIndexRef.current = null
+    dragPointerIdRef.current = null
+    isDraggingRef.current = false
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    setDragIndex(null)
+    setDragOverIndex(null)
+  }
+
+  function commitDrop(index) {
+    const fromIndex = dragIndexRef.current
+    if (fromIndex !== null) handleReorder(fromIndex, index)
+    finishDrag()
+  }
+
+  function isDropSlotActive(index) {
+    if (dragIndex === null || dragOverIndex !== index) return false
+    return index !== dragIndex && index !== dragIndex + 1
   }
 
   function handleAddVideo() {
@@ -1885,10 +2030,28 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
     setVideoUrl('')
   }
 
+  function handleSubmit(event) {
+    event.preventDefault()
+    if (missingRequired.length > 0) {
+      setAttemptedSubmit(true)
+      return
+    }
+    onSubmit(event)
+  }
+
   return (
-    <div className="fixed inset-0 z-[100] overflow-y-auto bg-ink/60 p-3 backdrop-blur-sm sm:p-6">
-      <div className="mx-auto flex min-h-full max-w-6xl items-center">
-        <div className="relative w-full overflow-hidden rounded-[2rem] border border-line bg-paper shadow-2xl">
+    <div
+      className="fixed inset-0 z-[100] bg-ink/60 p-3 backdrop-blur-sm sm:p-5 lg:p-6"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isDraggingRef.current) {
+          event.preventDefault()
+          event.stopPropagation()
+          onClose()
+        }
+      }}
+    >
+      <div className="flex h-full items-center justify-center overflow-y-auto">
+        <div className="relative w-[90vw] max-w-[1280px] overflow-hidden rounded-[2rem] border border-line bg-paper shadow-2xl">
           <div className="flex items-center justify-between gap-4 border-b border-line px-4 py-4 sm:px-6">
             <div>
               <div className="eyebrow">Portfolio Project v1</div>
@@ -1899,12 +2062,12 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
             </button>
           </div>
 
-          <div className="grid max-h-[calc(100dvh-7rem)] overflow-y-auto lg:grid-cols-[minmax(0,1.05fr)_minmax(25rem,0.95fr)]">
-            <section className="bg-soft/60 p-4 sm:p-6">
+          <div className="grid max-h-[calc(100dvh-4rem)] overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(25rem,0.96fr)] xl:grid-cols-[minmax(0,1.02fr)_minmax(30rem,0.98fr)]">
+            <section className="min-w-0 bg-soft/60 p-4 sm:p-6 lg:p-7">
               <div className="overflow-hidden rounded-[1.65rem] border border-white/80 bg-paper shadow-[0_18px_55px_rgba(13,35,64,0.08)]">
                 <div className="aspect-[16/10] bg-soft">
                   {image ? (
-                    <img src={image} alt={draft.title || 'Портфолио проект'} className="h-full w-full object-cover" />
+                    <img src={image} alt={draft.title || 'Портфолио проект'} className="h-full w-full object-cover" draggable={false} />
                   ) : (
                     <div className="flex h-full items-center justify-center text-sm text-muted">Качи основна снимка, за да продава картата визуално.</div>
                   )}
@@ -1915,8 +2078,8 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
                     {draft.budgetBand && <span className="rounded-full bg-ink px-3 py-1 text-xs font-semibold text-paper">{draft.budgetBand}</span>}
                     {!draft.isPublished && <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">Скрит</span>}
                   </div>
-                  <h4 className="mt-4 font-display text-4xl leading-none text-ink">{draft.title || 'Заглавие на проекта'}</h4>
-                  <p className="mt-3 text-sm leading-6 text-muted">{draft.description || 'Опиши накратко: какъв беше проблемът, каква беше твоята роля, какво решение даде и какъв е резултатът.'}</p>
+                  <h4 className="mt-4 break-words font-display text-[clamp(2.2rem,4vw,3.25rem)] leading-none text-ink">{draft.title || 'Заглавие на проекта'}</h4>
+                  <p className="mt-3 break-words text-sm leading-6 text-muted">{draft.description || 'Опиши накратко: какъв беше проблемът, каква беше твоята роля, какво решение даде и какъв е резултатът.'}</p>
                 </div>
               </div>
 
@@ -1934,7 +2097,7 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
                         {isVideoMedia(item) ? (
                           <LazyVideoEmbed item={item} title={draft.title || 'Видео към портфолио проект'} />
                         ) : (
-                          <img src={getMediaPreviewUrl(item)} alt={item.caption || draft.title || 'Портфолио'} className="img-cover" />
+                          <img src={getMediaPreviewUrl(item)} alt={item.caption || draft.title || 'Портфолио'} className="img-cover" draggable={false} />
                         )}
                       </div>
                       <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs font-semibold text-muted">
@@ -1948,22 +2111,30 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
               {meta && <p className="mt-4 text-xs font-semibold uppercase tracking-[0.14em] text-muted">{meta}</p>}
             </section>
 
-            <form onSubmit={onSubmit} className="space-y-5 p-4 sm:p-6">
+            <form onSubmit={handleSubmit} className="min-w-0 space-y-5 p-4 sm:p-6 lg:p-7">
               <div className="rounded-3xl border border-line bg-soft/70 p-4">
                 <div className="text-sm font-semibold text-ink">Бърза формула</div>
                 <p className="mt-1 text-sm leading-6 text-muted">Проблем → Роля → Решение → Резултат. Достатъчно е кратко, но конкретно.</p>
               </div>
+
+              <PortfolioValidationPanel checks={requiredChecks} attempted={attemptedSubmit} />
 
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label="Заглавие"><input value={draft.title} onChange={event => onChange('title', event.target.value)} className={INPUT} placeholder="Модерна баня в Русе" /></Field>
                 <Field label="Слой"><TotsanSelect value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} /></Field>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-4">
-                <LocationCombobox label="Град" value={draft.city} onChange={(value) => onChange('city', value)} />
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="min-w-0 xl:col-span-2">
+                  <LocationCombobox
+                    label={<LabelWithHelp text="Град" help="Избери град от официалния списък." />}
+                    value={draft.city}
+                    onChange={(value) => onChange('city', value)}
+                    helper=""
+                  />
+                </div>
                 <Field label="Година"><input type="number" min="1900" max="2100" value={draft.year} onChange={event => onChange('year', event.target.value)} className={INPUT} /></Field>
                 <Field label="Силен акцент"><input value={draft.budgetBand} onChange={event => onChange('budgetBand', event.target.value)} className={INPUT} placeholder="Преди/След · 6 кв.м." /></Field>
-                <Field label="Ред"><input type="number" value={draft.orderIndex} onChange={event => onChange('orderIndex', event.target.value)} className={INPUT} /></Field>
               </div>
 
               <Field label="Кратко описание"><textarea rows={5} value={draft.description} onChange={event => onChange('description', event.target.value)} className={INPUT} placeholder="Проблем → роля → решение → резултат" /></Field>
@@ -2016,49 +2187,25 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
                     </div>
                     <span className="rounded-full bg-soft px-3 py-1 text-xs font-semibold text-muted">{media.length}</span>
                   </div>
-                  <div ref={mediaListRef} className="mt-4 space-y-2">
+                  <div
+                    ref={mediaListRef}
+                    className="mt-4 space-y-2"
+                  >
                     {media.map((item, index) => (
-                      <PortfolioMediaManagerItem
-                        key={getMediaSortKey(item, index)}
-                        mediaKey={getMediaSortKey(item, index)}
-                        item={item}
-                        index={index}
-                        isDragging={dragIndex === index}
-                        isDragTarget={dragOverIndex === index && dragIndex !== index}
-                        onDragStart={(event) => {
-                          dragIndexRef.current = index
-                          setDragIndex(index)
-                          setDragOverIndex(index)
-                          document.body.style.cursor = 'grabbing'
-                          event.dataTransfer.effectAllowed = 'move'
-                          event.dataTransfer.setData('text/plain', String(index))
-                          handleDragPreview(event)
-                        }}
-                        onDragEnter={(event) => {
-                          event.preventDefault()
-                          handleDragEnter(index)
-                        }}
-                        onDragOver={(event) => {
-                          event.preventDefault()
-                          event.dataTransfer.dropEffect = 'move'
-                          setDragOverIndex(index)
-                        }}
-                        onDrop={(event) => {
-                          event.preventDefault()
-                          dragIndexRef.current = null
-                          document.body.style.cursor = ''
-                          setDragIndex(null)
-                          setDragOverIndex(null)
-                        }}
-                        onDragEnd={() => {
-                          dragIndexRef.current = null
-                          document.body.style.cursor = ''
-                          setDragIndex(null)
-                          setDragOverIndex(null)
-                        }}
-                        onRemove={() => handleRemoveMedia(index)}
-                      />
+                      <div key={getMediaSortKey(item, index)} className="space-y-2">
+                        <DropSlot active={isDropSlotActive(index)} />
+                        <PortfolioMediaManagerItem
+                          mediaKey={getMediaSortKey(item, index)}
+                          item={item}
+                          index={index}
+                          isDragging={dragIndex === index}
+                          isDragTarget={false}
+                          onPointerDown={(event) => handlePointerDragStart(event, index)}
+                          onRemove={() => handleRemoveMedia(index)}
+                        />
+                      </div>
                     ))}
+                    <DropSlot active={isDropSlotActive(media.length)} />
                   </div>
                 </div>
               )}
@@ -2067,6 +2214,12 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
                 <input type="checkbox" checked={draft.isPublished} onChange={event => onChange('isPublished', event.target.checked)} className="mt-1 accent-black" />
                 <span>Публикуван проект в публичното портфолио.</span>
               </label>
+
+              {attemptedSubmit && missingRequired.length > 0 && (
+                <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                  {missingRequired[0].message}
+                </div>
+              )}
 
               <div className="flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className={`text-sm ${state.status === 'error' ? 'text-red-700' : 'text-muted'}`}>{state.message || 'Запази проекта, за да се появи като продуктова карта.'}</div>
@@ -2083,7 +2236,56 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
   )
 }
 
-function PortfolioMediaManagerItem({ item, index, mediaKey, isDragging, isDragTarget, onDragStart, onDragEnter, onDragOver, onDrop, onDragEnd, onRemove }) {
+function getPortfolioRequiredChecks(draft, media) {
+  return [
+    {
+      key: 'title',
+      label: 'Заглавие',
+      message: 'Добави заглавие на проекта.',
+      done: Boolean(String(draft.title || '').trim()),
+    },
+    {
+      key: 'description',
+      label: 'Кратко описание',
+      message: 'Опиши накратко проблем, роля, решение и резултат.',
+      done: Boolean(String(draft.description || '').trim()),
+    },
+    {
+      key: 'media',
+      label: 'Поне една медия',
+      message: 'Добави поне една снимка или видео към проекта.',
+      done: media.length > 0,
+    },
+  ]
+}
+
+function PortfolioValidationPanel({ checks, attempted }) {
+  const missing = checks.filter(item => !item.done)
+  const complete = missing.length === 0
+
+  return (
+    <div className={`rounded-3xl border p-4 ${complete ? 'border-emerald-100 bg-emerald-50' : attempted ? 'border-red-100 bg-red-50' : 'border-line bg-paper'}`}>
+      <div className={`text-sm font-semibold ${complete ? 'text-emerald-800' : attempted ? 'text-red-700' : 'text-ink'}`}>
+        {complete ? 'Готово за запазване' : attempted ? 'Остава още малко' : 'Задължително за портфолио'}
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        {checks.map(item => (
+          <div key={item.key} className={`rounded-2xl px-3 py-2 text-sm ${item.done ? 'bg-paper/70 text-ink' : attempted ? 'bg-white/70 text-red-700' : 'bg-soft text-muted'}`}>
+            <span className="flex items-center gap-2 font-medium">
+              <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${item.done ? 'bg-trustGreen text-paper' : attempted ? 'bg-red-100 text-red-700' : 'bg-paper text-muted'}`}>
+                {item.done ? <Check size={13} /> : <CircleDot size={13} />}
+              </span>
+              {item.label}
+            </span>
+            {!item.done && attempted && <span className="mt-1 block text-xs leading-5">{item.message}</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PortfolioMediaManagerItem({ item, index, mediaKey, isDragging, isDragTarget, onPointerDown, onRemove }) {
   const isVideo = isVideoMedia(item)
   const preview = getMediaPreviewUrl(item)
   const label = isVideo ? (item.provider === 'youtube' ? 'YouTube видео' : 'Видео линк') : 'Снимка'
@@ -2097,25 +2299,20 @@ function PortfolioMediaManagerItem({ item, index, mediaKey, isDragging, isDragTa
   return (
     <div
       data-media-key={mediaKey}
-      onDragEnter={onDragEnter}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      className={`group flex transform-gpu items-center gap-3 rounded-2xl border p-2 will-change-transform transition-[transform,box-shadow,border-color,background-color,opacity] duration-200 ease-out ${stateClass}`}
+      className={`group flex transform-gpu select-none items-center gap-3 rounded-2xl border p-2 will-change-transform transition-[transform,box-shadow,border-color,background-color,opacity] duration-200 ease-out ${stateClass}`}
     >
       <span
         role="button"
         tabIndex={0}
-        draggable
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
-        className={`flex h-12 w-9 shrink-0 cursor-grab select-none items-center justify-center rounded-2xl transition active:cursor-grabbing ${isDragging ? 'bg-ink text-paper shadow-sm' : 'text-muted group-hover:bg-paper group-hover:text-ink'}`}
+        onPointerDown={onPointerDown}
+        className={`touch-none flex h-12 w-9 shrink-0 cursor-grab select-none items-center justify-center rounded-2xl transition active:cursor-grabbing ${isDragging ? 'cursor-grabbing bg-ink text-paper shadow-sm' : 'text-muted group-hover:bg-paper group-hover:text-ink'}`}
         aria-label="Премести медия"
       >
         <GripVertical size={19} />
       </span>
       <div className={`relative h-14 w-16 shrink-0 overflow-hidden rounded-xl border bg-paper transition ${isDragging ? 'border-accentDeep shadow-sm' : 'border-line'}`}>
         {preview ? (
-          <img src={preview} alt="" className="img-cover" />
+          <img src={preview} alt="" className="pointer-events-none img-cover select-none" draggable={false} />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-muted">
             <Video size={18} />
@@ -2140,6 +2337,57 @@ function PortfolioMediaManagerItem({ item, index, mediaKey, isDragging, isDragTa
         <Trash2 size={16} />
       </button>
     </div>
+  )
+}
+
+function DropSlot({ active }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`overflow-hidden rounded-2xl transition-all duration-200 ease-out ${active ? 'h-6 opacity-100' : 'h-0 opacity-0'}`}
+    >
+      <div className="flex h-full items-center rounded-2xl border border-dashed border-accent/45 bg-accent/10 px-3">
+        <div className="h-1.5 w-full rounded-full bg-accent/35" />
+      </div>
+    </div>
+  )
+}
+
+function LabelWithHelp({ text, help }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span>{text}</span>
+      <HelpTooltip text={help} />
+    </span>
+  )
+}
+
+function HelpTooltip({ text }) {
+  const id = useId()
+  const [open, setOpen] = useState(false)
+
+  return (
+    <span className="relative inline-flex items-center">
+      <button
+        type="button"
+        aria-label={text}
+        aria-describedby={open ? id : undefined}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-line bg-paper text-[11px] font-semibold leading-none text-muted transition hover:border-ink/25 hover:text-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
+      >
+        ?
+      </button>
+      <span
+        id={id}
+        role="tooltip"
+        className={`pointer-events-none absolute left-1/2 top-full z-20 mt-2 w-56 -translate-x-1/2 rounded-2xl bg-ink px-3 py-2 text-left text-xs font-medium leading-5 text-paper shadow-[0_18px_45px_rgba(13,35,64,0.24)] transition ${open ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'}`}
+      >
+        {text}
+      </span>
+    </span>
   )
 }
 
@@ -2194,7 +2442,7 @@ function LazyVideoEmbed({ item, title }) {
         />
       ) : (
         <div className="relative h-full w-full">
-          {thumbnail ? <img src={thumbnail} alt="" className="img-cover opacity-75" /> : <div className="h-full w-full bg-ink" />}
+          {thumbnail ? <img src={thumbnail} alt="" className="img-cover opacity-75" draggable={false} /> : <div className="h-full w-full bg-ink" />}
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-ink/35 text-paper">
             <PlayCircle size={34} />
             <span className="text-xs font-semibold uppercase tracking-[0.16em]">Видео</span>
@@ -2230,17 +2478,73 @@ function ContactPreview({ profile, onEdit }) {
   )
 }
 
-function InfoTile({ label, value }) {
+function ProfileIntroCard() {
   return (
-    <div className="rounded-2xl border border-line bg-soft p-4">
-      <div className="text-xs uppercase tracking-[0.14em] text-muted">{label}</div>
-      <div className="mt-1 text-sm font-medium text-ink">{value}</div>
+    <div className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_20px_65px_-45px_rgba(13,35,64,0.28)] md:p-6">
+      <div className="flex items-start gap-4">
+        <div className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.35rem] border border-line bg-soft text-accentDeep">
+          <UserRound size={24} />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-2xl font-semibold text-ink">Основна информация</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">
+            Актуализирайте данните на Вашия профил. Информацията е видима публично и помага на клиентите да разберат с какво точно се занимавате.
+          </p>
+        </div>
+      </div>
     </div>
   )
 }
 
+function ProfileSection({ number, icon: Icon, title, children, className = '' }) {
+  return (
+    <section className={`rounded-[2rem] border border-line bg-paper p-5 shadow-[0_20px_65px_-45px_rgba(13,35,64,0.28)] md:p-6 ${className}`.trim()}>
+      <div className="flex items-center gap-3">
+        <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-soft text-accentDeep">
+          <Icon size={20} />
+        </div>
+        <h3 className="text-xl font-semibold text-ink">{number}. {title}</h3>
+      </div>
+      <div className="mt-5 space-y-4">
+        {children}
+      </div>
+    </section>
+  )
+}
+
+function InfoTile({ label, value, icon: Icon, tone = 'neutral' }) {
+  const iconTone = tone === 'success'
+    ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+    : 'bg-soft text-accentDeep border-line'
+
+  return (
+    <div className="rounded-[1.4rem] border border-line bg-paper p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-xs uppercase tracking-[0.14em] text-muted">{label}</div>
+          <div className="mt-2 text-sm font-medium text-ink">{value}</div>
+        </div>
+        {Icon && (
+          <div className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border ${iconTone}`}>
+            <Icon size={16} />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function FieldLabelWithCounter({ label, count, limit }) {
+  return (
+    <span className="flex items-center justify-between gap-3">
+      <span>{label}</span>
+      <span className={`text-xs font-medium ${count >= limit ? 'text-amber-700' : 'text-muted'}`}>{count} / {limit}</span>
+    </span>
+  )
+}
+
 function Field({ label, children }) {
-  return <div className="block text-sm font-medium text-ink">{label}{children}</div>
+  return <div className="min-w-0 block text-sm font-medium text-ink">{label}{children}</div>
 }
 
 function Range({ label, value, min, max, step, onChange }) {

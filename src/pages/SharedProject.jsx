@@ -40,19 +40,8 @@ import {
   loadSharedClientProject,
 } from '../lib/projects.js'
 
-function getExtension(value = '') {
-  const match = String(value).toLowerCase().match(/\.([a-z0-9]+)(?:\?|#|$)/)
-  return match?.[1] || ''
-}
-
-function getMediaUrl(item) {
-  return item?.url || item?.signedUrl || item?.publicUrl || ''
-}
-
-function isImageMedia(item) {
-  return String(item?.type || '').startsWith('image/')
-    || ['jpg', 'jpeg', 'png', 'webp'].includes(getExtension(item?.fileName || item?.path || getMediaUrl(item)))
-}
+import { getMediaUrl, isImageMedia, getExtension } from '../components/media/MediaCarousel.jsx'
+import MediaCarousel from '../components/media/MediaCarousel.jsx'
 
 function getDocumentTypeLabel(item) {
   const extension = getExtension(item?.fileName || item?.path || getMediaUrl(item))
@@ -167,9 +156,6 @@ export default function SharedProject() {
   } = useAccount()
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
-  const [activeImageIndex, setActiveImageIndex] = useState(0)
-  const [carouselDirection, setCarouselDirection] = useState('next')
-  const [lightboxOpen, setLightboxOpen] = useState(false)
   const [chatAction, setChatAction] = useState({ status: 'idle', message: '' })
 
   useEffect(() => {
@@ -190,24 +176,8 @@ export default function SharedProject() {
   }, [shareId])
 
   useEffect(() => {
-    setActiveImageIndex(0)
-    setLightboxOpen(false)
     setChatAction({ status: 'idle', message: '' })
   }, [shareId])
-
-  useEffect(() => {
-    if (!lightboxOpen || typeof document === 'undefined') return undefined
-    const previousOverflow = document.body.style.overflow
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') setLightboxOpen(false)
-    }
-    document.body.style.overflow = 'hidden'
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.body.style.overflow = previousOverflow
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [lightboxOpen])
 
   if (error) {
     return (
@@ -303,29 +273,6 @@ export default function SharedProject() {
     'нужда от оглед',
     'начин на офериране',
   ]
-  const totalImages = imageMedia.length
-  const safeActiveImageIndex = totalImages ? Math.min(activeImageIndex, totalImages - 1) : 0
-  const activeImage = totalImages ? imageMedia[safeActiveImageIndex] : null
-  const previousImage = totalImages > 1 ? imageMedia[(safeActiveImageIndex - 1 + totalImages) % totalImages] : null
-  const nextImage = totalImages > 1 ? imageMedia[(safeActiveImageIndex + 1) % totalImages] : null
-
-  function goToPreviousImage() {
-    if (totalImages < 2) return
-    setCarouselDirection('prev')
-    setActiveImageIndex((current) => (current - 1 + totalImages) % totalImages)
-  }
-
-  function goToNextImage() {
-    if (totalImages < 2) return
-    setCarouselDirection('next')
-    setActiveImageIndex((current) => (current + 1) % totalImages)
-  }
-
-  function selectImage(index) {
-    if (index === safeActiveImageIndex) return
-    setCarouselDirection(index > safeActiveImageIndex ? 'next' : 'prev')
-    setActiveImageIndex(index)
-  }
 
   async function startChatWithClient() {
     if (chatAction.status === 'opening') return
@@ -576,117 +523,56 @@ export default function SharedProject() {
           </main>
         </div>
 
-        <ProjectImageCarousel
-          images={imageMedia}
-          activeImage={activeImage}
-          activeIndex={safeActiveImageIndex}
-          direction={carouselDirection}
-          previousImage={previousImage}
-          nextImage={nextImage}
-          totalImages={totalImages}
-          onPrevious={goToPreviousImage}
-          onNext={goToNextImage}
-          onSelect={selectImage}
-          onOpen={() => setLightboxOpen(true)}
-        />
+        <MediaCarousel images={imageMedia} />
 
         <div className="container-page px-4 md:px-6">
           <div className="space-y-6">
             {documentMedia.length > 0 && (
               <div className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_18px_50px_rgba(13,35,64,0.06)] sm:p-6 lg:p-8">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                      <div className="eyebrow">Файлове и документи</div>
-                      <h3 className="mt-2 font-display text-3xl font-semibold text-ink">Прикачени файлове</h3>
-                    </div>
-                    <div className="inline-flex w-fit items-center gap-2 rounded-full border border-line bg-soft px-3 py-1.5 text-xs font-semibold text-muted">
-                      <Files size={14} />
-                      {documentMedia.length} {documentMedia.length === 1 ? 'файл' : 'файла'}
-                    </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <div className="eyebrow">Файлове и документи</div>
+                    <h3 className="mt-2 font-display text-3xl font-semibold text-ink">Прикачени файлове</h3>
                   </div>
-
-                  <div className="mt-6 space-y-3">
-                    {documentMedia.map((item, index) => (
-                      <DocumentRow key={item.id || `${getMediaUrl(item)}-${index}`} item={item} />
-                    ))}
+                  <div className="inline-flex w-fit items-center gap-2 rounded-full border border-line bg-soft px-3 py-1.5 text-xs font-semibold text-muted">
+                    <Files size={14} />
+                    {documentMedia.length} {documentMedia.length === 1 ? 'файл' : 'файла'}
                   </div>
                 </div>
-              )}
 
-              <div className="rounded-[2rem] border border-line/70 bg-[linear-gradient(135deg,rgba(224,232,226,0.52),rgba(255,255,255,0.86))] p-5 shadow-[0_16px_42px_rgba(13,35,64,0.05)] sm:p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-accentDeep">Следваща стъпка</div>
-                    <p className="mt-1 break-words text-sm leading-relaxed text-ink/78">
-                      Ако проектът е релевантен за услугите ти, продължи към контакт с клиента.
-                    </p>
-                  </div>
-                  <div className="w-full sm:w-auto">
-                    <ProjectCta
-                      cta={cta}
-                      className="w-full justify-center sm:w-auto"
-                      onAction={isAuthenticated && isSpecialist && !viewerIsOwner ? startChatWithClient : undefined}
-                    />
-                    {chatAction.status === 'error' && chatAction.message && (
-                      <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 sm:max-w-sm">
-                        {chatAction.message}
-                      </div>
-                    )}
-                  </div>
+                <div className="mt-6 space-y-3">
+                  {documentMedia.map((item, index) => (
+                    <DocumentRow key={item.id || `${getMediaUrl(item)}-${index}`} item={item} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-[2rem] border border-line/70 bg-[linear-gradient(135deg,rgba(224,232,226,0.52),rgba(255,255,255,0.86))] p-5 shadow-[0_16px_42px_rgba(13,35,64,0.05)] sm:p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-accentDeep">Следваща стъпка</div>
+                  <p className="mt-1 break-words text-sm leading-relaxed text-ink/78">
+                    Ако проектът е релевантен за услугите ти, продължи към контакт с клиента.
+                  </p>
+                </div>
+                <div className="w-full sm:w-auto">
+                  <ProjectCta
+                    cta={cta}
+                    className="w-full justify-center sm:w-auto"
+                    onAction={isAuthenticated && isSpecialist && !viewerIsOwner ? startChatWithClient : undefined}
+                  />
+                  {chatAction.status === 'error' && chatAction.message && (
+                    <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 sm:max-w-sm">
+                      {chatAction.message}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
-      </section>
-
-      {lightboxOpen && activeImage && (
-        <div
-          className="fixed inset-0 z-[999] bg-ink/94 px-4 py-5 text-paper backdrop-blur-xl sm:px-6"
-          onClick={() => setLightboxOpen(false)}
-        >
-          <button
-            type="button"
-            onClick={() => setLightboxOpen(false)}
-            className="absolute right-4 top-4 z-20 flex h-12 w-12 items-center justify-center rounded-full border border-paper bg-paper text-ink shadow-[0_18px_50px_rgba(0,0,0,0.35)] transition hover:scale-105"
-            aria-label="Затвори снимката"
-          >
-            <X size={20} />
-          </button>
-          <div className="mx-auto flex h-full max-w-7xl flex-col justify-center" onClick={(event) => event.stopPropagation()}>
-            <div className="mb-4 flex items-center justify-between gap-4 text-xs font-bold uppercase tracking-wider text-paper/65">
-              <span>Снимка {safeActiveImageIndex + 1} / {totalImages}</span>
-              <span className="text-right">Клик извън снимката или Escape за затваряне</span>
-            </div>
-            <div className="relative min-h-0 flex-1">
-              <img
-                src={getMediaUrl(activeImage)}
-                alt={activeImage.caption || 'Снимка към проекта'}
-                className="h-full w-full rounded-[1.5rem] object-contain"
-              />
-              {totalImages > 1 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={goToPreviousImage}
-                    className="absolute left-3 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-paper/25 bg-ink/55 text-paper backdrop-blur transition hover:bg-ink/75"
-                    aria-label="Предишна снимка"
-                  >
-                    <ChevronLeft size={22} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={goToNextImage}
-                    className="absolute right-3 top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-paper/25 bg-ink/55 text-paper backdrop-blur transition hover:bg-ink/75"
-                    aria-label="Следваща снимка"
-                  >
-                    <ChevronRight size={22} />
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
         </div>
-      )}
+      </section>
     </div>
   )
 }
@@ -751,155 +637,7 @@ function BriefMetric({ item }) {
   )
 }
 
-function ProjectImageCarousel({
-  images,
-  activeImage,
-  activeIndex,
-  direction,
-  previousImage,
-  nextImage,
-  totalImages,
-  onPrevious,
-  onNext,
-  onSelect,
-  onOpen,
-}) {
-  if (!totalImages || !activeImage) {
-    return (
-      <section className="relative left-1/2 my-8 w-screen -translate-x-1/2 overflow-hidden border-y border-line bg-[linear-gradient(135deg,rgba(224,232,226,0.44),rgba(255,255,255,0.9))] px-4 py-16 md:px-6">
-        <div className="container-page">
-          <div className="mx-auto max-w-2xl rounded-[2rem] border border-dashed border-line bg-paper/80 p-8 text-center shadow-[0_18px_50px_rgba(13,35,64,0.05)]">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-soft text-accentDeep">
-              <Image size={22} />
-            </div>
-            <h3 className="mt-4 font-display text-3xl font-semibold text-ink">Визуален контекст</h3>
-            <p className="mt-2 text-sm text-muted">Клиентът още не е добавил снимки към проекта.</p>
-          </div>
-        </div>
-      </section>
-    )
-  }
 
-  return (
-    <section
-      className="relative left-1/2 my-8 min-h-[72svh] w-screen -translate-x-1/2 overflow-hidden border-y border-line bg-[linear-gradient(135deg,rgba(244,247,250,0.98),rgba(224,232,226,0.56))] px-4 py-10 md:px-6 lg:min-h-[84svh] lg:py-14"
-    >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.9),transparent_28%),radial-gradient(circle_at_82%_70%,rgba(47,143,116,0.13),transparent_32%)]" />
-      <div className="container-page relative z-10 flex min-h-[calc(72svh-5rem)] flex-col justify-center lg:min-h-[calc(84svh-7rem)]">
-        <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="eyebrow">Снимки и визуален контекст</div>
-            <h3 className="mt-2 font-display text-4xl font-semibold text-ink">Project moodboard</h3>
-          </div>
-          <div className="flex w-fit items-center gap-3 rounded-full border border-line bg-paper/85 px-4 py-2 text-xs font-bold uppercase tracking-wider text-muted shadow-sm backdrop-blur">
-            <Image size={14} />
-            {activeIndex + 1} / {totalImages}
-          </div>
-        </div>
-
-        <div className="relative mx-auto flex w-full max-w-7xl items-center justify-center py-4 lg:min-h-[34rem]">
-          {previousImage && (
-            <button
-              type="button"
-              onClick={onPrevious}
-              className="absolute left-0 hidden h-[16rem] w-[36%] max-w-[30rem] overflow-hidden rounded-[1.75rem] border border-paper/80 bg-soft shadow-[0_24px_70px_rgba(13,35,64,0.14)] opacity-55 blur-[0.2px] transition hover:opacity-75 lg:block"
-              aria-label="Покажи предишната снимка"
-            >
-              <img src={getMediaUrl(previousImage)} alt="" className="h-full w-full object-cover" aria-hidden="true" />
-              <div className="absolute inset-0 bg-paper/35" />
-            </button>
-          )}
-
-          {nextImage && (
-            <button
-              type="button"
-              onClick={onNext}
-              className="absolute right-0 hidden h-[16rem] w-[36%] max-w-[30rem] overflow-hidden rounded-[1.75rem] border border-paper/80 bg-soft shadow-[0_24px_70px_rgba(13,35,64,0.14)] opacity-55 blur-[0.2px] transition hover:opacity-75 lg:block"
-              aria-label="Покажи следващата снимка"
-            >
-              <img src={getMediaUrl(nextImage)} alt="" className="h-full w-full object-cover" aria-hidden="true" />
-              <div className="absolute inset-0 bg-paper/35" />
-            </button>
-          )}
-
-          <div
-            key={activeImage.id || getMediaUrl(activeImage)}
-            className={`relative z-10 w-full max-w-4xl ${direction === 'prev' ? 'shared-project-carousel-card--from-left' : 'shared-project-carousel-card--from-right'}`}
-          >
-            <button
-              type="button"
-              onClick={onOpen}
-              className="group relative block w-full overflow-hidden rounded-[2rem] border border-paper bg-ink text-left shadow-[0_30px_90px_rgba(13,35,64,0.22)]"
-              aria-label="Отвори снимката на цял екран"
-            >
-              <img
-                src={getMediaUrl(activeImage)}
-                alt={activeImage.caption || 'Снимка към проекта'}
-                className="aspect-[16/10] w-full object-cover transition duration-500 group-hover:scale-[1.02]"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-ink/62 via-transparent to-transparent" />
-              <div className="absolute bottom-4 left-4 right-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div className="min-w-0">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-paper/70">Качена снимка</div>
-                  <p className="mt-1 line-clamp-2 text-sm font-medium text-paper">
-                    {activeImage.caption || 'Натисни за преглед на цял екран'}
-                  </p>
-                </div>
-                <span className="inline-flex w-fit items-center gap-2 rounded-full border border-paper/25 bg-paper/12 px-3 py-2 text-xs font-semibold text-paper backdrop-blur">
-                  <Maximize2 size={15} />
-                  Цял екран
-                </span>
-              </div>
-            </button>
-
-            {totalImages > 1 && (
-              <div className="pointer-events-none absolute inset-y-0 left-0 right-0 flex items-center justify-between px-3">
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onPrevious()
-                  }}
-                  className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-paper/40 bg-ink/55 text-paper shadow-lg backdrop-blur transition hover:bg-ink/75"
-                  aria-label="Предишна снимка"
-                >
-                  <ChevronLeft size={21} />
-                </button>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onNext()
-                  }}
-                  className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-paper/40 bg-ink/55 text-paper shadow-lg backdrop-blur transition hover:bg-ink/75"
-                  aria-label="Следваща снимка"
-                >
-                  <ChevronRight size={21} />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {totalImages > 1 && (
-          <div className="mx-auto mt-6 flex max-w-full gap-2 overflow-x-auto rounded-full border border-line bg-paper/80 p-2 shadow-sm backdrop-blur">
-            {images.map((item, index) => (
-              <button
-                key={item.id || `${getMediaUrl(item)}-${index}`}
-                type="button"
-                onClick={() => onSelect(index)}
-                className={`h-12 w-16 shrink-0 overflow-hidden rounded-full border transition ${index === activeIndex ? 'border-ink opacity-100' : 'border-transparent opacity-55 hover:opacity-90'}`}
-                aria-label={`Покажи снимка ${index + 1}`}
-              >
-                <img src={getMediaUrl(item)} alt="" className="h-full w-full object-cover" aria-hidden="true" />
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </section>
-  )
-}
 
 function DocumentRow({ item }) {
   const mediaUrl = getMediaUrl(item)

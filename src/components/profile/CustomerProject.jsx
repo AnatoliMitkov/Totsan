@@ -342,7 +342,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
   const documentMedia = media.filter(isDocumentMedia)
 
   return (
-    <div className="grid gap-6 lg:grid-cols-12">
+    <div className="grid gap-6 grid-cols-1 lg:grid-cols-12">
       {conflictModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4" role="dialog" aria-modal="true">
           <div className="w-full max-w-md rounded-3xl bg-paper p-6 md:p-8 shadow-2xl">

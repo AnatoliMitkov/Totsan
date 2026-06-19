@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, BriefcaseBusiness, CheckCircle2, MapPin, Search, ShieldCheck, SlidersHorizontal, UserRound, X } from 'lucide-react'
 import FallbackImage from '../components/FallbackImage.jsx'
+import { locationCountKey } from '../lib/locations.js'
 import { useProfileDirectory } from '../lib/profiles.js'
 import { loadPublicPartnerServices, packagePriceLabel } from '../lib/partner-services.js'
 import { getPartnerServiceCoverCandidates } from '../lib/service-media.js'
@@ -84,6 +85,17 @@ export default function Services() {
     return new Set(services.map(service => service.profileId).filter(Boolean)).size
   }, [services])
 
+  const coveredCitiesCount = useMemo(() => {
+    const coveredCityKeys = new Set()
+    services.forEach((service) => {
+      serviceAreas(service).forEach((area) => {
+        const key = locationCountKey(area)
+        if (key) coveredCityKeys.add(key)
+      })
+    })
+    return coveredCityKeys.size
+  }, [services])
+
   const hasActiveFilters = query.trim() || layer !== 'all' || city !== 'all'
   const resetFilters = () => {
     setQuery('')
@@ -93,7 +105,7 @@ export default function Services() {
 
   return (
     <>
-      <section className="section !pt-20 bg-gradient-to-br from-soft to-cloud">
+      <section className="section !pt-10 !pb-10 bg-gradient-to-br from-soft to-cloud">
         <div className="container-page max-w-5xl reveal">
           <div className="eyebrow">Услуги и пакети</div>
           <h1 className="h-display mt-3">Пакетирани услуги от партньори в Totsan.</h1>
@@ -108,12 +120,12 @@ export default function Services() {
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             <StatTile icon={BriefcaseBusiness} label="Публикувани пакети" value={services.length} />
             <StatTile icon={UserRound} label="Партньори" value={partnerCount} />
-            <StatTile icon={SlidersHorizontal} label="Слоеве" value={layers.length} />
+            <StatTile icon={MapPin} label={'\u041f\u043e\u043a\u0440\u0438\u0442\u0438 \u0433\u0440\u0430\u0434\u043e\u0432\u0435'} value={coveredCitiesCount} />
           </div>
         </div>
       </section>
 
-      <section className="section !pt-10">
+      <section className="section !pt-10 !pb-10">
         <div className="container-page">
           <div className="rounded-3xl border border-line bg-paper p-4 shadow-sm reveal">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">

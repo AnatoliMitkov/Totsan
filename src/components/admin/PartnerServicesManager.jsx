@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CheckCircle2, Clock, Eye, LayoutGrid, List, RefreshCw, Search, XCircle, Trash2 } from 'lucide-react'
 import { ADMIN_INPUT_CLASS, formatAdminDate } from '../../lib/admin.js'
-import { SERVICE_STATUS_LABELS, loadAdminPartnerServices, packagePriceLabel, updateAdminPartnerServiceStatus } from '../../lib/partner-services.js'
+import { SERVICE_STATUS_LABELS, loadAdminPartnerServices, packagePriceLabel, updateAdminPartnerServiceStatus, deletePartnerService } from '../../lib/partner-services.js'
 import { getPartnerServiceCoverCandidates } from '../../lib/service-media.js'
 import { supabase } from '../../lib/supabase.js'
 import FallbackImage from '../FallbackImage.jsx'
@@ -23,6 +23,7 @@ export default function PartnerServicesManager({ globalQuery }) {
   const [localQuery, setLocalQuery] = useState('')
   const [viewMode, setViewMode] = useState('details')
   const [actionState, setActionState] = useState({ id: '', status: 'idle' })
+  const [serviceToDelete, setServiceToDelete] = useState(null)
 
   useEffect(() => { load() }, [])
 
@@ -65,12 +66,17 @@ export default function PartnerServicesManager({ globalQuery }) {
     }
   }
 
-  async function deleteService(service) {
-    if (!window.confirm('Сигурни ли сте, че искате да изтриете тази услуга?')) return
+  function deleteService(service) {
+    setServiceToDelete(service)
+  }
+
+  async function confirmDeleteService() {
+    if (!serviceToDelete) return
+    const service = serviceToDelete
+    setServiceToDelete(null)
     setActionState({ id: service.id, status: 'saving' })
     try {
-      const { error: delError } = await supabase.from('partner_services').delete().eq('id', service.id)
-      if (delError) throw delError
+      await deletePartnerService(service.id)
       setRows(current => current.filter(item => item.id !== service.id))
     } catch (err) {
       setError(err.message || 'Грешка при изтриване.')
@@ -119,6 +125,36 @@ export default function PartnerServicesManager({ globalQuery }) {
         ))}
         {filtered.length === 0 && <div className="rounded-3xl border border-dashed border-line bg-paper p-8 text-center text-sm text-muted">Няма услуги в този филтър.</div>}
       </div>
+
+      {serviceToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[2rem] border border-line bg-paper p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+              <Trash2 size={24} />
+            </div>
+            <h3 className="mt-4 font-display text-2xl text-ink">Изтриване на услуга</h3>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              Сигурни ли сте, че искате да изтриете услугата <strong className="text-ink font-medium">„{serviceToDelete.title}“</strong>? Това действие е окончателно и ще изтрие всички данни и прикачените файлове.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setServiceToDelete(null)}
+                className="btn btn-ghost flex-1 justify-center py-2.5 text-sm"
+              >
+                Отказ
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteService}
+                className="btn bg-red-600 text-white hover:bg-red-700 active:bg-red-800 flex-1 justify-center py-2.5 text-sm font-medium"
+              >
+                Да, изтрий
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -205,7 +241,11 @@ function ServiceActions({ service, actionState, updateServiceStatus, deleteServi
           <button type="button" onClick={() => updateServiceStatus(service, 'rejected')} disabled={actionState.id === service.id} className="btn btn-ghost w-full justify-center whitespace-nowrap !py-2 text-sm"><XCircle size={16} /> Върни</button>
         </>
       )}
-      {service.isPublished && <Link to={`/uslugi/${service.slug}`} className="btn btn-ghost w-full justify-center whitespace-nowrap !py-2 text-sm"><Eye size={16} /> Публична страница</Link>}
+      {service.isPublished ? (
+        <Link to={`/uslugi/${service.slug}`} className="btn btn-ghost w-full justify-center whitespace-nowrap !py-2 text-sm"><Eye size={16} /> Публична страница</Link>
+      ) : (
+        <Link to={`/uslugi/${service.slug}`} className="btn btn-ghost w-full justify-center whitespace-nowrap !py-2 text-sm text-amber-700 hover:bg-amber-50"><Eye size={16} /> Преглед на услугата</Link>
+      )}
       {!service.isPublished && service.moderationStatus !== 'pending' && !compact && <div className="rounded-2xl border border-line bg-soft p-4 text-sm text-muted">Тази услуга не е публична за клиенти.</div>}
       <button type="button" onClick={() => deleteService(service)} disabled={actionState.id === service.id} className="btn border border-red-200 text-red-600 hover:bg-red-50 w-full justify-center whitespace-nowrap !py-2 text-sm"><Trash2 size={16} className="mr-1.5" /> Изтрий</button>
     </div>

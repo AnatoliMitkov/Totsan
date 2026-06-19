@@ -8,6 +8,10 @@ import Avatar from './Avatar.jsx'
 
 const BLOCKED_ACCOUNT_STATUSES = new Set(['banned', 'blocked'])
 
+const HEADER_LAYER_LABELS = {
+  materiali: 'Материали',
+}
+
 const PAGES_WITH_HERO = [
   '/',
   '/moy-profil',
@@ -173,7 +177,7 @@ function Header() {
               {LAYERS.map(l => (
                 <NavLink key={l.slug} to={`/sloy/${l.slug}`}
                   className={({ isActive }) => desktopNavClassName(isActive, isTopOverlayMode)}>
-                  {l.number} · {l.title.split(' ')[0]}
+                  {l.number} · {headerLayerLabel(l)}
                 </NavLink>
               ))}
             </nav>
@@ -243,7 +247,7 @@ function Header() {
                       onClick={close}
                       className={({ isActive }) => mobileNavClassName(isActive)}
                     >
-                      <span>{l.number} · {l.title}</span>
+                      <span>{l.number} · {headerLayerLabel(l)}</span>
                       <span className="mobile-nav-arrow">→</span>
                     </NavLink>
                   ))}
@@ -286,6 +290,10 @@ function Header() {
 
 function desktopNavClassName(isActive, onDarkHero = false) {
   return `nav-pill header-layer-pill ${onDarkHero ? 'nav-pill-on-dark' : ''} ${isActive ? 'nav-pill-active' : ''}`
+}
+
+function headerLayerLabel(layer) {
+  return HEADER_LAYER_LABELS[layer.slug] || layer.title.split(' ')[0]
 }
 
 function mobileNavClassName(isActive) {
@@ -430,7 +438,7 @@ function UserMenu({ session, account, isAdmin }) {
 
 function Footer({ isAuthPage = false }) {
   return (
-    <footer className={`border-t border-line ${isAuthPage ? 'mt-0' : 'mt-24'}`}>
+    <footer className={`border-t border-line ${isAuthPage ? 'mt-0' : 'mt-0'}`}>
       <div className="container-page section !py-12 grid gap-10 md:grid-cols-5">
         <div>
           <div className="font-display text-2xl">Totsan</div>

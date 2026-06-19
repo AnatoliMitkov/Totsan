@@ -16,6 +16,45 @@
 
 ---
 
+## 🧹 Phase 0: Cleanup Temp Files (10 minutes) ⭐ DO THIS FIRST
+
+Before analyzing, clean up any temporary/incomplete uploads that clutter the buckets:
+
+### 0.1 Add Temp File Manager to Admin
+
+```javascript
+// src/pages/AdminTempFiles.jsx
+import TempFileManager from '@/components/admin/TempFileManager.jsx'
+
+export default function AdminTempFiles() {
+  return <TempFileManager />
+}
+```
+
+- [ ] Create file `src/pages/AdminTempFiles.jsx`
+- [ ] Add route: `/admin/temp-files`
+- [ ] Visit admin panel → Temp Files tab
+
+### 0.2 Scan for Temp Files
+
+- [ ] Click "Scan Buckets"
+- [ ] Review findings (total temp files, storage wasted)
+- [ ] If found, note the count: ___ files, ___ MB wasted
+
+### 0.3 Clean Up Temp Files
+
+- [ ] Keep "Dry Run" mode enabled
+- [ ] Click "Cleanup" to preview what would be deleted
+- [ ] Review the preview (what files, ages, sizes)
+- [ ] Switch to "Actually Delete" mode
+- [ ] Click "Cleanup" again to execute
+- [ ] Confirm deletion
+- [ ] Note space freed: ___ MB
+
+**Why first?** Temp files cloud the analysis and waste storage. Clean first for accurate results.
+
+---
+
 ## 📊 Phase 1: Analysis (15 minutes)
 
 ### 1.1 Add Migration Dashboard
@@ -32,6 +71,8 @@ export default function AdminImageMigration() {
 - [ ] Create file `src/pages/AdminImageMigration.jsx`
 - [ ] Add route in your router: `/admin/images/migration`
 - [ ] Access admin panel → Image Migration tab
+
+**Note:** If you already cleaned temp files in Phase 0, these numbers will be more accurate.
 
 ### 1.2 Run Analysis
 
@@ -413,6 +454,21 @@ profiles.forEach(p => {
 - [ ] [ ] Create runbook for common tasks
 - [ ] [ ] Share with team
 
+### 7.5 Setup Automated Cleanup
+
+```javascript
+// Enable daily temp file cleanup (optional)
+// Via cron job or scheduled function
+import { scheduleCleanup } from '@/lib/temp-file-cleanup.js'
+
+// Run daily via Supabase cron or external scheduler
+await scheduleCleanup()
+```
+
+- [ ] [ ] Setup cron job for daily temp file cleanup
+- [ ] [ ] Or: Enable weekly manual cleanup via admin dashboard
+- [ ] [ ] Verify cleanup is working
+
 ---
 
 ## 📚 Files You Have
@@ -421,9 +477,11 @@ profiles.forEach(p => {
 - [x] `src/lib/image-storage-schema.js` — Folder structure definition
 - [x] `src/lib/advanced-image-manager.js` — Upload, versioning, cleanup
 - [x] `src/lib/image-migration-analyzer.js` — Analyze current state
+- [x] `src/lib/temp-file-cleanup.js` — Temp file detection & cleanup
 
 ### Components
 - [x] `src/components/admin/MigrationDashboard.jsx` — Admin analysis tool
+- [x] `src/components/admin/TempFileManager.jsx` — Temp file cleanup tool
 
 ### SQL
 - [x] `supabase/migrations/002_advanced_image_management.sql` — Database setup
@@ -432,6 +490,7 @@ profiles.forEach(p => {
 - [x] `ADVANCED_IMAGE_MANAGEMENT_GUIDE.md` — Complete reference
 - [x] `SETUP_IMAGE_MANAGEMENT.md` — Quick SQL setup
 - [x] `IMAGE_MIGRATION_GUIDE.md` — Migration instructions
+- [x] `TEMP_FILE_MANAGEMENT.md` — Temp file cleanup guide
 
 ---
 
@@ -439,6 +498,7 @@ profiles.forEach(p => {
 
 ### Before
 - [ ] Total storage: ___ MB
+- [ ] Temp files: ___ files, ___ MB wasted
 - [ ] Organization: Poor
 - [ ] Compression: Poor
 - [ ] Version history: None
@@ -446,6 +506,7 @@ profiles.forEach(p => {
 
 ### After
 - [ ] Total storage: ___ MB (aim for 60-70% reduction)
+- [ ] Temp files: 0 (auto-cleaned daily)
 - [ ] Organization: Perfect (hierarchical by profile)
 - [ ] Compression: Optimized (JPEG 85%, resized)
 - [ ] Version history: Automatic (last 10 versions)
@@ -473,12 +534,18 @@ A: New system uses smart cache headers (24h for images, 30d for thumbnails).
 **Q: Is there a performance impact?**
 A: No. Faster loading (smaller files) + better mobile UX (responsive variants).
 
+**Q: What about those temp_ folders?**
+A: Use the Temp File Manager (Phase 0) to scan and cleanup. They accumulate from failed uploads and should be cleaned daily.
+
+**Q: How often should I cleanup temp files?**
+A: Automatically via cron job (recommended: daily). Or manually via admin dashboard weekly.
+
 ---
 
 ## 📞 Support
 
 If you get stuck:
-1. Check the guides (ADVANCED_IMAGE_MANAGEMENT_GUIDE.md)
+1. Check the guides (ADVANCED_IMAGE_MANAGEMENT_GUIDE.md, TEMP_FILE_MANAGEMENT.md)
 2. Review the migration dashboard findings
 3. Check browser console for errors
 4. Review Supabase logs

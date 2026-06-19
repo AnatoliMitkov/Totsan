@@ -3,37 +3,40 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowRight, BriefcaseBusiness, CheckCircle2, MapPin, PackageSearch, Search, SlidersHorizontal, UserRound, X } from 'lucide-react'
 import { useProfileDirectory } from '../lib/profiles.js'
 import { loadPublicPartnerServices, packagePriceLabel } from '../lib/partner-services.js'
+import { loadPublicPortfolioCounts } from '../lib/portfolio.js'
 import { productImageFor } from '../data/images.js'
 import { productSlugFor } from '../lib/product-metadata.js'
+import { buildMaterialSolutionItems, loadPublicMaterialCapabilities } from '../lib/partner-materials.js'
 import FallbackImage from '../components/FallbackImage.jsx'
 import ProfessionalCard from '../components/ProfessionalCard.jsx'
-import { formatMoneyText } from '../lib/money.js'
+import { formatMoney, formatMoneyText, normalizeMoneyValue } from '../lib/money.js'
 import { getPartnerServiceCoverCandidates } from '../lib/service-media.js'
 import { trackEvent } from '../lib/analytics.js'
 import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
 
-const VALID_KINDS = new Set(['all', 'pro', 'service', 'product'])
+const VALID_KINDS = new Set(['all', 'pro', 'service', 'material'])
 const KIND_TABS = [
   { value: 'all', label: 'Всичко', helper: 'Целият marketplace' },
   { value: 'pro', label: 'Специалисти', helper: 'Профили за запитване' },
   { value: 'service', label: 'Услуги', helper: 'Пакети и оферти' },
-  { value: 'product', label: 'Продукти', helper: 'Материали и решения' },
+  { value: 'material', label: 'Материали', helper: 'Материали, марки и решения' },
 ]
 
 const KIND_COPY = {
   all: { label: 'Всичко', resultLabel: 'резултата' },
   pro: { label: 'Специалисти', resultLabel: 'специалисти' },
   service: { label: 'Услуги', resultLabel: 'услуги' },
-  product: { label: 'Продукти', resultLabel: 'продукти' },
+  material: { label: 'Материали', resultLabel: 'материали' },
 }
 
 const SECTION_LIMITS = {
   pro: 4,
   service: 3,
-  product: 6,
+  material: 6,
 }
 
 function normalizeKind(value) {
+  if (value === 'product') return 'material'
   return VALID_KINDS.has(value) ? value : 'all'
 }
 
@@ -41,6 +44,40 @@ function itemAreas(item) {
   return [item.city, ...(item.serviceAreas || []), ...(item.deliveryAreas || [])]
     .map(value => String(value || '').trim())
     .filter(Boolean)
+}
+
+function buildServiceInsightsByProfile(services = []) {
+  const byProfile = new Map()
+
+  services.forEach((service) => {
+    const profileId = service.profileId || service.profile?.id
+    if (!profileId) return
+
+    const current = byProfile.get(profileId) || {
+      count: 0,
+      titles: [],
+      prices: [],
+    }
+
+    current.count += 1
+    if (service.title) current.titles.push(service.title)
+
+    const price = normalizeMoneyValue(service.lowestPrice)
+    if (price !== null) current.prices.push(price)
+
+    byProfile.set(profileId, current)
+  })
+
+  byProfile.forEach((value) => {
+    const averagePrice = value.prices.length
+      ? Math.round(value.prices.reduce((sum, price) => sum + price, 0) / value.prices.length)
+      : 0
+    value.averagePrice = averagePrice
+    value.priceGuide = averagePrice ? `Среден старт ${formatMoney(averagePrice, 'EUR')}` : ''
+    value.titles = Array.from(new Set(value.titles)).slice(0, 3)
+  })
+
+  return byProfile
 }
 
 function itemMatchesFilters(item, { layer, city, query }) {
@@ -56,6 +93,9 @@ function itemMatchesFilters(item, { layer, city, query }) {
     item.city,
     item.tag,
     item.layerTitle,
+    item.categoryLabel,
+    item.brandLabel,
+    item.source === 'partner_capability' ? 'партньор материал марка' : '',
     ...(item.serviceAreas || []),
     ...(item.deliveryAreas || []),
   ].filter(Boolean).join(' ').toLowerCase()
@@ -68,6 +108,9 @@ export default function Catalog() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [services, setServices] = useState([])
   const [servicesError, setServicesError] = useState('')
+  const [materialCapabilities, setMaterialCapabilities] = useState([])
+  const [portfolioCounts, setPortfolioCounts] = useState({})
+  const [materialsError, setMaterialsError] = useState('')
   const [q, setQ] = useState(() => searchParams.get('q') || '')
   const [layer, setLayer] = useState(() => searchParams.get('layer') || 'all')
   const [kind, setKind] = useState(() => normalizeKind(searchParams.get('kind')))
@@ -76,19 +119,29 @@ export default function Catalog() {
 
   useEffect(() => {
     let active = true
-    async function loadServices() {
+    async function loadMarketplaceData() {
       try {
-        const rows = await loadPublicPartnerServices()
+        const [serviceRows, capabilityRows, portfolioCountRows] = await Promise.all([
+          loadPublicPartnerServices(),
+          loadPublicMaterialCapabilities(),
+          loadPublicPortfolioCounts().catch(() => ({})),
+        ])
         if (!active) return
-        setServices(rows)
+        setServices(serviceRows)
+        setMaterialCapabilities(capabilityRows)
+        setPortfolioCounts(portfolioCountRows)
         setServicesError('')
+        setMaterialsError('')
       } catch (error) {
         if (!active) return
         setServices([])
-        setServicesError(error.message || 'Услугите не се заредиха.')
+        setMaterialCapabilities([])
+        setPortfolioCounts({})
+        setServicesError(error.message || 'Marketplace данните не се заредиха.')
+        setMaterialsError(error.message || 'Материалите не се заредиха.')
       }
     }
-    loadServices()
+    loadMarketplaceData()
     return () => { active = false }
   }, [])
 
@@ -114,6 +167,15 @@ export default function Catalog() {
   }, [city, kind, layer, q, setSearchParams])
 
   const all = useMemo(() => {
+    const servicesByProfile = buildServiceInsightsByProfile(services)
+    const profileItems = profileCatalog.map((profile) => ({
+      ...profile,
+      serviceCount: servicesByProfile.get(profile.id)?.count || 0,
+      serviceTitles: servicesByProfile.get(profile.id)?.titles || [],
+      averageServicePrice: servicesByProfile.get(profile.id)?.averagePrice || 0,
+      priceGuide: servicesByProfile.get(profile.id)?.priceGuide || profile.pricingNote || '',
+      portfolioCount: portfolioCounts[profile.id] || 0,
+    }))
     const serviceItems = services.map((service) => {
       const layerInfo = layers.find(item => item.slug === service.layerSlug)
       return {
@@ -131,8 +193,13 @@ export default function Catalog() {
         service,
       }
     })
-    return [...profileCatalog, ...serviceItems]
-  }, [layers, profileCatalog, services])
+    const materialItems = buildMaterialSolutionItems({
+      templates: [],
+      capabilities: materialCapabilities,
+      layers,
+    })
+    return [...profileItems, ...serviceItems, ...materialItems]
+  }, [layers, materialCapabilities, portfolioCounts, profileCatalog, services])
 
   const availableCities = useMemo(() => {
     const cities = new Set()
@@ -150,10 +217,10 @@ export default function Catalog() {
 
   const professionals = useMemo(() => baseFiltered.filter(item => item.kind === 'pro'), [baseFiltered])
   const serviceResults = useMemo(() => baseFiltered.filter(item => item.kind === 'service'), [baseFiltered])
-  const productResults = useMemo(() => baseFiltered.filter(item => item.kind === 'product'), [baseFiltered])
+  const materialResults = useMemo(() => baseFiltered.filter(item => item.kind === 'material'), [baseFiltered])
 
   const kindCounts = useMemo(() => {
-    const counts = { all: 0, pro: 0, service: 0, product: 0 }
+    const counts = { all: 0, pro: 0, service: 0, material: 0 }
     baseFiltered.forEach((item) => {
       counts.all += 1
       if (counts[item.kind] !== undefined) counts[item.kind] += 1
@@ -174,10 +241,10 @@ export default function Catalog() {
       ? `Каталог за ${selectedLayer.title.toLowerCase()} | Totsan`
       : kind !== 'all'
         ? `${selectedKind.label} в каталога | Totsan`
-        : 'Каталог със специалисти, услуги и продукти | Totsan',
+        : 'Каталог със специалисти, услуги и материали | Totsan',
     description: selectedLayer
-      ? `Разгледай публични профили, услуги и продукти за Слой ${selectedLayer.number} · ${selectedLayer.title}.`
-      : 'Каталогът на Totsan събира публични профили, партньорски услуги и продукти за петте слоя на проекта.',
+      ? `Разгледай публични профили, услуги и материални решения за Слой ${selectedLayer.number} · ${selectedLayer.title}.`
+      : 'Каталогът на Totsan събира публични профили, партньорски услуги и материали за петте слоя на проекта.',
     canonicalPath: '/katalog',
     jsonLd: [
       buildBreadcrumbSchema([
@@ -217,21 +284,21 @@ export default function Catalog() {
 
   return (
     <>
-      <section className="section !pt-20 bg-gradient-to-br from-soft to-cloud">
+      <section className="section !pt-10 !pb-10 bg-gradient-to-br from-soft to-cloud">
         <div className="container-page max-w-5xl reveal">
           <div className="eyebrow">{selectedLayer ? `Слой ${selectedLayer.number}` : 'Totsan marketplace'}</div>
           <h1 className="h-display mt-3">
-            {selectedLayer ? `Marketplace за ${selectedLayer.title.toLowerCase()}.` : 'Намери правилните хора, услуги и продукти.'}
+            {selectedLayer ? `Marketplace за ${selectedLayer.title.toLowerCase()}.` : 'Намери правилните хора, услуги и материали.'}
           </h1>
           <p className="mt-5 max-w-3xl text-muted" style={{fontSize:'var(--step-md)'}}>
             {selectedLayer
-              ? 'Виж специалисти, готови услуги и продукти, които пасват на този етап. Филтрирай по тип, град или ключова дума и продължи към профил, пакет или продукт.'
-              : 'Каталогът събира публични профили, одобрени партньорски услуги и продукти от петте слоя. Избери какво търсиш, после продължи към запитване, оферта или детайли.'}
+              ? 'Виж специалисти, готови услуги и материални решения, които пасват на този етап. Филтрирай по тип, град или ключова дума и продължи към профил, пакет или запитване.'
+              : 'Каталогът събира публични профили, одобрени партньорски услуги и материали от петте слоя. Избери какво търсиш, после продължи към запитване, оферта или детайли.'}
           </p>
           <div className="mt-6 flex flex-wrap gap-2 text-sm text-muted">
             <span className="inline-flex items-center gap-2 rounded-full border border-line bg-paper/70 px-3 py-1.5"><CheckCircle2 size={15} className="text-accentDeep" /> Публични профили</span>
             <span className="inline-flex items-center gap-2 rounded-full border border-line bg-paper/70 px-3 py-1.5"><BriefcaseBusiness size={15} className="text-accentDeep" /> Одобрени услуги</span>
-            <span className="inline-flex items-center gap-2 rounded-full border border-line bg-paper/70 px-3 py-1.5"><PackageSearch size={15} className="text-accentDeep" /> Подбрани продукти</span>
+            <span className="inline-flex items-center gap-2 rounded-full border border-line bg-paper/70 px-3 py-1.5"><PackageSearch size={15} className="text-accentDeep" /> Материали и марки</span>
           </div>
         </div>
       </section>
@@ -290,7 +357,7 @@ export default function Catalog() {
           <div className="mt-4 grid gap-3 sm:grid-cols-3 reveal">
             <SummaryTile icon={UserRound} label="Специалисти" value={kindCounts.pro} />
             <SummaryTile icon={BriefcaseBusiness} label="Услуги" value={kindCounts.service} />
-            <SummaryTile icon={PackageSearch} label="Продукти" value={kindCounts.product} />
+            <SummaryTile icon={PackageSearch} label="Материали" value={kindCounts.material} />
           </div>
 
           {hasActiveFilters && (
@@ -318,7 +385,7 @@ export default function Catalog() {
             <MarketplaceSections
               professionals={professionals}
               services={serviceResults}
-              products={productResults}
+              materials={materialResults}
               onSelectKind={setKind}
               resetFilters={resetFilters}
             />
@@ -368,8 +435,8 @@ function EmptyCatalogState({ resetFilters }) {
   )
 }
 
-function MarketplaceSections({ professionals, services, products, onSelectKind, resetFilters }) {
-  const hasAnyResults = professionals.length || services.length || products.length
+function MarketplaceSections({ professionals, services, materials, onSelectKind, resetFilters }) {
+  const hasAnyResults = professionals.length || services.length || materials.length
   if (!hasAnyResults) {
     return (
       <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -412,16 +479,16 @@ function MarketplaceSections({ professionals, services, products, onSelectKind, 
         </MarketplaceSection>
       )}
 
-      {products.length > 0 && (
+      {materials.length > 0 && (
         <MarketplaceSection
           eyebrow="Материали"
-          title="Продукти и материали"
-          count={`${products.length} продукти`}
-          actionLabel="Виж всички продукти"
-          onAction={() => onSelectKind('product')}
+          title="Материали, марки и решения"
+          count={`${materials.length} материала`}
+          actionLabel="Виж всички материали"
+          onAction={() => onSelectKind('material')}
         >
           <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {products.slice(0, SECTION_LIMITS.product).map((item) => (
+            {materials.slice(0, SECTION_LIMITS.material).map((item) => (
               <CatalogCard key={`featured-${item.kind}-${item.slug || item.name}`} it={item} />
             ))}
           </div>
@@ -470,13 +537,15 @@ function CatalogGrid({ items, resetFilters }) {
 function CatalogCard({ it }) {
   const isPro = it.kind === 'pro'
   const isService = it.kind === 'service'
+  const isMaterial = it.kind === 'material'
   const to = isPro ? `/profil/${it.slug || slugify(it.name)}` : `/produkt/${it.slug || productSlugFor(it.name)}`
   if (isService) return <ServiceCatalogCard it={it} />
+  if (isMaterial) return <MaterialCatalogCard it={it} to={to} />
   const img = productImageFor(it.name, it.layer)
   if (isPro) {
     return (
       <ProfessionalCard
-        person={{ slug: it.slug, layer: it.layer, layerSlug: it.layer, layerTitle: it.layerTitle, name: it.name, tag: it.sub, city: it.city, rating: it.rating, projects: it.projects, since: it.since, bio: it.bio, responseTimeHours: it.responseTimeHours, imageUrl: it.imageUrl, imageZoom: it.imageZoom, imageX: it.imageX, imageY: it.imageY }}
+        person={it}
         to={to}
         state={{ item: it }}
         layerLabel={`Слой ${it.layerNumber} · ${it.layerTitle}`}
@@ -490,7 +559,7 @@ function CatalogCard({ it }) {
       <div className="media-frame aspect-[16/10]">
         <img src={img} alt={it.name} loading="lazy" decoding="async" className="img-cover img-zoom" />
         <span className="absolute top-3 right-3 rounded-full bg-ink/90 px-2.5 py-1 text-xs text-paper backdrop-blur">
-          Продукт
+          Материал
         </span>
       </div>
       <div className="flex flex-1 flex-col p-6">
@@ -502,7 +571,40 @@ function CatalogCard({ it }) {
           <span className="truncate text-muted">{it.tag}</span>
         </div>
         <div className="mt-auto pt-5">
-          <span className="btn btn-ghost w-full justify-center">Виж продукт</span>
+          <span className="btn btn-ghost w-full justify-center">Виж материал</span>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+function MaterialCatalogCard({ it, to }) {
+  const img = productImageFor(it.name || it.categoryLabel, it.layer)
+  const hasPartners = Number(it.partnerCount || 0) > 0
+
+  return (
+    <Link to={to} state={{ item: it }} className="card reveal img-zoom-host flex h-full min-h-[28rem] flex-col overflow-hidden bg-paper p-0">
+      <div className="media-frame aspect-[16/10]">
+        <img src={img} alt={it.name} loading="lazy" decoding="async" className="img-cover img-zoom" />
+        <span className="absolute top-3 right-3 rounded-full bg-ink/90 px-2.5 py-1 text-xs text-paper backdrop-blur">
+          Материал
+        </span>
+      </div>
+      <div className="flex flex-1 flex-col p-6">
+        <span className="text-xs text-muted">Слой {it.layerNumber} · {it.layerTitle}</span>
+        <div className="mt-2 font-display text-xl text-ink">{it.brandLabel || it.name}</div>
+        <div className="text-sm text-muted">{it.categoryLabel || it.sub}</div>
+        <div className="mt-4 flex flex-wrap gap-2 text-xs">
+          <span className="rounded-full border border-line bg-soft px-3 py-1 text-muted">
+            {it.source === 'partner_capability' ? 'От партньорски данни' : 'Ориентировъчна категория'}
+          </span>
+          <span className={`rounded-full border px-3 py-1 ${hasPartners ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-line bg-soft text-muted'}`}>
+            {hasPartners ? `${it.partnerCount} партньор${it.partnerCount === 1 ? '' : 'и'}` : 'Очаква партньори'}
+          </span>
+        </div>
+        {it.tag && <p className="mt-4 line-clamp-2 text-sm text-muted">{it.tag}</p>}
+        <div className="mt-auto pt-5">
+          <span className="btn btn-ghost w-full justify-center">{hasPartners ? 'Виж партньори' : 'Попитай за материала'}</span>
         </div>
       </div>
     </Link>

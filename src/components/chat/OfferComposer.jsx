@@ -84,8 +84,8 @@ export default function OfferComposer({ open, onClose, onSubmit, status }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4 py-6 backdrop-blur-sm">
-      <form onSubmit={submit} className="totsan-scrollbar max-h-full w-full max-w-2xl overflow-y-auto rounded-3xl border border-line bg-paper p-5 shadow-2xl md:p-7">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/60 px-4 py-6 backdrop-blur-sm">
+      <form onSubmit={submit} className="totsan-scrollbar max-h-[calc(100dvh-4rem)] w-[90vw] max-w-[1000px] overflow-y-auto rounded-3xl border border-line bg-paper p-5 shadow-2xl md:p-7">
         <div className="sticky top-0 z-10 -mx-5 -mt-5 flex items-start justify-between gap-4 border-b border-line bg-paper/95 px-5 py-5 backdrop-blur-sm md:-mx-7 md:-mt-7 md:px-7 md:pt-7">
           <div>
             <div className="eyebrow">Оферта</div>

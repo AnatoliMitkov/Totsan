@@ -1,10 +1,8 @@
 import { Link, useParams } from 'react-router-dom'
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { LAYER_HEROS, WHAT_YOU_FIND_IMAGES, SHOWCASE_IMAGES, productImageFor } from '../data/images.js'
+import { LAYER_HEROS, WHAT_YOU_FIND_IMAGES, SHOWCASE_IMAGES } from '../data/images.js'
 import ProfessionalCard from '../components/ProfessionalCard.jsx'
 import { useProfileDirectory } from '../lib/profiles.js'
-import { formatMoneyText } from '../lib/money.js'
-import { getStaticProductsForLayer } from '../lib/product-metadata.js'
 import { buildBreadcrumbSchema, buildFaqSchema, useSeo } from '../lib/seo.js'
 
 export default function Layer({ slug }) {
@@ -49,7 +47,6 @@ export default function Layer({ slug }) {
   // скролни нагоре при смяна на слой
   useEffect(() => { window.scrollTo({ top: 0 }) }, [currentSlug])
 
-  const hasProducts = !!layer.products
   const isIdeaLayer = layer.slug === 'ideya'
   const isConstructionLayer = layer.slug === 'postroyka'
   const isMaterialsLayer = layer.slug === 'materiali'
@@ -62,7 +59,6 @@ export default function Layer({ slug }) {
       {!isIdeaLayer && !isConstructionLayer && !isMaterialsLayer && !isFurnishingLayer && !isDecorationLayer && <Intro layer={layer} />}
       <WhatYouFind layer={layer} />
       <Professionals layer={layer} />
-      {hasProducts && <Products layer={layer} />}
       <Showcase layer={layer} />
       <ProcessSection layer={layer} />
       {!isIdeaLayer && !isFurnishingLayer && !isDecorationLayer && <ServicesBand layer={layer} />}
@@ -101,7 +97,7 @@ function Hero({ layer }) {
             ) : isConstructionLayer ? (
               <Link to="/katalog?layer=postroyka" className="btn btn-ghost bg-paper/80 backdrop-blur">Разгледай строителите и майсторите</Link>
             ) : isMaterialsLayer ? (
-              <Link to="/katalog?layer=materiali&kind=product" className="btn btn-ghost bg-paper/80 backdrop-blur">Разгледай продуктите</Link>
+              <Link to="/katalog?layer=materiali&kind=material" className="btn btn-ghost bg-paper/80 backdrop-blur">Разгледай материалите</Link>
             ) : isFurnishingLayer ? (
               <Link to="/katalog?layer=obzavezhdane" className="btn btn-ghost bg-paper/80 backdrop-blur">Разгледай производителите</Link>
             ) : isDecorationLayer ? (
@@ -316,48 +312,6 @@ function Professionals({ layer }) {
   )
 }
 
-function Products({ layer }) {
-  const products = getStaticProductsForLayer(layer.slug)
-
-  return (
-    <section className="section">
-      <div className="container-page">
-        <div className="flex items-end justify-between mb-10 reveal flex-wrap gap-4">
-          <div>
-            <div className="eyebrow">{layer.slug === 'materiali' ? 'Подбрани материали' : 'Подбрани продукти'}</div>
-            <h2 className="h-section mt-2">{layer.slug === 'materiali' ? 'Качество, на което се разчита.' : 'Готови за поръчка.'}</h2>
-          </div>
-          <span className="text-sm text-muted hidden md:block">Цените са примерни</span>
-        </div>
-
-        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {products.map((p,i) => (
-            <Link
-              key={i}
-              to={`/produkt/${p.slug}`}
-              state={{ item: p }}
-              className="card reveal img-zoom-host p-0 overflow-hidden bg-paper block"
-            >
-              <div className="media-frame aspect-[4/3]">
-                <img src={productImageFor(p.name, layer.slug)} alt={p.name} loading="lazy" decoding="async" className="img-cover img-zoom" />
-                <span className="absolute top-3 left-3 text-xs px-2.5 py-1 rounded-full bg-paper/90 text-ink backdrop-blur">{p.tag}</span>
-              </div>
-              <div className="p-6 border-t border-line">
-                <div className="text-xs text-muted">{p.cat}</div>
-                <div className="font-display text-xl mt-1">{p.name}</div>
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="font-medium">{formatMoneyText(p.price)}</span>
-                  <span className="link-arrow text-sm">Виж →</span>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
 function Showcase({ layer }) {
   const sc = layer.showcase
   const imgs = SHOWCASE_IMAGES[layer.slug] || []
@@ -408,7 +362,7 @@ function ProcessSection({ layer }) {
 function ServicesBand({ layer }) {
   const cards = [
     { title: 'Публикувани услуги', text: 'Само реални оферти от партньори с профил в Totsan.', to: '/uslugi' },
-    { title: 'Каталог', text: 'Прегледай специалисти, услуги и продукти за този слой.', to: `/katalog?layer=${layer.slug}` },
+    { title: 'Каталог', text: 'Прегледай специалисти, услуги и материални решения за този слой.', to: `/katalog?layer=${layer.slug}` },
   ]
 
   return (
@@ -501,7 +455,7 @@ function CTA({ layer }) {
           <Link to={isIdeaLayer || isConstructionLayer || isMaterialsLayer || isFurnishingLayer || isDecorationLayer ? '/start' : '/contact'} className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">{isIdeaLayer ? 'Опиши идеята си' : isConstructionLayer ? 'Опиши какво ти трябва' : isMaterialsLayer ? 'Намери правилния материал' : isFurnishingLayer ? 'Опиши какво ти трябва' : isDecorationLayer ? 'Опиши от какво имаш нужда' : 'Заяви консултация'}</Link>
           {isIdeaLayer && <Link to="/katalog?layer=ideya" className="btn btn-ghost !border-paper/30 !text-paper hover:!bg-paper/10">Разгледай специалистите</Link>}
           {isConstructionLayer && <Link to="/katalog?layer=postroyka" className="btn btn-ghost !border-paper/30 !text-paper hover:!bg-paper/10">Разгледай строителите и майсторите</Link>}
-          {isMaterialsLayer && <Link to="/katalog?layer=materiali&kind=product" className="btn btn-ghost !border-paper/30 !text-paper hover:!bg-paper/10">Разгледай продуктите</Link>}
+          {isMaterialsLayer && <Link to="/katalog?layer=materiali&kind=material" className="btn btn-ghost !border-paper/30 !text-paper hover:!bg-paper/10">Разгледай материалите</Link>}
           {isFurnishingLayer && <Link to="/katalog?layer=obzavezhdane" className="btn btn-ghost !border-paper/30 !text-paper hover:!bg-paper/10">Разгледай производителите</Link>}
           {isDecorationLayer && <Link to="/katalog?layer=dekoraciya" className="btn btn-ghost !border-paper/30 !text-paper hover:!bg-paper/10">Разгледай специалистите</Link>}
         </div>

@@ -1,6 +1,7 @@
 import { uploadPortfolioMedia } from './profile-media-upload-client.js'
 import { supabase } from './supabase.js'
 import { normalizeLocationValue } from './locations.js'
+import { deleteStorageRefs, diffStorageRefs, mediaAndCoverStorageRefs } from './storage-media-cleanup.js'
 
 export const PORTFOLIO_SELECT_COLUMNS = `
   id,
@@ -101,6 +102,18 @@ export async function loadProfilePortfolio(profileId, { includeUnpublished = fal
 }
 
 export async function savePortfolioItem(profileId, item) {
+  let previous = null
+  if (item.id) {
+    const { data: previousRow, error: previousError } = await supabase
+      .from('profile_portfolio')
+      .select('cover_url, media')
+      .eq('id', item.id)
+      .eq('profile_id', profileId)
+      .maybeSingle()
+    if (previousError) throw previousError
+    previous = previousRow ? normalizePortfolioItem(previousRow) : null
+  }
+
   const payload = toDbPayload(item, profileId)
   const query = item.id
     ? supabase.from('profile_portfolio').update(payload).eq('id', item.id).eq('profile_id', profileId)
@@ -108,16 +121,33 @@ export async function savePortfolioItem(profileId, item) {
 
   const { data, error } = await query.select(PORTFOLIO_SELECT_COLUMNS).single()
   if (error) throw error
-  return normalizePortfolioItem(data)
+  const saved = normalizePortfolioItem(data)
+
+  if (previous) {
+    await deleteStorageRefs(diffStorageRefs(
+      mediaAndCoverStorageRefs(previous),
+      mediaAndCoverStorageRefs(saved),
+    ))
+  }
+
+  return saved
 }
 
 export async function deletePortfolioItem(itemId) {
+  const { data: previousRow, error: loadError } = await supabase
+    .from('profile_portfolio')
+    .select('cover_url, media')
+    .eq('id', itemId)
+    .maybeSingle()
+  if (loadError) throw loadError
+
   const { error } = await supabase
     .from('profile_portfolio')
     .delete()
     .eq('id', itemId)
 
   if (error) throw error
+  await deleteStorageRefs(mediaAndCoverStorageRefs(previousRow ? normalizePortfolioItem(previousRow) : null))
 }
 
 export async function loadProfileStats(profileId) {
@@ -130,6 +160,22 @@ export async function loadProfileStats(profileId) {
 
   if (error && error.code !== 'PGRST116') throw error
   return data || null
+}
+
+export async function loadPublicPortfolioCounts() {
+  const { data, error } = await supabase
+    .from('profile_portfolio')
+    .select('profile_id')
+    .eq('is_published', true)
+
+  if (error) throw error
+
+  return (data || []).reduce((acc, row) => {
+    const profileId = row.profile_id
+    if (!profileId) return acc
+    acc[profileId] = (acc[profileId] || 0) + 1
+    return acc
+  }, {})
 }
 
 export async function uploadPortfolioImage({ file, target, kind = 'photo' }) {

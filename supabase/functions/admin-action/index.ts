@@ -5,6 +5,7 @@ const ACCOUNT_ROLES = new Set(['user', 'specialist', 'admin'])
 const SPECIALIST_STATUSES = new Set(['pending', 'approved', 'rejected'])
 const ACCOUNT_STATUSES = new Set(['active', 'banned'])
 const ORDER_STATUSES = new Set(['pending_payment', 'paid', 'in_progress', 'delivered', 'completed', 'disputed', 'refunded', 'cancelled'])
+const MATERIAL_MODERATION_STATUSES = new Set(['pending', 'approved', 'rejected', 'hidden'])
 const ADMIN_ROLE_MANAGER_EMAILS = new Set(['a.mitkov@totsan.com'])
 const AUTH_REDIRECT_ORIGINS = new Set(['https://totsan.com', 'https://www.totsan.com', 'http://localhost:3000', 'http://127.0.0.1:3000'])
 
@@ -297,6 +298,77 @@ Deno.serve(async (req) => {
       return jsonResponse(200, { ok: true, row: data })
     }
 
+    if (action === 'update_profile') {
+      const id = assertUuid(payload.id, 'Profile id')
+      const updates = (payload.updates && typeof payload.updates === 'object' ? payload.updates : {}) as Record<string, unknown>
+      const patch: Record<string, unknown> = {}
+
+      const { data: targetProfile, error: targetProfileError } = await adminClient
+        .from('profiles')
+        .select('id, user_id, slug, name, layer_slug, is_published')
+        .eq('id', id)
+        .single()
+
+      if (targetProfileError) throw targetProfileError
+
+      if ('is_published' in updates) {
+        patch.is_published = Boolean(updates.is_published)
+      }
+
+      if ('layer_slug' in updates) {
+        const layerSlug = String(updates.layer_slug || '').trim()
+        if (!layerSlug) throw new Error('Profile layer is invalid.')
+        patch.layer_slug = layerSlug
+      }
+
+      if (Object.keys(patch).length === 0) {
+        return jsonResponse(200, { ok: true, row: targetProfile })
+      }
+
+      const { data, error } = await adminClient.from('profiles').update(patch).eq('id', id).select('*').single()
+      if (error) throw error
+
+      await writeAudit(adminClient, user.id, action, 'profile', id, {
+        updates,
+        actor_email: actorEmail,
+        target: {
+          id: targetProfile.id,
+          user_id: targetProfile.user_id,
+          slug: targetProfile.slug,
+          name: targetProfile.name,
+        },
+        before: {
+          layer_slug: targetProfile.layer_slug,
+          is_published: targetProfile.is_published,
+        },
+        after: {
+          layer_slug: data.layer_slug,
+          is_published: data.is_published,
+        },
+      })
+      return jsonResponse(200, { ok: true, row: data })
+    }
+
+    if (action === 'delete_profile') {
+      const id = assertUuid(payload.id, 'Profile id')
+      const { data: targetProfile, error: targetProfileError } = await adminClient
+        .from('profiles')
+        .select('id, user_id, slug, name, layer_slug, is_published')
+        .eq('id', id)
+        .single()
+
+      if (targetProfileError) throw targetProfileError
+
+      const { error } = await adminClient.from('profiles').delete().eq('id', id)
+      if (error) throw error
+
+      await writeAudit(adminClient, user.id, action, 'profile', id, {
+        actor_email: actorEmail,
+        target: targetProfile,
+      })
+      return jsonResponse(200, { ok: true })
+    }
+
     if (action === 'send_user_recovery_email') {
       const id = assertUuid(payload.id, 'Account id')
       const { data: targetAccount, error: targetAccountError } = await adminClient
@@ -345,6 +417,59 @@ Deno.serve(async (req) => {
         .single()
       if (error) throw error
       await writeAudit(adminClient, user.id, action, 'partner_service', serviceId, { moderation_note: moderationNote, actor_email: actorEmail })
+      return jsonResponse(200, { ok: true, row: data })
+    }
+
+    if (action === 'update_material_capability_moderation') {
+      const capabilityId = assertUuid(payload.capabilityId, 'Material capability id')
+      const moderationStatus = String(payload.moderationStatus || '')
+      if (!MATERIAL_MODERATION_STATUSES.has(moderationStatus)) throw new Error('Material moderation status is invalid.')
+      const moderationNote = String(payload.moderationNote || '').trim() || null
+
+      const { data: currentCapability, error: currentCapabilityError } = await adminClient
+        .from('partner_material_capabilities')
+        .select('id, profile_id, partner_id, layer_slug, category_slug, brand_slug, is_public, moderation_status, moderation_note')
+        .eq('id', capabilityId)
+        .single()
+
+      if (currentCapabilityError) throw currentCapabilityError
+
+      const patch: Record<string, unknown> = {
+        moderation_status: moderationStatus,
+        moderation_note: moderationNote,
+        reviewed_at: new Date().toISOString(),
+      }
+
+      const { data, error } = await adminClient
+        .from('partner_material_capabilities')
+        .update(patch)
+        .eq('id', capabilityId)
+        .select('*')
+        .single()
+
+      if (error) throw error
+
+      await writeAudit(adminClient, user.id, action, 'partner_material_capability', capabilityId, {
+        actor_email: actorEmail,
+        before: {
+          moderation_status: currentCapability.moderation_status,
+          moderation_note: currentCapability.moderation_note,
+          is_public: currentCapability.is_public,
+        },
+        after: {
+          moderation_status: data.moderation_status,
+          moderation_note: data.moderation_note,
+          is_public: data.is_public,
+        },
+        target: {
+          id: currentCapability.id,
+          profile_id: currentCapability.profile_id,
+          partner_id: currentCapability.partner_id,
+          layer_slug: currentCapability.layer_slug,
+          category_slug: currentCapability.category_slug,
+          brand_slug: currentCapability.brand_slug,
+        },
+      })
       return jsonResponse(200, { ok: true, row: data })
     }
 

@@ -736,7 +736,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
 
 function CustomerActivity({ account, completeness }) {
   return (
-    <div className="grid gap-5 lg:grid-cols-12">
+    <div className="grid gap-5 grid-cols-1 lg:grid-cols-12">
       <div className="lg:col-span-8 rounded-3xl border border-line bg-paper p-5 md:p-7">
         <div className="eyebrow">Активност</div>
         <h2 className="mt-2 font-display text-3xl text-ink">История на профила</h2>
@@ -1002,7 +1002,7 @@ function ProForm({ profile, userId, onSaved }) {
           <button className="btn btn-ghost" onClick={() => signOutAndRedirect(session?.user?.id)}>Изход</button>
         </div>
 
-        <form onSubmit={submit} className="grid gap-6 lg:grid-cols-12">
+        <form onSubmit={submit} className="grid gap-6 grid-cols-1 lg:grid-cols-12">
           <div className="lg:col-span-8 rounded-3xl border border-line bg-paper p-6 md:p-8 space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block text-sm font-medium text-ink">Име / фирма<input value={draft.name} onChange={e => update('name', e.target.value)} className={INPUT} /></label>

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { LAYERS as BASE_LAYERS } from '../data/layers.js'
-import { getStaticProductsForLayer } from './product-metadata.js'
 import { supabase } from './supabase.js'
 import { normalizeLocationList, normalizeLocationValue } from './locations.js'
 
@@ -152,7 +151,8 @@ export function normalizeProfile(input = {}, fallback = null) {
   const city = normalizeLocationValue(input.city ?? base.city ?? '')
   const slug = String(input.slug ?? base.slug ?? slugify(name)).trim() || slugify(name)
   const since = clamp(input.since ?? base.since, 1900, 2100, new Date().getFullYear())
-  const rating = clamp(input.rating ?? base.rating, 0, 5, 5)
+  const ratingInput = input.rating ?? base.rating
+  const rating = ratingInput === null || ratingInput === undefined || ratingInput === '' ? null : clamp(ratingInput, 0, 5, null)
   const projects = clamp(input.projects ?? base.projects, 0, 100000, 0)
   const imageUrl = String(input.imageUrl ?? input.image_url ?? base.imageUrl ?? base.image_url ?? '').trim()
   const imageZoom = clamp(input.imageZoom ?? input.image_zoom ?? base.imageZoom ?? base.image_zoom, 1, 2.5, 1)
@@ -161,6 +161,11 @@ export function normalizeProfile(input = {}, fallback = null) {
   const coverUrl = String(input.coverUrl ?? input.cover_url ?? base.coverUrl ?? base.cover_url ?? '').trim()
   const coverY = clamp(input.coverY ?? input.cover_y ?? base.coverY ?? base.cover_y, 0, 100, 50)
   const isPublished = input.isPublished ?? input.is_published ?? base.isPublished ?? base.is_published ?? true
+  const hasProfileDescription = Boolean(
+    String(input.bio ?? base.bio ?? '').trim()
+    || String(input.headline ?? base.headline ?? '').trim()
+    || String(input.descriptionLong ?? input.description_long ?? base.descriptionLong ?? base.description_long ?? '').trim()
+  )
   const bio = String(input.bio ?? base.bio ?? buildFallbackBio({ name, tag, city, since, projects }, layer)).trim()
   const headline = String(input.headline ?? base.headline ?? tag).trim()
   const descriptionLong = String(input.descriptionLong ?? input.description_long ?? base.descriptionLong ?? base.description_long ?? bio).trim()
@@ -196,11 +201,12 @@ export function normalizeProfile(input = {}, fallback = null) {
     sub: tag,
     city,
     since: Math.round(since),
-    rating: Number(rating.toFixed(1)),
+    rating: rating === null ? null : Number(rating.toFixed(1)),
     projects: Math.round(projects),
     bio,
     headline,
     descriptionLong,
+    hasProfileDescription,
     phone,
     emailPublic,
     website,
@@ -253,13 +259,13 @@ export function buildProfileDirectory(rows = [], options = {}) {
 function toProfessionalCardPerson(profile) {
   return {
     slug: profile.slug,
+    id: profile.id,
     layer: profile.layerSlug,
     layerSlug: profile.layerSlug,
     layerTitle: profile.layerTitle,
     name: profile.name,
     tag: profile.tag,
     city: profile.city,
-    rating: profile.rating,
     projects: profile.projects,
     since: profile.since,
     bio: profile.bio,
@@ -270,6 +276,12 @@ function toProfessionalCardPerson(profile) {
     imageY: profile.imageY,
     coverUrl: profile.coverUrl,
     coverY: profile.coverY,
+    headline: profile.headline,
+    descriptionLong: profile.descriptionLong,
+    serviceAreas: profile.serviceAreas,
+    yearsExperience: profile.yearsExperience,
+    pricingNote: profile.pricingNote,
+    hasProfileDescription: profile.hasProfileDescription,
   }
 }
 
@@ -302,6 +314,7 @@ export function buildCatalogWithProfiles(profiles) {
     ;(byLayer.get(layer.slug) || []).sort(compareProfiles).forEach((profile) => {
       items.push({
         kind: 'pro',
+        id: profile.id,
         slug: profile.slug,
         layer: layer.slug,
         layerNumber: layer.number,
@@ -310,12 +323,12 @@ export function buildCatalogWithProfiles(profiles) {
         sub: profile.tag,
         tag: profile.tag,
         city: profile.city,
-        rating: profile.rating,
         projects: profile.projects,
         since: profile.since,
         bio: profile.bio,
         headline: profile.headline,
         descriptionLong: profile.descriptionLong,
+        hasProfileDescription: profile.hasProfileDescription,
         phone: profile.phone,
         emailPublic: profile.emailPublic,
         website: profile.website,
@@ -341,20 +354,6 @@ export function buildCatalogWithProfiles(profiles) {
       })
     })
 
-    getStaticProductsForLayer(layer.slug).forEach((product) => {
-      items.push({
-        ...product,
-        kind: 'product',
-        layer: layer.slug,
-        layerSlug: layer.slug,
-        layerNumber: layer.number,
-        layerTitle: layer.title,
-        name: product.name,
-        sub: product.cat || product.sub,
-        price: product.price,
-        tag: product.tag,
-      })
-    })
   })
 
   return items
