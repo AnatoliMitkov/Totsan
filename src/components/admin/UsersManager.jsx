@@ -5,10 +5,12 @@ import {
   ACCOUNT_STATUS_LABELS,
   SPECIALIST_STATUS_LABELS,
   formatAdminDate,
+  deleteProfile as deleteAdminProfile,
   loadAccounts,
   loadPartnerApplications,
   paginateRows,
   updateAccount,
+  updateProfile,
 } from '../../lib/admin.js'
 import { LAYERS } from '../../data/layers.js'
 import { getProfileImage, getProfileImageStyle, normalizeProfile, runProfileSelectWithLayer01Fallback } from '../../lib/profiles.js'
@@ -189,15 +191,9 @@ export default function UsersManager({ globalQuery = '', account: currentAccount
           : draft
         const profileUpdates = buildProfileUpdates(entity.profile, effectiveDraft)
         if (Object.keys(profileUpdates).length > 0) {
-          const { data, error: updateError } = await runProfileSelectWithLayer01Fallback((columns) => (
-            supabase
-              .from('profiles')
-              .update(profileUpdates)
-              .eq('id', entity.profile.id)
-              .select(columns)
-              .single()
-          ))
-          if (updateError) throw updateError
+          const result = await updateProfile(entity.profile.id, profileUpdates)
+          const data = result?.row
+          if (!data) throw new Error('Профилът беше обновен, но не получихме новите данни.')
 
           setProfiles((current) => current.map((profile) => profile.id === entity.profile.id ? data : profile))
         }
@@ -221,8 +217,7 @@ export default function UsersManager({ globalQuery = '', account: currentAccount
     setError('')
 
     try {
-      const { error: deleteError } = await supabase.from('profiles').delete().eq('id', entity.profile.id)
-      if (deleteError) throw deleteError
+      await deleteAdminProfile(entity.profile.id)
 
       setProfiles((current) => current.filter((profile) => profile.id !== entity.profile.id))
       setEditingEntity((current) => current?.profile?.id === entity.profile.id ? null : current)
@@ -383,8 +378,13 @@ function EditUserModal({ entity, canManageAdmins, currentAccount, actionState, o
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/35 px-3 py-4 backdrop-blur-sm sm:items-center">
-      <form onSubmit={submit} className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-line bg-paper p-5 shadow-[0_30px_90px_-45px_rgba(13,35,64,0.65)] md:p-6">
+    <div
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-ink/60 px-3 py-4 backdrop-blur-sm sm:items-center"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+    >
+      <form onSubmit={submit} className="max-h-[calc(100dvh-4rem)] w-[90vw] max-w-[900px] overflow-y-auto rounded-3xl border border-line bg-paper p-5 shadow-[0_30px_90px_-45px_rgba(13,35,64,0.65)] md:p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="eyebrow">Редакция</div>

@@ -5,9 +5,9 @@ import { getProfileImage, getProfileImageStyle, slugify, useProfileDirectory } f
 import { formatMoneyText } from '../lib/money.js'
 import {
   buildProductPartnerRecommendations,
-  loadPublicMaterialCapabilitiesForProduct,
+  loadPublicMaterialCapabilitiesForSolution,
 } from '../lib/partner-materials.js'
-import { findStaticProductBySlug, normalizeProductItem } from '../lib/product-metadata.js'
+import { normalizeProductItem } from '../lib/product-metadata.js'
 import { getPageLocation, trackEvent, trackPageView } from '../lib/analytics.js'
 import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
 
@@ -20,8 +20,8 @@ export default function Product() {
   const productPath = slug ? `/produkt/${slug}` : '/katalog'
 
   const item = useMemo(() => {
-    if (state?.item?.kind === 'product') return normalizeProductItem(state.item)
-    return findStaticProductBySlug(slug) || normalizeProductItem(catalog.find(c => c.kind === 'product' && (c.slug === slug || slugify(c.name) === slug)) || {})
+    if (state?.item?.kind === 'product' || state?.item?.kind === 'material') return normalizeProductItem(state.item)
+    return normalizeProductItem(catalog.find(c => c.kind === 'material' && (c.slug === slug || slugify(c.name) === slug)) || {})
   }, [catalog, state, slug])
 
   const hasProduct = Boolean(item?.name)
@@ -41,7 +41,7 @@ export default function Product() {
     let active = true
     async function loadCapabilities() {
       try {
-        const rows = await loadPublicMaterialCapabilitiesForProduct(item)
+        const rows = await loadPublicMaterialCapabilitiesForSolution(item)
         if (!active) return
         setCapabilities(rows)
       } catch {
@@ -58,10 +58,10 @@ export default function Product() {
     if (hasProduct && layer) {
       const description = item.sub
         ? `${item.name} в категория ${item.sub}${layer ? ` за Слой ${layer.number} · ${layer.title}` : ''}.`
-        : `${item.name} е продуктова страница в Totsan.`
+        : `${item.name} е материално решение в Totsan.`
 
       return {
-        title: `${item.name} | Totsan`,
+        title: `${item.brandLabel || item.name} | Материали и решения | Totsan`,
         description,
         canonicalPath: productPath,
         jsonLd: [
@@ -75,8 +75,8 @@ export default function Product() {
     }
 
     return {
-      title: 'Продуктът не е намерен | Totsan',
-      description: 'Този продукт не е наличен или линкът е невалиден.',
+      title: 'Материалът не е намерен | Totsan',
+      description: 'Това материално решение не е налично или линкът е невалиден.',
       canonicalPath: productPath,
       robots: 'noindex, nofollow',
     }
@@ -108,7 +108,7 @@ export default function Product() {
     <>
       <section className="section !pt-20 bg-soft border-b border-line">
         <div className="container-page reveal">
-          <Link to="/katalog" className="eyebrow !text-ink/70 hover:!text-ink">← Обратно в каталога</Link>
+          <Link to="/katalog?kind=material" className="eyebrow !text-ink/70 hover:!text-ink">← Обратно към материалите</Link>
         </div>
       </section>
 
@@ -132,30 +132,31 @@ export default function Product() {
 
           <div className="lg:col-span-5 reveal">
             <div className="eyebrow">Слой {layer.number} · {layer.title}</div>
-            <h1 className="h-display mt-2">{item.name}</h1>
-            <div className="text-muted mt-2">{item.sub}</div>
+            <h1 className="h-display mt-2">{item.brandLabel || item.name}</h1>
+            <div className="text-muted mt-2">{item.categoryLabel || item.sub}</div>
 
-            <div className="mt-6 flex items-baseline gap-3">
-              <span className="font-display text-3xl text-ink">{formatMoneyText(item.price)}</span>
-              <span className="text-sm text-muted">вкл. ДДС</span>
-            </div>
+            {item.price && (
+              <div className="mt-6 rounded-2xl border border-line bg-soft px-4 py-3 text-sm text-muted">
+                Ориентир от демо каталога: <span className="font-medium text-ink">{formatMoneyText(item.price)}</span>. Финална цена, условия и монтаж се уточняват с партньор.
+              </div>
+            )}
 
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link to="/kontakt" state={{ subject: `Оферта за: ${item.name}` }} className="btn btn-primary">Поискай оферта</Link>
-              <Link to="/katalog" className="btn btn-ghost">Назад в каталога</Link>
+              <Link to="/kontakt" state={{ subject: `Запитване за материал: ${item.brandLabel || item.name}` }} className="btn btn-primary">Попитай за материала</Link>
+              <Link to="/katalog?kind=material" className="btn btn-ghost">Назад към материалите</Link>
             </div>
 
             <div className="mt-8 grid grid-cols-2 gap-3 text-sm">
-              <Info k="Доставка" v="2–5 работни дни" />
-              <Info k="Гаранция" v="24 месеца" />
-              <Info k="Връщане" v="14 дни" />
-              <Info k="Наличност" v="В склад" />
+              <Info k="Тип" v={item.brandLabel ? 'Марка и категория' : 'Категория'} />
+              <Info k="Слой" v={`Слой ${layer.number}`} />
+              <Info k="Партньори" v={capabilities.length ? `${capabilities.length} активни връзки` : 'Очаква одобрени партньори'} />
+              <Info k="Модел" v="Запитване, не директна покупка" />
             </div>
 
             <div className="mt-8 border-t border-line pt-6">
-              <div className="eyebrow mb-3">За продукта</div>
+              <div className="eyebrow mb-3">За материала</div>
               <p className="text-sm text-muted">
-                {item.name} е част от {item.categoryLabel || String(item.sub || 'продукт').toLowerCase()} с маркер „{item.tag}“. Подбран е от екипа на Totsan заради съчетанието между качество, цена и наличност на пазара.
+                {item.brandLabel || item.name} е материално решение в категория {item.categoryLabel || String(item.sub || 'материали').toLowerCase()}. Totsan го използва като ориентир, за да те насочи към партньори, които работят с тази категория или марка.
               </p>
             </div>
           </div>
@@ -165,7 +166,7 @@ export default function Product() {
       {recommendations.length > 0 && (
         <section className="section !pt-0">
           <div className="container-page">
-            <div className="eyebrow reveal">Специалисти за този тип материал</div>
+            <div className="eyebrow reveal">Партньори за този тип материал</div>
             <div className="mt-6 grid gap-5 md:grid-cols-3">
               {recommendations.map((recommendation) => (
                 <ProductPartnerCard key={recommendation.person.id || recommendation.person.slug || recommendation.person.name} recommendation={recommendation} product={item} layer={layer} />
@@ -231,9 +232,9 @@ function NotFound() {
   return (
     <section className="section">
       <div className="container-page max-w-2xl text-center">
-        <h1 className="h-section">Този продукт не е намерен.</h1>
-        <p className="text-muted mt-3">Може да си отворил линк директно. Върни се в каталога.</p>
-        <Link to="/katalog" className="btn btn-primary mt-6 inline-flex">Към каталога</Link>
+        <h1 className="h-section">Този материал не е намерен.</h1>
+        <p className="text-muted mt-3">Може да си отворил стар линк или материалът вече да не е активен. Върни се към каталога.</p>
+        <Link to="/katalog?kind=material" className="btn btn-primary mt-6 inline-flex">Към материалите</Link>
       </div>
     </section>
   )

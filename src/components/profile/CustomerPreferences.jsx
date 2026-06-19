@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Save, X, Lock, Sparkles } from 'lucide-react'
+import { X, Lock, Sparkles } from 'lucide-react'
+import FloatingSaveBar from './FloatingSaveBar.jsx'
 
 // ─── Option definitions ─────────────────────────────────────────────────────
 
@@ -198,7 +199,7 @@ export default function CustomerPreferences({ account, session, onSave }) {
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-5 lg:grid-cols-12">
+    <form onSubmit={submit} className="grid gap-5 pb-28 lg:grid-cols-12">
       <div className="lg:col-span-8 rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-7 space-y-6">
         {/* Header */}
         <div>
@@ -259,16 +260,6 @@ export default function CustomerPreferences({ account, session, onSave }) {
           isPrivate
         />
 
-        {/* Save bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
-          <div className={`text-sm ${status.type === 'error' ? 'text-red-700' : 'text-muted'}`}>
-            {status.message || 'Всички полета са по желание.'}
-          </div>
-          <button className="btn btn-primary" disabled={status.type === 'saving'}>
-            <Save size={18} />
-            {status.type === 'saving' ? 'Запазва се…' : 'Запази'}
-          </button>
-        </div>
       </div>
 
       {/* Sidebar info card */}
@@ -294,6 +285,12 @@ export default function CustomerPreferences({ account, session, onSave }) {
           </div>
         </div>
       </aside>
+      <FloatingSaveBar
+        status={status.type}
+        message={status.message}
+        idleMessage="Всички полета са по желание."
+        disabled={status.type === 'saving'}
+      />
     </form>
   )
 }

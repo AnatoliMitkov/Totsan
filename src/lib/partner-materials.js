@@ -21,7 +21,10 @@ export const PARTNER_MATERIAL_CAPABILITY_COLUMNS = `
   brand_slug,
   relation_types,
   note,
-  is_public
+  is_public,
+  moderation_status,
+  moderation_note,
+  reviewed_at
 `
 
 const PROFILE_PUBLIC_COLUMNS = `
@@ -80,6 +83,9 @@ export function normalizeMaterialCapability(row = {}) {
     relationTypes: textArray(row.relationTypes || row.relation_types),
     note: row.note || '',
     isPublic: row.isPublic ?? row.is_public ?? true,
+    moderationStatus: row.moderationStatus || row.moderation_status || 'approved',
+    moderationNote: row.moderationNote || row.moderation_note || '',
+    reviewedAt: row.reviewedAt || row.reviewed_at || null,
     profile: row.profile ? normalizeProfile(row.profile) : null,
   }
 }
@@ -99,6 +105,7 @@ function capabilityPayload(profile, draft) {
     relation_types: relationTypes,
     note: cleanText(draft.note),
     is_public: Boolean(draft.isPublic),
+    moderation_status: draft.id ? (draft.moderationStatus || 'pending') : 'pending',
   }
 }
 
@@ -113,6 +120,8 @@ export function makeMaterialCapabilityDraft(profile, capability = null) {
     relationTypes: capability?.relationTypes?.length ? capability.relationTypes : ['uses'],
     note: capability?.note || '',
     isPublic: capability?.isPublic ?? true,
+    moderationStatus: capability?.moderationStatus || 'pending',
+    moderationNote: capability?.moderationNote || '',
   }
 }
 
@@ -151,6 +160,7 @@ export async function loadPublicMaterialCapabilitiesForProduct(product) {
     .from('partner_material_capabilities')
     .select(`${PARTNER_MATERIAL_CAPABILITY_COLUMNS}, profile:profiles(${PROFILE_PUBLIC_COLUMNS})`)
     .eq('is_public', true)
+    .eq('moderation_status', 'approved')
     .eq('layer_slug', product.layerSlug)
     .eq('category_slug', product.categorySlug)
 
@@ -161,6 +171,20 @@ export async function loadPublicMaterialCapabilitiesForProduct(product) {
   }
 
   const { data, error } = await request.order('created_at', { ascending: false })
+  if (error) throw error
+  return (data || []).map(normalizeMaterialCapability).filter(item => item.profile?.id)
+}
+
+export const loadPublicMaterialCapabilitiesForSolution = loadPublicMaterialCapabilitiesForProduct
+
+export async function loadPublicMaterialCapabilities() {
+  const { data, error } = await supabase
+    .from('partner_material_capabilities')
+    .select(`${PARTNER_MATERIAL_CAPABILITY_COLUMNS}, profile:profiles(${PROFILE_PUBLIC_COLUMNS})`)
+    .eq('is_public', true)
+    .eq('moderation_status', 'approved')
+    .order('created_at', { ascending: false })
+
   if (error) throw error
   return (data || []).map(normalizeMaterialCapability).filter(item => item.profile?.id)
 }
@@ -209,4 +233,62 @@ export function buildProductPartnerRecommendations({ product, capabilities = [],
   }
 
   return recommendations
+}
+
+export function buildMaterialSolutionItems({ templates = [], capabilities = [], layers = [] } = {}) {
+  const byKey = new Map()
+  const layerMap = new Map(layers.map((layer) => [layer.slug, layer]))
+
+  function upsertSolution(base) {
+    const key = `${base.layerSlug || base.layer}-${base.categorySlug || 'category'}-${base.brandSlug || 'all'}`
+    const existing = byKey.get(key) || {
+      kind: 'material',
+      slug: base.slug,
+      layer: base.layerSlug || base.layer,
+      layerSlug: base.layerSlug || base.layer,
+      layerNumber: base.layerNumber || layerMap.get(base.layerSlug || base.layer)?.number || '',
+      layerTitle: base.layerTitle || layerMap.get(base.layerSlug || base.layer)?.title || '',
+      name: base.name,
+      sub: base.sub || base.categoryLabel,
+      tag: base.tag || '',
+      price: base.price || '',
+      categorySlug: base.categorySlug,
+      categoryLabel: base.categoryLabel,
+      brandSlug: base.brandSlug || null,
+      brandLabel: base.brandLabel || '',
+      partnerCount: 0,
+      capabilities: [],
+      source: base.source || 'template',
+    }
+
+    if (base.capability) {
+      existing.capabilities = [...existing.capabilities, base.capability]
+      existing.partnerCount = new Set(existing.capabilities.map((item) => item.profileId || item.profile?.id).filter(Boolean)).size
+      existing.source = existing.source === 'template' ? 'partner_capability' : existing.source
+    }
+
+    byKey.set(key, existing)
+  }
+
+  templates.forEach((template) => upsertSolution({ ...template, source: 'template' }))
+  capabilities.forEach((capability) => {
+    upsertSolution({
+      slug: `${capability.categorySlug}${capability.brandSlug ? `-${capability.brandSlug}` : ''}`,
+      layerSlug: capability.layerSlug,
+      name: capability.brandLabel || capability.categoryLabel,
+      sub: capability.categoryLabel,
+      categorySlug: capability.categorySlug,
+      categoryLabel: capability.categoryLabel,
+      brandSlug: capability.brandSlug,
+      brandLabel: capability.brandLabel,
+      capability,
+      source: 'partner_capability',
+    })
+  })
+
+  return Array.from(byKey.values()).sort((left, right) => {
+    const layerCompare = String(left.layerNumber || '').localeCompare(String(right.layerNumber || ''), 'bg')
+    if (layerCompare) return layerCompare
+    return String(left.name || '').localeCompare(String(right.name || ''), 'bg')
+  })
 }

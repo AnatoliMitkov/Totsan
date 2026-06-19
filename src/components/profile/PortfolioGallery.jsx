@@ -149,8 +149,15 @@ export default function PortfolioGallery({ items = [], emptyText = 'Още ня�
       </div>
 
       {activeItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4" role="dialog" aria-modal="true">
-          <div className="relative max-h-[92vh] w-full max-w-5xl overflow-auto rounded-3xl bg-paper">
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/80 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setActiveIndex(-1)
+          }}
+        >
+          <div className="relative max-h-[calc(100dvh-4rem)] w-[90vw] max-w-[1180px] overflow-auto rounded-3xl bg-paper">
             <button type="button" onClick={() => setActiveIndex(-1)} className="absolute right-4 top-4 z-10 rounded-full bg-paper/90 p-2 text-ink shadow" aria-label="Затвори">
               <X size={20} />
             </button>

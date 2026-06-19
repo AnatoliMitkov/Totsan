@@ -94,7 +94,7 @@ export default function PartnerMaterialsEditor({ profile }) {
   const selectedCategory = getMaterialCategory(draft.categorySlug)
   const selectedBrand = getProductBrand(draft.brandSlug)
   const brandOptions = selectedCategory ? getBrandsForCategory(selectedCategory.slug) : []
-  const publicCount = items.filter((item) => item.isPublic).length
+  const publicCount = items.filter((item) => item.isPublic && item.moderationStatus === 'approved').length
   const categoryUsage = useMemo(() => {
     const usage = new Map()
     items.forEach((item) => usage.set(item.categorySlug, (usage.get(item.categorySlug) || 0) + 1))
@@ -203,7 +203,7 @@ export default function PartnerMaterialsEditor({ profile }) {
           <div>
             <div className="eyebrow">Материали и марки</div>
             <h2 className="mt-2 font-display text-3xl text-ink">Запазени категории</h2>
-            <p className="mt-2 text-sm text-muted">Подреди материалите като продуктови карти и редактирай всеки запис от popup.</p>
+            <p className="mt-2 text-sm text-muted">Подреди материалите и марките, с които работиш. Новите записи чакат кратък admin преглед преди да излязат публично.</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -229,8 +229,8 @@ export default function PartnerMaterialsEditor({ profile }) {
       </section>
 
       {isEditorOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/50 p-3 backdrop-blur-sm md:items-center md:p-6">
-          <div className="max-h-[92vh] w-full max-w-[1500px] overflow-hidden rounded-[32px] border border-line bg-paper shadow-2xl">
+        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-ink/60 p-3 backdrop-blur-sm md:items-center md:p-6">
+          <div className="max-h-[calc(100dvh-4rem)] w-[90vw] max-w-[1500px] overflow-hidden rounded-[32px] border border-line bg-paper shadow-2xl">
             <form onSubmit={saveCapability} className="flex h-full max-h-[92vh] flex-col">
               <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-4 md:px-7">
                 <div>
@@ -364,11 +364,11 @@ export default function PartnerMaterialsEditor({ profile }) {
 
                     <label className="flex items-start gap-3 rounded-2xl border border-line bg-soft p-4 text-sm text-muted">
                       <input type="checkbox" checked={draft.isPublic} onChange={(event) => update('isPublic', event.target.checked)} className="mt-1 accent-black" />
-                      <span>Покажи публично в продуктови препоръки.</span>
+                      <span>Покажи публично след admin одобрение.</span>
                     </label>
 
                     <div className={`rounded-2xl p-3 text-sm ${state.status === 'error' ? 'bg-red-50 text-red-700' : 'bg-soft text-muted'}`}>
-                      {state.message || 'Запази, за да се използва при продуктови препоръки.'}
+                      {state.message || 'Запази, за да изпратиш материала за преглед.'}
                     </div>
                   </div>
                 </aside>
@@ -410,7 +410,7 @@ function CapabilityCard({ item, onSelect }) {
         <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/55 to-transparent" />
         <div className="absolute left-3 right-3 top-3 flex items-start justify-between gap-2">
           <BrandBadge brandSlug={item.brandSlug} brandLabel={item.brandLabel || 'Категория'} compact />
-          {item.isPublic ? <Eye size={16} className="text-paper" /> : <EyeOff size={16} className="text-paper/80" />}
+          {item.isPublic && item.moderationStatus === 'approved' ? <Eye size={16} className="text-paper" /> : <EyeOff size={16} className="text-paper/80" />}
         </div>
         <div className="absolute inset-x-3 bottom-3">
           <div className="line-clamp-2 font-display text-xl leading-tight text-paper">{item.brandLabel || item.categoryLabel}</div>
@@ -425,10 +425,18 @@ function CapabilityCard({ item, onSelect }) {
             ))}
           </div>
         )}
+        <div className="text-[11px] uppercase tracking-[0.14em] text-muted">{statusLabel(item.moderationStatus)}</div>
         <div className="line-clamp-2 text-xs text-muted">{item.note || 'Кликни за редакция на детайлите.'}</div>
       </div>
     </button>
   )
+}
+
+function statusLabel(value) {
+  if (value === 'approved') return 'Одобрен'
+  if (value === 'rejected') return 'Отхвърлен'
+  if (value === 'hidden') return 'Скрит'
+  return 'Чака преглед'
 }
 
 function CategoryCard({ category, active, count, brandsCount, onSelect }) {

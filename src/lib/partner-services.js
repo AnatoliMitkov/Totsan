@@ -4,6 +4,7 @@ import { supabase } from './supabase.js'
 import { formatMoney } from './money.js'
 import { normalizeLocationList } from './locations.js'
 import { refreshProfileAiSummary } from './profile-ai-summary.js'
+import { deleteStorageRefs, diffStorageRefs, mediaAndCoverStorageRefs } from './storage-media-cleanup.js'
 
 export const SERVICE_STATUS_LABELS = {
   draft: 'Чернова',
@@ -407,6 +408,18 @@ export async function savePartnerService(profile, draft, { submit = false } = {}
   if (submit && !draft.title.trim()) throw new Error('Услугата има нужда от заглавие.')
   if (submit && !Number(primaryPackage.priceAmount)) throw new Error('Въведи цена в евро, за да създадеш услугата.')
 
+  let previous = null
+  if (draft.id) {
+    const { data: previousRow, error: previousError } = await supabase
+      .from('partner_services')
+      .select(PARTNER_SERVICE_COLUMNS)
+      .eq('id', draft.id)
+      .eq('profile_id', profile.id)
+      .maybeSingle()
+    if (previousError) throw previousError
+    previous = previousRow ? normalizePartnerService(previousRow) : null
+  }
+
   const status = submit ? 'pending' : 'draft'
   const slug = await uniqueServiceSlug(profile, draft)
   const payload = servicePayload(profile, draft, status, slug)
@@ -451,13 +464,27 @@ export async function savePartnerService(profile, draft, { submit = false } = {}
   }
 
   const [service] = await attachServiceRelations([serviceRow])
+  if (previous) {
+    await deleteStorageRefs(diffStorageRefs(
+      mediaAndCoverStorageRefs(previous),
+      mediaAndCoverStorageRefs(service),
+    ))
+  }
   return service
 }
 
 export async function deletePartnerService(serviceId) {
   if (!serviceId) return
+  const { data: previousRow, error: loadError } = await supabase
+    .from('partner_services')
+    .select(PARTNER_SERVICE_COLUMNS)
+    .eq('id', serviceId)
+    .maybeSingle()
+  if (loadError) throw loadError
+
   const { error } = await supabase.from('partner_services').delete().eq('id', serviceId)
   if (error) throw error
+  await deleteStorageRefs(mediaAndCoverStorageRefs(previousRow ? normalizePartnerService(previousRow) : null))
 }
 
 export async function uploadPartnerServiceImage({ file, target, kind = 'cover' }) {
@@ -473,17 +500,18 @@ export async function uploadPartnerServiceImage({ file, target, kind = 'cover' }
 
 export function appendPartnerServiceMedia(draft, upload, caption = '') {
   const media = Array.isArray(draft.media) ? draft.media : []
+  const nextMedia = [
+    ...media,
+    {
+      url: upload.url,
+      path: upload.path,
+      caption,
+    },
+  ]
   return {
     ...draft,
-    coverUrl: draft.coverUrl || upload.url,
-    media: [
-      ...media,
-      {
-        url: upload.url,
-        path: upload.path,
-        caption,
-      },
-    ],
+    coverUrl: nextMedia[0]?.url || '',
+    media: nextMedia,
   }
 }
 

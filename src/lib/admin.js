@@ -35,6 +35,13 @@ export const ACCOUNT_STATUS_LABELS = {
   banned: 'Блокиран',
 }
 
+export const MATERIAL_MODERATION_STATUS_LABELS = {
+  pending: 'Чака',
+  approved: 'Одобрен',
+  rejected: 'Отхвърлен',
+  hidden: 'Скрит',
+}
+
 export function formatAdminDate(value) {
   if (!value) return '—'
   return new Intl.DateTimeFormat('bg-BG', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
@@ -112,13 +119,35 @@ export async function loadAdminOrders() {
 }
 
 export async function invokeAdminAction(action, payload = {}) {
-  const { data, error } = await supabase.functions.invoke('admin-action', {
+  const { data, error, response } = await supabase.functions.invoke('admin-action', {
     body: { action, payload },
   })
 
-  if (error) throw error
+  if (error) throw new Error(await getAdminActionErrorMessage(error, response))
   if (data?.error) throw new Error(data.error)
   return data
+}
+
+async function getAdminActionErrorMessage(error, response) {
+  const fallback = error?.message || 'Admin action failed.'
+  const errorResponse = response || error?.context
+
+  if (!errorResponse || typeof errorResponse.clone !== 'function') return fallback
+
+  try {
+    const contentType = errorResponse.headers?.get?.('Content-Type') || ''
+    const clonedResponse = errorResponse.clone()
+
+    if (contentType.includes('application/json')) {
+      const body = await clonedResponse.json()
+      return body?.error || body?.message || fallback
+    }
+
+    const text = await clonedResponse.text()
+    return text || fallback
+  } catch {
+    return fallback
+  }
 }
 
 export function updateInquiryStatus(id, status) {
@@ -137,6 +166,14 @@ export function updateAccount(id, updates) {
   return invokeAdminAction('update_account', { id, updates })
 }
 
+export function updateProfile(id, updates) {
+  return invokeAdminAction('update_profile', { id, updates })
+}
+
+export function deleteProfile(id) {
+  return invokeAdminAction('delete_profile', { id })
+}
+
 export function sendUserRecoveryEmail(id) {
   return invokeAdminAction('send_user_recovery_email', { id })
 }
@@ -147,6 +184,35 @@ export function approvePartnerService(serviceId, moderationNote = '') {
 
 export function rejectPartnerService(serviceId, moderationNote = '') {
   return invokeAdminAction('reject_partner_service', { serviceId, moderationNote })
+}
+
+export async function loadAdminMaterialCapabilities() {
+  const result = await supabase
+    .from('partner_material_capabilities')
+    .select(`
+      id,
+      created_at,
+      updated_at,
+      profile_id,
+      partner_id,
+      layer_slug,
+      category_slug,
+      brand_slug,
+      relation_types,
+      note,
+      is_public,
+      moderation_status,
+      moderation_note,
+      reviewed_at,
+      profile:profiles(id, slug, name, tag, city, image_url, image_zoom, image_x, image_y, is_published, user_id)
+    `)
+    .order('created_at', { ascending: false })
+
+  return requireData(result, [])
+}
+
+export function updateMaterialCapabilityModeration(capabilityId, moderationStatus, moderationNote = '') {
+  return invokeAdminAction('update_material_capability_moderation', { capabilityId, moderationStatus, moderationNote })
 }
 
 export function adminUpdateOrderStatus(orderId, status, note = '') {

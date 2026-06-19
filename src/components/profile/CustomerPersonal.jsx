@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { Save } from 'lucide-react'
 import { LocationCombobox } from '../ui/LocationCombobox.jsx'
 import { normalizeLocationValue } from '../../lib/locations.js'
+import FloatingSaveBar from './FloatingSaveBar.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 
@@ -75,7 +75,7 @@ export default function CustomerPersonal({ account, session, onSave }) {
   }
 
   return (
-    <form onSubmit={submit} className="max-w-4xl">
+    <form onSubmit={submit} className="max-w-4xl pb-28">
       <div className="rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-7 space-y-5">
         <div>
           <div className="eyebrow">Лични данни</div>
@@ -101,14 +101,13 @@ export default function CustomerPersonal({ account, session, onSave }) {
           <span>Искам да получавам полезни идеи и новини от Totsan.</span>
         </label>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
-          <div className={`text-sm ${status.type === 'error' ? 'text-red-700' : 'text-muted'}`}>{status.message || 'Промените се пазят само след запазване.'}</div>
-          <button className="btn btn-primary" disabled={status.type === 'saving' || status.type === 'uploading'}>
-            <Save size={18} />
-            {status.type === 'saving' ? 'Запазва се…' : 'Запази'}
-          </button>
-        </div>
       </div>
+      <FloatingSaveBar
+        status={status.type}
+        message={status.message}
+        idleMessage="Промените се пазят само след запазване."
+        disabled={status.type === 'saving' || status.type === 'uploading'}
+      />
     </form>
   )
 }

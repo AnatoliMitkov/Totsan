@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowUpRight,
@@ -11,14 +11,18 @@ import {
   ClipboardList,
   Eye,
   FileQuestion,
+  GripVertical,
   ImagePlus,
   Images,
   Lightbulb,
+  Link2,
   MapPin,
+  PlayCircle,
   Plus,
   Save,
   Sparkles,
   Trash2,
+  Video,
   X,
 } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
@@ -215,11 +219,22 @@ const SERVICE_STARTERS = [
   },
 ]
 
+function makeNeutralServiceDraft(profile) {
+  const nextDraft = makePartnerServiceDraft(profile)
+  return {
+    ...nextDraft,
+    layerSlug: '',
+    deliveryAreasText: '',
+  }
+}
+
 export default function PartnerServiceEditor({ profile, userId, onProfileSummaryRefresh }) {
   const [items, setItems] = useState([])
-  const [draft, setDraft] = useState(() => makePartnerServiceDraft(profile))
+  const [draft, setDraft] = useState(() => makeNeutralServiceDraft(profile))
   const [activeSection, setActiveSection] = useState('info')
   const [showPreview, setShowPreview] = useState(true)
+  const [isEditorOpen, setIsEditorOpen] = useState(false)
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false)
   const [state, setState] = useState({ status: 'loading', message: 'Зареждаме услугите...' })
 
   useEffect(() => {
@@ -230,7 +245,7 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
         const rows = await loadPartnerServicesForProfile(profile.id)
         if (!active) return
         setItems(rows)
-        setDraft(makePartnerServiceDraft(profile, rows[0] || null))
+        setDraft(rows[0] ? makePartnerServiceDraft(profile, rows[0]) : makeNeutralServiceDraft(profile))
         setState({ status: 'ready', message: '' })
       } catch (error) {
         if (!active) return
@@ -241,11 +256,42 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
     return () => { active = false }
   }, [profile.id, profile.updatedAt])
 
+  useEffect(() => {
+    if (!isEditorOpen) return undefined
+    const scrollY = window.scrollY
+    const previousHtmlOverflow = document.documentElement.style.overflow
+    const previousBodyOverflow = document.body.style.overflow
+    const previousBodyPosition = document.body.style.position
+    const previousBodyTop = document.body.style.top
+    const previousBodyLeft = document.body.style.left
+    const previousBodyRight = document.body.style.right
+    const previousBodyWidth = document.body.style.width
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.left = '0'
+    document.body.style.right = '0'
+    document.body.style.width = '100%'
+    return () => {
+      document.body.style.overflow = previousBodyOverflow
+      document.documentElement.style.overflow = previousHtmlOverflow
+      document.body.style.position = previousBodyPosition
+      document.body.style.top = previousBodyTop
+      document.body.style.left = previousBodyLeft
+      document.body.style.right = previousBodyRight
+      document.body.style.width = previousBodyWidth
+      window.scrollTo(0, scrollY)
+    }
+  }, [isEditorOpen])
+
   const primaryPackage = draft.packages[0] || makeEmptyPackage('basic')
   const checklist = useMemo(() => getServiceChecklist(draft, primaryPackage), [draft, primaryPackage])
+  const requiredChecks = useMemo(() => getServiceRequiredChecks(draft, primaryPackage), [draft, primaryPackage])
+  const missingRequired = requiredChecks.filter(item => !item.done)
   const doneCount = checklist.filter(item => item.done).length
   const completionPercent = Math.round((doneCount / checklist.length) * 100)
-  const canSubmit = Boolean(draft.title.trim()) && Number(primaryPackage.priceAmount) > 0
+  const canSubmit = missingRequired.length === 0
   const publishedCount = items.filter(item => item.isPublished && item.moderationStatus === 'approved').length
   const pendingCount = items.filter(item => item.moderationStatus === 'pending').length
 
@@ -312,9 +358,11 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
   }
 
   function startNewService() {
-    setDraft(makePartnerServiceDraft(profile))
+    setDraft(makeNeutralServiceDraft(profile))
     setActiveSection('info')
     setShowPreview(true)
+    setIsEditorOpen(true)
+    setAttemptedSubmit(false)
     setState(current => ({ ...current, message: current.status === 'error' ? current.message : '' }))
   }
 
@@ -345,7 +393,9 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
 
   async function handleSave(publish = false) {
     if (publish && !canSubmit) {
-      setState({ status: 'error', message: 'Попълни заглавие и стартова цена, преди да изпратиш услугата за одобрение.' })
+      setAttemptedSubmit(true)
+      setActiveSection(missingRequired[0]?.step || 'info')
+      setState({ status: 'error', message: missingRequired[0]?.message || 'Попълни липсващата информация, за да изпратиш услугата.' })
       return
     }
 
@@ -354,6 +404,7 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
       const saved = await savePartnerService(profile, draft, { submit: publish })
       setItems(current => [saved, ...current.filter(item => item.id !== saved.id)])
       setDraft(makePartnerServiceDraft(profile, saved))
+      setIsEditorOpen(false)
       setState({ status: 'saved', message: publish ? 'Услугата е изпратена за одобрение. Ще стане публична след преглед от Totsan.' : 'Черновата е запазена.' })
       void onProfileSummaryRefresh?.()
     } catch (error) {
@@ -369,6 +420,7 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
       const next = items.filter(item => item.id !== draft.id)
       setItems(next)
       setDraft(makePartnerServiceDraft(profile, next[0] || null))
+      setIsEditorOpen(false)
       setState({ status: 'saved', message: 'Услугата е изтрита.' })
       void onProfileSummaryRefresh?.()
     } catch (error) {
@@ -393,6 +445,60 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
     setDraft(makePartnerServiceDraft(profile, selected))
     setActiveSection('info')
     setShowPreview(true)
+    setIsEditorOpen(true)
+    setAttemptedSubmit(false)
+  }
+
+  function draftHasContent() {
+    const emptyDraft = makeNeutralServiceDraft(profile)
+    const emptyPackage = emptyDraft.packages[0] || makeEmptyPackage('basic')
+    const hasPackageContent = Boolean(
+      (primaryPackage.title?.trim() && primaryPackage.title !== emptyPackage.title)
+      || primaryPackage.description?.trim()
+      || Number(primaryPackage.priceAmount) > 0
+      || (primaryPackage.features || []).some(feature => feature?.trim())
+    )
+    return Boolean(
+      draft.id
+      || draft.title.trim()
+      || draft.subtitle.trim()
+      || draft.tagsText.trim()
+      || draft.descriptionMd.trim()
+      || (draft.deliveryAreasText.trim() && draft.deliveryAreasText !== emptyDraft.deliveryAreasText)
+      || draft.coverUrl
+      || draft.media?.length
+      || draft.faq.some(item => item.question.trim() || item.answer.trim())
+      || hasPackageContent
+    )
+  }
+
+  async function closeEditorSafely() {
+    if (state.status === 'saving') return
+    if (draftHasContent()) {
+      await handleSave(false)
+      return
+    }
+    setIsEditorOpen(false)
+  }
+
+  function handleEditorBackdropMouseDown(event) {
+    if (event.target === event.currentTarget) {
+      void closeEditorSafely()
+    }
+  }
+
+  function handleClearDraft() {
+    if (!window.confirm('Сигурни ли сте, че искате да изчистите тази услуга?')) return
+    setDraft(makeNeutralServiceDraft(profile))
+    setActiveSection('info')
+    setShowPreview(true)
+    setAttemptedSubmit(false)
+  }
+
+  async function handleDeleteWithConfirm() {
+    if (!draft.id) return
+    if (!window.confirm('Сигурни ли сте, че искате да изтриете тази услуга?')) return
+    await handleDelete()
   }
 
   const sectionTitle = draft.id ? draft.title || 'Редакция на услуга' : 'Нова услуга'
@@ -404,14 +510,12 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="max-w-3xl">
             <div className="eyebrow">Моите услуги</div>
-            <h2 className="mt-2 font-display text-3xl text-ink">{sectionTitle}</h2>
+            <h2 className="mt-2 font-display text-4xl leading-none text-ink md:text-5xl">Моите услуги</h2>
             <p className="mt-2 text-sm leading-6 text-muted">
-              Направи оферта, която клиентът разбира за 30 секунди: какво включва, колко започва да струва, къде работиш и какво трябва да очаква.
+              Подреди офертите си като ясни продуктови карти: какво включват, от каква цена започват, къде работиш и дали са готови за публикуване.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {draft.isPublished && <Link to={`/uslugi/${draft.slug}`} className="btn btn-ghost"><Eye size={18} /> Виж публично</Link>}
-            {draft.id && <button type="button" onClick={handleDelete} className="btn btn-ghost"><Trash2 size={18} /> Изтрий</button>}
             <button type="button" onClick={startNewService} className="btn btn-primary"><Plus size={18} /> Нова услуга</button>
           </div>
         </div>
@@ -420,7 +524,7 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
           <StatTile label="Всички услуги" value={items.length} />
           <StatTile label="Публични" value={publishedCount} tone="green" />
           <StatTile label="За преглед" value={pendingCount} tone="blue" />
-          <StatTile label="Готовност" value={`${completionPercent}%`} tone={completionPercent >= 70 ? 'green' : 'blue'} />
+          <StatTile label="Чернови" value={items.filter(item => item.moderationStatus === 'draft').length} />
         </div>
 
         {items.length > 0 ? (
@@ -435,83 +539,130 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
             ))}
           </div>
         ) : (
-          <EmptyServicesPanel onStarter={applyStarter} />
+          <div className="mt-6 rounded-[1.75rem] border border-dashed border-line bg-soft/70 p-6 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-paper text-accentDeep shadow-sm">
+              <BriefcaseBusiness size={24} />
+            </div>
+            <h3 className="mt-4 font-display text-3xl leading-none text-ink">Още няма услуги</h3>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted">Добави първата оферта, за да я покажеш като карта в профила и каталога след одобрение.</p>
+            <button type="button" onClick={startNewService} className="btn btn-primary mt-5"><Plus size={18} /> Нова услуга</button>
+          </div>
         )}
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="rounded-3xl border border-line bg-paper p-5 md:p-7">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-medium text-ink">
-                <ActiveIcon size={18} className="text-accentDeep" />
-                Редакция
+      {isEditorOpen && (
+        <div
+          className="fixed inset-0 z-[100] h-[100dvh] w-screen overflow-hidden bg-ink/65 p-0 backdrop-blur-sm"
+          onMouseDown={handleEditorBackdropMouseDown}
+        >
+          <div
+            className="mx-auto flex h-full w-full items-stretch px-1 pb-[2rem] pt-[4.5rem]"
+            onMouseDown={handleEditorBackdropMouseDown}
+          >
+          <div className="mx-auto flex h-full w-[90vw] max-w-[1700px] items-stretch">
+            <div className="relative flex h-full w-full flex-col overflow-hidden rounded-[2rem] border border-line bg-paper shadow-2xl">
+              <div className="shrink-0 border-b border-line bg-paper/95 px-4 py-3 backdrop-blur sm:px-6">
+                <div className="flex items-center justify-between gap-4">
+                <div>
+                  <div className="eyebrow">Услуга</div>
+                  <h3 className="mt-1 font-display text-3xl leading-none text-ink">{sectionTitle}</h3>
+                </div>
+                <button type="button" onClick={() => void closeEditorSafely()} className="rounded-full p-2 text-muted transition hover:bg-soft hover:text-ink" aria-label="Затвори">
+                  <X size={22} />
+                </button>
+                </div>
               </div>
-              <h3 className="mt-2 font-display text-3xl text-ink">{GUIDE_STEPS.find(step => step.id === activeSection)?.label}</h3>
+
+              <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_21rem]">
+                <div className="min-w-0 p-4 sm:p-5 lg:p-6">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 text-sm font-medium text-ink">
+                        <ActiveIcon size={18} className="text-accentDeep" />
+                        Редакция
+                      </div>
+                      <h3 className="mt-2 font-display text-3xl text-ink">{GUIDE_STEPS.find(step => step.id === activeSection)?.label}</h3>
+                    </div>
+                    <button type="button" onClick={() => setShowPreview(value => !value)} className="btn btn-ghost">
+                      <Eye size={18} /> {showPreview ? 'Скрий преглед' : 'Покажи преглед'}
+                    </button>
+                  </div>
+
+                  <div className="mt-5 grid gap-2 md:grid-cols-4">
+                    {GUIDE_STEPS.map((step, index) => (
+                      <GuideStepButton
+                        key={step.id}
+                        step={step}
+                        index={index}
+                        active={activeSection === step.id}
+                        done={stepDone(step.id, checklist)}
+                        onClick={() => setActiveSection(step.id)}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="mt-5">
+                    {activeSection === 'info' && <InfoSection draft={draft} onChange={update} onStarter={applyStarter} />}
+                    {activeSection === 'price' && <PriceSection item={primaryPackage} onChange={updatePackage} onFeatureChange={updateFeature} onAddFeature={addFeature} onRemoveFeature={removeFeature} />}
+                    {activeSection === 'media' && <MediaSection draft={draft} onChange={update} onUpload={uploadImage} />}
+                    {activeSection === 'faq' && <FaqSection draft={draft} onFaqChange={updateFaq} onAddFaq={addFaq} onRemoveFaq={removeFaq} />}
+                  </div>
+
+                  {showPreview && (
+                    <div className="mt-7 flex min-h-[36rem] flex-col justify-center rounded-3xl border border-line bg-soft/60 p-5">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="eyebrow">Преглед</div>
+                          <h3 className="mt-2 font-display text-3xl text-ink">Как ще изглежда за клиента</h3>
+                        </div>
+                        {draft.slug && draft.isPublished && (
+                          <Link to={`/uslugi/${draft.slug}`} className="btn btn-ghost">
+                            Отвори страницата <ArrowUpRight size={18} />
+                          </Link>
+                        )}
+                      </div>
+                      <ServicePreview service={previewService} profile={profile} />
+                    </div>
+                  )}
+                </div>
+
+                <aside className="space-y-4 border-t border-line bg-soft/50 p-4 sm:p-5 lg:border-l lg:border-t-0">
+                  <ServiceValidationPanel checks={requiredChecks} attempted={attemptedSubmit} onSelectStep={setActiveSection} />
+                  <ReadinessPanel checklist={checklist} percent={completionPercent} />
+                  <VisibilityPanel draft={draft} state={state} />
+                  <HelpPanel section={activeSection} profile={profile} />
+                </aside>
+              </div>
+
+              <div className="shrink-0 border-t border-line bg-paper/95 px-4 py-3 shadow-[0_-18px_40px_rgba(7,31,55,0.08)] backdrop-blur sm:px-6">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                  <div className={`text-sm ${state.status === 'error' ? 'text-red-700' : 'text-muted'}`}>
+                    {state.message || (canSubmit ? 'Готово за запазване и изпращане.' : 'Можеш да запазиш чернова. За изпращане попълни задължителните полета.')}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={handleClearDraft} disabled={state.status === 'saving'} className="btn btn-ghost justify-center">
+                      <X size={18} /> Изчисти
+                    </button>
+                    {draft.isPublished && <Link to={`/uslugi/${draft.slug}`} className="btn btn-ghost justify-center"><Eye size={18} /> Виж публично</Link>}
+                    <button type="button" onClick={() => handleSave(false)} disabled={state.status === 'saving'} className="btn btn-primary justify-center">
+                      <Save size={18} /> Запази
+                    </button>
+                    <button type="button" onClick={() => handleSave(true)} disabled={state.status === 'saving'} className="btn btn-ghost justify-center">
+                      <ClipboardList size={18} /> Изпрати
+                    </button>
+                    {draft.id && (
+                      <button type="button" onClick={handleDeleteWithConfirm} disabled={state.status === 'saving'} className="btn btn-ghost justify-center">
+                        <Trash2 size={18} /> Изтрий
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-            <button type="button" onClick={() => setShowPreview(value => !value)} className="btn btn-ghost">
-              <Eye size={18} /> {showPreview ? 'Скрий преглед' : 'Покажи преглед'}
-            </button>
           </div>
-
-          <div className="mt-5 grid gap-2 md:grid-cols-4">
-            {GUIDE_STEPS.map((step, index) => (
-              <GuideStepButton
-                key={step.id}
-                step={step}
-                index={index}
-                active={activeSection === step.id}
-                done={stepDone(step.id, checklist)}
-                onClick={() => setActiveSection(step.id)}
-              />
-            ))}
-          </div>
-
-          <div className="mt-7">
-            {activeSection === 'info' && <InfoSection draft={draft} onChange={update} onStarter={applyStarter} />}
-            {activeSection === 'price' && <PriceSection item={primaryPackage} onChange={updatePackage} onFeatureChange={updateFeature} onAddFeature={addFeature} onRemoveFeature={removeFeature} />}
-            {activeSection === 'media' && <MediaSection draft={draft} onChange={update} onUpload={uploadImage} />}
-            {activeSection === 'faq' && <FaqSection draft={draft} onFaqChange={updateFaq} onAddFaq={addFaq} onRemoveFaq={removeFaq} />}
           </div>
         </div>
-
-        <aside className="space-y-5 xl:sticky xl:top-24 xl:self-start">
-          <VisibilityPanel draft={draft} state={state} />
-          <ReadinessPanel checklist={checklist} percent={completionPercent} />
-          <HelpPanel section={activeSection} profile={profile} />
-        </aside>
-      </section>
-
-      {showPreview && (
-        <section className="rounded-3xl border border-line bg-paper p-5 md:p-7">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="eyebrow">Преглед</div>
-              <h3 className="mt-2 font-display text-3xl text-ink">Как ще изглежда за клиента</h3>
-            </div>
-            {draft.slug && draft.isPublished && (
-              <Link to={`/uslugi/${draft.slug}`} className="btn btn-ghost">
-                Отвори страницата <ArrowUpRight size={18} />
-              </Link>
-            )}
-          </div>
-          <ServicePreview service={previewService} profile={profile} />
-        </section>
       )}
-
-      <section className="rounded-3xl border border-line bg-paper p-5 md:p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className={`text-sm ${state.status === 'error' ? 'text-red-700' : 'text-muted'}`}>
-            {state.message || (canSubmit ? 'Можеш да запазиш чернова или да изпратиш услугата за одобрение.' : 'Попълни поне заглавие и стартова цена, за да я изпратиш за одобрение.')}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => handleSave(false)} disabled={state.status === 'saving'} className="btn btn-ghost"><Save size={18} /> Запази чернова</button>
-            <button type="button" onClick={() => handleSave(true)} disabled={state.status === 'saving' || !canSubmit} className="btn btn-primary">
-              {draft.id ? 'Изпрати промените' : 'Изпрати за одобрение'}
-            </button>
-          </div>
-        </div>
-      </section>
     </div>
   )
 }
@@ -619,13 +770,13 @@ function VisibilityPanel({ draft, state }) {
 
 function ReadinessPanel({ checklist, percent }) {
   return (
-    <div className="rounded-3xl border border-line bg-paper p-5">
+    <div className="rounded-3xl border border-line bg-paper p-4">
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="text-sm font-medium text-ink">Готовност</div>
           <div className="mt-1 text-sm text-muted">{percent}% попълнено</div>
         </div>
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-soft font-display text-2xl text-ink">{percent}</div>
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-soft font-display text-xl text-ink">{percent}</div>
       </div>
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-soft">
         <div className="h-full rounded-full bg-accentDeep transition-all" style={{ width: `${percent}%` }} />
@@ -638,6 +789,46 @@ function ReadinessPanel({ checklist, percent }) {
             </span>
             <span className={item.done ? 'text-ink' : 'text-muted'}>{item.label}</span>
           </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ServiceValidationPanel({ checks, attempted, onSelectStep }) {
+  const missing = checks.filter(item => !item.done)
+  const complete = missing.length === 0
+
+  return (
+    <div className={`rounded-3xl border p-4 ${complete ? 'border-emerald-100 bg-emerald-50' : attempted ? 'border-red-100 bg-red-50' : 'border-line bg-paper'}`}>
+      <div className={`text-sm font-semibold ${complete ? 'text-emerald-800' : attempted ? 'text-red-700' : 'text-ink'}`}>
+        {complete ? 'Готово за изпращане' : attempted ? 'Остава още малко' : 'Задължително за изпращане'}
+      </div>
+      <p className={`mt-1 text-sm leading-5 ${complete ? 'text-emerald-800/80' : attempted ? 'text-red-700/80' : 'text-muted'}`}>
+        {complete ? 'Всички задължителни полета са попълнени.' : 'Чернова може да се запази по всяко време. За изпращане попълни тези полета.'}
+      </p>
+      <div className="mt-3 space-y-2">
+        {checks.map(item => (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => onSelectStep(item.step)}
+            className={`flex w-full items-start gap-2 rounded-2xl px-3 py-2 text-left text-sm transition ${
+              item.done
+                ? 'bg-paper/70 text-ink'
+                : attempted
+                  ? 'bg-white/70 text-red-700 hover:bg-white'
+                  : 'bg-soft text-muted hover:bg-paper'
+            }`}
+          >
+            <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${item.done ? 'bg-trustGreen text-paper' : attempted ? 'bg-red-100 text-red-700' : 'bg-paper text-muted'}`}>
+              {item.done ? <Check size={13} /> : <CircleDot size={13} />}
+            </span>
+            <span>
+              <span className="block font-medium">{item.label}</span>
+              {!item.done && attempted && <span className="mt-0.5 block text-xs leading-5">{item.message}</span>}
+            </span>
+          </button>
         ))}
       </div>
     </div>
@@ -691,35 +882,49 @@ function HelpPanel({ section, profile }) {
 function InfoSection({ draft, onChange, onStarter }) {
   return (
     <div className="space-y-5">
-      <div className="rounded-3xl border border-line bg-soft p-4">
-        <div className="flex items-start gap-3">
-          <ClipboardList size={20} className="mt-0.5 shrink-0 text-accentDeep" />
-          <div>
-            <div className="font-medium text-ink">Бърз старт от готов шаблон</div>
-            <p className="mt-1 text-sm leading-6 text-muted">Избери най-близък тип работа, за да получиш готова структура. После промени думите, цената и детайлите според твоята оферта.</p>
-          </div>
+      <details className="group rounded-3xl border border-line bg-soft p-4">
+        <summary className="flex cursor-pointer list-none items-start justify-between gap-3 [&::-webkit-details-marker]:hidden">
+          <span className="flex items-start gap-3">
+            <ClipboardList size={20} className="mt-0.5 shrink-0 text-accentDeep" />
+            <span>
+              <span className="block font-medium text-ink">Бърз старт от готов шаблон</span>
+            </span>
+          </span>
+          <ChevronRight size={18} className="mt-1 shrink-0 text-muted transition group-open:rotate-90" />
+        </summary>
+        <div className="mt-4 border-t border-line pt-4">
+          <p className="text-sm leading-6 text-muted">Избери най-близък тип работа. После промени думите, цената и детайлите според твоята оферта.</p>
+          <StarterTemplateGrid onStarter={onStarter} compact />
         </div>
-        <StarterTemplateGrid onStarter={onStarter} compact />
-      </div>
+      </details>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Заглавие" hint="Кратко и конкретно, например “Монтаж на паркет”, не “Всякакви ремонти”.">
-          <input value={draft.title} onChange={event => onChange('title', event.target.value)} className={INPUT} placeholder="Боядисване на стая" />
-        </Field>
-        <Field label="Кратко подзаглавие" hint="Едно изречение с ползата за клиента.">
-          <input value={draft.subtitle} onChange={event => onChange('subtitle', event.target.value)} className={INPUT} placeholder="Подготовка, чисто изпълнение и финално почистване" />
-        </Field>
-      </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        <Field label="Слой">
-          <TotsanSelect value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} />
-        </Field>
-        <Field label="Тагове" hint="Раздели с запетая. Използват се за търсене.">
-          <input value={draft.tagsText} onChange={event => onChange('tagsText', event.target.value)} className={INPUT} placeholder="боя, шпакловка, освежаване" />
-        </Field>
-        <Field label="Райони" hint="Градове или населени места, в които работиш.">
-          <LocationMultiCombobox label="Обслужвани места" value={draft.deliveryAreasText} onChange={(value) => onChange('deliveryAreasText', value)} />
-        </Field>
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.18fr)_minmax(26rem,0.82fr)]">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+          <Field label="Заглавие" hint="Кратко и конкретно, например “Монтаж на паркет”, не “Всякакви ремонти”.">
+            <input value={draft.title} onChange={event => onChange('title', event.target.value)} className={INPUT} placeholder="Боядисване на стая" />
+          </Field>
+          <Field label="Кратко подзаглавие" hint="Едно изречение с ползата за клиента.">
+            <input value={draft.subtitle} onChange={event => onChange('subtitle', event.target.value)} className={INPUT} placeholder="Подготовка, чисто изпълнение и финално почистване" />
+          </Field>
+          <Field label="Слой">
+            <TotsanSelect value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} placeholder="Избери слой" options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} />
+          </Field>
+          <Field label="Тагове" hint="Раздели с запетая. Използват се за търсене.">
+            <input value={draft.tagsText} onChange={event => onChange('tagsText', event.target.value)} className={INPUT} placeholder="боя, шпакловка, освежаване" />
+          </Field>
+        </div>
+        <div className="min-w-0 rounded-3xl border border-line bg-paper/70 p-4 shadow-[0_14px_35px_rgba(13,35,64,0.04)]">
+          <div className="mb-3 inline-flex items-center gap-2 text-base font-semibold text-ink">
+            Райони
+            <HelperHint text="Градове или населени места, в които работиш." />
+          </div>
+          <LocationMultiCombobox
+            label="Обслужвани места"
+            value={draft.deliveryAreasText}
+            onChange={(value) => onChange('deliveryAreasText', value)}
+            helper=""
+          />
+        </div>
       </div>
       <Field label="Описание" hint="Опиши обхвата, процеса и какво трябва да подготви клиентът.">
         <textarea rows={8} value={draft.descriptionMd} onChange={event => onChange('descriptionMd', event.target.value)} className={INPUT} placeholder="Подходящо за освежаване на стая, коридор или малък офис. Оглеждам основата, пазя пода и мебелите, правя нужната подготовка и оставям помещението чисто след работа." />
@@ -767,7 +972,245 @@ function PriceSection({ item, onChange, onFeatureChange, onAddFeature, onRemoveF
   )
 }
 
+function isVideoMedia(item = {}) {
+  return item.type === 'video' || item.provider === 'youtube' || item.kind === 'video'
+}
+
+function getYoutubeVideoId(url = '') {
+  const value = String(url || '').trim()
+  if (!value) return ''
+
+  try {
+    const parsed = new URL(value)
+    if (parsed.hostname.includes('youtu.be')) return parsed.pathname.replace('/', '').split(/[?&]/)[0]
+    if (parsed.hostname.includes('youtube.com')) {
+      if (parsed.pathname.startsWith('/shorts/')) return parsed.pathname.split('/')[2] || ''
+      if (parsed.pathname.startsWith('/embed/')) return parsed.pathname.split('/')[2] || ''
+      return parsed.searchParams.get('v') || ''
+    }
+  } catch {
+    const match = value.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&/\s]+)/)
+    return match?.[1] || ''
+  }
+
+  return ''
+}
+
+function normalizeVideoUrl(url = '') {
+  const value = String(url || '').trim()
+  if (!value) return ''
+  const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`
+  try {
+    const parsed = new URL(candidate)
+    return ['http:', 'https:'].includes(parsed.protocol) ? parsed.toString() : ''
+  } catch {
+    return ''
+  }
+}
+
+function getYoutubeThumbnail(url = '') {
+  const id = getYoutubeVideoId(url)
+  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : ''
+}
+
+function getMediaPreviewUrl(item = {}) {
+  if (!item) return ''
+  if (isVideoMedia(item)) return item.thumbnail || getYoutubeThumbnail(item.url) || ''
+  return item.url || ''
+}
+
+function getCoverFromMedia(media = []) {
+  const firstVisual = media.find(item => getMediaPreviewUrl(item))
+  return firstVisual ? getMediaPreviewUrl(firstVisual) : ''
+}
+
+function getMediaSortKey(item = {}, index = 0) {
+  return item.path || item.url || item.thumbnail || item.caption || `${item.provider || item.type || 'media'}-${index}`
+}
+
 function MediaSection({ draft, onChange, onUpload }) {
+  const media = Array.isArray(draft.media) ? draft.media : []
+  const [videoUrl, setVideoUrl] = useState('')
+  const [videoError, setVideoError] = useState('')
+  const [dragIndex, setDragIndex] = useState(null)
+  const [dragOverIndex, setDragOverIndex] = useState(null)
+  const mediaListRef = useRef(null)
+  const dragIndexRef = useRef(null)
+  const dragOverIndexRef = useRef(null)
+  const dragPointerIdRef = useRef(null)
+  const isDraggingRef = useRef(false)
+
+  useEffect(() => () => {
+    removePointerDragListeners()
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+  }, [])
+
+  function captureMediaRects() {
+    const list = mediaListRef.current
+    if (!list) return null
+    return new Map(
+      Array.from(list.querySelectorAll('[data-media-key]')).map((node) => [
+        node.dataset.mediaKey,
+        node.getBoundingClientRect(),
+      ]),
+    )
+  }
+
+  function animateMediaList(snapshot) {
+    if (!snapshot) return
+    window.requestAnimationFrame(() => {
+      const list = mediaListRef.current
+      if (!list) return
+      Array.from(list.querySelectorAll('[data-media-key]')).forEach((node) => {
+        const before = snapshot.get(node.dataset.mediaKey)
+        if (!before) return
+        const after = node.getBoundingClientRect()
+        const deltaX = before.left - after.left
+        const deltaY = before.top - after.top
+        if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) return
+
+        node.style.transition = 'none'
+        node.style.transform = `translate(${deltaX}px, ${deltaY}px)`
+        node.style.zIndex = '2'
+
+        window.requestAnimationFrame(() => {
+          node.style.transition = 'transform 240ms cubic-bezier(0.22, 1, 0.36, 1)'
+          node.style.transform = ''
+          window.setTimeout(() => {
+            node.style.transition = ''
+            node.style.zIndex = ''
+          }, 260)
+        })
+      })
+    })
+  }
+
+  function updateMedia(nextMedia, options = {}) {
+    const snapshot = options.animate ? captureMediaRects() : null
+    onChange('media', nextMedia)
+    onChange('coverUrl', getCoverFromMedia(nextMedia))
+    animateMediaList(snapshot)
+  }
+
+  function handleReorder(fromIndex, toIndex) {
+    const from = Number(fromIndex)
+    const to = Number(toIndex)
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from === to || from < 0 || to < 0) return
+    const nextMedia = [...media]
+    const [moved] = nextMedia.splice(from, 1)
+    if (!moved) return
+    const insertionIndex = from < to ? to - 1 : to
+    nextMedia.splice(insertionIndex, 0, moved)
+    updateMedia(nextMedia, { animate: true })
+  }
+
+  function updateDropIndex(index) {
+    if (dragIndexRef.current === null) return
+    dragOverIndexRef.current = index
+    setDragOverIndex(index)
+  }
+
+  function getDropIndex(clientY) {
+    const rows = Array.from(mediaListRef.current?.querySelectorAll('[data-media-key]') || [])
+    if (!rows.length) return 0
+    const targetIndex = rows.findIndex((node) => {
+      const rect = node.getBoundingClientRect()
+      return clientY < rect.top + rect.height / 2
+    })
+    return targetIndex === -1 ? rows.length : targetIndex
+  }
+
+  function handlePointerDragStart(event, index) {
+    if (event.button !== undefined && event.button !== 0) return
+    event.preventDefault()
+    dragIndexRef.current = index
+    dragOverIndexRef.current = index
+    dragPointerIdRef.current = event.pointerId
+    isDraggingRef.current = true
+    setDragIndex(index)
+    setDragOverIndex(index)
+    document.body.style.cursor = 'grabbing'
+    document.body.style.userSelect = 'none'
+    window.addEventListener('pointermove', handlePointerDragMove)
+    window.addEventListener('pointerup', handlePointerDragEnd)
+    window.addEventListener('pointercancel', handlePointerDragEnd)
+  }
+
+  function handlePointerDragMove(event) {
+    if (!isDraggingRef.current) return
+    if (dragPointerIdRef.current !== null && event.pointerId !== dragPointerIdRef.current) return
+    event.preventDefault()
+    updateDropIndex(getDropIndex(event.clientY))
+  }
+
+  function handlePointerDragEnd(event) {
+    if (!isDraggingRef.current) return
+    if (dragPointerIdRef.current !== null && event.pointerId !== dragPointerIdRef.current) return
+    event.preventDefault()
+    commitDrop(dragOverIndexRef.current ?? dragIndexRef.current)
+  }
+
+  function removePointerDragListeners() {
+    window.removeEventListener('pointermove', handlePointerDragMove)
+    window.removeEventListener('pointerup', handlePointerDragEnd)
+    window.removeEventListener('pointercancel', handlePointerDragEnd)
+  }
+
+  function finishDrag() {
+    removePointerDragListeners()
+    dragIndexRef.current = null
+    dragOverIndexRef.current = null
+    dragPointerIdRef.current = null
+    isDraggingRef.current = false
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    setDragIndex(null)
+    setDragOverIndex(null)
+  }
+
+  function commitDrop(index) {
+    const fromIndex = dragIndexRef.current
+    if (fromIndex !== null) handleReorder(fromIndex, index)
+    finishDrag()
+  }
+
+  function isDropSlotActive(index) {
+    if (dragIndex === null || dragOverIndex !== index) return false
+    return index !== dragIndex && index !== dragIndex + 1
+  }
+
+  async function handleUploadFiles(files) {
+    const nextFiles = Array.from(files || [])
+    for (const file of nextFiles) {
+      await onUpload(file)
+    }
+  }
+
+  function handleRemoveMedia(index) {
+    updateMedia(media.filter((_, itemIndex) => itemIndex !== index), { animate: true })
+  }
+
+  function handleAddVideo() {
+    const cleanUrl = normalizeVideoUrl(videoUrl)
+    if (!cleanUrl) {
+      setVideoError('Добави валиден YouTube или видео линк.')
+      return
+    }
+    const youtubeId = getYoutubeVideoId(cleanUrl)
+    updateMedia([
+      ...media,
+      {
+        type: 'video',
+        provider: youtubeId ? 'youtube' : 'link',
+        url: cleanUrl,
+        thumbnail: youtubeId ? getYoutubeThumbnail(cleanUrl) : '',
+      },
+    ])
+    setVideoError('')
+    setVideoUrl('')
+  }
+
   return (
     <div className="space-y-5">
       <div className="rounded-3xl border border-line bg-soft p-4">
@@ -775,30 +1218,146 @@ function MediaSection({ draft, onChange, onUpload }) {
           <Images size={20} className="mt-0.5 shrink-0 text-accentDeep" />
           <div>
             <div className="font-medium text-ink">Снимката продава доверието</div>
-            <p className="mt-1 text-sm leading-6 text-muted">Най-добре работят реални снимки от обект, детайли на изпълнение или завършен резултат.</p>
+            <p className="mt-1 text-sm leading-6 text-muted">Добави снимки и YouTube видео към услугата. Първата визуална позиция става основна снимка.</p>
           </div>
         </div>
       </div>
-      <Field label="Cover URL" hint="Може да го оставиш празно, ако качиш снимка. Първата качена става cover.">
-        <input value={draft.coverUrl} onChange={event => onChange('coverUrl', event.target.value)} className={INPUT} placeholder="https://..." />
-      </Field>
       <label className="btn btn-primary cursor-pointer justify-center">
-        <ImagePlus size={18} /> Качи снимка към услугата
-        <input type="file" accept="image/*" className="sr-only" onChange={async (event) => { await onUpload(event.target.files?.[0]); event.target.value = '' }} />
+        <ImagePlus size={18} /> Качи снимки към услугата
+        <input type="file" accept="image/*" multiple className="sr-only" onChange={async (event) => { await handleUploadFiles(event.target.files); event.target.value = '' }} />
       </label>
-      {draft.media.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {draft.media.map((media, index) => (
-            <div key={`${media.url}-${index}`} className="overflow-hidden rounded-2xl border border-line bg-soft">
-              <div className="aspect-square"><img src={media.url} alt={media.caption || draft.title || 'Услуга'} className="img-cover" /></div>
+
+      <div className="rounded-3xl border border-line bg-soft/70 p-4">
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-paper text-accentDeep shadow-sm">
+            <Video size={18} />
+          </span>
+          <div>
+            <div className="text-sm font-semibold text-ink">Добави видео с линк</div>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <input
+            type="text"
+            inputMode="url"
+            value={videoUrl}
+            onChange={(event) => {
+              setVideoUrl(event.target.value)
+              if (videoError) setVideoError('')
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                handleAddVideo()
+              }
+            }}
+            className="min-w-0 flex-1 rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink"
+            placeholder="youtube.com/watch?v=..."
+          />
+          <button type="button" onClick={handleAddVideo} disabled={!videoUrl.trim()} className="btn btn-ghost justify-center sm:w-auto">
+            <Link2 size={18} /> Добави
+          </button>
+        </div>
+        {videoError && <div className="mt-2 text-sm text-red-700">{videoError}</div>}
+      </div>
+
+      {media.length > 0 ? (
+        <div className="rounded-3xl border border-line bg-paper/80 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-ink">Медии към услугата</div>
+              <p className="mt-1 text-sm leading-6 text-muted">Първата позиция е основната снимка/визия. Хвани ред и го премести нагоре или надолу.</p>
             </div>
-          ))}
+            <span className="rounded-full bg-soft px-3 py-1 text-xs font-semibold text-muted">{media.length}</span>
+          </div>
+          <div ref={mediaListRef} className="mt-4 space-y-2">
+            {media.map((item, index) => (
+              <div key={getMediaSortKey(item, index)} className="space-y-2">
+                <DropSlot active={isDropSlotActive(index)} />
+                <ServiceMediaManagerItem
+                  mediaKey={getMediaSortKey(item, index)}
+                  item={item}
+                  index={index}
+                  isDragging={dragIndex === index}
+                  onPointerDown={(event) => handlePointerDragStart(event, index)}
+                  onRemove={() => handleRemoveMedia(index)}
+                />
+              </div>
+            ))}
+            <DropSlot active={isDropSlotActive(media.length)} />
+          </div>
         </div>
       ) : (
         <div className="rounded-2xl border border-dashed border-line bg-soft p-5 text-sm text-muted">
-          Още няма качени снимки към тази услуга.
+          Още няма качени снимки или видео към тази услуга.
         </div>
       )}
+    </div>
+  )
+}
+
+function ServiceMediaManagerItem({ item, index, mediaKey, isDragging, onPointerDown, onRemove }) {
+  const isVideo = isVideoMedia(item)
+  const preview = getMediaPreviewUrl(item)
+  const label = isVideo ? (item.provider === 'youtube' ? 'YouTube видео' : 'Видео линк') : 'Снимка'
+  const source = item.caption || item.url || item.thumbnail || 'Медия към услугата'
+  const stateClass = isDragging
+    ? 'relative z-10 scale-[1.035] -translate-y-0.5 rotate-[0.25deg] border-accentDeep bg-paper shadow-[0_22px_60px_rgba(13,35,64,0.18)] ring-4 ring-accent/20'
+    : 'border-line bg-soft/65 hover:-translate-y-0.5 hover:border-ink/15 hover:bg-paper hover:shadow-[0_12px_30px_rgba(13,35,64,0.07)]'
+
+  return (
+    <div
+      data-media-key={mediaKey}
+      className={`group flex transform-gpu select-none items-center gap-3 rounded-2xl border p-2 will-change-transform transition-[transform,box-shadow,border-color,background-color,opacity] duration-200 ease-out ${stateClass}`}
+    >
+      <span
+        role="button"
+        tabIndex={0}
+        onPointerDown={onPointerDown}
+        className={`touch-none flex h-12 w-9 shrink-0 cursor-grab select-none items-center justify-center rounded-2xl transition active:cursor-grabbing ${isDragging ? 'cursor-grabbing bg-ink text-paper shadow-sm' : 'text-muted group-hover:bg-paper group-hover:text-ink'}`}
+        aria-label="Премести медия"
+      >
+        <GripVertical size={19} />
+      </span>
+      <div className={`relative h-14 w-16 shrink-0 overflow-hidden rounded-xl border bg-paper transition ${isDragging ? 'border-accentDeep shadow-sm' : 'border-line'}`}>
+        {preview ? (
+          <img src={preview} alt="" className="pointer-events-none img-cover select-none" draggable={false} />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-muted">
+            <Video size={18} />
+          </div>
+        )}
+        {isVideo && (
+          <span className="absolute inset-0 flex items-center justify-center bg-ink/28 text-paper">
+            <PlayCircle size={17} />
+          </span>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${index === 0 ? 'bg-ink text-paper' : 'bg-paper text-muted'}`}>
+            {index === 0 ? 'Основна' : `#${index + 1}`}
+          </span>
+          <span className="text-sm font-semibold text-ink">{label}</span>
+        </div>
+        <div className="mt-1 truncate text-xs text-muted">{source}</div>
+      </div>
+      <button type="button" onClick={onRemove} className="rounded-full p-2 text-muted transition hover:bg-red-50 hover:text-red-700" aria-label="Премахни медия">
+        <Trash2 size={16} />
+      </button>
+    </div>
+  )
+}
+
+function DropSlot({ active }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={`overflow-hidden rounded-2xl transition-all duration-200 ease-out ${active ? 'h-6 opacity-100' : 'h-0 opacity-0'}`}
+    >
+      <div className="flex h-full items-center rounded-2xl border border-dashed border-accent/45 bg-accent/10 px-3">
+        <div className="h-1.5 w-full rounded-full bg-accent/35" />
+      </div>
     </div>
   )
 }
@@ -832,7 +1391,7 @@ function ServicePreview({ service, profile }) {
   const location = previewProfile.city || areas[0] || 'По запитване'
 
   return (
-    <article className="card img-zoom-host mt-5 flex h-full min-h-[28rem] max-w-md flex-col overflow-hidden bg-paper p-0">
+    <article className="card img-zoom-host mx-auto mt-5 flex h-full min-h-[28rem] max-w-md flex-col overflow-hidden bg-paper p-0">
       <div className="media-frame aspect-[16/10] bg-soft">
         <FallbackImage sources={coverCandidates} alt={service.title || 'Услуга'} loading="lazy" decoding="async" className="img-cover img-zoom" />
         <span className="absolute right-3 top-3 rounded-full bg-ink/90 px-2.5 py-1 text-xs text-paper backdrop-blur">
@@ -871,12 +1430,12 @@ function GuideStepButton({ step, index, active, done, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-2xl border p-3 text-left transition ${active ? 'border-ink bg-ink text-paper' : 'border-line bg-soft text-ink hover:border-ink/30'}`}
+      className={`rounded-2xl border px-3 py-3 text-left transition ${active ? 'border-ink bg-ink text-paper' : 'border-line bg-soft text-ink hover:border-ink/30'}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className={`flex h-8 w-8 items-center justify-center rounded-full ${active ? 'bg-paper/12' : 'bg-paper'}`}>
-            <Icon size={17} />
+          <span className={`flex h-7 w-7 items-center justify-center rounded-full ${active ? 'bg-paper/12' : 'bg-paper'}`}>
+            <Icon size={15} />
           </span>
           <div>
             <div className={`text-[11px] uppercase tracking-[0.14em] ${active ? 'text-paper/60' : 'text-muted'}`}>Стъпка {index + 1}</div>
@@ -885,7 +1444,7 @@ function GuideStepButton({ step, index, active, done, onClick }) {
         </div>
         {done && <CheckCircle2 size={18} className={active ? 'text-paper' : 'text-trustGreen'} />}
       </div>
-      <p className={`mt-2 line-clamp-2 text-xs leading-5 ${active ? 'text-paper/65' : 'text-muted'}`}>{step.helper}</p>
+      <p className={`mt-1.5 line-clamp-2 text-xs leading-5 ${active ? 'text-paper/65' : 'text-muted'}`}>{step.helper}</p>
     </button>
   )
 }
@@ -918,7 +1477,7 @@ function HelperHint({ text }) {
       <span tabIndex={0} className="flex h-5 w-5 cursor-help items-center justify-center rounded-full border border-line bg-soft text-[11px] font-semibold text-muted outline-none transition hover:border-ink/30 hover:text-ink focus:border-ink/30 focus:text-ink">
         ?
       </span>
-      <span className="pointer-events-none absolute left-1/2 top-7 z-20 hidden w-72 -translate-x-1/2 rounded-2xl border border-line bg-ink px-3 py-2 text-xs font-normal leading-5 text-paper shadow-xl group-hover/help:block group-focus-within/help:block">
+      <span className="pointer-events-none absolute left-0 top-7 z-20 hidden w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-line bg-ink px-3 py-2 text-xs font-normal leading-5 text-paper shadow-xl group-hover/help:block group-focus-within/help:block">
         {text}
       </span>
     </span>
@@ -927,20 +1486,47 @@ function HelperHint({ text }) {
 
 function getServiceChecklist(draft, primaryPackage) {
   return [
+    { key: 'layer', label: 'Има избран слой', done: Boolean(draft.layerSlug) },
     { key: 'title', label: 'Има ясно заглавие', done: Boolean(draft.title.trim()) },
     { key: 'subtitle', label: 'Има кратко подзаглавие', done: Boolean(draft.subtitle.trim()) },
     { key: 'price', label: 'Има стартова цена', done: Number(primaryPackage.priceAmount) > 0 },
     { key: 'features', label: 'Има включени дейности', done: (primaryPackage.features || []).filter(Boolean).length >= 3 },
     { key: 'areas', label: 'Има райони на работа', done: Boolean(draft.deliveryAreasText.trim()) },
     { key: 'description', label: 'Има описание на процеса', done: draft.descriptionMd.trim().length >= 80 },
-    { key: 'media', label: 'Има поне една снимка', done: Boolean(draft.coverUrl || draft.media?.length) },
+    { key: 'media', label: 'Има поне една снимка', done: Boolean(draft.media?.length) },
     { key: 'faq', label: 'Има полезен въпрос и отговор', done: draft.faq.some(item => item.question.trim() && item.answer.trim()) },
+  ]
+}
+
+function getServiceRequiredChecks(draft, primaryPackage) {
+  return [
+    {
+      key: 'layer',
+      step: 'info',
+      label: 'Избран слой',
+      message: 'Избери слой, за да знаем в коя категория да показваме услугата.',
+      done: Boolean(draft.layerSlug),
+    },
+    {
+      key: 'title',
+      step: 'info',
+      label: 'Заглавие на услугата',
+      message: 'Добави кратко и ясно заглавие.',
+      done: Boolean(draft.title.trim()),
+    },
+    {
+      key: 'price',
+      step: 'price',
+      label: 'Стартова цена',
+      message: 'Добави стартова цена в евро.',
+      done: Number(primaryPackage.priceAmount) > 0,
+    },
   ]
 }
 
 function stepDone(stepId, checklist) {
   const keysByStep = {
-    info: ['title', 'subtitle', 'areas', 'description'],
+    info: ['layer', 'title', 'subtitle', 'areas', 'description'],
     price: ['price', 'features'],
     media: ['media'],
     faq: ['faq'],

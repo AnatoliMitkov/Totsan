@@ -184,8 +184,13 @@ function ApplicationDetailsModal({ row, onClose }) {
   ]
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-ink/35 px-4 py-6 backdrop-blur-sm">
-      <div className="mx-auto max-w-5xl rounded-[2rem] border border-white/70 bg-paper p-5 shadow-[0_40px_120px_-60px_rgba(13,35,64,0.75)] md:p-7">
+    <div
+      className="fixed inset-0 z-[100] overflow-y-auto bg-ink/60 px-4 py-6 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+    >
+      <div className="mx-auto max-h-[calc(100dvh-4rem)] w-[90vw] max-w-[1180px] overflow-y-auto rounded-[2rem] border border-white/70 bg-paper p-5 shadow-[0_40px_120px_-60px_rgba(13,35,64,0.75)] md:p-7">
         <div className="flex flex-col gap-4 border-b border-line pb-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 flex-1 items-start gap-4">
             <ApplicantAvatar photoUrl={selfPhotoUrl} name={row.name || basic.name || row.company} />

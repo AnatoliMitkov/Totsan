@@ -14,6 +14,7 @@ import {
 
 const INPUT_CLASS = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const DEFAULT_REGION = BULGARIA_REGIONS.includes('София град') ? 'София град' : BULGARIA_REGIONS[0]
+const SPECIAL_LOCATION_OPTIONS = ['За цялата страна', 'Извън България']
 
 function optionMatches(option, needle) {
   const query = String(needle || '').trim().toLocaleLowerCase('bg-BG')
@@ -109,8 +110,8 @@ export function LocationCombobox({
   }
 
   return (
-    <div ref={rootRef} className="relative">
-      <div className="grid gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
+    <div ref={rootRef} className="relative min-w-0">
+      <div className="grid min-w-0 gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
         <TotsanSelect
           label="Област"
           value={region}
@@ -122,7 +123,7 @@ export function LocationCombobox({
           }}
           options={BULGARIA_REGIONS.map((item) => ({ value: item, label: item }))}
         />
-        <div>
+        <div className="min-w-0">
           <label htmlFor={id} className="block text-sm font-medium text-ink">{label}</label>
           <div className="relative">
             <Search size={16} className="pointer-events-none absolute left-4 top-1/2 mt-1 -translate-y-1/2 text-muted" />
@@ -193,6 +194,11 @@ export function LocationMultiCombobox({
     onChange?.(normalizeLocationList(nextList, { storage: 'cityWithOblast' }).join(', '))
   }
 
+  function addSpecialOption(option) {
+    if (list.includes(option)) return
+    setList([...list, option])
+  }
+
   return (
     <div>
       <LocationCombobox
@@ -204,6 +210,27 @@ export function LocationMultiCombobox({
         placeholder="Избери град"
         helper={helper}
       />
+      <div className="mt-3 flex flex-wrap gap-2">
+        {SPECIAL_LOCATION_OPTIONS.map((option) => {
+          const selected = list.includes(option)
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => addSpecialOption(option)}
+              disabled={selected}
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                selected
+                  ? 'border-accentDeep/20 bg-accentSoft text-accentDeep'
+                  : 'border-line bg-paper text-ink hover:border-ink/30 hover:bg-soft'
+              }`}
+            >
+              {selected && <Check size={14} />}
+              {option}
+            </button>
+          )
+        })}
+      </div>
       {list.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           {list.map((item) => (

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowRight, BarChart3, ClipboardList, CreditCard, FileClock, FolderKanban, KeyRound, Mail, MessagesSquare, PackageCheck, ScrollText, Search, ShieldCheck, Sparkles, Star, UserCog, Users, CheckCircle2, Circle, Eye, EyeOff } from 'lucide-react'
+import { ArrowRight, BarChart3, ClipboardList, CreditCard, FileClock, FolderKanban, KeyRound, Mail, MessagesSquare, PackageCheck, ScrollText, Search, ShieldCheck, Sparkles, Star, Tags, UserCog, Users, CheckCircle2, Circle, Eye, EyeOff } from 'lucide-react'
 import { brand, supabase } from '../lib/supabase.js'
 import { HERO_COLLAGE, HOME_PROJECTS } from '../data/images.js'
 import { getAccountDisplayName, useAccount } from '../lib/account.js'
@@ -54,6 +54,7 @@ const PartnerServicesManagerSection = lazy(() => import('../components/admin/Par
 const OrdersManagerSection = lazy(() => import('../components/admin/OrdersManager.jsx'))
 const ReviewsManagerSection = lazy(() => import('../components/admin/ReviewsManager.jsx'))
 const MigrationDashboardSection = lazy(() => import('../components/admin/MigrationDashboard.jsx'))
+const MaterialsManagerSection = lazy(() => import('../components/admin/MaterialsManager.jsx'))
 
 const ADMIN_SECTIONS = [
   { id: 'dashboard', label: 'Обзор', hint: 'KPI и последни събития', icon: BarChart3, Component: DashboardSection },
@@ -63,6 +64,7 @@ const ADMIN_SECTIONS = [
   { id: 'partner-services', label: 'Услуги', hint: 'Модерация на партньорски услуги', icon: PackageCheck, Component: PartnerServicesManagerSection },
   { id: 'orders', label: 'Поръчки', hint: 'Плащания, статуси, спорове', icon: CreditCard, Component: OrdersManagerSection },
   { id: 'reviews', label: 'Отзиви', hint: 'Verified отзиви и сигнали', icon: Star, Component: ReviewsManagerSection },
+  { id: 'materials', label: 'Материали', hint: 'Модерация на материали и марки', icon: Tags, Component: MaterialsManagerSection },
   { id: 'audit', label: 'Audit log', hint: 'Админ действия', icon: ScrollText, Component: AuditLogSection },
   { id: 'image-migration', label: 'Изображения', hint: 'Миграция и оптимизация', icon: FolderKanban, Component: MigrationDashboardSection },
 ]
