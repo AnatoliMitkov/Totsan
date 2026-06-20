@@ -80,16 +80,16 @@ Sender name: Totsan
 Sender email: no-reply@totsan.com
 ```
 
-5. Use the SMTP credentials from the Totsan mail provider. For the current domain mailbox setup, the likely values are:
+5. Use the SMTP credentials from the Totsan mail provider. Do not paste or store the mailbox password anywhere in this repository. For the current domain mailbox setup, enter the values directly in Supabase Dashboard:
 
 ```text
 Host: mail.totsan.com
 Port: 465 with SSL, or 587 with TLS if 465 is not accepted
-Username: no-reply@totsan.com
-Password: mailbox password for no-reply@totsan.com
 ```
 
-6. Do not commit SMTP credentials to this repo, `.env`, migrations, edge functions, or frontend code.
+Use the mailbox address as the SMTP username in the dashboard, and type the mailbox password only into the Supabase password field.
+
+6. Do not commit SMTP usernames/passwords to this repo, `.env`, migrations, edge functions, frontend code, screenshots, tickets, or docs.
 7. Save the SMTP settings.
 8. Send a Supabase test email before testing the app signup flow.
 9. Go to `Authentication` -> `Email Templates`.
