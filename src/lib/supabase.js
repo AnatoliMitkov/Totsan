@@ -51,6 +51,8 @@ function createMockSupabaseClient() {
       signInWithPassword: async () => ({ data: null, error: missingConfigError }),
       resetPasswordForEmail: async () => ({ data: null, error: missingConfigError }),
       signUp: async () => ({ data: null, error: missingConfigError }),
+      verifyOtp: async () => ({ data: null, error: missingConfigError }),
+      resend: async () => ({ data: null, error: missingConfigError }),
       updateUser: async () => ({ data: null, error: missingConfigError }),
       mfa: {
         enroll: async () => ({ data: null, error: missingConfigError }),

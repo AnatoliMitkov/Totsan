@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowRight, CheckCircle2, Circle, Eye, EyeOff, Lightbulb, Mail, Search, Sparkles, UserRound, Wrench } from 'lucide-react'
+import { ArrowRight, CheckCircle2, Circle, Eye, EyeOff, KeyRound, Lightbulb, Loader2, RefreshCw, Search, ShieldCheck, Sparkles, UserRound, Wrench } from 'lucide-react'
 import { signOutAndRedirect, useAccount } from '../lib/account.js'
 import { supabase } from '../lib/supabase.js'
 
 const INPUT_CLASS = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const TERMS_REQUIRED_MESSAGE = 'Първо потвърди, че се съгласяваш с общите условия и политиката за поверителност.'
 const PRODUCTION_APP_ORIGIN = 'https://totsan.com'
+const CHECK_EMAIL_BACKGROUND = '/Images/images-for-pro-page/01-totsan-pro-hero-visual.png'
 
 const welcomeCards = [
   {
@@ -31,32 +32,243 @@ const welcomeCards = [
   },
 ]
 
+const MAILBOX_OPTIONS = [
+  {
+    id: 'gmail',
+    label: 'Gmail',
+    href: 'https://mail.google.com/mail/u/0/#inbox',
+    icon: '/svg/Gmail.svg',
+    domains: ['gmail.com', 'googlemail.com'],
+  },
+  {
+    id: 'outlook',
+    label: 'Outlook',
+    href: 'https://outlook.live.com/mail/0/inbox',
+    icon: '/svg/outlook.svg',
+    domains: ['outlook.com', 'hotmail.com', 'live.com', 'msn.com'],
+  },
+]
+
+function getEmailDomain(email = '') {
+  const [, domain = ''] = String(email).toLowerCase().split('@')
+  return domain.trim()
+}
+
+function getMailboxOptions(email = '') {
+  const domain = getEmailDomain(email)
+  const recommendedId = MAILBOX_OPTIONS.find((option) => option.domains.includes(domain))?.id || ''
+
+  return [...MAILBOX_OPTIONS]
+    .sort((a, b) => Number(b.id === recommendedId) - Number(a.id === recommendedId))
+    .map((option) => ({
+      ...option,
+      recommended: option.id === recommendedId,
+    }))
+}
+
 export function CheckEmailPage() {
   const location = useLocation()
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const email = searchParams.get('email') || location.state?.email || ''
+  const accountType = searchParams.get('type') || location.state?.type || 'customer'
+  const [code, setCode] = useState('')
+  const [status, setStatus] = useState('idle')
+  const [message, setMessage] = useState('')
+  const isBusy = status === 'checking' || status === 'resending'
+  const normalizedCode = code.replace(/\D/g, '').slice(0, 6)
+  const nextPath = accountType === 'partner' ? '/pro/onboarding' : '/welcome'
+  const mailboxOptions = getMailboxOptions(email)
+
+  async function verifyCode(event) {
+    event.preventDefault()
+
+    if (!email) {
+      setStatus('error')
+      setMessage('Липсва имейл адрес. Отворете линка от имейла или започнете регистрацията отново.')
+      return
+    }
+
+    if (normalizedCode.length !== 6) {
+      setStatus('error')
+      setMessage('Въведете 6-цифрения код от имейла.')
+      return
+    }
+
+    setStatus('checking')
+    setMessage('')
+
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: normalizedCode,
+      type: 'email',
+    })
+
+    if (error) {
+      setStatus('error')
+      setMessage('Кодът не беше потвърден. Проверете дали е въведен правилно или изпратете нов имейл.')
+      return
+    }
+
+    setStatus('success')
+    setMessage('Имейлът е потвърден. Пренасочваме ви към следващата стъпка.')
+    navigate(nextPath, { replace: true })
+  }
+
+  async function resendEmail() {
+    if (!email) {
+      setStatus('error')
+      setMessage('Липсва имейл адрес за повторно изпращане.')
+      return
+    }
+
+    setStatus('resending')
+    setMessage('')
+
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: new URL(nextPath, getAuthRedirectOrigin()).toString(),
+      },
+    })
+
+    if (error) {
+      setStatus('error')
+      setMessage(error.message)
+      return
+    }
+
+    setStatus('sent')
+    setMessage('Изпратихме нов имейл за потвърждение.')
+  }
+
+  function updateCode(value) {
+    setCode(value.replace(/\D/g, '').slice(0, 6))
+    if (status === 'error') {
+      setStatus('idle')
+      setMessage('')
+    }
+  }
 
   return (
-    <OnboardingShell eyebrow="Totsan account" icon={Mail}>
-      <div className="mx-auto max-w-2xl text-center">
-        <h1 className="h-section">Проверете имейла си</h1>
-        {email && (
-          <p className="mt-4 rounded-2xl border border-line bg-paper/70 px-4 py-3 text-sm text-muted backdrop-blur">
-            Изпратихме линк до: <span className="font-medium text-ink">{email}</span>
-          </p>
-        )}
-        <p className="mt-5 text-lg text-ink/80">
-          Натиснете линка в имейла, за да активирате акаунта си.
-        </p>
-        <p className="mt-3 text-sm text-muted">
-          Ако не виждате имейла, проверете Spam или Promotions.
-        </p>
-        <Link to="/login" className="btn btn-primary mt-8">
-          Към вход
-          <ArrowRight size={18} />
-        </Link>
+    <section className="relative min-h-screen overflow-hidden bg-soft">
+      <img
+        src={CHECK_EMAIL_BACKGROUND}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      <div className="absolute inset-0 bg-[#102033]/35" />
+      <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-soft via-soft/80 to-transparent" />
+
+      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-5 sm:px-6 lg:px-8">
+        <div className="flex flex-1 items-center justify-center py-10 md:py-14">
+          <div className="w-full max-w-[500px] rounded-[2rem] border border-white/80 bg-paper/95 p-5 text-center shadow-[0_34px_110px_-58px_rgba(13,35,64,0.72)] backdrop-blur md:p-8">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-line bg-soft text-accentDeep">
+              <ShieldCheck size={25} />
+            </div>
+
+            <div className="mt-5 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted">
+              Totsan account
+            </div>
+            <h1 className="mt-3 font-display text-4xl leading-none text-ink md:text-5xl">
+              Проверете имейла си
+            </h1>
+            <p className="mt-4 text-base leading-7 text-ink/78">
+              Изпратихме линк и 6-цифрен код за потвърждение. Можете да отворите пощата си или да въведете кода тук.
+            </p>
+
+            {email && (
+              <div className="mt-5 rounded-2xl border border-line bg-soft px-4 py-3 text-sm text-muted">
+                Изпратено до <span className="font-semibold text-ink">{email}</span>
+              </div>
+            )}
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              {mailboxOptions.map((option) => (
+                <a
+                  key={option.id}
+                  href={option.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`btn justify-center ${option.recommended ? 'btn-primary' : 'btn-ghost bg-paper'}`}
+                >
+                  <img src={option.icon} alt="" className="h-5 w-5 shrink-0 object-contain" />
+                  <span className="inline-flex min-w-0 flex-col items-start leading-tight">
+                    <span>{option.label}</span>
+                    {option.recommended && <span className="text-[10px] font-semibold uppercase tracking-[0.16em] opacity-80">Препоръчано</span>}
+                  </span>
+                </a>
+              ))}
+            </div>
+
+            <div className="my-7 flex items-center gap-4 text-[11px] uppercase tracking-[0.22em] text-muted/60">
+              <span className="h-px flex-1 bg-line" />
+              <span>или</span>
+              <span className="h-px flex-1 bg-line" />
+            </div>
+
+            <form onSubmit={verifyCode} className="text-left">
+              <label className="block text-sm font-medium text-ink">
+                Код за потвърждение
+                <div className="relative mt-2">
+                  <KeyRound size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
+                  <input
+                    value={normalizedCode}
+                    onChange={(event) => updateCode(event.target.value)}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="Въведете 6 цифри"
+                    className="w-full rounded-2xl border border-line bg-paper px-11 py-3.5 text-center text-lg font-semibold tracking-[0.32em] text-ink outline-none transition placeholder:text-left placeholder:text-sm placeholder:font-normal placeholder:tracking-normal focus:border-ink"
+                  />
+                </div>
+              </label>
+              <button
+                disabled={isBusy || normalizedCode.length !== 6}
+                className="btn btn-primary mt-4 w-full justify-center !py-3.5 text-base disabled:opacity-55"
+              >
+                {status === 'checking' ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Проверяваме…
+                  </>
+                ) : (
+                  <>
+                    Потвърди кода
+                    <ArrowRight size={18} />
+                  </>
+                )}
+              </button>
+            </form>
+
+            {message && (
+              <div className={`mt-4 rounded-2xl px-4 py-3 text-sm ${status === 'error' ? 'border border-red-200 bg-red-50 text-red-700' : 'border border-line bg-soft text-muted'}`}>
+                {message}
+              </div>
+            )}
+
+            <div className="mt-7 flex flex-col items-center justify-center gap-3 text-sm text-muted sm:flex-row">
+              <button
+                type="button"
+                onClick={resendEmail}
+                disabled={isBusy || !email}
+                className="inline-flex items-center gap-2 rounded-full px-3 py-2 font-medium text-accent transition hover:bg-soft disabled:opacity-50"
+              >
+                {status === 'resending' ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                Изпрати отново
+              </button>
+              <Link to="/login" className="inline-flex items-center gap-2 rounded-full px-3 py-2 font-medium text-accent transition hover:bg-soft">
+                Използвай друг акаунт
+              </Link>
+            </div>
+
+            <p className="mt-5 text-xs leading-5 text-muted">
+              Ако не виждате имейла, проверете Spam, Promotions или Other. Кодът е временен и може да бъде заменен с нов.
+            </p>
+          </div>
+        </div>
       </div>
-    </OnboardingShell>
+    </section>
   )
 }
 

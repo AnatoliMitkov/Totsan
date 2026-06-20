@@ -8,39 +8,41 @@
     <meta name="supported-color-schemes" content="light dark">
     <title>Възстановяване на достъпа до Totsan</title>
     <style>
-      @media only screen and (max-width: 620px) {
+      @media only screen and (max-width: 640px) {
+        .shell { padding: 18px 10px !important; }
         .container { width: 100% !important; }
-        .shell { padding: 20px 12px !important; }
-        .card { border-radius: 20px !important; }
+        .hero { padding: 26px 20px 22px !important; }
         .card-inner { padding: 28px 20px !important; }
-        .headline { font-size: 28px !important; line-height: 32px !important; }
+        .headline { font-size: 30px !important; line-height: 34px !important; }
         .button { display: block !important; width: 100% !important; box-sizing: border-box !important; }
+        .two-col { display: block !important; width: 100% !important; }
+        .two-col td { display: block !important; width: 100% !important; }
       }
 
       @media (prefers-color-scheme: dark) {
-        body, .shell { background: #e8eef5 !important; }
-        .card, .logo-box { background: #ffffff !important; }
-        .headline, .body-text, .signature-name { color: #102033 !important; }
-        .muted, .footer-text, .fallback { color: #536477 !important; }
-        .link-text { color: #244766 !important; }
+        body, .shell { background: #eef4f8 !important; }
+        .panel, .logo-pill, .note { background: #ffffff !important; }
+        .headline, .body, .strong { color: #102033 !important; }
+        .muted, .footer, .label { color: #647487 !important; }
+        .link { color: #244766 !important; }
       }
     </style>
   </head>
-  <body style="margin:0; padding:0; background:#e8eef5; font-family:Arial, Helvetica, sans-serif; color:#102033;">
+  <body style="margin:0; padding:0; background:#eef4f8; font-family:Arial, Helvetica, sans-serif; color:#102033;">
     <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:transparent; line-height:1px;">
-      Използвайте защитения линк, за да зададете нова парола за акаунта си.
+      Отворете защитения линк, за да зададете нова парола за Totsan.
     </div>
 
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="shell" style="background:#e8eef5; padding:36px 16px;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="shell" style="background:#eef4f8; padding:34px 16px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" class="container" style="width:600px; max-width:600px;">
+          <table role="presentation" width="620" cellspacing="0" cellpadding="0" border="0" class="container" style="width:620px; max-width:620px;">
             <tr>
               <td align="center" style="padding:0 0 18px;">
-                <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="logo-box" style="background:#ffffff; border:1px solid #dbe4ee; border-radius:18px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="logo-pill" style="background:#ffffff; border:1px solid #dbe6ef; border-radius:999px; box-shadow:0 18px 45px rgba(16,32,51,0.08);">
                   <tr>
-                    <td style="padding:14px 20px;">
-                      <img src="https://totsan.com/email/totsan-design-dark.png" width="156" alt="Totsan Design" style="display:block; width:156px; max-width:156px; height:auto; border:0; outline:none; text-decoration:none;">
+                    <td style="padding:13px 20px;">
+                      <img src="https://totsan.com/email/totsan-design-dark.png" width="154" alt="Totsan Design" style="display:block; width:154px; max-width:154px; height:auto; border:0; outline:none; text-decoration:none;">
                     </td>
                   </tr>
                 </table>
@@ -48,57 +50,82 @@
             </tr>
 
             <tr>
-              <td class="card" style="background:#ffffff; border:1px solid #d7e1eb; border-radius:28px; box-shadow:0 18px 50px rgba(16,32,51,0.10); overflow:hidden;">
+              <td class="panel" style="background:#ffffff; border:1px solid #d6e1eb; border-radius:30px; overflow:hidden; box-shadow:0 26px 70px rgba(16,32,51,0.12);">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                   <tr>
-                    <td style="height:6px; background:#244766; font-size:0; line-height:0;">&nbsp;</td>
-                  </tr>
-                  <tr>
-                    <td class="card-inner" style="padding:40px 42px 34px;">
-                      <p style="margin:0 0 10px; color:#6f7f91; font-size:12px; line-height:18px; font-weight:bold; letter-spacing:1.6px; text-transform:uppercase;">
-                        Totsan профил
+                    <td class="hero" style="padding:34px 38px 30px; background:#102033;">
+                      <p style="margin:0 0 12px; color:#a8bdd1; font-size:12px; line-height:18px; font-weight:bold; letter-spacing:1.8px; text-transform:uppercase;">
+                        Totsan security
                       </p>
-                      <h1 class="headline" style="margin:0; color:#102033; font-family:Georgia, 'Times New Roman', serif; font-size:34px; line-height:40px; font-weight:700;">
-                        Възстановяване на достъпа
+                      <h1 class="headline" style="margin:0; color:#ffffff; font-family:Georgia, 'Times New Roman', serif; font-size:38px; line-height:42px; font-weight:700;">
+                        Задайте нова парола
                       </h1>
-                      <p class="body-text" style="margin:22px 0 0; color:#26384d; font-size:16px; line-height:26px;">
+                      <p style="margin:16px 0 0; color:#d8e4ef; font-size:16px; line-height:26px;">
+                        Получихме заявка за възстановяване на достъпа.
+                      </p>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td class="card-inner" style="padding:38px 42px 34px;">
+                      <p class="body" style="margin:0; color:#26384d; font-size:16px; line-height:26px;">
                         Здравейте,<br>
-                        получавате този имейл, защото беше заявена промяна на паролата за вашия акаунт в Totsan. Натиснете бутона по-долу, за да продължите към защитената страница за нова парола.
+                        натиснете бутона по-долу, за да отворите защитената страница и да зададете нова парола за <span class="strong" style="font-weight:bold; color:#102033;">{{ .Email }}</span>.
                       </p>
 
-                      <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:30px 0 24px;">
+                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:28px 0 22px;">
                         <tr>
-                          <td align="center" bgcolor="#102033" style="border-radius:999px;">
-                            <a href="{{ .ConfirmationURL }}" class="button" style="display:inline-block; padding:15px 28px; min-width:190px; border-radius:999px; background:#102033; color:#ffffff; font-size:15px; line-height:20px; font-weight:bold; text-align:center; text-decoration:none;">
-                              Задай нова парола
+                          <td align="center" bgcolor="#244766" style="border-radius:18px;">
+                            <a href="{{ .ConfirmationURL }}" class="button" style="display:inline-block; padding:16px 30px; min-width:260px; border-radius:18px; background:#244766; color:#ffffff; font-size:16px; line-height:20px; font-weight:bold; text-align:center; text-decoration:none;">
+                              Отвори защитената страница
                             </a>
                           </td>
                         </tr>
                       </table>
 
-                      <p class="fallback" style="margin:0; color:#536477; font-size:13px; line-height:21px;">
-                        Ако бутонът не работи, копирайте и отворете този линк в браузъра:
-                      </p>
-                      <p style="margin:8px 0 0; font-size:13px; line-height:20px; word-break:break-all;">
-                        <a href="{{ .ConfirmationURL }}" class="link-text" style="color:#244766; text-decoration:underline;">{{ .ConfirmationURL }}</a>
+                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="note" style="background:#f4f7fa; border:1px solid #dbe6ef; border-radius:24px;">
+                        <tr>
+                          <td style="padding:22px 20px;">
+                            <p class="strong" style="margin:0; color:#102033; font-size:15px; line-height:23px; font-weight:bold;">
+                              Малка проверка за сигурност
+                            </p>
+                            <p class="muted" style="margin:8px 0 0; color:#647487; font-size:14px; line-height:22px;">
+                              Ако не сте заявявали нова парола, не отваряйте линка. Паролата ви няма да се промени без действие от ваша страна.
+                            </p>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="two-col" style="margin:28px 0 0;">
+                        <tr>
+                          <td width="50%" style="padding:0 8px 0 0; vertical-align:top;">
+                            <p class="strong" style="margin:0; color:#102033; font-size:14px; line-height:21px; font-weight:bold;">
+                              Не работи бутонът?
+                            </p>
+                            <p class="muted" style="margin:7px 0 0; color:#647487; font-size:13px; line-height:21px;">
+                              Копирайте резервния линк и го отворете в браузъра.
+                            </p>
+                          </td>
+                          <td width="50%" style="padding:0 0 0 8px; vertical-align:top;">
+                            <p class="strong" style="margin:0; color:#102033; font-size:14px; line-height:21px; font-weight:bold;">
+                              След смяната
+                            </p>
+                            <p class="muted" style="margin:7px 0 0; color:#647487; font-size:13px; line-height:21px;">
+                              Влезте отново и продължете към профила си в Totsan.
+                            </p>
+                          </td>
+                        </tr>
+                      </table>
+
+                      <p style="margin:24px 0 0; font-size:12px; line-height:19px; word-break:break-all;">
+                        <a href="{{ .ConfirmationURL }}" class="link" style="color:#244766; text-decoration:underline;">{{ .ConfirmationURL }}</a>
                       </p>
 
-                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:32px 0 0; border-top:1px solid #dbe4ee;">
+                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:30px 0 0; border-top:1px solid #dbe6ef;">
                         <tr>
-                          <td style="padding-top:24px;">
-                            <p class="signature-name" style="margin:0; color:#102033; font-size:15px; line-height:23px; font-weight:bold;">
-                              инж. Анатоли Митков
-                            </p>
-                            <p class="body-text" style="margin:2px 0 0; color:#26384d; font-size:14px; line-height:22px;">
-                              Изграждаме бъдещето на Totsan
-                            </p>
-                            <p class="body-text" style="margin:16px 0 0; color:#26384d; font-size:14px; line-height:22px;">
-                              Уеб: <a href="https://totsan.com" style="color:#244766; text-decoration:underline;">totsan.com</a><br>
-                              Тел: <a href="tel:+359892703058" style="color:#244766; text-decoration:underline;">+359 89 270 3058</a>
-                            </p>
-                            <p class="muted" style="margin:18px 0 0; color:#536477; font-size:13px; line-height:21px;">
-                              Лична бележка:<br>
-                              Уважавам вашето време така, както и своето. Ако въпросът е спешен, не се колебайте да ме потърсите директно. В противен случай ще ви отговоря при първа възможност.
+                          <td style="padding-top:22px;">
+                            <p class="muted" style="margin:0; color:#647487; font-size:13px; line-height:21px;">
+                              Totsan изпраща този имейл само при заявка за възстановяване на достъп.
                             </p>
                           </td>
                         </tr>
@@ -111,11 +138,11 @@
 
             <tr>
               <td align="center" style="padding:22px 18px 0;">
-                <p class="footer-text" style="margin:0; color:#667789; font-size:12px; line-height:19px;">
-                  Този имейл е изпратен автоматично от Totsan.
+                <p class="footer" style="margin:0; color:#647487; font-size:12px; line-height:19px;">
+                  Изпратено автоматично от Totsan Design.
                 </p>
-                <p class="footer-text" style="margin:6px 0 0; color:#667789; font-size:12px; line-height:19px;">
-                  Ако не сте заявявали промяна на паролата, можете спокойно да игнорирате този имейл.
+                <p class="footer" style="margin:6px 0 0; color:#647487; font-size:12px; line-height:19px;">
+                  totsan.com
                 </p>
               </td>
             </tr>

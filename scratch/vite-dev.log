@@ -9,3 +9,47 @@
   [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.0.108:[1m5173[22m/[39m
   [32m➜[39m  [1mNetwork[22m: [36mhttp://172.19.64.1:[1m5173[22m/[39m
   [32m➜[39m  [1mNetwork[22m: [36mhttp://172.26.208.1:[1m5173[22m/[39m
+[2m4:10:22 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:15:37 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:20:19 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:22:48 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:22:58 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:23:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:23:46 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:27:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/Services.jsx, /src/pages/Product.jsx, /src/pages/PartnerService.jsx, /src/pages/Catalog.jsx, /src/pages/ProStatus.jsx, /src/pages/Layer.jsx, /src/pages/Pro.jsx, /src/pages/MyProfile.jsx, /src/components/profile/PartnerProfileWorkspace.jsx, /src/components/profile/PartnerServiceEditor.jsx, /src/components/profile/PartnerMaterialsEditor.jsx, /src/pages/ProOnboarding.jsx, /src/pages/SharedProject.jsx, /src/components/profile/CustomerOverview.jsx, /src/components/profile/CustomerProject.jsx, /src/components/ProfessionalCard.jsx[22m
+[2m4:27:33 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:27:50 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:28:06 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ProfessionalCard.jsx, /src/index.css[22m
+[2m4:28:12 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Pro.jsx, /src/index.css[22m
+[2m4:28:17 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Catalog.jsx, /src/index.css[22m
+[2m4:31:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/Layer.jsx, /src/components/profile/CustomerProject.jsx[22m
+[2m4:31:33 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/Layer.jsx, /src/components/profile/CustomerProject.jsx[22m
+[2m4:32:57 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css, /src/components/profile/CustomerProject.jsx[22m
+[2m4:50:31 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/Layer.jsx, /src/components/profile/CustomerProject.jsx[22m
+[2m4:51:02 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css, /src/components/profile/CustomerProject.jsx[22m
+[2m4:51:11 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css, /src/components/profile/CustomerProject.jsx[22m
+[2m5:03:36 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css, /src/components/profile/CustomerProject.jsx[22m
+[2m5:05:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css, /src/components/profile/CustomerProject.jsx[22m
+[2m5:06:13 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css, /src/components/profile/CustomerProject.jsx[22m
+[2m5:08:16 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/main.jsx, /src/index.css, /src/pages/Legal.jsx, /src/pages/Contact.jsx, /src/pages/Product.jsx, /src/pages/PartnerService.jsx, /src/pages/TotsanPro.jsx, /src/pages/Start.jsx, /src/pages/Catalog.jsx, /src/pages/Layer.jsx, /src/pages/Pro.jsx, /src/pages/Home.jsx, /src/pages/HowItWorks.jsx, /src/components/Layout.jsx, /src/pages/MyProfile.jsx, /src/pages/SharedProject.jsx, /src/pages/Services.jsx, /src/pages/ProStatus.jsx, /src/components/profile/PartnerProfileWorkspace.jsx, /src/components/profile/PartnerServiceEditor.jsx, /src/components/profile/PartnerMaterialsEditor.jsx, /src/pages/ProOnboarding.jsx, /src/components/profile/CustomerOverview.jsx, /src/components/profile/CustomerProject.jsx, /src/components/ProfessionalCard.jsx, /src/components/profile/PortfolioGallery.jsx, /src/components/profile/PartnerInquiries.jsx[22m
+[2m5:08:16 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/main.jsx[22m Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:08:16 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m5:08:16 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/main.jsx[22m Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:08:16 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m5:08:17 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/main.jsx[22m Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:08:17 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m5:12:33 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css[22m
+[2m5:16:06 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/main.jsx, /src/index.css, /src/pages/Legal.jsx, /src/pages/Contact.jsx, /src/pages/Product.jsx, /src/pages/PartnerService.jsx, /src/pages/TotsanPro.jsx, /src/pages/Start.jsx, /src/pages/Catalog.jsx, /src/pages/Layer.jsx, /src/pages/Pro.jsx, /src/pages/Home.jsx, /src/pages/HowItWorks.jsx, /src/components/Layout.jsx, /src/pages/MyProfile.jsx, /src/pages/SharedProject.jsx, /src/pages/Services.jsx, /src/pages/ProStatus.jsx, /src/components/profile/PartnerProfileWorkspace.jsx, /src/components/profile/PartnerServiceEditor.jsx, /src/components/profile/PartnerMaterialsEditor.jsx, /src/pages/ProOnboarding.jsx, /src/components/profile/CustomerOverview.jsx, /src/components/profile/CustomerProject.jsx, /src/components/ProfessionalCard.jsx, /src/components/profile/PortfolioGallery.jsx, /src/components/profile/PartnerInquiries.jsx[22m
+[2m5:16:07 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/main.jsx[22m Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:16:07 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m5:16:07 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/main.jsx[22m Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:16:07 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m5:16:07 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/main.jsx[22m Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:16:07 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m5:16:38 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css[22m
+[2m5:16:58 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css[22m
+[2m5:17:24 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css[22m
+[2m5:17:47 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css[22m
+[2m5:18:04 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css[22m
+[2m5:20:52 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css[22m
+[2m5:48:54 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css, /src/components/profile/CustomerProject.jsx[22m

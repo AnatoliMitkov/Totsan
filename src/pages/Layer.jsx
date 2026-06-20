@@ -91,7 +91,7 @@ function Hero({ layer }) {
           <h1 className="h-display mt-3">{layer.title}</h1>
           <p className="mt-5 max-w-2xl text-ink/80" style={{fontSize:'var(--step-md)'}}>{layer.long}</p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link to={isIdeaLayer || isConstructionLayer || isMaterialsLayer || isFurnishingLayer || isDecorationLayer ? '/start' : '/contact'} className="btn btn-primary">{isIdeaLayer ? 'Опиши идеята си' : isConstructionLayer ? 'Опиши какво ти трябва' : isMaterialsLayer ? 'Намери правилния материал' : isFurnishingLayer ? 'Опиши какво ти трябва' : isDecorationLayer ? 'Опиши от какво имаш нужда' : 'Заяви консултация'}</Link>
+            <Link to={isIdeaLayer || isConstructionLayer || isMaterialsLayer || isFurnishingLayer || isDecorationLayer ? '/start' : '/contact'} className="btn btn-primary">{isIdeaLayer ? 'Опиши идеята си' : isConstructionLayer ? 'Опиши какво ти трябва' : isMaterialsLayer ? 'Намери подходяща посока' : isFurnishingLayer ? 'Опиши какво ти трябва' : isDecorationLayer ? 'Опиши от какво имаш нужда' : 'Заяви консултация'}</Link>
             {isIdeaLayer ? (
               <Link to="/katalog?layer=ideya" className="btn btn-ghost bg-paper/80 backdrop-blur">Разгледай специалистите</Link>
             ) : isConstructionLayer ? (
@@ -109,7 +109,7 @@ function Hero({ layer }) {
         </div>
         <div className="lg:col-span-4 reveal">
           <div className="bg-paper/90 backdrop-blur border border-line rounded-2xl p-6">
-            <div className="eyebrow mb-3">В този слой намираш</div>
+            <div className="eyebrow mb-3">{isMaterialsLayer ? 'В този раздел ще намерите' : 'В този слой намираш'}</div>
             <ul className="space-y-2">
               {layer.pros.map(p => (
                 <li key={p} className="flex items-center justify-between border-b border-line/80 pb-2 text-sm">
@@ -152,7 +152,15 @@ function WhatYouFind({ layer }) {
   const imgs = WHAT_YOU_FIND_IMAGES[layer.slug] || {}
   const [activeQuizSlug, setActiveQuizSlug] = useState(null)
   const quizRef = useRef(null)
-  const headingText = layer.whatYouFind.length === 5 ? 'Пет посоки. Един слой.' : 'Четири посоки. Един слой.'
+  const isMaterialsLayer = layer.slug === 'materiali'
+  const headingText = isMaterialsLayer
+    ? 'Започнете от това, което избирате'
+    : layer.whatYouFind.length === 5
+      ? 'Пет посоки. Един слой.'
+      : 'Четири посоки. Един слой.'
+  const helperText = isMaterialsLayer
+    ? 'Изберете категория и Totsan ще ви помогне да разберете какво е важно преди покупка, монтаж или разговор със специалист.'
+    : ''
 
   const activeItem = activeQuizSlug
     ? layer.whatYouFind.find(w => w.quizSlug === activeQuizSlug)
@@ -182,6 +190,7 @@ function WhatYouFind({ layer }) {
           <div>
             <div className="eyebrow">Какво намираш тук</div>
             <h2 className="h-section mt-2 max-w-3xl">{activeItem ? activeItem.title : headingText}</h2>
+            {!activeItem && helperText && <p className="mt-3 max-w-2xl text-muted">{helperText}</p>}
           </div>
           {activeQuizSlug && (
             <button onClick={() => setActiveQuizSlug(null)} className="btn btn-ghost border border-line text-sm bg-soft">
@@ -276,16 +285,17 @@ function WhatYouFind({ layer }) {
 function Professionals({ layer }) {
   const professionals = layer.professionals ?? []
   const catalogLayerPath = `/katalog?layer=${layer.slug}`
+  const isMaterialsLayer = layer.slug === 'materiali'
 
   return (
     <section id="specialisti" className="section bg-soft border-y border-line">
       <div className="container-page">
         <div className="flex items-end justify-between mb-10 reveal flex-wrap gap-4">
           <div>
-            <div className="eyebrow">Препоръчани за теб</div>
-            <h2 className="h-section mt-2">Хора, на които можеш да разчиташ.</h2>
+            <div className="eyebrow">{isMaterialsLayer ? 'Материали и монтаж' : 'Препоръчани за теб'}</div>
+            <h2 className="h-section mt-2">{isMaterialsLayer ? 'Специалисти за материали и монтаж' : 'Хора, на които можеш да разчиташ.'}</h2>
           </div>
-          <Link to={catalogLayerPath} className="link-arrow text-sm">Виж каталога за този слой →</Link>
+          <Link to={catalogLayerPath} className="link-arrow text-sm">{isMaterialsLayer ? 'Виж специалисти за материали →' : 'Виж каталога за този слой →'}</Link>
         </div>
 
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -299,13 +309,15 @@ function Professionals({ layer }) {
           ))}
           {professionals.length === 0 && (
             <div className="col-span-full border border-dashed border-line rounded-2xl p-8 text-center text-muted">
-              Добавяме проверени специалисти за този слой.
+              {isMaterialsLayer
+                ? 'Добавяме проверени партньори за този раздел — доставчици, консултанти и изпълнители, които могат да помогнат с избор, доставка или монтаж.'
+                : 'Добавяме проверени специалисти за този слой.'}
             </div>
           )}
         </div>
 
         <div className="mt-10 text-center reveal">
-          <Link to={catalogLayerPath} className="btn btn-primary">Виж каталога за този слой</Link>
+          <Link to={catalogLayerPath} className="btn btn-primary">{isMaterialsLayer ? 'Виж специалисти за материали' : 'Виж каталога за този слой'}</Link>
         </div>
       </div>
     </section>
@@ -315,17 +327,23 @@ function Professionals({ layer }) {
 function Showcase({ layer }) {
   const sc = layer.showcase
   const imgs = SHOWCASE_IMAGES[layer.slug] || []
+  const isMaterialsLayer = layer.slug === 'materiali'
   return (
     <section className="section !pt-0">
       <div className="container-page">
         <div className="eyebrow reveal">{sc.label}</div>
-        <h2 className="h-section mt-2 reveal max-w-3xl">Виж какво вече е създадено.</h2>
+        <h2 className="h-section mt-2 reveal max-w-3xl">{isMaterialsLayer ? 'Материали в реални проекти' : 'Виж какво вече е създадено.'}</h2>
+        {isMaterialsLayer && (
+          <p className="mt-3 max-w-2xl text-muted reveal">
+            Вижте как различни материали изглеждат в завършени обекти и каква роля имат в проекта.
+          </p>
+        )}
         <div className="mt-10 grid gap-5 md:grid-cols-3">
           {sc.items.map((it,i) => (
             <article key={i} className="card reveal img-zoom-host p-0 overflow-hidden bg-paper">
               <div className="media-frame aspect-[4/3]">
                 <img src={imgs[i]} alt={it.t} loading="lazy" decoding="async" className="img-cover img-zoom" />
-                <div className="absolute top-3 left-3 text-xs px-2.5 py-1 rounded-full bg-paper/90 text-ink backdrop-blur">Слой {layer.number}</div>
+                <div className="absolute top-3 left-3 text-xs px-2.5 py-1 rounded-full bg-paper/90 text-ink backdrop-blur">{isMaterialsLayer ? 'Материали' : `Слой ${layer.number}`}</div>
               </div>
               <div className="p-6 border-t border-line">
                 <div className="h-card">{it.t}</div>
@@ -340,11 +358,13 @@ function Showcase({ layer }) {
 }
 
 function ProcessSection({ layer }) {
+  const isMaterialsLayer = layer.slug === 'materiali'
+
   return (
     <section className="section bg-ink text-paper">
       <div className="container-page">
-        <div className="eyebrow !text-paper/60 reveal">Как работим в този слой</div>
-        <h2 className="h-section text-paper mt-2 reveal max-w-3xl">Четири стъпки до резултат.</h2>
+        <div className="eyebrow !text-paper/60 reveal">{isMaterialsLayer ? 'Как Totsan помага при избор на материал' : 'Как работим в този слой'}</div>
+        <h2 className="h-section text-paper mt-2 reveal max-w-3xl">{isMaterialsLayer ? 'От неясен избор до подготвено запитване' : 'Четири стъпки до резултат.'}</h2>
         <div className="mt-12 grid md:grid-cols-4 gap-8">
           {layer.process.map(s => (
             <div key={s.n} className="reveal border-t border-paper/20 pt-5">
@@ -360,27 +380,37 @@ function ProcessSection({ layer }) {
 }
 
 function ServicesBand({ layer }) {
-  const cards = [
-    { title: 'Публикувани услуги', text: 'Само реални оферти от партньори с профил в Totsan.', to: '/uslugi' },
-    { title: 'Каталог', text: 'Прегледай специалисти, услуги и материални решения за този слой.', to: `/katalog?layer=${layer.slug}` },
-  ]
+  const isMaterialsLayer = layer.slug === 'materiali'
+  const cards = isMaterialsLayer
+    ? [
+        { title: 'Публикувай запитване', text: 'Опишете какво избирате, за кое помещение е и какво ви притеснява.', to: '/start', cta: 'Създай запитване' },
+        { title: 'Разгледай каталога', text: 'Вижте специалисти, услуги и материали, свързани с този раздел.', to: `/katalog?layer=${layer.slug}`, cta: 'Отвори каталога' },
+      ]
+    : [
+        { title: 'Публикувани услуги', text: 'Само реални оферти от партньори с профил в Totsan.', to: '/uslugi' },
+        { title: 'Каталог', text: 'Прегледай специалисти, услуги и материални решения за този слой.', to: `/katalog?layer=${layer.slug}` },
+      ]
 
   return (
     <section className="section !py-16">
       <div className="container-page">
         <div className="grid md:grid-cols-12 gap-8 items-center">
           <div className="md:col-span-4 reveal">
-            <div className="eyebrow">Нужна е и услуга?</div>
-            <h2 className="h-section mt-2">Хоризонталният слой винаги е под ръка.</h2>
-            <p className="text-muted mt-3 text-sm">Електричар, ВиК, отопление, smart home — добавяш ги към всеки слой, по всяко време.</p>
-            <Link to="/uslugi" className="link-arrow inline-flex mt-5 text-sm">Всички услуги →</Link>
+            <div className="eyebrow">{isMaterialsLayer ? 'Неясен избор?' : 'Нужна е и услуга?'}</div>
+            <h2 className="h-section mt-2">{isMaterialsLayer ? 'Не сте сигурни откъде да започнете?' : 'Хоризонталният слой винаги е под ръка.'}</h2>
+            <p className="text-muted mt-3 text-sm">
+              {isMaterialsLayer
+                ? 'При материалите правилният избор често зависи от помещението, основата, монтажа и поддръжката. Започнете с помощник или изпратете запитване към специалист.'
+                : 'Електричар, ВиК, отопление, smart home — добавяш ги към всеки слой, по всяко време.'}
+            </p>
+            <Link to={isMaterialsLayer ? '/start' : '/uslugi'} className="link-arrow inline-flex mt-5 text-sm">{isMaterialsLayer ? 'Започни помощника →' : 'Всички услуги →'}</Link>
           </div>
           <div className="md:col-span-8 reveal grid gap-4 sm:grid-cols-2">
             {cards.map(card => (
               <Link key={card.title} to={card.to} className="rounded-2xl border border-line bg-paper p-6 transition hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-sm">
                 <div className="font-display text-3xl text-ink">{card.title}</div>
                 <p className="mt-3 text-sm leading-relaxed text-muted">{card.text}</p>
-                <div className="mt-5 text-sm font-medium text-ink underline underline-offset-4">Отвори →</div>
+                <div className="mt-5 text-sm font-medium text-ink underline underline-offset-4">{card.cta || 'Отвори'} →</div>
               </Link>
             ))}
           </div>
@@ -391,16 +421,18 @@ function ServicesBand({ layer }) {
 }
 
 function FAQ({ layer }) {
+  const isMaterialsLayer = layer.slug === 'materiali'
+
   return (
     <section className="section bg-soft border-y border-line">
       <div className="container-page max-w-4xl">
         <div className="eyebrow reveal">Често задавани въпроси</div>
-        <h2 className="h-section mt-2 reveal">За този слой.</h2>
+        <h2 className="h-section mt-2 reveal">{isMaterialsLayer ? 'Често задавани въпроси за материалите' : 'За този слой.'}</h2>
         <div className="mt-10 divide-y divide-line border-y border-line">
           {layer.faq.map((it, i) => (
             <details key={i} className="group py-5 reveal">
               <summary className="cursor-pointer flex items-center justify-between gap-4 list-none">
-                <span className="font-display text-xl">{it.q}</span>
+                <span className="font-display text-[1.5rem] leading-tight md:text-[1.75rem]">{it.q}</span>
                 <span className="text-accentDeep text-2xl group-open:rotate-45 transition">+</span>
               </summary>
               <p className="text-muted mt-3 max-w-3xl">{it.a}</p>
@@ -448,11 +480,15 @@ function CTA({ layer }) {
     <section className="section !pt-0">
       <div className="container-page rounded-3xl bg-ink text-paper p-10 md:p-16 grid md:grid-cols-12 gap-8 items-center reveal">
         <div className="md:col-span-8">
-          <h2 className="h-section text-paper">Готов да влезеш в Слой {layer.number}?</h2>
-          <p className="mt-3 text-paper/70 max-w-2xl">Кажи ни в две изречения какво ти трябва. Връщаме се с подходящи хора още същата седмица.</p>
+          <h2 className="h-section text-paper">{isMaterialsLayer ? 'Готови ли сте да изберете по-уверено?' : `Готов да влезеш в Слой ${layer.number}?`}</h2>
+          <p className="mt-3 text-paper/70 max-w-2xl">
+            {isMaterialsLayer
+              ? 'Започнете с помощник или разгледайте материалните категории, за да разберете какво е подходящо за вашия проект.'
+              : 'Кажи ни в две изречения какво ти трябва. Връщаме се с подходящи хора още същата седмица.'}
+          </p>
         </div>
         <div className="md:col-span-4 flex md:justify-end gap-3 flex-wrap">
-          <Link to={isIdeaLayer || isConstructionLayer || isMaterialsLayer || isFurnishingLayer || isDecorationLayer ? '/start' : '/contact'} className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">{isIdeaLayer ? 'Опиши идеята си' : isConstructionLayer ? 'Опиши какво ти трябва' : isMaterialsLayer ? 'Намери правилния материал' : isFurnishingLayer ? 'Опиши какво ти трябва' : isDecorationLayer ? 'Опиши от какво имаш нужда' : 'Заяви консултация'}</Link>
+          <Link to={isIdeaLayer || isConstructionLayer || isMaterialsLayer || isFurnishingLayer || isDecorationLayer ? '/start' : '/contact'} className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">{isIdeaLayer ? 'Опиши идеята си' : isConstructionLayer ? 'Опиши какво ти трябва' : isMaterialsLayer ? 'Намери подходяща посока' : isFurnishingLayer ? 'Опиши какво ти трябва' : isDecorationLayer ? 'Опиши от какво имаш нужда' : 'Заяви консултация'}</Link>
           {isIdeaLayer && <Link to="/katalog?layer=ideya" className="btn btn-ghost !border-paper/30 !text-paper hover:!bg-paper/10">Разгледай специалистите</Link>}
           {isConstructionLayer && <Link to="/katalog?layer=postroyka" className="btn btn-ghost !border-paper/30 !text-paper hover:!bg-paper/10">Разгледай строителите и майсторите</Link>}
           {isMaterialsLayer && <Link to="/katalog?layer=materiali&kind=material" className="btn btn-ghost !border-paper/30 !text-paper hover:!bg-paper/10">Разгледай материалите</Link>}

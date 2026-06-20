@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { buildInquiryEmail } from '../_shared/totsan-email.js'
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 
@@ -22,16 +23,7 @@ serve(async (req) => {
       })
     }
 
-    const htmlContent = `
-      <h2>Ново запитване от: ${record.name}</h2>
-      <p><strong>Контакт:</strong> ${record.contact}</p>
-      <p><strong>Източник:</strong> ${record.source}</p>
-      ${record.layer_slug ? `<p><strong>Слой:</strong> ${record.layer_slug}</p>` : ''}
-      ${record.target_slug ? `<p><strong>Насочено към:</strong> ${record.target_slug}</p>` : ''}
-      <hr />
-      <h3>Съобщение:</h3>
-      <p style="white-space: pre-wrap;">${record.message}</p>
-    `
+    const htmlContent = buildInquiryEmail(record)
 
     if (!RESEND_API_KEY) {
       console.warn('RESEND_API_KEY is not set. Simulating email send.')

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { BriefcaseBusiness, Euro, FolderKanban, MapPin, Tags } from 'lucide-react'
 import FallbackImage from './FallbackImage.jsx'
 import { LAYER_HEROS } from '../data/images.js'
-import { getProfileImage, getProfileImageCandidates, getProfileImageStyle } from '../lib/profiles.js'
+import { getProfileImage, getProfileImageCandidates, getProfileImageStyle, normalizePricingNoteDisplay } from '../lib/profiles.js'
 
 const CARD_IMAGE_ASPECT_CLASS = 'aspect-[16/9]'
 const PROFILE_AVATAR_SIZE_CLASS = 'h-32 w-32'
@@ -21,7 +21,7 @@ export default function ProfessionalCard({ person, to, state, layerLabel, cta = 
   const hasServiceMetric = person?.serviceCount !== undefined && person?.serviceCount !== null
   const hasPortfolioMetric = person?.portfolioCount !== undefined && person?.portfolioCount !== null
   const yearsExperience = toCount(person?.yearsExperience ?? person?.years_experience)
-  const priceGuide = person?.priceGuide || person?.pricingNote || person?.pricing_note || ''
+  const priceGuide = normalizePricingNoteDisplay(person?.priceGuide || person?.pricingNote || person?.pricing_note || '')
   const serviceTitles = normalizeList(person?.serviceTitles)
   const description = person?.hasProfileDescription
     ? compactText(person?.descriptionLong || person?.description_long || person?.bio)

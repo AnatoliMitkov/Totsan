@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "check:encoding": "node scripts/check-text-encoding.mjs",
+    "email:preview": "node scripts/build-email-previews.mjs",
+    "email:validate": "node scripts/validate-email-system.mjs",
+    "email:check": "npm run email:preview && npm run email:validate",
     "validate:seo": "node scripts/validate-seo.mjs",
     "prebuild": "npm run check:encoding",
     "dev": "vite",

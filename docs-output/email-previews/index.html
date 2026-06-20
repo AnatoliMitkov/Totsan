@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="bg">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Totsan email previews</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #102033;
+        --muted: #647487;
+        --line: #d6e1eb;
+        --paper: #ffffff;
+        --soft: #eef4f8;
+        --accent: #244766;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: var(--soft);
+        color: var(--ink);
+        font-family: Arial, Helvetica, sans-serif;
+      }
+
+      main {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 36px 0 48px;
+      }
+
+      header {
+        margin-bottom: 24px;
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+        font-family: Georgia, 'Times New Roman', serif;
+      }
+
+      h1 {
+        font-size: 42px;
+        line-height: 1;
+      }
+
+      h2 {
+        font-size: 25px;
+        line-height: 1.08;
+      }
+
+      .intro {
+        max-width: 720px;
+        margin: 14px 0 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.65;
+      }
+
+      .grid {
+        display: grid;
+        gap: 22px;
+      }
+
+      .card {
+        display: grid;
+        grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+        gap: 18px;
+        align-items: start;
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.76);
+        padding: 18px;
+        box-shadow: 0 24px 70px rgba(16, 32, 51, 0.10);
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .subject,
+      .description {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 38px;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff;
+        padding: 0 14px;
+        font-size: 13px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+
+      a + a {
+        background: var(--paper);
+        color: var(--accent);
+        border: 1px solid var(--line);
+      }
+
+      iframe {
+        width: 100%;
+        height: 760px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: #fff;
+      }
+
+      .frames {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 390px;
+        gap: 14px;
+        min-width: 0;
+      }
+
+      .frame-label {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .mobile-frame {
+        width: 390px;
+        max-width: 100%;
+      }
+
+      @media (max-width: 860px) {
+        .card {
+          grid-template-columns: 1fr;
+        }
+
+        .frames {
+          grid-template-columns: 1fr;
+        }
+
+        iframe {
+          height: 720px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">Totsan email QA</p>
+        <h1>Email previews</h1>
+        <p class="intro">
+          Local previews with sample Supabase variables. These files are for visual QA only; production emails still use the templates in <code>supabase/email-templates</code>.
+        </p>
+      </header>
+      <section class="grid">
+        
+    <article class="card">
+      <div>
+        <p class="eyebrow">Subject</p>
+        <h2>Потвърждение на имейл</h2>
+        <p class="subject">Потвърдете регистрацията си в Totsan</p>
+        <p class="description">Signup confirmation with CTA link and 6-digit OTP fallback.</p>
+      </div>
+      <div class="actions">
+        <a href="./confirm-signup-preview.html" target="_blank" rel="noreferrer">Open full preview</a>
+      </div>
+      <div class="frames">
+        <div>
+          <p class="frame-label">Desktop email width</p>
+          <iframe class="desktop-frame" title="Потвърждение на имейл desktop" src="./confirm-signup-preview.html"></iframe>
+        </div>
+        <div>
+          <p class="frame-label">Mobile email width</p>
+          <iframe class="mobile-frame" title="Потвърждение на имейл mobile" src="./confirm-signup-preview.html"></iframe>
+        </div>
+      </div>
+    </article>
+  
+
+    <article class="card">
+      <div>
+        <p class="eyebrow">Subject</p>
+        <h2>Възстановяване на достъп</h2>
+        <p class="subject">Възстановяване на достъпа до Totsan</p>
+        <p class="description">Password recovery email in the same Totsan visual system.</p>
+      </div>
+      <div class="actions">
+        <a href="./recovery-preview.html" target="_blank" rel="noreferrer">Open full preview</a>
+      </div>
+      <div class="frames">
+        <div>
+          <p class="frame-label">Desktop email width</p>
+          <iframe class="desktop-frame" title="Възстановяване на достъп desktop" src="./recovery-preview.html"></iframe>
+        </div>
+        <div>
+          <p class="frame-label">Mobile email width</p>
+          <iframe class="mobile-frame" title="Възстановяване на достъп mobile" src="./recovery-preview.html"></iframe>
+        </div>
+      </div>
+    </article>
+  
+
+    <article class="card">
+      <div>
+        <p class="eyebrow">Subject</p>
+        <h2>Ново запитване</h2>
+        <p class="subject">Ново запитване от Мария Иванова</p>
+        <p class="description">Internal notification email sent when a visitor submits an inquiry.</p>
+      </div>
+      <div class="actions">
+        <a href="./inquiry-notification-preview.html" target="_blank" rel="noreferrer">Open full preview</a>
+      </div>
+      <div class="frames">
+        <div>
+          <p class="frame-label">Desktop email width</p>
+          <iframe class="desktop-frame" title="Ново запитване desktop" src="./inquiry-notification-preview.html"></iframe>
+        </div>
+        <div>
+          <p class="frame-label">Mobile email width</p>
+          <iframe class="mobile-frame" title="Ново запитване mobile" src="./inquiry-notification-preview.html"></iframe>
+        </div>
+      </div>
+    </article>
+  
+      </section>
+    </main>
+  </body>
+</html>

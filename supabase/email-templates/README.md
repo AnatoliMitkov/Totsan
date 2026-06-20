@@ -4,7 +4,7 @@ These files are dashboard-ready HTML templates for Supabase Auth emails. They do
 
 ## Files
 
-- `confirm-signup.html`: email confirmation / signup confirmation template.
+- `confirm-signup.html`: email confirmation / signup confirmation template with both a secure button link and a 6-digit OTP fallback.
 - `recovery.html`: password recovery template using the same visual system.
 
 ## Public Email Assets
@@ -40,6 +40,17 @@ Both templates use:
 ```
 
 Supabase replaces this with the secure confirmation, recovery, or action URL for the email type.
+
+`confirm-signup.html` also uses:
+
+```text
+{{ .Email }}
+{{ .Token }}
+```
+
+`{{ .Token }}` is the 6-digit one-time code shown on the `/check-email` page. The page verifies it with `supabase.auth.verifyOtp({ email, token, type: 'email' })`. The button link remains available through `{{ .ConfirmationURL }}`.
+
+`recovery.html` uses `{{ .Email }}` for clarity, but keeps the reset flow link-based because the current Totsan password recovery UI is built around Supabase's recovery redirect.
 
 ## Recommended Subjects
 
@@ -77,6 +88,77 @@ Password recovery:
 18. Add redirect URLs if the auth flow needs them, for example production, preview, and local development URLs.
 19. Send a test email from Supabase.
 20. Check Gmail desktop, Gmail mobile, Apple Mail, Outlook, and dark mode.
+
+## Check Email Page
+
+After signup, Totsan routes users to:
+
+```text
+/check-email?email=user@example.com
+```
+
+For partner signup, it uses:
+
+```text
+/check-email?type=partner&email=user@example.com
+```
+
+The page offers:
+
+- Open Gmail / Open Outlook shortcuts.
+- A 6-digit code input.
+- A resend action using `supabase.auth.resend({ type: 'signup', email })`.
+- A fallback link path through the email button.
+
+The code field is useful only when Supabase email confirmations are enabled for the project and the Confirm signup template includes `{{ .Token }}`.
+
+## Local Preview
+
+Generate local preview files with sample Supabase variables:
+
+```bash
+npm run email:preview
+```
+
+Open:
+
+```text
+docs-output/email-previews/index.html
+```
+
+The preview index shows both desktop and mobile-width frames. These files are for visual QA only and do not replace the Supabase Dashboard templates.
+
+Currently generated previews:
+
+- Signup confirmation with button and 6-digit code.
+- Password recovery.
+- New inquiry notification.
+
+Run the static email system checks with:
+
+```bash
+npm run email:validate
+```
+
+This verifies the required Supabase template variables, `/check-email` OTP/resend support, mailbox shortcuts, local email confirmation settings, and generated previews.
+
+For the normal full local QA pass, use:
+
+```bash
+npm run email:check
+```
+
+This regenerates previews first and then validates them, so checks do not race against stale or partially written preview files.
+
+Local `supabase/config.toml` has email confirmations enabled so local Supabase auth can exercise the same confirmation/code flow as production.
+
+The validation command also writes:
+
+```text
+docs-output/email-previews/qa-report.html
+```
+
+Use this as the handoff checklist for the final Gmail/Outlook test pass.
 
 ## Notes
 
