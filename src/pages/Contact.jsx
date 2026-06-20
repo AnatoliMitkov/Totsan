@@ -16,6 +16,8 @@ const INQUIRY_TYPES = [
   { value: 'specific', label: 'Специфична нужда' }
 ]
 
+const TURNSTILE_SITE_KEY = '0x4AAAAAADoPPM7fsJbPWv96'
+
 export default function Contact() {
   useSeo({
     canonicalPath: '/kontakt',
@@ -44,7 +46,7 @@ export default function Contact() {
   const [captchaToken, setCaptchaToken] = useState('')
   const [captchaResetKey, setCaptchaResetKey] = useState(0)
 
-  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || TURNSTILE_SITE_KEY
   const requiresCaptcha = Boolean(turnstileSiteKey)
 
   useEffect(() => {
