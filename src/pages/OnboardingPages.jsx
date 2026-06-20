@@ -8,6 +8,7 @@ const INPUT_CLASS = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py
 const TERMS_REQUIRED_MESSAGE = 'Първо потвърди, че се съгласяваш с общите условия и политиката за поверителност.'
 const PRODUCTION_APP_ORIGIN = 'https://totsan.com'
 const CHECK_EMAIL_BACKGROUND = '/Images/images-for-pro-page/01-totsan-pro-hero-visual.png'
+const EMAIL_CODE_LENGTH = 8
 
 const welcomeCards = [
   {
@@ -76,7 +77,7 @@ export function CheckEmailPage() {
   const [status, setStatus] = useState('idle')
   const [message, setMessage] = useState('')
   const isBusy = status === 'checking' || status === 'resending'
-  const normalizedCode = code.replace(/\D/g, '').slice(0, 6)
+  const normalizedCode = code.replace(/\D/g, '').slice(0, EMAIL_CODE_LENGTH)
   const nextPath = accountType === 'partner' ? '/pro/onboarding' : '/welcome'
   const mailboxOptions = getMailboxOptions(email)
 
@@ -89,9 +90,9 @@ export function CheckEmailPage() {
       return
     }
 
-    if (normalizedCode.length !== 6) {
+    if (normalizedCode.length !== EMAIL_CODE_LENGTH) {
       setStatus('error')
-      setMessage('Въведете 6-цифрения код от имейла.')
+      setMessage(`Въведете ${EMAIL_CODE_LENGTH}-цифрения код от имейла.`)
       return
     }
 
@@ -144,7 +145,7 @@ export function CheckEmailPage() {
   }
 
   function updateCode(value) {
-    setCode(value.replace(/\D/g, '').slice(0, 6))
+    setCode(value.replace(/\D/g, '').slice(0, EMAIL_CODE_LENGTH))
     if (status === 'error') {
       setStatus('idle')
       setMessage('')
@@ -175,7 +176,7 @@ export function CheckEmailPage() {
               Проверете имейла си
             </h1>
             <p className="mt-4 text-base leading-7 text-ink/78">
-              Изпратихме линк и 6-цифрен код за потвърждение. Можете да отворите пощата си или да въведете кода тук.
+              Изпратихме линк и {EMAIL_CODE_LENGTH}-цифрен код за потвърждение. Можете да отворите пощата си или да въведете кода тук.
             </p>
 
             {email && (
@@ -218,13 +219,13 @@ export function CheckEmailPage() {
                     onChange={(event) => updateCode(event.target.value)}
                     inputMode="numeric"
                     autoComplete="one-time-code"
-                    placeholder="Въведете 6 цифри"
+                    placeholder={`Въведете ${EMAIL_CODE_LENGTH} цифри`}
                     className="w-full rounded-2xl border border-line bg-paper px-11 py-3.5 text-center text-lg font-semibold tracking-[0.32em] text-ink outline-none transition placeholder:text-left placeholder:text-sm placeholder:font-normal placeholder:tracking-normal focus:border-ink"
                   />
                 </div>
               </label>
               <button
-                disabled={isBusy || normalizedCode.length !== 6}
+                disabled={isBusy || normalizedCode.length !== EMAIL_CODE_LENGTH}
                 className="btn btn-primary mt-4 w-full justify-center !py-3.5 text-base disabled:opacity-55"
               >
                 {status === 'checking' ? (
