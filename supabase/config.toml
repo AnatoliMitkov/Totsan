@@ -233,15 +233,19 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
+# Use a production-ready SMTP server.
+# Production Supabase Dashboard should send Auth emails as:
+# Totsan <no-reply@totsan.com>
+#
+# For a cPanel/domain mailbox, the values are usually similar to:
 # [auth.email.smtp]
 # enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# host = "mail.totsan.com"
+# port = 465
+# user = "no-reply@totsan.com"
+# pass = "env(TOTSAN_SMTP_PASSWORD)"
+# admin_email = "no-reply@totsan.com"
+# sender_name = "Totsan"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]

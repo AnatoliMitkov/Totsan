@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1383.84 440.83">
+  <defs>
+    <style>
+      .cls-1 {
+        letter-spacing: -.03em;
+      }
+
+      .cls-2 {
+        letter-spacing: 0em;
+      }
+
+      .cls-3 {
+        letter-spacing: -.05em;
+      }
+
+      .cls-4 {
+        letter-spacing: -.08em;
+      }
+
+      .cls-5 {
+        font-family: Monoton-Regular, Monoton;
+        font-size: 300px;
+      }
+
+      .cls-5, .cls-6 {
+        fill: #f1f1f1;
+      }
+
+      .cls-7 {
+        letter-spacing: -.02em;
+      }
+
+      .cls-8 {
+        letter-spacing: .02em;
+      }
+
+      .cls-6 {
+        font-family: GoogleSans-Medium, 'Google Sans';
+        font-size: 72px;
+        font-variation-settings: 'opsz' 18, 'wght' 500, 'GRAD' 0;
+        font-weight: 500;
+      }
+
+      .cls-9 {
+        letter-spacing: -.02em;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <text class="cls-5" transform="translate(0 271.29)"><tspan x="0" y="0">TOTSAN</tspan></text>
+    <text class="cls-6" transform="translate(223.92 369.62)"><tspan class="cls-1" x="0" y="0">C</tspan><tspan x="51.34" y="0">ONTROL, Q</tspan><tspan class="cls-7" x="440.2" y="0">U</tspan><tspan x="487.94" y="0">ALI</tspan><tspan class="cls-8" x="595.36" y="0">T</tspan><tspan class="cls-4" x="636.33" y="0">Y</tspan><tspan x="674.41" y="0">, TRU</tspan><tspan class="cls-9" x="843.25" y="0">S</tspan><tspan class="cls-2" x="882.85" y="0">T</tspan><tspan class="cls-3" x="922.74" y="0">	</tspan></text>
+  </g>
+</svg>

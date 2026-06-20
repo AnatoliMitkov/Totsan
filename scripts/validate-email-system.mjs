@@ -52,9 +52,13 @@ function buildReport(checks) {
   `).join('')
 
   const manualItems = [
+    'Enable production Supabase custom SMTP before real inbox QA.',
+    'Set production sender to Totsan <no-reply@totsan.com>, using the Totsan mailbox SMTP credentials.',
+    'Confirm Gmail inbox row does not show Supabase Auth or noreply@mail.app.supabase.io.',
     'Paste confirm-signup.html into Supabase Authentication -> Email Templates -> Confirm signup.',
     'Paste recovery.html into Supabase Authentication -> Email Templates -> Reset password / Recovery.',
     'Confirm production Auth email confirmations are enabled and OTP length is 6.',
+    'Confirm signup/recovery subjects are Bulgarian Totsan subjects, not the default Supabase English subjects.',
     'Send Supabase test emails to Gmail and Outlook.',
     'Check desktop and mobile inbox rendering, including dark mode.',
     'Complete a real signup using both the email button and the 6-digit code.',
