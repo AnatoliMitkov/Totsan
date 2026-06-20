@@ -6,7 +6,7 @@ Important: the HTML templates only control the email body. The sender shown in G
 
 ## Files
 
-- `confirm-signup.html`: email confirmation / signup confirmation template with both a secure button link and a 6-digit OTP fallback.
+- `confirm-signup.html`: email confirmation / signup confirmation template with both a secure button link and an 8-digit OTP fallback.
 - `recovery.html`: password recovery template using the same visual system.
 
 ## Public Email Assets
@@ -50,7 +50,7 @@ Supabase replaces this with the secure confirmation, recovery, or action URL for
 {{ .Token }}
 ```
 
-`{{ .Token }}` is the 6-digit one-time code shown on the `/check-email` page. The page verifies it with `supabase.auth.verifyOtp({ email, token, type: 'email' })`. The button link remains available through `{{ .ConfirmationURL }}`.
+`{{ .Token }}` is the 8-digit one-time code shown on the `/check-email` page. The page verifies it with `supabase.auth.verifyOtp({ email, token, type: 'email' })`. The button link remains available through `{{ .ConfirmationURL }}`.
 
 `recovery.html` uses `{{ .Email }}` for clarity, but keeps the reset flow link-based because the current Totsan password recovery UI is built around Supabase's recovery redirect.
 
@@ -143,7 +143,7 @@ For partner signup, it uses:
 The page offers:
 
 - Open Gmail / Open Outlook shortcuts.
-- A 6-digit code input.
+- An 8-digit code input.
 - A resend action using `supabase.auth.resend({ type: 'signup', email })`.
 - A fallback link path through the email button.
 
@@ -167,7 +167,7 @@ The preview index shows both desktop and mobile-width frames. These files are fo
 
 Currently generated previews:
 
-- Signup confirmation with button and 6-digit code.
+- Signup confirmation with button and 8-digit code.
 - Password recovery.
 - New inquiry notification.
 
@@ -188,6 +188,18 @@ npm run email:check
 This regenerates previews first and then validates them, so checks do not race against stale or partially written preview files.
 
 Local `supabase/config.toml` has email confirmations enabled so local Supabase auth can exercise the same confirmation/code flow as production.
+
+## Gmail Sender Avatar
+
+The small circular avatar next to the sender in Gmail is not controlled by the email HTML template. Gmail decides it from the sender account/domain identity.
+
+Ways to show a Totsan mark there:
+
+1. If `no-reply@totsan.com` is a Google Workspace mailbox, set the profile photo for that mailbox/account in Google Admin or the account profile.
+2. If mail is sent from a non-Google mailbox, configure BIMI for `totsan.com`. This requires a DNS TXT record, a BIMI-compatible square SVG logo hosted publicly, and often a verified certificate depending on the recipient mailbox provider.
+3. Keep SPF, DKIM, and DMARC correctly configured for `totsan.com`; BIMI generally depends on good domain authentication.
+
+This cannot be solved by changing `confirm-signup.html` or `recovery.html`.
 
 The validation command also writes:
 
