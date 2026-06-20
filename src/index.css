@@ -1088,29 +1088,75 @@ body { font-family: theme('fontFamily.sans'); font-size: var(--step-sm); line-he
   -webkit-text-fill-color: transparent;
 }
 
+/* Global Modern Scrollbar (Based on Asset 2) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #adadad transparent;
+}
+
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px #999;
+  border-radius: 20px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #adadad;
+  border-radius: 20px;
+  /* Fake border to make the thumb look like it has its own stroke as per SVG */
+  box-shadow: inset 0 0 0 1px #999;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
+
+/* Scrollbar up/down arrows */
+::-webkit-scrollbar-button:single-button:vertical:decrement {
+  height: 20px;
+  width: 14px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 76 76' fill='none' stroke='%23999' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22.5 47.3 38 22.5 53.4 47.3'%3E%3C/polyline%3E%3C/svg%3E");
+  background-size: contain;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+}
+
+::-webkit-scrollbar-button:single-button:vertical:increment {
+  height: 20px;
+  width: 14px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 76 76' fill='none' stroke='%23999' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22.5 28.7 38 53.5 53.4 28.7'%3E%3C/polyline%3E%3C/svg%3E");
+  background-size: contain;
+  background-position: center top;
+  background-repeat: no-repeat;
+}
+
+::-webkit-scrollbar-button:single-button:horizontal:decrement {
+  height: 14px;
+  width: 20px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 76 76' fill='none' stroke='%23999' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='47.3 22.5 22.5 38 47.3 53.4'%3E%3C/polyline%3E%3C/svg%3E");
+  background-size: contain;
+  background-position: right center;
+  background-repeat: no-repeat;
+}
+
+::-webkit-scrollbar-button:single-button:horizontal:increment {
+  height: 14px;
+  width: 20px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 76 76' fill='none' stroke='%23999' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='28.7 22.5 53.5 38 28.7 53.4'%3E%3C/polyline%3E%3C/svg%3E");
+  background-size: contain;
+  background-position: left center;
+  background-repeat: no-repeat;
+}
+
+/* Backward compatibility for the old .totsan-scrollbar class */
 .totsan-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(15, 23, 42, 0.2) rgba(15, 23, 42, 0.05);
-}
-
-.totsan-scrollbar::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.totsan-scrollbar::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.05);
-  border-radius: 999px;
-}
-
-.totsan-scrollbar::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.22), rgba(15, 23, 42, 0.14));
-  border: 2px solid rgba(255, 255, 255, 0.7);
-  border-radius: 999px;
-}
-
-.totsan-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.3), rgba(15, 23, 42, 0.2));
+  scrollbar-color: #adadad transparent;
 }
 
 /* Custom premium CTA button animations */

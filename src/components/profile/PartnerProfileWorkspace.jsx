@@ -185,8 +185,10 @@ function makeProfileDraft(profile) {
     facebook: profile.facebook || '',
     languagesText: csv(profile.languages?.length ? profile.languages : ['bg']),
     serviceAreasText: csv(profile.serviceAreas?.length ? profile.serviceAreas : (profile.city ? [profile.city] : [])),
-    responseTimeHours: profile.responseTimeHours || '',
+    responseTimeHours: profile.responseTimeHours === null ? '' : profile.responseTimeHours,
     acceptsRemote: Boolean(profile.acceptsRemote),
+    remotePricePerHour: profile.remotePricePerHour === null ? '' : profile.remotePricePerHour,
+    remoteIsFree: Boolean(profile.remoteIsFree),
     pricingNote: profile.pricingNote || '',
     coverUrl: profile.coverUrl || '',
     coverY: profile.coverY ?? 50,
@@ -668,6 +670,8 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       service_areas: fromLocationCsv(profileDraft.serviceAreasText, []),
       response_time_hours: profileDraft.responseTimeHours === '' ? null : Number(profileDraft.responseTimeHours),
       accepts_remote: Boolean(profileDraft.acceptsRemote),
+      remote_price_per_hour: profileDraft.remotePricePerHour === '' ? null : Number(profileDraft.remotePricePerHour),
+      remote_is_free: Boolean(profileDraft.remoteIsFree),
       pricing_note: profileDraft.pricingNote.trim() || null,
     }
 
@@ -1622,10 +1626,51 @@ function ProfileForm({
           <Field label={<FieldLabelWithCounter label="Ценови ориентир" count={pricingLength} limit={PROFILE_PRICING_LIMIT} />}>
             <textarea rows={3} maxLength={PROFILE_PRICING_LIMIT} value={draft.pricingNote} onChange={event => updateLimitedText('pricingNote', event.target.value, PROFILE_PRICING_LIMIT)} className={`${INPUT} min-h-28 resize-y`} placeholder="Напр. Консултация от 80€, цена след оглед или проект по оферта." />
           </Field>
-          <label className="flex items-start gap-3 rounded-2xl border border-line bg-soft p-4 text-sm text-muted">
-            <input type="checkbox" checked={draft.acceptsRemote} onChange={event => onChange('acceptsRemote', event.target.checked)} className="mt-1 accent-black" />
-            <span>Приемам дистанционни консултации и онлайн запитвания.</span>
-          </label>
+          <div className="rounded-2xl border border-line bg-soft p-5">
+            <div className="flex items-start gap-4">
+              <div className="text-accentDeep shrink-0">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                  <line x1="8" y1="21" x2="16" y2="21"></line>
+                  <line x1="12" y1="17" x2="12" y2="21"></line>
+                  <circle cx="12" cy="9" r="2.5"></circle>
+                  <path d="M7 17v-1.5c0-1.4 2.2-2.5 5-2.5s5 1.1 5 2.5V17"></path>
+                </svg>
+              </div>
+              <div className="flex-1">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={draft.acceptsRemote} onChange={event => onChange('acceptsRemote', event.target.checked)} className="accent-black w-4 h-4 rounded" />
+                  <span className="font-semibold text-ink text-sm">Дистанционни консултации</span>
+                </label>
+                
+                {draft.acceptsRemote && (
+                  <div className="mt-4 flex items-center gap-4 border-t border-line/50 pt-4">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm text-ink">
+                      <input type="checkbox" checked={draft.remoteIsFree} onChange={event => {
+                        onChange('remoteIsFree', event.target.checked)
+                        if (event.target.checked) onChange('remotePricePerHour', '')
+                      }} className="accent-black rounded w-4 h-4" />
+                      <span>Безплатно</span>
+                    </label>
+                    
+                    {!draft.remoteIsFree && (
+                      <div className="relative w-32 ml-auto flex items-center">
+                        <span className="absolute left-3 z-10 text-ink font-medium">€</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={draft.remotePricePerHour}
+                          onChange={event => onChange('remotePricePerHour', event.target.value)}
+                          className={`${INPUT} pl-8 py-2 w-full text-sm`}
+                          placeholder="Цена / час"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </ProfileSection>
 
