@@ -96,6 +96,39 @@ export class MaterialDecisionQuiz extends HTMLElement {
     });
   }
 
+  escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  renderContent(value) {
+    if (!value) return '';
+
+    if (Array.isArray(value)) {
+      const items = value.filter(Boolean);
+      if (!items.length) return '';
+      return `<ul class="section-list">${items.map(item => `<li>${this.escapeHtml(item)}</li>`).join('')}</ul>`;
+    }
+
+    return `<p>${this.escapeHtml(value)}</p>`;
+  }
+
+  renderResultSection(title, value, className = '') {
+    const content = this.renderContent(value);
+    if (!content) return '';
+
+    return `
+      <section class="result-section ${className}">
+        <h3>${this.escapeHtml(title)}</h3>
+        ${content}
+      </section>
+    `;
+  }
+
   render() {
     if (!this._config) {
       this.shadowRoot.innerHTML = `<div>Зареждане на конфигурация...</div>`;
@@ -128,24 +161,48 @@ export class MaterialDecisionQuiz extends HTMLElement {
 
     let questionHtml = '';
     if (isResult) {
-      const tilesHtml = recommendation.tiles.map(tile => `
+      const summaryTiles = Array.isArray(recommendation.tiles) ? recommendation.tiles : [];
+      const bullets = Array.isArray(recommendation.bullets) ? recommendation.bullets : [];
+      const resultTitle = recommendation.recommendationTitle || recommendation.title || ui.resultTitle;
+      const resultText = recommendation.recommendationText || recommendation.text || '';
+      const cta = recommendation.cta || {};
+      const primaryCta = cta.primary || ui.consultBtn;
+      const secondaryCta = cta.secondary || ui.restartBtn;
+      const riskHtml = recommendation.riskLevel
+        ? `<span class="risk-pill">${this.escapeHtml(recommendation.riskLevel)}</span>`
+        : '';
+      const tilesHtml = summaryTiles.map(tile => `
         <div class="summary-tile" style="${tile.spanAll ? 'grid-column: 1 / -1;' : ''}">
-          <span class="summary-label">${tile.label}</span>
-          <strong>${tile.value}</strong>
+          <span class="summary-label">${this.escapeHtml(tile.label)}</span>
+          <strong>${this.escapeHtml(tile.value)}</strong>
         </div>
       `).join('');
+      const summaryHtml = tilesHtml ? `<div class="summary-grid">${tilesHtml}</div>` : '';
+      const legacyBulletsHtml = bullets.length ? `
+        <ul class="bullet-list">
+          ${bullets.map(item => `<li>${this.escapeHtml(item)}</li>`).join('')}
+        </ul>
+      ` : '';
 
       questionHtml = `
         <div class="result-stack">
-          <span class="eyebrow">${ui.resultEyebrow}</span>
-          <h2 class="result-title">${ui.resultTitle}</h2>
-          <div class="summary-grid">${tilesHtml}</div>
-          <ul class="bullet-list">
-            ${recommendation.bullets.map(item => `<li>${item}</li>`).join('')}
-          </ul>
+          <div class="result-heading-row">
+            <span class="eyebrow">${this.escapeHtml(ui.resultEyebrow)}</span>
+            ${riskHtml}
+          </div>
+          <h2 class="result-title">${this.escapeHtml(resultTitle)}</h2>
+          ${resultText ? `<p class="recommendation-text">${this.escapeHtml(resultText)}</p>` : ''}
+          ${this.renderResultSection(recommendation.whyTitle || 'Защо това е подходящо', recommendation.why)}
+          ${this.renderResultSection('Какво да внимавате', recommendation.watchOut, recommendation.riskLevel ? 'is-watchout' : '')}
+          ${this.renderResultSection('Какво да попитате специалиста', recommendation.askSpecialist)}
+          ${this.renderResultSection('Кога не решавайте сами', recommendation.dontDecideAlone, 'is-caution')}
+          ${summaryHtml}
+          ${legacyBulletsHtml}
+          ${this.renderResultSection('Следваща стъпка', recommendation.nextStep)}
+          ${this.renderResultSection('Информационен преглед', recommendation.savedPayloadPreview)}
           <div class="action-row">
-            <button class="primary-button" type="button" data-action="consult">${ui.consultBtn}</button>
-            <button class="text-button" type="button" data-action="restart">${ui.restartBtn}</button>
+            <button class="primary-button" type="button" data-action="consult">${this.escapeHtml(primaryCta)}</button>
+            <button class="text-button" type="button" data-action="restart">${this.escapeHtml(secondaryCta)}</button>
           </div>
         </div>
       `;
@@ -206,6 +263,16 @@ export class MaterialDecisionQuiz extends HTMLElement {
           letter-spacing: -0.02em; color: #132238; font-weight: 700;
         }
         .question-stack, .result-stack { display: grid; gap: 1rem; }
+        .result-heading-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+        .result-heading-row .eyebrow { margin-bottom: 0; }
+        .risk-pill {
+          display: inline-flex; align-items: center; justify-content: center; padding: 0.35rem 0.65rem;
+          border-radius: 999px; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa;
+          font-size: 0.76rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+        }
+        .recommendation-text {
+          margin: 0; color: #304259; line-height: 1.55; font-size: 1rem;
+        }
         .options { display: grid; gap: 0.8rem; margin-top: 0.35rem; }
         .option-button {
           width: 100%; padding: 1rem 1.05rem; border: 1px solid #d7deea; border-radius: 1rem;
@@ -233,6 +300,22 @@ export class MaterialDecisionQuiz extends HTMLElement {
           font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; font-weight: 600;
         }
         .summary-tile strong { font-size: 1.05rem; color: #132238; line-height: 1.25; display: block; }
+        .result-section {
+          padding: 1rem; border-radius: 1rem; background: rgba(246, 249, 253, 0.72);
+          border: 1px solid rgba(221, 229, 240, 0.9);
+        }
+        .result-section.is-watchout { background: #fffaf0; border-color: #fdecc8; }
+        .result-section.is-caution { background: #fff5f5; border-color: #fed7d7; }
+        .result-section h3 {
+          margin: 0 0 0.55rem; color: #132238; font-size: 0.98rem; line-height: 1.3; font-weight: 700;
+        }
+        .result-section p {
+          margin: 0; color: #304259; line-height: 1.52; font-size: 0.94rem;
+        }
+        .section-list {
+          margin: 0; padding-left: 1.1rem; display: grid; gap: 0.45rem; color: #304259; font-size: 0.94rem;
+        }
+        .section-list li { line-height: 1.45; }
         .bullet-list { margin: 0.5rem 0 0 0; padding-left: 1.1rem; display: grid; gap: 0.7rem; color: #304259; font-size: 0.95rem; }
         .bullet-list li { line-height: 1.45; }
         .action-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-top: 0.5rem; }

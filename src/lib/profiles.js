@@ -73,6 +73,29 @@ export function slugify(value = '') {
   return value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '')
 }
 
+export function normalizePricingNoteDisplay(value = '') {
+  const text = String(value || '').trim()
+  if (!text) return ''
+
+  const amountMatch = text.match(/(?:€\s*)?(\d+(?:[.,]\d+)?)(?:\s*€)?/i)
+  if (!amountMatch) return text
+
+  const amount = amountMatch[1].replace(',', '.')
+  const lower = text.toLowerCase()
+  const hasEuro = /€/.test(text)
+
+  let unit = ''
+  if (lower.includes('м²') || lower.includes('m²') || lower.includes('кв')) unit = 'м²'
+  else if (lower.includes('л.м') || lower.includes('лине')) unit = 'л.м.'
+  else if (lower.includes('час')) unit = 'час'
+  else if (lower.includes('ден')) unit = 'ден'
+  else if (lower.includes('проект')) unit = 'проект'
+
+  if (hasEuro && unit) return `${amount}€/${unit}`
+  if (hasEuro && /^€?\s*\d+(?:[.,]\d+)?\s*€?$/.test(text)) return `${amount}€`
+  return text
+}
+
 function clamp(value, min, max, fallback) {
   const numeric = Number(value)
   if (!Number.isFinite(numeric)) return fallback
@@ -183,7 +206,7 @@ export function normalizeProfile(input = {}, fallback = null) {
   const acceptsRemote = input.acceptsRemote ?? input.accepts_remote ?? base.acceptsRemote ?? base.accepts_remote ?? false
   const remotePricePerHour = input.remotePricePerHour ?? input.remote_price_per_hour ?? base.remotePricePerHour ?? base.remote_price_per_hour ?? null
   const remoteIsFree = input.remoteIsFree ?? input.remote_is_free ?? base.remoteIsFree ?? base.remote_is_free ?? false
-  const pricingNote = String(input.pricingNote ?? input.pricing_note ?? base.pricingNote ?? base.pricing_note ?? '').trim()
+  const pricingNote = normalizePricingNoteDisplay(input.pricingNote ?? input.pricing_note ?? base.pricingNote ?? base.pricing_note ?? '')
   const userId = input.userId ?? input.user_id ?? base.userId ?? base.user_id ?? null
   const role = input.role ?? base.role ?? 'pro'
   const layer01Meta = toPlainObject(input.layer01Meta ?? input.layer01_meta ?? base.layer01Meta ?? base.layer01_meta)

@@ -17,7 +17,7 @@ import {
 import { supabase } from '../lib/supabase.js'
 import { LAYER_HEROS } from '../data/images.js'
 import { DELIVERABLES, SPECIALIST_TYPES, SPECIFIC_SERVICES, TARGET_OBJECTS } from '../data/layer01-meta.js'
-import { getProfileImage, getProfileImageStyle, normalizeProfile, runProfileSelectWithLayer01Fallback, slugify, useProfileDirectory } from '../lib/profiles.js'
+import { getProfileImage, getProfileImageStyle, normalizePricingNoteDisplay, normalizeProfile, runProfileSelectWithLayer01Fallback, slugify, useProfileDirectory } from '../lib/profiles.js'
 import { loadProfilePortfolio, loadProfileStats } from '../lib/portfolio.js'
 import { loadPublicPartnerServicesForProfile, packagePriceLabel } from '../lib/partner-services.js'
 import { useAccount } from '../lib/account.js'
@@ -104,7 +104,7 @@ function formatResponseLabel(hours) {
 }
 
 function getPriceGuide(profile, services) {
-  if (profile.pricingNote) return profile.pricingNote
+  if (profile.pricingNote) return normalizePricingNoteDisplay(profile.pricingNote)
   const pricedService = services.find((service) => service.lowestPrice)
   if (pricedService) return `Ориентир от ${packagePriceLabel(pricedService)}`
   return 'След оглед / по оферта'

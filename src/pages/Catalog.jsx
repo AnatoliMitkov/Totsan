@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowRight, BriefcaseBusiness, CheckCircle2, MapPin, PackageSearch, Search, SlidersHorizontal, UserRound, X } from 'lucide-react'
-import { useProfileDirectory } from '../lib/profiles.js'
+import { normalizePricingNoteDisplay, useProfileDirectory } from '../lib/profiles.js'
 import { loadPublicPartnerServices, packagePriceLabel } from '../lib/partner-services.js'
 import { loadPublicPortfolioCounts } from '../lib/portfolio.js'
 import { productImageFor } from '../data/images.js'
@@ -173,7 +173,7 @@ export default function Catalog() {
       serviceCount: servicesByProfile.get(profile.id)?.count || 0,
       serviceTitles: servicesByProfile.get(profile.id)?.titles || [],
       averageServicePrice: servicesByProfile.get(profile.id)?.averagePrice || 0,
-      priceGuide: servicesByProfile.get(profile.id)?.priceGuide || profile.pricingNote || '',
+      priceGuide: normalizePricingNoteDisplay(servicesByProfile.get(profile.id)?.priceGuide || profile.pricingNote || ''),
       portfolioCount: portfolioCounts[profile.id] || 0,
     }))
     const serviceItems = services.map((service) => {

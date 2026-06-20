@@ -9,7 +9,6 @@ import {
   CreditCard,
   Eye,
   FolderKanban,
-  Headphones,
   GripVertical,
   Globe2,
   Home,
@@ -73,6 +72,13 @@ const MAX_BANNER_BYTES = 12 * 1024 * 1024
 const PROFILE_BIO_LIMIT = 300
 const PROFILE_DESCRIPTION_LIMIT = 500
 const PROFILE_PRICING_LIMIT = 300
+const PRICE_UNIT_OPTIONS = [
+  { value: 'sqm', label: 'на квадратен метър', suffix: 'м²' },
+  { value: 'hour', label: 'на час', suffix: 'час' },
+  { value: 'linear_meter', label: 'на линеен метър', suffix: 'л.м.' },
+  { value: 'day', label: 'на ден', suffix: 'ден' },
+  { value: 'project', label: 'на проект', suffix: 'проект' },
+]
 const SUPPORTED_PROFILE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const BANNER_DESCRIPTION = 'Широк банер работи най-добре около 3:1. Препоръчваме 1600 x 520 px за най-чист резултат.'
 
@@ -91,6 +97,38 @@ function readFileAsDataUrl(file) {
     reader.onerror = () => reject(new Error('Файлът не може да бъде прочетен.'))
     reader.readAsDataURL(file)
   })
+}
+
+function normalizePriceInput(value) {
+  return String(value || '')
+    .replace(',', '.')
+    .replace(/[^\d.]/g, '')
+    .replace(/(\..*)\./g, '$1')
+}
+
+function getPriceUnit(value) {
+  return PRICE_UNIT_OPTIONS.find((option) => option.value === value) || PRICE_UNIT_OPTIONS[0]
+}
+
+function detectPriceUnit(value) {
+  const text = String(value || '').toLowerCase()
+  if (text.includes('л.м') || text.includes('лине')) return 'linear_meter'
+  if (text.includes('час')) return 'hour'
+  if (text.includes('ден')) return 'day'
+  if (text.includes('проект')) return 'project'
+  return 'sqm'
+}
+
+function parsePriceGuide(value) {
+  const text = String(value || '')
+  const amount = normalizePriceInput(text.match(/\d+(?:[.,]\d+)?/)?.[0] || '')
+  return { amount, unit: detectPriceUnit(text) }
+}
+
+function formatPriceGuide(amount, unit) {
+  const normalizedAmount = normalizePriceInput(amount)
+  if (!normalizedAmount) return ''
+  return `${normalizedAmount}€/${getPriceUnit(unit).suffix}`
 }
 
 function stripCacheBust(url) {
@@ -1203,20 +1241,6 @@ function WorkspaceSidebar({ tabs, activeTab, profile, completion, portfolioCount
           <InfoTile label="Проекти" value={portfolioCount} icon={FolderKanban} />
         </div>
 
-        <div className="mt-4 rounded-[1.5rem] border border-line bg-paper p-4">
-          <div className="flex items-start gap-3">
-            <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-soft text-accentDeep">
-              <Headphones size={18} />
-            </div>
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-ink">Нуждаете се от помощ?</div>
-              <p className="mt-1 text-sm leading-6 text-muted">Контактните полета и публичната информация могат да се редактират директно от този екран.</p>
-              <button type="button" onClick={() => onTabChange('contact')} className="btn btn-ghost mt-3 w-full justify-center">
-                Към контактите
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
     </aside>
   )
@@ -1538,10 +1562,23 @@ function ProfileForm({
 }) {
   const bioLength = String(draft.bio || '').length
   const descriptionLength = String(draft.descriptionLong || '').length
-  const pricingLength = String(draft.pricingNote || '').length
+  const priceGuide = parsePriceGuide(draft.pricingNote)
 
   function updateLimitedText(key, value, limit) {
     onChange(key, String(value || '').slice(0, limit))
+  }
+
+  function updateRemotePrice(value) {
+    const normalized = String(value || '')
+      .replace(',', '.')
+      .replace(/[^\d.]/g, '')
+      .replace(/(\..*)\./g, '$1')
+    onChange('remotePricePerHour', normalized)
+    if (normalized) onChange('remoteIsFree', false)
+  }
+
+  function updatePriceGuide(nextAmount = priceGuide.amount, nextUnit = priceGuide.unit) {
+    onChange('pricingNote', formatPriceGuide(nextAmount, nextUnit).slice(0, PROFILE_PRICING_LIMIT))
   }
 
   return (
@@ -1623,52 +1660,98 @@ function ProfileForm({
 
       <ProfileSection number="4" icon={CreditCard} title="Ценови ориентир и допълнителни настройки">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(18rem,1fr)]">
-          <Field label={<FieldLabelWithCounter label="Ценови ориентир" count={pricingLength} limit={PROFILE_PRICING_LIMIT} />}>
-            <textarea rows={3} maxLength={PROFILE_PRICING_LIMIT} value={draft.pricingNote} onChange={event => updateLimitedText('pricingNote', event.target.value, PROFILE_PRICING_LIMIT)} className={`${INPUT} min-h-28 resize-y`} placeholder="Напр. Консултация от 80€, цена след оглед или проект по оферта." />
-          </Field>
-          <div className="rounded-2xl border border-line bg-soft p-5">
-            <div className="flex items-start gap-4">
-              <div className="text-accentDeep shrink-0">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                  <line x1="8" y1="21" x2="16" y2="21"></line>
-                  <line x1="12" y1="17" x2="12" y2="21"></line>
-                  <circle cx="12" cy="9" r="2.5"></circle>
-                  <path d="M7 17v-1.5c0-1.4 2.2-2.5 5-2.5s5 1.1 5 2.5V17"></path>
-                </svg>
+          <div className="rounded-2xl border border-line bg-paper p-5 shadow-[0_14px_38px_rgba(13,35,64,0.06)]">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="text-base font-semibold leading-6 text-ink">Ценови ориентир</div>
+                <p className="mt-1 text-sm leading-6 text-muted">Въведете стартова стойност и база, по която обикновено калкулирате.</p>
               </div>
-              <div className="flex-1">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" checked={draft.acceptsRemote} onChange={event => onChange('acceptsRemote', event.target.checked)} className="accent-black w-4 h-4 rounded" />
-                  <span className="font-semibold text-ink text-sm">Дистанционни консултации</span>
-                </label>
-                
-                {draft.acceptsRemote && (
-                  <div className="mt-4 flex items-center gap-4 border-t border-line/50 pt-4">
-                    <label className="flex items-center gap-2 cursor-pointer text-sm text-ink">
-                      <input type="checkbox" checked={draft.remoteIsFree} onChange={event => {
-                        onChange('remoteIsFree', event.target.checked)
-                        if (event.target.checked) onChange('remotePricePerHour', '')
-                      }} className="accent-black rounded w-4 h-4" />
-                      <span>Безплатно</span>
-                    </label>
-                    
-                    {!draft.remoteIsFree && (
-                      <div className="relative w-32 ml-auto flex items-center">
-                        <span className="absolute left-3 z-10 text-ink font-medium">€</span>
-                        <input
-                          type="number"
-                          min="0"
-                          value={draft.remotePricePerHour}
-                          onChange={event => onChange('remotePricePerHour', event.target.value)}
-                          className={`${INPUT} pl-8 py-2 w-full text-sm`}
-                          placeholder="Цена / час"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
+            </div>
+            <div className="mt-4 grid items-end gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(13rem,0.85fr)]">
+              <label className="flex min-w-0 flex-col">
+                <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted">Стартова цена</span>
+                <span className="relative mt-2 block h-[3.05rem]">
+                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-base font-semibold text-ink">€</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={priceGuide.amount}
+                    onChange={event => updatePriceGuide(event.target.value, priceGuide.unit)}
+                    className={`${INPUT} !mt-0 h-full w-full pl-10`}
+                    placeholder="80"
+                  />
+                </span>
+              </label>
+              <div className="flex min-w-0 flex-col">
+                <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted">База</span>
+                <div className="mt-2 h-[3.05rem]">
+                  <TotsanSelect
+                    value={priceGuide.unit}
+                    onChange={(value) => updatePriceGuide(priceGuide.amount, value)}
+                    options={PRICE_UNIT_OPTIONS.map(({ value, label }) => ({ value, label }))}
+                    className="h-full"
+                    buttonClassName="h-full min-h-0"
+                  />
+                </div>
               </div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-line bg-paper p-5 shadow-[0_14px_38px_rgba(13,35,64,0.06)]">
+            <label className="flex cursor-pointer items-start gap-4">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-line bg-soft">
+                <img src="/svg/Asset%201.svg" alt="" className="h-7 w-7 object-contain" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-start justify-between gap-3">
+                  <span className="text-base font-semibold leading-6 text-ink">Дистанционни консултации</span>
+                  <input
+                    type="checkbox"
+                    checked={draft.acceptsRemote}
+                    onChange={event => {
+                      onChange('acceptsRemote', event.target.checked)
+                      if (!event.target.checked) {
+                        onChange('remoteIsFree', false)
+                        onChange('remotePricePerHour', '')
+                      }
+                    }}
+                    className="mt-1 h-4 w-4 rounded accent-black"
+                  />
+                </span>
+                <span className="mt-1 block text-sm leading-6 text-muted">Покажете дали предлагате разговор от разстояние и какъв е ориентирът на час.</span>
+              </span>
+            </label>
+
+            <div className={`mt-4 grid gap-3 border-t border-line/60 pt-4 transition ${draft.acceptsRemote ? 'opacity-100' : 'pointer-events-none opacity-45'}`}>
+              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-line bg-soft/65 px-4 py-3 text-sm text-ink">
+                <span className="font-medium">Безплатна консултация</span>
+                <input
+                  type="checkbox"
+                  checked={draft.remoteIsFree}
+                  disabled={!draft.acceptsRemote}
+                  onChange={event => {
+                    onChange('remoteIsFree', event.target.checked)
+                    if (event.target.checked) onChange('remotePricePerHour', '')
+                  }}
+                  className="h-4 w-4 rounded accent-black disabled:opacity-50"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted">Цена на час</span>
+                <span className="relative mt-2 block">
+                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-base font-semibold text-ink">€</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={draft.remotePricePerHour}
+                    disabled={!draft.acceptsRemote || draft.remoteIsFree}
+                    onChange={event => updateRemotePrice(event.target.value)}
+                    className={`${INPUT} w-full pl-10 pr-20 disabled:bg-soft disabled:text-muted`}
+                    placeholder="80"
+                  />
+                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted">/ час</span>
+                </span>
+              </label>
             </div>
           </div>
         </div>

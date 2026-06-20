@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1850.63 1487.16">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #fd2c27;
+      }
+
+      .cls-2 {
+        fill: url(#linear-gradient-2);
+      }
+
+      .cls-3 {
+        fill: url(#linear-gradient);
+      }
+    </style>
+    <linearGradient id="linear-gradient" x1="1647.33" y1="1487.16" x2="1647.33" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1f7afb"/>
+      <stop offset=".2" stop-color="#2c8ecd"/>
+      <stop offset=".47" stop-color="#3ea794"/>
+      <stop offset=".71" stop-color="#4bba6b"/>
+      <stop offset=".89" stop-color="#53c551"/>
+      <stop offset="1" stop-color="#56ca48"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="0" y1="524.42" x2="1850.63" y2="524.42" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fd4e9e"/>
+      <stop offset=".5" stop-color="#fe2d29"/>
+      <stop offset="1" stop-color="#ffe019"/>
+    </linearGradient>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <g>
+      <path class="cls-1" d="M203.39,0h0C313.82,0,403.47,89.65,403.47,200.08v1124.81c0,57.97-47.07,105.04-105.04,105.04H105.04C47.07,1429.94,0,1382.87,0,1324.89V203.39C0,91.13,91.13,0,203.39,0Z"/>
+      <path class="cls-3" d="M1648.99,0h0C1759.42,0,1849.07,89.65,1849.07,200.08v1182.04c0,57.97-47.07,105.04-105.04,105.04h-193.39c-57.97,0-105.04-47.07-105.04-105.04V203.39C1445.6,91.13,1536.73,0,1648.99,0Z"/>
+      <path class="cls-2" d="M1850.46,193.46C1846.25,88.3,1760.21,3.21,1655.01.09c-41.23-1.22-79.76,9.96-112.19,30.06v-.02s-.15.11-.15.11c-15.09,9.37-28.83,20.67-40.92,33.56l-576.43,472.78L348.89,63.81c-12.09-12.89-25.83-24.2-40.92-33.56l-.14-.11v.02C275.38,10.06,236.85-1.13,195.62.09,90.42,3.21,4.38,88.3.17,193.46c-2.3,57.58,19.58,110.02,56.26,148.13l-.03.04.35.29c9.67,10,20.33,19.03,31.88,26.87l784.28,660.91c30.28,25.52,74.54,25.52,104.82,0l784.28-660.91c11.55-7.84,22.21-16.87,31.88-26.87l.35-.29-.03-.04c36.68-38.1,58.56-90.55,56.26-148.13Z"/>
+    </g>
+  </g>
+</svg>
