@@ -237,14 +237,12 @@ otp_expiry = 3600
 # Production Supabase Dashboard should send Auth emails as:
 # Totsan <no-reply@totsan.com>
 #
-# For a cPanel/domain mailbox, the values are usually similar to:
+# For a cPanel/domain mailbox, configure SMTP only in Supabase Dashboard.
+# Do not put SMTP usernames or passwords in this repository.
 # [auth.email.smtp]
 # enabled = true
 # host = "mail.totsan.com"
 # port = 465
-# user = "no-reply@totsan.com"
-# pass = "env(TOTSAN_SMTP_PASSWORD)"
-# admin_email = "no-reply@totsan.com"
 # sender_name = "Totsan"
 
 # Uncomment to customize email template

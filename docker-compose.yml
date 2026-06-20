@@ -29,11 +29,13 @@ services:
     container_name: totsan-db
     ports:
       - "5432:5432"
+    env_file:
+      - .env.local
     environment:
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.local}
       - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
-      - JWT_SECRET=super-secret-jwt-token-change-me-in-production
+      - JWT_SECRET=${SUPABASE_JWT_SECRET:?Set SUPABASE_JWT_SECRET in .env.local}
     volumes:
       - pgdata:/var/lib/postgresql/data
       # Mount migrations so they run automatically when the database is initialized
