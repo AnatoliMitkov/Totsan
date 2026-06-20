@@ -42,9 +42,10 @@ export default function Contact() {
   const [status, setStatus] = useState('idle') // idle | sending | sent | error
   const [errorMsg, setErrorMsg] = useState('')
   const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaResetKey, setCaptchaResetKey] = useState(0)
 
-  // Testing site key for local dev if real key isn't provided in .env
-  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || '1x00000000000000000000AA'
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+  const requiresCaptcha = Boolean(turnstileSiteKey)
 
   useEffect(() => {
     if (account) {
@@ -58,6 +59,16 @@ export default function Contact() {
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }))
 
+  async function resolveFunctionError(error) {
+    try {
+      const payload = await error?.context?.json?.()
+      if (payload?.error) return payload.error
+    } catch {
+      // Keep the public fallback below when Supabase does not expose a JSON body.
+    }
+    return error?.message || 'Нещо се обърка. Опитай отново след малко или ни пиши директно на ' + brand.email + '.'
+  }
+
   async function onSubmit(e) {
     e.preventDefault()
     if (!form.name.trim() || !form.contact.trim() || !form.message.trim() || !form.inquiryType) {
@@ -65,7 +76,7 @@ export default function Contact() {
       setStatus('error')
       return
     }
-    if (!captchaToken) {
+    if (requiresCaptcha && !captchaToken) {
       setErrorMsg('Моля, потвърди, че не си робот.')
       setStatus('error')
       return
@@ -76,25 +87,31 @@ export default function Contact() {
     const inquiryLabel = INQUIRY_TYPES.find(t => t.value === form.inquiryType)?.label || form.inquiryType
     const finalMessage = `[Тип: ${inquiryLabel}]\n\n${form.message.trim()}`
 
-    const { data: newInquiry, error } = await supabase.from('inquiries').insert({
-      name: form.name.trim(),
-      contact: form.contact.trim(),
-      layer_slug: form.layer || null,
-      message: finalMessage,
-      source: 'contact_form',
-      client_id: session?.user?.id || null,
-    }).select().single()
+    const { data, error } = await supabase.functions.invoke('submit-inquiry', {
+      body: {
+        captchaToken,
+        inquiry: {
+          name: form.name.trim(),
+          contact: form.contact.trim(),
+          layer_slug: form.layer || null,
+          message: finalMessage,
+          source: 'contact_form',
+        },
+      },
+    })
 
     if (error) {
-      console.error('[contact] insert error:', error)
-      setErrorMsg('Нещо се обърка. Опитай отново след малко или ни пиши директно на ' + brand.email + '.')
+      console.error('[contact] submit-inquiry error:', error)
+      setErrorMsg(await resolveFunctionError(error))
       setStatus('error')
+      setCaptchaToken('')
+      setCaptchaResetKey((key) => key + 1)
       return
     }
 
     // Trigger email notification (fire and forget)
     supabase.functions.invoke('notify-inquiry', {
-      body: { record: newInquiry }
+      body: { record: data?.record }
     }).catch(err => console.error('[contact] failed to notify:', err))
 
     setStatus('sent')
@@ -107,6 +124,7 @@ export default function Contact() {
     })
     setForm({ name: '', contact: '', layer: '', inquiryType: '', message: '' })
     setCaptchaToken('')
+    setCaptchaResetKey((key) => key + 1)
   }
 
   return (
@@ -167,19 +185,27 @@ export default function Contact() {
                     className="mt-2 w-full px-4 py-3 rounded-xl border border-line focus:border-ink outline-none text-sm"></textarea>
                 </div>
 
-                <div className="mt-6 flex justify-center sm:justify-start">
-                  <Turnstile 
-                    siteKey={turnstileSiteKey} 
-                    onSuccess={(token) => setCaptchaToken(token)}
-                    onError={() => setErrorMsg('Неуспешна верификация. Опитай отново.')}
-                  />
-                </div>
-
                 {status === 'error' && (
                   <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">{errorMsg}</div>
                 )}
 
-                <button disabled={status === 'sending' || !captchaToken} className="btn btn-primary mt-6 disabled:opacity-50">
+                {requiresCaptcha && (
+                  <div className="mt-6 flex justify-center sm:justify-start">
+                    <Turnstile
+                      key={captchaResetKey}
+                      siteKey={turnstileSiteKey}
+                      options={{ action: 'contact_form', theme: 'light' }}
+                      onSuccess={(token) => setCaptchaToken(token)}
+                      onExpire={() => setCaptchaToken('')}
+                      onError={() => {
+                        setErrorMsg('Неуспешна верификация. Опитай отново.')
+                        setStatus('error')
+                      }}
+                    />
+                  </div>
+                )}
+
+                <button disabled={status === 'sending' || (requiresCaptcha && !captchaToken)} className="btn btn-primary mt-6 disabled:opacity-50">
                   {status === 'sending' ? 'Изпраща се…' : 'Изпрати запитване'}
                 </button>
                 <div className="mt-3 text-xs text-muted">

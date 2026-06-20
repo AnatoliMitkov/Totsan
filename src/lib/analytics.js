@@ -1,8 +1,8 @@
 import { CANONICAL_ORIGIN, getAnalyticsPath, shouldAutoTrackPath, toAbsoluteUrl, toCanonicalPath } from './site-routes.js'
+import { getStoredConsent } from '../utils/consentMode.js'
 
 const GA_MEASUREMENT_ID = String(import.meta.env.VITE_GA_MEASUREMENT_ID || '').trim()
 const REQUIRE_CONSENT = String(import.meta.env.VITE_GA_REQUIRE_CONSENT || 'true').trim().toLowerCase() !== 'false'
-const CONSENT_STORAGE_KEY = 'totsan.analyticsConsent'
 
 let initialized = false
 let lastTrackedPageViewKey = ''
@@ -16,15 +16,9 @@ export function hasAnalyticsConsent() {
   if (typeof window === 'undefined') return false
 
   const runtimeConsent = window.__totsanAnalyticsConsent
-  if (runtimeConsent && typeof runtimeConsent === 'object') {
-    return runtimeConsent.analytics === true
-  }
+  if (runtimeConsent && typeof runtimeConsent === 'object') return runtimeConsent.analytics === true
 
-  try {
-    return window.localStorage.getItem(CONSENT_STORAGE_KEY) === 'granted'
-  } catch {
-    return false
-  }
+  return getStoredConsent()?.analytics === true
 }
 
 export function initializeAnalytics() {

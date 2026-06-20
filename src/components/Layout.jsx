@@ -5,6 +5,7 @@ import { Menu, MessageCircle, X } from 'lucide-react'
 import { getAccountDisplayName, getAccountAvatar, useAccount, signOutAndRedirect } from '../lib/account.js'
 import { loadUnreadConversationCount, subscribeToConversationList } from '../lib/chat.js'
 import Avatar from './Avatar.jsx'
+import { openCookieSettings } from './CookieConsent.jsx'
 
 const BLOCKED_ACCOUNT_STATUSES = new Set(['banned', 'blocked'])
 
@@ -474,6 +475,11 @@ function Footer({ isAuthPage = false }) {
           <ul className="space-y-1.5 text-sm text-muted">
             <li><Link to="/obshti-usloviya" className="hover:text-ink">Общи условия</Link></li>
             <li><Link to="/politika-za-poveritelnost" className="hover:text-ink">Политика за поверителност</Link></li>
+            <li>
+              <button type="button" className="text-left hover:text-ink" onClick={openCookieSettings}>
+                Настройки за бисквитки
+              </button>
+            </li>
           </ul>
         </div>
       </div>

@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Link, Navigate, useLocation, useNavigate 
 import './index.css'
 import Layout from './components/Layout.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
+import CookieConsent from './components/CookieConsent.jsx'
 import { supabase } from './lib/supabase.js'
 import Home from './pages/Home.jsx'
 import Start from './pages/Start.jsx'
@@ -46,9 +47,12 @@ import { loadMfaStatus } from './lib/mfa.js'
 import { trackPageView, canAutoTrackPath, getPageLocation } from './lib/analytics.js'
 import { applySeo, getDefaultSeo } from './lib/seo.js'
 import { getAnalyticsPath } from './lib/site-routes.js'
+import { getStoredConsent, initDefaultConsent, updateConsentFromPreferences } from './utils/consentMode.js'
 
 let mfaNextPath = ''
-const GTM_CONTAINER_ID = 'GTM-KRRXFW9H'
+const GTM_CONTAINER_ID = String(import.meta.env.VITE_GTM_ID || '').trim()
+
+initDefaultConsent()
 
 function normalizeNextPath(value = '') {
   const raw = String(value || '').trim()
@@ -114,13 +118,17 @@ function GoogleTagManagerRouteTracker() {
 
     window.dataLayer = window.dataLayer || []
 
-    if (!document.querySelector(`script[src*="googletagmanager.com/gtm.js?id=${GTM_CONTAINER_ID}"]`)) {
+    const storedConsent = getStoredConsent()
+    if (storedConsent) updateConsentFromPreferences(storedConsent)
+
+    if (GTM_CONTAINER_ID && !document.querySelector(`script[data-totsan-gtm="${GTM_CONTAINER_ID}"]`)) {
       window.dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' })
 
       const firstScript = document.getElementsByTagName('script')[0]
       const script = document.createElement('script')
       script.async = true
       script.src = `https://www.googletagmanager.com/gtm.js?id=${GTM_CONTAINER_ID}`
+      script.setAttribute('data-totsan-gtm', GTM_CONTAINER_ID)
       firstScript?.parentNode?.insertBefore(script, firstScript)
     }
 
@@ -315,6 +323,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <GoogleTagManagerRouteTracker />
       <RouteAnalyticsManager />
       <AppRoutes />
+      <CookieConsent />
     </BrowserRouter>
   </React.StrictMode>
 )
