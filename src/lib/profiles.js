@@ -39,7 +39,9 @@ export const PROFILE_SELECT_COLUMNS_BASE = `
   years_experience,
   response_time_hours,
   accepts_remote,
-  pricing_note
+  pricing_note,
+  remote_price_per_hour,
+  remote_is_free
 `
 
 export const PROFILE_AI_FIT_SUMMARY_COLUMNS = `
@@ -179,6 +181,8 @@ export function normalizeProfile(input = {}, fallback = null) {
   const yearsExperience = clamp(input.yearsExperience ?? input.years_experience ?? base.yearsExperience ?? base.years_experience, 0, 100, Math.max(0, new Date().getFullYear() - since))
   const responseTimeHours = input.responseTimeHours ?? input.response_time_hours ?? base.responseTimeHours ?? base.response_time_hours ?? null
   const acceptsRemote = input.acceptsRemote ?? input.accepts_remote ?? base.acceptsRemote ?? base.accepts_remote ?? false
+  const remotePricePerHour = input.remotePricePerHour ?? input.remote_price_per_hour ?? base.remotePricePerHour ?? base.remote_price_per_hour ?? null
+  const remoteIsFree = input.remoteIsFree ?? input.remote_is_free ?? base.remoteIsFree ?? base.remote_is_free ?? false
   const pricingNote = String(input.pricingNote ?? input.pricing_note ?? base.pricingNote ?? base.pricing_note ?? '').trim()
   const userId = input.userId ?? input.user_id ?? base.userId ?? base.user_id ?? null
   const role = input.role ?? base.role ?? 'pro'
@@ -217,6 +221,8 @@ export function normalizeProfile(input = {}, fallback = null) {
     yearsExperience: Math.round(yearsExperience),
     responseTimeHours: responseTimeHours === null || responseTimeHours === undefined || responseTimeHours === '' ? null : Math.round(Number(responseTimeHours)),
     acceptsRemote: Boolean(acceptsRemote),
+    remotePricePerHour: remotePricePerHour === null || remotePricePerHour === undefined || remotePricePerHour === '' ? null : Math.round(Number(remotePricePerHour)),
+    remoteIsFree: Boolean(remoteIsFree),
     pricingNote,
     imageUrl,
     imageZoom,
@@ -339,6 +345,8 @@ export function buildCatalogWithProfiles(profiles) {
         yearsExperience: profile.yearsExperience,
         responseTimeHours: profile.responseTimeHours,
         acceptsRemote: profile.acceptsRemote,
+        remotePricePerHour: profile.remotePricePerHour,
+        remoteIsFree: profile.remoteIsFree,
         pricingNote: profile.pricingNote,
         imageUrl: profile.imageUrl,
         imageZoom: profile.imageZoom,

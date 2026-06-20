@@ -125,7 +125,7 @@ export default function TotsanSelect({
         <div
           role="listbox"
           aria-labelledby={label ? `${id}-label` : undefined}
-          className={`absolute left-0 right-0 z-50 mt-2 max-h-72 overflow-y-auto rounded-2xl border border-line bg-paper/95 p-1.5 shadow-[0_24px_70px_-36px_rgba(13,35,64,0.55)] backdrop-blur-xl ${menuClassName}`.trim()}
+          className={`absolute left-0 right-0 z-50 mt-2 max-h-72 overflow-y-auto totsan-scrollbar rounded-2xl border border-line bg-paper/95 p-1.5 shadow-[0_24px_70px_-36px_rgba(13,35,64,0.55)] backdrop-blur-xl ${menuClassName}`.trim()}
         >
           {items.map((option, index) => {
             const isSelected = String(option.value) === String(value)

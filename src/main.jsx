@@ -48,6 +48,7 @@ import { applySeo, getDefaultSeo } from './lib/seo.js'
 import { getAnalyticsPath } from './lib/site-routes.js'
 
 let mfaNextPath = ''
+const GTM_CONTAINER_ID = 'GTM-KRRXFW9H'
 
 function normalizeNextPath(value = '') {
   const raw = String(value || '').trim()
@@ -101,6 +102,38 @@ function RouteAnalyticsManager() {
       pageLocation: getPageLocation(location.pathname),
     })
   }, [location.pathname])
+
+  return null
+}
+
+function GoogleTagManagerRouteTracker() {
+  const location = useLocation()
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return
+
+    window.dataLayer = window.dataLayer || []
+
+    if (!document.querySelector(`script[src*="googletagmanager.com/gtm.js?id=${GTM_CONTAINER_ID}"]`)) {
+      window.dataLayer.push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' })
+
+      const firstScript = document.getElementsByTagName('script')[0]
+      const script = document.createElement('script')
+      script.async = true
+      script.src = `https://www.googletagmanager.com/gtm.js?id=${GTM_CONTAINER_ID}`
+      firstScript?.parentNode?.insertBefore(script, firstScript)
+    }
+
+    const seo = getDefaultSeo(location.pathname)
+    const pagePath = `${location.pathname}${location.search || ''}${location.hash || ''}`
+
+    window.dataLayer.push({
+      event: 'page_view',
+      page_title: seo.title || document.title,
+      page_path: pagePath,
+      page_location: `${window.location.origin}${pagePath}`,
+    })
+  }, [location.pathname, location.search, location.hash])
 
   return null
 }
@@ -279,6 +312,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <RouteSeoManager />
+      <GoogleTagManagerRouteTracker />
       <RouteAnalyticsManager />
       <AppRoutes />
     </BrowserRouter>

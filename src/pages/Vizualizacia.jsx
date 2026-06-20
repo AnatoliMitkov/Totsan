@@ -75,7 +75,7 @@ export default function Vizualizacia() {
               <div className="rounded-[1.6rem] border border-line bg-soft/50 p-5">
                 <div className="eyebrow">Достъп</div>
                 <p className="mt-3 text-sm text-muted">
-                  На mobile и tablet не зареждаме стрийм прозореца, за да избегнем слаб UX и ненужно стартиране на сесия.
+                  На мобилно устройство и таблет не зареждаме стрийм прозореца. Това ще бъде възможно в бъдеща версия.
                 </p>
               </div>
 

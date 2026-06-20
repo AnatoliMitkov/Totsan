@@ -37,6 +37,8 @@ export function LocationCombobox({
   storageMode = 'name',
   placeholder = 'Избери град',
   helper = 'Избери град от официалния списък.',
+  className = '',
+  topRightSlot = null,
 }) {
   const id = useId()
   const rootRef = useRef(null)
@@ -110,49 +112,54 @@ export function LocationCombobox({
   }
 
   return (
-    <div ref={rootRef} className="relative min-w-0">
-      <div className="grid min-w-0 gap-3 sm:grid-cols-[12rem_minmax(0,1fr)]">
-        <TotsanSelect
-          label="Област"
-          value={region}
-          onChange={(nextRegion) => {
-            setRegion(nextRegion)
-            setQuery('')
-            setOpen(true)
-            if (selectedCity) onChange?.('')
-          }}
-          options={BULGARIA_REGIONS.map((item) => ({ value: item, label: item }))}
-        />
-        <div className="min-w-0">
+    <div ref={rootRef} className={`relative min-w-0 ${className || ''}`.trim()}>
+      <div className="grid min-w-0 gap-4 sm:grid-cols-3">
+        <div className="sm:col-span-1">
+          <TotsanSelect
+            label="Област (град)"
+            value={region}
+            onChange={(nextRegion) => {
+              setRegion(nextRegion)
+              setQuery('')
+              setOpen(true)
+              if (selectedCity) onChange?.('')
+            }}
+            options={BULGARIA_REGIONS.map((item) => ({ value: item, label: item }))}
+          />
+        </div>
+        <div className="min-w-0 sm:col-span-2">
           <label htmlFor={id} className="block text-sm font-medium text-ink">{label}</label>
-          <div className="relative">
-            <Search size={16} className="pointer-events-none absolute left-4 top-1/2 mt-1 -translate-y-1/2 text-muted" />
-            <input
-              ref={inputRef}
-              id={id}
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value)
-                setOpen(true)
-              }}
-              onFocus={() => setOpen(true)}
-              onBlur={normalizeTypedValue}
-              required={required}
-              className={`${INPUT_CLASS} pl-11 ${error ? 'border-red-300 bg-red-50/70' : ''}`}
-              placeholder={placeholder}
-              autoComplete="off"
-              role="combobox"
-              aria-expanded={open}
-              aria-invalid={Boolean(error)}
-              aria-controls={`${id}-listbox`}
-            />
+          <div className="flex flex-wrap items-start gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search size={16} className="pointer-events-none absolute left-4 top-1/2 mt-1 -translate-y-1/2 text-muted" />
+              <input
+                ref={inputRef}
+                id={id}
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value)
+                  setOpen(true)
+                }}
+                onFocus={() => setOpen(true)}
+                onBlur={normalizeTypedValue}
+                required={required}
+                className={`${INPUT_CLASS} pl-11 ${error ? 'border-red-300 bg-red-50/70' : ''}`}
+                placeholder={placeholder}
+                autoComplete="off"
+                role="combobox"
+                aria-expanded={open}
+                aria-invalid={Boolean(error)}
+                aria-controls={`${id}-listbox`}
+              />
+            </div>
+            {topRightSlot && <div className="mt-2 shrink-0">{topRightSlot}</div>}
           </div>
           {(helper || error) && <p className={`mt-1.5 text-xs ${error ? 'text-red-700' : 'text-muted'}`}>{error || helper}</p>}
         </div>
       </div>
 
       {open && (
-        <div id={`${id}-listbox`} role="listbox" className="absolute left-0 right-0 z-50 mt-2 max-h-72 overflow-y-auto rounded-2xl border border-line bg-paper/95 p-1.5 shadow-[0_24px_70px_-36px_rgba(13,35,64,0.55)] backdrop-blur-xl">
+        <div id={`${id}-listbox`} role="listbox" className="absolute left-0 right-0 z-50 mt-2 max-h-72 overflow-y-auto totsan-scrollbar rounded-2xl border border-line bg-paper/95 p-1.5 shadow-[0_24px_70px_-36px_rgba(13,35,64,0.55)] backdrop-blur-xl">
           {options.map((option) => {
             const isSelected = selectedCity?.id === option.id
             return (
@@ -186,7 +193,8 @@ export function LocationMultiCombobox({
   label = 'Райони',
   value = '',
   onChange,
-  helper = 'Добавяй градове от официалния списък. Записват се без дублиране.',
+  helper = '',
+  bottomLeftSlot = null,
 }) {
   const list = normalizeLocationList(value, { storage: 'cityWithOblast' })
 
@@ -209,41 +217,55 @@ export function LocationMultiCombobox({
         storageMode="cityWithOblast"
         placeholder="Избери град"
         helper={helper}
+        className="mb-4"
+        topRightSlot={
+          <div className="flex flex-wrap gap-2">
+            {SPECIAL_LOCATION_OPTIONS.map((option) => {
+              const selected = list.includes(option)
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => addSpecialOption(option)}
+                  disabled={selected}
+                  className={`inline-flex h-11 items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-medium transition ${
+                    selected
+                      ? 'border-accentDeep/20 bg-accentSoft text-accentDeep'
+                      : 'border-line bg-paper text-ink hover:border-ink/30 hover:bg-soft'
+                  }`}
+                >
+                  {selected && <Check size={14} />}
+                  {option}
+                </button>
+              )
+            })}
+          </div>
+        }
       />
-      <div className="mt-3 flex flex-wrap gap-2">
-        {SPECIAL_LOCATION_OPTIONS.map((option) => {
-          const selected = list.includes(option)
-          return (
-            <button
-              key={option}
-              type="button"
-              onClick={() => addSpecialOption(option)}
-              disabled={selected}
-              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                selected
-                  ? 'border-accentDeep/20 bg-accentSoft text-accentDeep'
-                  : 'border-line bg-paper text-ink hover:border-ink/30 hover:bg-soft'
-              }`}
-            >
-              {selected && <Check size={14} />}
-              {option}
-            </button>
-          )
-        })}
-      </div>
-      {list.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {list.map((item) => (
-            <span key={locationCountKey(item) || item} className="inline-flex items-center gap-2 rounded-full border border-line bg-soft px-3 py-1.5 text-sm text-ink">
-              <MapPin size={14} className="text-accentDeep" />
-              {locationDisplayValue(item)}
-              <button type="button" onClick={() => setList(list.filter((current) => current !== item))} className="rounded-full p-0.5 text-muted transition hover:bg-paper hover:text-red-700" aria-label={`Премахни ${locationDisplayValue(item)}`}>
-                <X size={13} />
-              </button>
-            </span>
-          ))}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="sm:col-span-1">
+          {bottomLeftSlot}
         </div>
-      )}
+        <div className="sm:col-span-2">
+          {list.length > 0 && (
+            <div className="rounded-2xl bg-gradient-to-r from-accentDeep to-purple-500 p-[1.5px]">
+              <div className="flex h-full flex-col gap-3 rounded-[14px] bg-paper p-4">
+                <div className="flex flex-wrap gap-2">
+                  {list.map((item) => (
+                    <span key={locationCountKey(item) || item} className="inline-flex items-center gap-2 rounded-full border border-line bg-soft px-3 py-1.5 text-sm text-ink">
+                      <MapPin size={14} className="text-accentDeep" />
+                      {locationDisplayValue(item)}
+                      <button type="button" onClick={() => setList(list.filter((current) => current !== item))} className="rounded-full p-0.5 text-muted transition hover:bg-paper hover:text-red-700" aria-label={`Премахни ${locationDisplayValue(item)}`}>
+                        <X size={13} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
