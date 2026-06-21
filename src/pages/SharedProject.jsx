@@ -39,6 +39,7 @@ import {
   getProjectPropertyTypeLabel,
   getProjectStageLabel,
   loadSharedClientProject,
+  getProjectAccessItems,
 } from '../lib/projects.js'
 
 import { getMediaUrl, isImageMedia, getExtension } from '../components/media/MediaCarousel.jsx'
@@ -239,6 +240,8 @@ export default function SharedProject() {
   const uploadedFilesLabel = mediaAvailabilityLabel(imageMedia.length, documentMedia.length)
   const objectLabel = [propertyTypeLabel, roomsLabel].filter(hasValue).join(', ')
 
+  const accessItems = getProjectAccessItems(project)
+
   const heroSignals = [
     { key: 'layer', label: 'Категория', value: layerLabel, icon: Layers3 },
   ].filter((item) => hasValue(item.value))
@@ -247,7 +250,6 @@ export default function SharedProject() {
     { key: 'layer', label: 'Категория', value: layerLabel, icon: Layers3 },
     { key: 'location', label: 'Локация', value: locationLabel, icon: MapPin },
     { key: 'property', label: 'Тип обект', value: propertyTypeLabel, icon: Home },
-    { key: 'access', label: 'Достъп', value: accessSummary, icon: ShieldCheck },
     { key: 'area', label: 'Квадратура', value: areaLabel, icon: Ruler },
     { key: 'rooms', label: 'Стаи', value: roomsLabel, icon: LayoutList },
     { key: 'start', label: 'Желан старт', value: desiredStartLabel, icon: CalendarDays },
@@ -317,24 +319,32 @@ export default function SharedProject() {
   }
 
   return (
-    <div className="overflow-x-clip bg-soft">
-      <section className="relative min-h-[460px] overflow-hidden bg-[#0d2340] text-paper sm:min-h-[520px] lg:min-h-[580px]">
-        {heroImageUrl ? (
-          <img
-            src={heroImageUrl}
-            alt=""
-            className="absolute inset-0 h-full w-full scale-[1.02] object-cover"
-            aria-hidden="true"
-          />
-        ) : (
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(255,255,255,0.42),transparent_28%),radial-gradient(circle_at_82%_18%,rgba(47,143,116,0.30),transparent_34%),linear-gradient(135deg,#0d2340_0%,#476a7e_48%,#e0e8e2_100%)]" />
-        )}
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(13,35,64,0.86)_0%,rgba(13,35,64,0.56)_48%,rgba(13,35,64,0.18)_100%)]" />
-        <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-soft to-transparent" />
+    <div className="bg-soft">
+      <section className="relative min-h-[460px] bg-[#0d2340] text-paper sm:min-h-[520px] lg:min-h-[580px]">
+        <div className="absolute inset-0 overflow-hidden">
+          {heroImageUrl ? (
+            <img
+              src={heroImageUrl}
+              alt=""
+              className="absolute inset-0 h-full w-full scale-[1.02] object-cover"
+              aria-hidden="true"
+            />
+          ) : (
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_16%,rgba(255,255,255,0.42),transparent_28%),radial-gradient(circle_at_82%_18%,rgba(47,143,116,0.30),transparent_34%),linear-gradient(135deg,#0d2340_0%,#476a7e_48%,#e0e8e2_100%)]" />
+          )}
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(13,35,64,0.86)_0%,rgba(13,35,64,0.56)_48%,rgba(13,35,64,0.18)_100%)]" />
+          <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-soft to-transparent" />
+        </div>
 
-        <div className="container-page relative z-10 flex min-h-[460px] items-end px-4 pb-8 pt-24 sm:min-h-[520px] md:px-6 lg:min-h-[580px] lg:pb-12">
-          <div className="grid w-full items-end gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
-            <div className="max-w-4xl rounded-[2rem] border border-white/22 bg-paper/90 p-5 text-ink shadow-[0_26px_80px_rgba(13,35,64,0.22)] backdrop-blur-xl sm:p-7 lg:p-8">
+        <div 
+          className="container-page relative z-10 flex min-h-[460px] items-start px-4 pb-10 sm:min-h-[520px] md:px-6 lg:min-h-[580px] lg:pb-16 [--pad-t:1rem] lg:[--pad-t:1.5rem]"
+          style={{ paddingTop: 'calc(var(--header-h, 64px) + var(--pad-t))' }}
+        >
+          <div className="grid w-full items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+            <div 
+              className="max-w-4xl lg:sticky lg:self-start rounded-[2rem] border border-white/22 bg-paper/90 p-5 text-ink shadow-[0_26px_80px_rgba(13,35,64,0.22)] backdrop-blur-xl sm:p-7 lg:p-8"
+              style={{ top: 'calc(var(--header-h, 64px) + var(--pad-t))' }}
+            >
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accentSoft/80 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-accentDeep">
                   <ShieldCheck size={13} />
@@ -488,11 +498,30 @@ export default function SharedProject() {
                     <Layers3 size={15} />
                     Основни параметри
                   </div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="mt-3 grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     {parameterItems.map((item) => (
                       <BriefMetric key={item.key} item={item} />
                     ))}
                   </div>
+
+                  {accessItems.length > 0 && (
+                    <div className="mt-5 border-t border-line/50 pt-5">
+                      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted">
+                        <ShieldCheck size={15} />
+                        Достъп до обекта
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {accessItems.map((val, idx) => (
+                          <div key={idx} className="flex items-center gap-2 rounded-2xl border border-line/70 bg-soft/38 px-3 py-2">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-paper text-accentDeep shadow-sm">
+                              <ShieldCheck size={13} />
+                            </div>
+                            <span className="text-xs font-semibold text-ink">{val}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -502,7 +531,7 @@ export default function SharedProject() {
                     <CheckCircle2 size={15} />
                     Какво е налично
                   </div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="mt-3 grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {availabilityItems.map((item) => (
                       <BriefMetric key={item.key} item={item} />
                     ))}

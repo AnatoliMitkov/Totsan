@@ -1,17 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { 
-  Pause, 
-  Play, 
-  ChevronRight, 
-  Sparkles, 
-  ArrowRight, 
-  Compass, 
-  CheckCircle2, 
-  UserCheck, 
-  ShieldCheck, 
-  Clock, 
-  HelpCircle 
+import {
+  Pause,
+  Play,
+  ChevronRight,
+  Sparkles,
+  ArrowRight,
+  Compass,
+  CheckCircle2,
+  UserCheck,
+  ShieldCheck,
+  Clock,
+  HelpCircle
 } from 'lucide-react'
 import { gsap } from 'gsap'
 import { LAYERS } from '../data/layers.js'
@@ -364,7 +364,7 @@ function Hero() {
             <span className="home-hero__title-line home-hero__title-line--top hero-animate-title-line">Твоят сигурен избор в</span>
             <span className="home-hero__title-line home-hero__title-line--bottom text-accent italic hero-animate-title-line">строителството.</span>
           </h1>
-          <p className="home-hero__lead mt-5 max-w-xl hero-animate-lead" style={{fontSize:'var(--step-md)'}}>
+          <p className="home-hero__lead mt-5 max-w-xl hero-animate-lead" style={{ fontSize: 'var(--step-md)' }}>
             От идея до завършен дом — на едно място. Отговаряш на няколко въпроса, а ние те насочваме към правилните проверени специалисти, материали и услуги. Безплатно за теб, със защитено плащане.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
@@ -497,9 +497,9 @@ function TrustPromise() {
     'Сигурна поръчка през платформата.'
   ]
   const items = [
-    { k:'Проверка преди видимост', v:'Партньорите минават през преглед, преди да бъдат показани като активни в платформата.', icon: <UserCheck className="text-accent" size={24} /> },
-    { k:'Ясен път', v:'Започваш с кратък бриф, получаваш насока и стигаш до правилния слой, специалист или услуга.', icon: <Compass className="text-accent" size={24} /> },
-    { k:'По-малко догадки', v:'Виждаш обхват, ориентир за цена и следваща стъпка, преди да губиш време в разговори.', icon: <ShieldCheck className="text-accent" size={24} /> }
+    { k: 'Проверка преди видимост', v: 'Партньорите минават през преглед, преди да бъдат показани като активни в платформата.', icon: <UserCheck className="text-accent" size={24} /> },
+    { k: 'Ясен път', v: 'Започваш с кратък бриф, получаваш насока и стигаш до правилния слой, специалист или услуга.', icon: <Compass className="text-accent" size={24} /> },
+    { k: 'По-малко догадки', v: 'Виждаш обхват, ориентир за цена и следваща стъпка, преди да губиш време в разговори.', icon: <ShieldCheck className="text-accent" size={24} /> }
   ]
   const [stats, setStats] = useState({
     publishedServices: 0,
@@ -550,7 +550,7 @@ function TrustPromise() {
                   {index === 3 ? <ShieldCheck size={30} className="text-accentDeep" /> : null}
                 </span>
               </div>
-              <div className={`font-display leading-none text-accentDeep font-bold flex justify-center text-center w-full ${index >= 2 ? 'text-[clamp(1.25rem,1vw+1rem,2.25rem)] tracking-tight' : 'text-[clamp(2rem,1.6rem+1vw,3.25rem)]'}`}>
+              <div className="font-display text-[clamp(2rem,1.6rem+1vw,3.25rem)] leading-none text-accentDeep font-bold">
                 {index === 1 ? '0.00€' : stat.value}
               </div>
               <div className="mt-3 font-display text-xl leading-tight text-ink">
@@ -563,12 +563,12 @@ function TrustPromise() {
           ))}
         </div>
         {false && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
-          <AnimatedStatCounter end={5} label="Слоя на създаване" suffix="" />
-          <AnimatedStatCounter end={100} label="Проверени партньори" suffix="%" />
-          <AnimatedStatCounter end={0} label="Такси за клиента" suffix="%" />
-          <AnimatedStatCounter end={100} label="Защитено плащане" suffix="%" />
-        </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
+            <AnimatedStatCounter end={5} label="Слоя на създаване" suffix="" />
+            <AnimatedStatCounter end={100} label="Проверени партньори" suffix="%" />
+            <AnimatedStatCounter end={0} label="Такси за клиента" suffix="%" />
+            <AnimatedStatCounter end={100} label="Защитено плащане" suffix="%" />
+          </div>
         )}
 
         <div className="grid md:grid-cols-3 gap-8">
@@ -626,15 +626,13 @@ function LayersTimelineExplorer() {
                 <button
                   key={layer.slug}
                   onClick={() => setActiveIndex(index)}
-                  className={`timeline-btn w-full max-w-full text-left py-3 px-4 rounded-xl transition-all duration-300 relative focus:outline-none overflow-hidden ${
-                    isActive 
-                      ? 'bg-accentSoft text-accentDeep font-bold border-l-2 border-accent' 
-                      : 'hover:bg-soft text-muted hover:text-ink'
-                  }`}>
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className={`font-mono text-sm px-2 py-0.5 rounded ${
-                      isActive ? 'bg-accent text-paper' : 'bg-cloud text-ink/70'
+                  className={`timeline-btn w-full max-w-full text-left py-3 px-4 rounded-xl transition-all duration-300 relative focus:outline-none overflow-hidden ${isActive
+                    ? 'bg-accentSoft text-accentDeep font-bold border-l-2 border-accent'
+                    : 'hover:bg-soft text-muted hover:text-ink'
                     }`}>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className={`font-mono text-sm px-2 py-0.5 rounded ${isActive ? 'bg-accent text-paper' : 'bg-cloud text-ink/70'
+                      }`}>
                       {layer.number}
                     </span>
                     <span className="font-display text-lg min-w-0 truncate">{layer.title}</span>
@@ -648,10 +646,10 @@ function LayersTimelineExplorer() {
           </div>
 
           {/* Interactive Glassmorphic Display Panel */}
-          <div 
+          <div
             ref={detailPanelRef}
             className="layer-detail-panel card w-full max-w-full p-8 bg-gradient-to-br from-soft/50 via-paper to-cloud/20 border border-line shadow-md rounded-3xl grid md:grid-cols-12 gap-8 min-h-[30rem] items-stretch min-w-0 overflow-hidden">
-            
+
             <div className="md:col-span-7 flex min-w-0 flex-col justify-between gap-6">
               <div>
                 <div className="flex min-w-0 items-center gap-3">
@@ -665,7 +663,7 @@ function LayersTimelineExplorer() {
                 <h3 className="font-display text-3xl text-ink font-bold mt-4 min-w-0">
                   {activeLayer.short}
                 </h3>
-                
+
                 <p className="text-muted mt-4 text-sm leading-relaxed">
                   {activeLayer.long}
                 </p>
@@ -691,13 +689,13 @@ function LayersTimelineExplorer() {
               </div>
 
               <div className="flex flex-wrap gap-4 items-center mt-4">
-                <Link 
+                <Link
                   to={`/sloy/${activeLayer.slug}`}
                   className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">
                   Влез в слоя →
                 </Link>
-                <Link 
-                  to="/contact" 
+                <Link
+                  to="/contact"
                   className="btn btn-ghost !border-accent/30 hover:!border-accent !text-accent hover:bg-accentSoft/30">
                   Заяви консултация
                 </Link>
@@ -706,13 +704,13 @@ function LayersTimelineExplorer() {
 
             {/* Visual Panel Right */}
             <div className="md:col-span-5 relative rounded-2xl overflow-hidden min-h-[16rem] md:min-h-full">
-              <img 
-                src={LAYER_HEROS[activeLayer.slug]} 
-                alt={activeLayer.title} 
-                className="absolute inset-0 w-full h-full object-cover rounded-2xl transform scale-100 hover:scale-105 transition-transform duration-700" 
+              <img
+                src={LAYER_HEROS[activeLayer.slug]}
+                alt={activeLayer.title}
+                className="absolute inset-0 w-full h-full object-cover rounded-2xl transform scale-100 hover:scale-105 transition-transform duration-700"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-transparent to-transparent pointer-events-none" />
-              
+
               <div className="absolute bottom-4 left-4 right-4 text-paper">
                 <div className="text-[10px] uppercase tracking-wider text-accentSoft font-bold">Препоръчан старт</div>
                 <div className="font-display text-lg font-medium leading-tight mt-0.5">
@@ -748,7 +746,7 @@ function DreamBuilderQuiz() {
     if (step < 3) {
       setStep(prev => prev + 1)
       // Smooth slide-up transition
-      gsap.fromTo('.quiz-step-container', 
+      gsap.fromTo('.quiz-step-container',
         { opacity: 0, y: 15 },
         { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }
       )
@@ -874,7 +872,7 @@ function DreamBuilderQuiz() {
           <div className="card p-8 bg-paper border border-line shadow-md rounded-3xl quiz-step-container">
             {/* Progress Bar */}
             <div className="w-full bg-soft h-1.5 rounded-full overflow-hidden mb-8">
-              <div 
+              <div
                 className="bg-accent h-full transition-all duration-300"
                 style={{ width: `${progressPercent}%` }}
               />
@@ -895,9 +893,8 @@ function DreamBuilderQuiz() {
                     <button
                       key={opt.id}
                       onClick={() => handleSelect('scope', opt.id)}
-                      className={`quiz-option-card p-5 text-left rounded-2xl ${
-                        answers.scope === opt.id ? 'selected' : ''
-                      }`}>
+                      className={`quiz-option-card p-5 text-left rounded-2xl ${answers.scope === opt.id ? 'selected' : ''
+                        }`}>
                       <div className="font-display text-lg text-ink font-semibold">{opt.label}</div>
                     </button>
                   ))}
@@ -920,9 +917,8 @@ function DreamBuilderQuiz() {
                     <button
                       key={opt.id}
                       onClick={() => handleSelect('stage', opt.id)}
-                      className={`quiz-option-card p-5 text-left rounded-2xl ${
-                        answers.stage === opt.id ? 'selected' : ''
-                      }`}>
+                      className={`quiz-option-card p-5 text-left rounded-2xl ${answers.stage === opt.id ? 'selected' : ''
+                        }`}>
                       <div className="font-display text-lg text-ink font-semibold">{opt.label}</div>
                     </button>
                   ))}
@@ -945,9 +941,8 @@ function DreamBuilderQuiz() {
                     <button
                       key={opt.id}
                       onClick={() => handleSelect('priority', opt.id)}
-                      className={`quiz-option-card p-5 text-left rounded-2xl ${
-                        answers.priority === opt.id ? 'selected' : ''
-                      }`}>
+                      className={`quiz-option-card p-5 text-left rounded-2xl ${answers.priority === opt.id ? 'selected' : ''
+                        }`}>
                       <div className="font-display text-lg text-ink font-semibold">{opt.label}</div>
                     </button>
                   ))}
@@ -1012,13 +1007,13 @@ function DreamBuilderQuiz() {
             </div>
 
             <div className="flex flex-wrap gap-3 justify-center mt-8 pt-6 border-t border-line">
-              <button 
-                onClick={resetQuiz} 
+              <button
+                onClick={resetQuiz}
                 className="btn btn-ghost !border-line hover:!border-ink">
                 Започни отначало
               </button>
-              <Link 
-                to={`/sloy/${result.layer.slug}#specialisti`} 
+              <Link
+                to={`/sloy/${result.layer.slug}#specialisti`}
                 className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">
                 Виж проверени специалисти →
               </Link>
@@ -1083,9 +1078,9 @@ function ServicesStrip() {
 
 function Projects() {
   const projects = [
-    { t:'Апартамент в София', who:'Архитект + интериорен дизайнер', layer:'Слоеве 01 → 04', img: HOME_PROJECTS[0] },
-    { t:'Семейна къща, Пловдив', who:'Главен изпълнител + материали', layer:'Слоеве 02 → 05', img: HOME_PROJECTS[1] },
-    { t:'Ресторант в морска градина', who:'Дизайн + декорация', layer:'Слоеве 01, 04, 05', img: HOME_PROJECTS[2] }
+    { t: 'Апартамент в София', who: 'Архитект + интериорен дизайнер', layer: 'Слоеве 01 → 04', img: HOME_PROJECTS[0] },
+    { t: 'Семейна къща, Пловдив', who: 'Главен изпълнител + материали', layer: 'Слоеве 02 → 05', img: HOME_PROJECTS[1] },
+    { t: 'Ресторант в морска градина', who: 'Дизайн + декорация', layer: 'Слоеве 01, 04, 05', img: HOME_PROJECTS[2] }
   ]
   return (
     <section className="section bg-paper">
@@ -1099,8 +1094,8 @@ function Projects() {
         </div>
         <div className="grid gap-6 md:grid-cols-3">
           {projects.map((p, i) => (
-            <article 
-              key={i} 
+            <article
+              key={i}
               className="card reveal img-zoom-host p-0 overflow-hidden bg-paper shadow-sm hover:shadow-md border border-line">
               <div className="media-frame aspect-[4/3] relative">
                 <img src={p.img} alt={p.t} loading="lazy" decoding="async" className="img-cover img-zoom" />
@@ -1120,10 +1115,10 @@ function Projects() {
 
 function HowItWorks() {
   const steps = [
-    { n:'01', t:'Кажи къде си', d:'Избери своя слой в Timeline или опиши мечтата си през интерактивния съветник.' },
-    { n:'02', t:'Виж избраните за теб', d:'Показваме ти само проверени марки, продукти и хора, подходящи за твоя етап.' },
-    { n:'03', t:'Сравни и реши спокойно', d:'Реални оферти, наличности, цени и условия — без скрити „звездички“.' },
-    { n:'04', t:'Свърши работата спокойно', d:'Заяви услуга или приеми оферта през Totsan. Плащането е защитено и се освобождава едва след като потвърдиш завършването.' }
+    { n: '01', t: 'Кажи къде си', d: 'Избери своя слой в Timeline или опиши мечтата си през интерактивния съветник.' },
+    { n: '02', t: 'Виж избраните за теб', d: 'Показваме ти само проверени марки, продукти и хора, подходящи за твоя етап.' },
+    { n: '03', t: 'Сравни и реши спокойно', d: 'Реални оферти, наличности, цени и условия — без скрити „звездички“.' },
+    { n: '04', t: 'Свърши работата спокойно', d: 'Заяви услуга или приеми оферта през Totsan. Плащането е защитено и се освобождава едва след като потвърдиш завършването.' }
   ]
   return (
     <section className="section bg-soft border-y border-line">
@@ -1238,7 +1233,7 @@ function Testimonial() {
     <section className="section bg-soft border-y border-line">
       <div className="container-page max-w-4xl text-center">
         <div className="eyebrow reveal">Защо Totsan</div>
-        <p className="font-display reveal mt-4 leading-normal" style={{fontSize:'var(--step-xl)', lineHeight:1.2}}>
+        <p className="font-display reveal mt-4 leading-normal" style={{ fontSize: 'var(--step-xl)', lineHeight: 1.2 }}>
           „Обикалях фирми три месеца и не разбирах нищо. <span className="text-accentDeep font-semibold">Тук за един следобед видях какво ми трябва</span> — и кой ще го направи както трябва.“
         </p>
         <div className="mt-6 text-sm text-muted reveal font-medium">— Мария, собственик на нов апартамент в Пловдив</div>
@@ -1298,7 +1293,7 @@ function CTA() {
       <div className="container-page rounded-3xl bg-ink text-paper p-10 md:p-16 grid md:grid-cols-12 gap-8 items-center relative overflow-hidden shadow-xl">
         <div className="hidden sm:block absolute top-0 right-0 w-80 h-80 bg-accent/20 rounded-full blur-[100px] pointer-events-none" />
         <div className="hidden sm:block absolute bottom-0 left-0 w-80 h-80 bg-trustPurple/10 rounded-full blur-[100px] pointer-events-none" />
-        
+
         <div className="md:col-span-8 relative z-10">
           <h2 className="h-section text-paper">Готов да започнеш своя проект?</h2>
           <p className="mt-3 text-paper/70 max-w-2xl leading-relaxed">

@@ -44,6 +44,7 @@ export const LOCATION_ACCESS_OPTIONS = {
   specialAccess: [
     { value: 'manager', label: 'Нужна е уговорка с домоуправител' },
     { value: 'security', label: 'Има охрана / пропуск' },
+    { value: 'elevator', label: 'Има асансьор' },
     { value: 'narrow', label: 'Има тесен вход или тесни стълби' },
     { value: 'steps', label: 'Има праг / стъпала / труден достъп' },
     { value: 'unknown', label: 'Не съм сигурен/а' },
@@ -291,6 +292,28 @@ export function getLocationAccessSummary(projectOrAccess, { includeExact = false
   }
 
   return [...new Set(items)].slice(0, includeExact ? 12 : 5).join(', ')
+}
+
+export function getProjectAccessItems(projectOrAccess) {
+  const locationAccess = projectOrAccess?.quizAnswers
+    ? getProjectLocationAccess(projectOrAccess)
+    : cleanLocationAccess(projectOrAccess)
+
+  const items = [
+    getLocationAccessLabel('floorLevel', locationAccess.floorLevel),
+    getLocationAccessLabel('elevator', locationAccess.elevator),
+    getLocationAccessLabel('parkingAvailability', locationAccess.parkingAvailability),
+    getLocationAccessLabel('vehicleAccess', locationAccess.vehicleAccess),
+    getLocationAccessLabel('roofAccess', locationAccess.roofAccess),
+    getLocationAccessLabel('businessHoursWork', locationAccess.businessHoursWork),
+    getLocationAccessLabel('loadingAccess', locationAccess.loadingAccess),
+    getLocationAccessLabel('materialStorage', locationAccess.materialStorage),
+    getLocationAccessLabel('wasteSpace', locationAccess.wasteSpace),
+    getLocationAccessLabel('workTimeRestrictions', locationAccess.workTimeRestrictions),
+    getLocationAccessLabel('specialAccess', locationAccess.specialAccess),
+  ].filter(Boolean)
+
+  return [...new Set(items)]
 }
 
 export function getSafeGoogleMapsUrl(projectOrAccess) {
