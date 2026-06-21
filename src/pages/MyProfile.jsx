@@ -16,6 +16,7 @@ import PartnerProfileWorkspace from '../components/profile/PartnerProfileWorkspa
 import PublicProfileBanner from '../components/profile/PublicProfileBanner.jsx'
 import Avatar from '../components/Avatar.jsx'
 import TotpMfaManager from '../components/auth/TotpMfa.jsx'
+import AccountDangerZone from '../components/profile/AccountDangerZone.jsx'
 import TotsanSelect from '../components/ui/TotsanSelect.jsx'
 import { LocationCombobox } from '../components/ui/LocationCombobox.jsx'
 import { normalizeLocationValue } from '../lib/locations.js'
@@ -630,6 +631,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
               {activeTab === 'security' && (
                 <div className="space-y-5">
                   <TotpMfaManager session={session} />
+                  <AccountDangerZone account={localAccount} session={session} />
                 </div>
               )}
             </main>

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, Clock, CreditCard, MessageSquare, PackageCheck } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Clock, CreditCard, MapPin, MessageSquare, PackageCheck, ShieldCheck } from 'lucide-react'
 import { useAccount } from '../lib/account.js'
 import { ORDER_ACTION_LABELS, ORDER_STATUS_LABELS, formatOrderDate, formatOrderMoney, loadOrderDetails, orderStatusTone } from '../lib/orders.js'
+import { PROPERTY_TYPES, getLocationAccessSummary, getSafeGoogleMapsUrl } from '../lib/projects.js'
 import { runOrderAction } from '../lib/payments.js'
 import { loadOrderReview } from '../lib/reviews.js'
 import ReviewForm from '../components/reviews/ReviewForm.jsx'
@@ -43,6 +44,7 @@ export default function Order() {
   const visiblePayments = useMemo(() => dedupePayments(details.payments), [details.payments])
   const checkoutPath = order ? checkoutTarget(order) : ''
   const canSeeFinancialBreakdown = role === 'partner' || isAdminView
+  const projectLocation = details.projectLocation
 
   async function run(action) {
     if (!order?.id) return
@@ -89,6 +91,8 @@ export default function Order() {
             <PartyCard label="Клиент" party={order.clientAccount} fallbackId={order.clientId} showEmail={isAdminView} />
             <PartyCard label="Партньор" party={order.partnerAccount} fallbackId={order.partnerId} showEmail={isAdminView} />
           </div>
+
+          {projectLocation && <OrderLocationCard location={projectLocation} />}
 
           {order.deliverables.length > 0 && (
             <div className="mt-7">
@@ -186,6 +190,110 @@ function PartyCard({ label, party, fallbackId, showEmail = false }) {
       <div className="mt-1 text-sm font-medium text-ink break-all">{displayName}</div>
       {showEmail && <div className="mt-1 text-xs text-muted break-all">{email || 'Без имейл'}</div>}
       {!showEmail && <div className="mt-1 text-xs text-muted break-all">ID: {shortId(fallbackId)}</div>}
+    </div>
+  )
+}
+
+function orderExactLocationLabels(propertyType) {
+  if (propertyType === 'house') {
+    return {
+      entrance: 'Двор / портал',
+      unit: 'Номер / ориентир',
+      showFloor: false,
+      showEntrance: true,
+      showUnit: true,
+    }
+  }
+
+  if (propertyType === 'office' || propertyType === 'commercial') {
+    return {
+      entrance: 'Вход / рецепция / охрана',
+      floor: 'Етаж',
+      unit: 'Офис / обект №',
+      showFloor: true,
+      showEntrance: true,
+      showUnit: true,
+    }
+  }
+
+  return {
+    entrance: 'Вход',
+    floor: 'Етаж',
+    unit: 'Апартамент',
+    showFloor: true,
+    showEntrance: true,
+    showUnit: true,
+  }
+}
+
+function OrderLocationCard({ location }) {
+  const access = location?.access || {}
+  const exact = location?.exact || {}
+  const objectTypeLabel = PROPERTY_TYPES.find((item) => item.value === location.objectType)?.label || ''
+  const roughLocation = [location.city, location.district].filter(Boolean).join(', ')
+  const accessSummary = getLocationAccessSummary(access, { includeExact: location.canViewExact })
+  const mapsUrl = location.canViewExact ? getSafeGoogleMapsUrl(exact) : ''
+  const exactLabels = orderExactLocationLabels(location.objectType)
+  const exactRows = [
+    { label: 'Точен адрес', value: exact.exactAddress },
+    ...(exactLabels.showEntrance ? [{ label: exactLabels.entrance, value: exact.entrance }] : []),
+    ...(exactLabels.showFloor ? [{ label: exactLabels.floor, value: exact.floor }] : []),
+    ...(exactLabels.showUnit ? [{ label: exactLabels.unit, value: exact.unitNumber }] : []),
+    { label: 'Телефон за оглед', value: exact.visitPhone },
+    { label: 'Инструкции', value: exact.accessInstructions, wide: true },
+  ].filter((item) => String(item.value || '').trim())
+
+  return (
+    <div className="mt-5 rounded-3xl border border-line bg-soft p-5">
+      <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-muted">
+        <MapPin size={16} className="text-accentDeep" />
+        Локация и достъп до обекта
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <LocationMini label="Локация" value={roughLocation || 'Не е посочена'} />
+        <LocationMini label="Тип обект" value={objectTypeLabel || 'Не е посочен'} />
+        <LocationMini label="Достъп" value={accessSummary || 'Няма допълнителни детайли'} className="sm:col-span-2" />
+      </div>
+
+      {location.canViewExact ? (
+        <div className="mt-5 rounded-2xl border border-line bg-paper p-4">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-accentDeep">
+            <ShieldCheck size={15} />
+            Точна локация
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-muted">
+            Тази информация е споделена само с партньора по поръчката.
+          </p>
+          {exactRows.length > 0 ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {exactRows.map((item) => (
+                <LocationMini key={item.label} label={item.label} value={item.value} className={item.wide ? 'sm:col-span-2' : ''} />
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 rounded-2xl border border-dashed border-line p-4 text-sm text-muted">Клиентът още не е добавил точен адрес.</div>
+          )}
+          {mapsUrl && (
+            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost mt-4 w-full justify-center sm:w-auto">
+              <MapPin size={16} />
+              Отвори Google Maps
+            </a>
+          )}
+        </div>
+      ) : (
+        <div className="mt-5 rounded-2xl border border-line bg-paper p-4 text-sm leading-relaxed text-muted">
+          Точният адрес ще бъде видим след потвърдена поръчка или разрешен оглед.
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LocationMini({ label, value, className = '' }) {
+  return (
+    <div className={className}>
+      <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">{label}</div>
+      <div className="mt-1 break-words text-sm font-medium text-ink">{value}</div>
     </div>
   )
 }

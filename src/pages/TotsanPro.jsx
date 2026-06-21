@@ -33,6 +33,7 @@ const assets = {
   workers: `${PRO_ASSET_BASE}/10-workers.png`,
   designers: `${PRO_ASSET_BASE}/11-designers.png`,
   brands: `${PRO_ASSET_BASE}/12-store-and-brands.png`,
+  profile: `${PRO_ASSET_BASE}/13-profile.png`,
 }
 
 const comparisonPanels = [
@@ -176,13 +177,31 @@ export default function TotsanPro() {
 
   return (
     <>
-      <section className="relative isolate overflow-hidden bg-[#020b18] text-paper">
+      <section
+        className="relative isolate overflow-hidden bg-[#020b18] text-paper"
+        style={{
+          '--pro-hero-mobile-x': '62%',
+          '--pro-hero-mobile-y': '50%',
+          '--pro-hero-desktop-x': '58%',
+          '--pro-hero-desktop-y': '50%',
+        }}
+      >
+        <div className="absolute inset-0 md:hidden">
+          <img
+            src={assets.hero}
+            alt=""
+            className="h-full w-full object-cover opacity-95"
+            style={{ objectPosition: 'var(--pro-hero-mobile-x) var(--pro-hero-mobile-y)' }}
+            fetchpriority="high"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,11,24,0.9)_0%,rgba(2,11,24,0.56)_42%,rgba(2,11,24,0.88)_100%)]" />
+        </div>
         <div className="absolute inset-0 hidden md:block">
           <img
             src={assets.hero}
             alt=""
             className="h-full w-full object-cover opacity-95"
-            style={{ objectPosition: '58% center' }}
+            style={{ objectPosition: 'var(--pro-hero-desktop-x) var(--pro-hero-desktop-y)' }}
             fetchpriority="high"
           />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_68%_34%,rgba(44,111,232,0.12),transparent_34%),linear-gradient(90deg,#020b18_0%,rgba(2,11,24,0.95)_18%,rgba(2,11,24,0.62)_42%,rgba(2,11,24,0.12)_76%)]" />
@@ -193,7 +212,7 @@ export default function TotsanPro() {
           <div className="container-page grid items-center gap-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)]">
             <div className="max-w-[40rem]">
               <div className="eyebrow !text-paper/55">Totsan Pro</div>
-              <h1 className="mt-4 max-w-full font-display text-[2.35rem] font-medium leading-none text-paper sm:text-[3.6rem] lg:text-[5.35rem]">
+              <h1 className="mt-28 max-w-full font-display text-[2.35rem] font-medium leading-none text-paper sm:text-[3.6rem] lg:text-[5.35rem]">
                 Работно място за добрите майстори, студиа и марки.
               </h1>
               <p className="mt-5 max-w-xl text-base leading-relaxed text-paper/78 sm:text-lg">
@@ -214,25 +233,13 @@ export default function TotsanPro() {
                   Виж повече
                 </a>
               </div>
-              <div className="mt-8 flex flex-wrap gap-3 text-sm text-paper/82">
+              <div className="mt-8 flex flex-wrap justify-start gap-3 text-sm text-paper/82">
                 <TrustPill icon={CheckCircle2} label="Безплатен вход" />
                 <TrustPill icon={UserCheck} label="Проверени клиенти" />
                 <TrustPill icon={ShieldCheck} label="Сигурни плащания" />
               </div>
             </div>
-
-            <div className="relative -mx-5 overflow-hidden md:hidden">
-              <div className="absolute inset-x-4 bottom-0 h-20 rounded-full bg-accent/20 blur-3xl" />
-              <img
-                src={assets.hero}
-                alt=""
-                className="relative mx-auto w-full origin-center scale-[1.28]"
-                style={{
-                  WebkitMaskImage: 'linear-gradient(180deg, black 72%, transparent 100%)',
-                  maskImage: 'linear-gradient(180deg, black 72%, transparent 100%)',
-                }}
-              />
-            </div>
+            <div className="hidden lg:block" aria-hidden="true" />
           </div>
         </div>
       </section>
@@ -309,63 +316,34 @@ export default function TotsanPro() {
         </div>
       </section>
 
-      <section className="section bg-paper">
-        <div className="container-page grid items-center gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-          <div className="reveal">
-            <div className="eyebrow">Повече от профил</div>
-            <h2 className="h-section mt-3 text-ink">Система за работа, не само страница в каталог.</h2>
-            <p className="mt-4 max-w-2xl text-muted">
-              Totsan Pro събира доверието, заявките, офертите и клиентската комуникация в един спокоен работен ритъм.
-            </p>
-            <div className="mt-7 grid gap-4 sm:grid-cols-2">
-              {workspaceFeatures.map((feature) => (
-                <WorkspaceFeature key={feature.title} feature={feature} />
-              ))}
+      <section
+        className="section relative isolate overflow-hidden bg-paper"
+        style={{
+          '--pro-profile-overlay-rgb': '13, 35, 64',
+          '--pro-profile-overlay-left': '0.74',
+          '--pro-profile-overlay-mid': '0.42',
+          '--pro-profile-overlay-right': '0.16',
+          backgroundImage: `linear-gradient(90deg, rgba(var(--pro-profile-overlay-rgb), var(--pro-profile-overlay-left)) 0%, rgba(var(--pro-profile-overlay-rgb), var(--pro-profile-overlay-mid)) 44%, rgba(var(--pro-profile-overlay-rgb), var(--pro-profile-overlay-right)) 100%), url(${assets.profile})`,
+          backgroundPosition: 'center',
+          backgroundSize: 'cover',
+        }}
+      >
+        <div className="container-page relative z-10 grid min-h-[34rem] items-center gap-8 lg:grid-cols-[minmax(0,0.84fr)_minmax(0,1.16fr)]">
+          <div className="reveal flex h-full flex-col justify-center">
+            <div className="max-w-[38rem] rounded-[2rem] border border-paper/18 bg-ink/38 p-6 shadow-[0_28px_90px_-64px_rgba(13,35,64,0.85)] backdrop-blur-sm sm:p-8">
+              <div className="eyebrow !text-white">Повече от профил</div>
+              <h2 className="h-section mt-3 max-w-[34rem] text-white">Система за работа, не само страница в каталог.</h2>
+              <p className="mt-4 max-w-xl text-white">
+                Totsan Pro събира доверието, заявките, офертите и клиентската комуникация в един спокоен работен ритъм.
+              </p>
             </div>
           </div>
 
-          <div className="reveal overflow-hidden rounded-[2rem] border border-line bg-soft shadow-[0_28px_90px_-64px_rgba(13,35,64,0.7)]">
-            <div className="grid min-h-[25rem] grid-cols-[8.5rem_minmax(0,1fr)] bg-[linear-gradient(135deg,#07162d_0%,#0d2340_34%,#f8fbff_34%,#f8fbff_100%)]">
-              <div className="p-5 text-paper">
-                <div className="eyebrow !text-paper/50">Totsan Pro</div>
-                <nav className="mt-8 space-y-3 text-sm text-paper/70">
-                  {['Табло', 'Заявки', 'Чат', 'Оферти', 'Услуги', 'Профил'].map((item, index) => (
-                    <div key={item} className={`rounded-2xl px-3 py-2 ${index === 1 ? 'bg-paper/12 text-paper' : ''}`}>{item}</div>
-                  ))}
-                </nav>
-              </div>
-              <div className="min-w-0 p-5 sm:p-7">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="eyebrow">Активни заявки</div>
-                    <h3 className="mt-2 font-display text-3xl text-ink">Днес има какво да се свърши.</h3>
-                  </div>
-                  <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-trustGreen">3 нови</span>
-                </div>
-                <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
-                  <div className="space-y-3">
-                    {['Ремонт на баня', 'Изграждане на тераса', 'Проектиране на кухня'].map((item, index) => (
-                      <div key={item} className="rounded-3xl border border-line bg-paper p-4 shadow-sm">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h4 className="font-semibold text-ink">{item}</h4>
-                            <p className="mt-1 text-sm text-muted">{index === 0 ? '6 000 лв. · София' : index === 1 ? '12 500 лв. · Варна' : 'по договаряне · Пловдив'}</p>
-                          </div>
-                          <span className="rounded-full bg-accentSoft px-3 py-1 text-xs font-semibold text-accentDeep">{index === 1 ? 'В процес' : 'Нова'}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="rounded-3xl border border-line bg-paper p-5 shadow-sm">
-                    <div className="eyebrow">Информация за клиента</div>
-                    <h4 className="mt-4 font-display text-2xl text-ink">Иван Петров</h4>
-                    <p className="mt-2 text-sm text-muted">Търси обновяване на баня, с бюджет и снимки към заявката.</p>
-                    <Link to={PRO_SIGNUP_URL} onClick={() => trackPartnerApplicationStart('totsan_pro_workspace_mockup')} className="btn btn-primary mt-6 w-full justify-center">
-                      Отвори чат
-                    </Link>
-                  </div>
-                </div>
-              </div>
+          <div className="reveal overflow-hidden rounded-[2rem] border border-line/70 bg-paper/42 p-5 shadow-[0_28px_90px_-64px_rgba(13,35,64,0.7)] backdrop-blur-sm sm:p-7">
+            <div className="grid gap-4 sm:grid-cols-2">
+              {workspaceFeatures.map((feature) => (
+                <WorkspaceFeature key={feature.title} feature={feature} />
+              ))}
             </div>
           </div>
         </div>

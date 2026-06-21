@@ -34,6 +34,7 @@ export const PROFILE_SELECT_COLUMNS_BASE = `
   website,
   instagram,
   facebook,
+  social_links,
   languages,
   service_areas,
   years_experience,
@@ -199,6 +200,9 @@ export function normalizeProfile(input = {}, fallback = null) {
   const website = String(input.website ?? base.website ?? '').trim()
   const instagram = String(input.instagram ?? base.instagram ?? '').trim()
   const facebook = String(input.facebook ?? base.facebook ?? '').trim()
+  const socialLinks = Array.isArray(input.socialLinks ?? input.social_links ?? base.socialLinks ?? base.social_links)
+    ? (input.socialLinks ?? input.social_links ?? base.socialLinks ?? base.social_links)
+    : []
   const languages = toTextArray(input.languages ?? base.languages, ['bg'])
   const serviceAreas = normalizeLocationList(toTextArray(input.serviceAreas ?? input.service_areas ?? base.serviceAreas ?? base.service_areas, city ? [city] : []))
   const yearsExperience = clamp(input.yearsExperience ?? input.years_experience ?? base.yearsExperience ?? base.years_experience, 0, 100, Math.max(0, new Date().getFullYear() - since))
@@ -239,6 +243,7 @@ export function normalizeProfile(input = {}, fallback = null) {
     website,
     instagram,
     facebook,
+    socialLinks,
     languages,
     serviceAreas,
     yearsExperience: Math.round(yearsExperience),
@@ -363,6 +368,7 @@ export function buildCatalogWithProfiles(profiles) {
         website: profile.website,
         instagram: profile.instagram,
         facebook: profile.facebook,
+        socialLinks: profile.socialLinks,
         languages: profile.languages,
         serviceAreas: profile.serviceAreas,
         yearsExperience: profile.yearsExperience,

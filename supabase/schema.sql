@@ -658,13 +658,14 @@ create table if not exists public.client_projects (
   id                 uuid primary key default gen_random_uuid(),
   user_id            uuid not null references auth.users(id) on delete cascade,
   title              text,
-  property_type      text check (property_type is null or property_type in ('apartment','house','office','commercial','outdoor','other')),
+  property_type      text check (property_type is null or property_type in ('apartment','house','office','commercial','building','outdoor','roof','other')),
   area_sqm           numeric(7,2) check (area_sqm is null or area_sqm > 0),
   rooms_count        integer check (rooms_count is null or rooms_count >= 0),
   address_city       text,
   address_region     text,
   current_layer_slug text check (current_layer_slug is null or current_layer_slug in ('ideya','postroyka','materiali','obzavezhdane','dekoraciya')),
   desired_start_date date,
+  desired_end_date   date,
   budget_min         integer check (budget_min is null or budget_min >= 0),
   budget_max         integer check (budget_max is null or budget_max >= 0),
   budget_currency    text not null default 'EUR',
@@ -2042,6 +2043,41 @@ create policy "participants can insert conversations"
 -- ============================================================================
 -- RPC: Вземане на споделен проект и публичните данни за клиента
 -- ============================================================================
+create or replace function public.project_public_quiz_answers(p_quiz_answers jsonb)
+returns jsonb
+language sql
+stable
+set search_path = public
+as $$
+  select case
+    when coalesce(p_quiz_answers, '{}'::jsonb) ? 'locationAccess' then
+      (coalesce(p_quiz_answers, '{}'::jsonb) - 'locationAccess')
+      || jsonb_build_object(
+        'locationAccess',
+        jsonb_strip_nulls(jsonb_build_object(
+          'parkingAvailability', p_quiz_answers->'locationAccess'->>'parkingAvailability',
+          'materialStorage', p_quiz_answers->'locationAccess'->>'materialStorage',
+          'wasteSpace', p_quiz_answers->'locationAccess'->>'wasteSpace',
+          'workTimeRestrictions', p_quiz_answers->'locationAccess'->>'workTimeRestrictions',
+          'specialAccess', coalesce(p_quiz_answers->'locationAccess'->'specialAccess', '[]'::jsonb),
+          'floorLevel', p_quiz_answers->'locationAccess'->>'floorLevel',
+          'elevator', p_quiz_answers->'locationAccess'->>'elevator',
+          'elevatorForMaterials', p_quiz_answers->'locationAccess'->>'elevatorForMaterials',
+          'entranceAccess', p_quiz_answers->'locationAccess'->>'entranceAccess',
+          'vehicleAccess', p_quiz_answers->'locationAccess'->>'vehicleAccess',
+          'roofAccess', p_quiz_answers->'locationAccess'->>'roofAccess',
+          'roofPermissionNeeded', p_quiz_answers->'locationAccess'->>'roofPermissionNeeded',
+          'businessHoursWork', p_quiz_answers->'locationAccess'->>'businessHoursWork',
+          'loadingAccess', p_quiz_answers->'locationAccess'->>'loadingAccess'
+        ))
+      )
+    else coalesce(p_quiz_answers, '{}'::jsonb)
+  end;
+$$;
+
+revoke execute on function public.project_public_quiz_answers(jsonb) from public, anon, authenticated;
+grant execute on function public.project_public_quiz_answers(jsonb) to anon, authenticated;
+
 create or replace function public.get_shared_client_project(p_share_id uuid)
 returns json
 language plpgsql
@@ -2096,11 +2132,12 @@ begin
       'address_region', v_project.address_region,
       'current_layer_slug', v_project.current_layer_slug,
       'desired_start_date', v_project.desired_start_date,
+      'desired_end_date', v_project.desired_end_date,
       'budget_min', v_project.budget_min,
       'budget_max', v_project.budget_max,
       'budget_currency', v_project.budget_currency,
       'idea_description', v_project.idea_description,
-      'quiz_answers', v_project.quiz_answers,
+      'quiz_answers', public.project_public_quiz_answers(v_project.quiz_answers),
       'is_active', v_project.is_active,
       'public_share_id', v_project.public_share_id,
       'is_shareable', v_project.is_shareable,
@@ -2123,6 +2160,88 @@ $$;
 
 revoke execute on function public.get_shared_client_project(uuid) from public, anon, authenticated;
 grant execute on function public.get_shared_client_project(uuid) to anon, authenticated;
+
+create or replace function public.get_order_project_location(p_order_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_order public.orders;
+  v_project public.client_projects;
+  v_viewer uuid := auth.uid();
+  v_is_admin boolean := public.is_admin();
+  v_can_read_order boolean := false;
+  v_can_view_exact boolean := false;
+  v_location jsonb := '{}'::jsonb;
+begin
+  if v_viewer is null then
+    return null;
+  end if;
+
+  select * into v_order
+  from public.orders
+  where id = p_order_id
+  limit 1;
+
+  if v_order.id is null then
+    return null;
+  end if;
+
+  v_can_read_order := v_is_admin or v_viewer in (v_order.client_id, v_order.partner_id);
+  if not v_can_read_order then
+    return null;
+  end if;
+
+  select cp.* into v_project
+  from public.orders o
+  left join public.offers f on f.id = o.offer_id
+  left join public.conversations c on c.id = o.conversation_id
+  left join public.client_projects cp on cp.id = coalesce(f.project_id, c.project_id)
+  where o.id = p_order_id
+  limit 1;
+
+  if v_project.id is null then
+    return null;
+  end if;
+
+  v_location := coalesce(v_project.quiz_answers->'locationAccess', '{}'::jsonb);
+  v_can_view_exact := v_is_admin
+    or v_viewer = v_order.client_id
+    or (
+      v_viewer = v_order.partner_id
+      and v_order.status in ('paid','in_progress','delivered','completed')
+    );
+
+  return jsonb_build_object(
+    'projectId', v_project.id,
+    'canViewExact', v_can_view_exact,
+    'city', v_project.address_city,
+    'district', v_project.address_region,
+    'objectType', v_project.property_type,
+    'access', case
+      when v_can_view_exact then v_location
+      else coalesce(public.project_public_quiz_answers(jsonb_build_object('locationAccess', v_location))->'locationAccess', '{}'::jsonb)
+    end,
+    'exact', case
+      when v_can_view_exact then jsonb_strip_nulls(jsonb_build_object(
+        'exactAddress', v_location->>'exactAddress',
+        'googleMapsUrl', v_location->>'googleMapsUrl',
+        'entrance', v_location->>'entrance',
+        'floor', v_location->>'floor',
+        'unitNumber', v_location->>'unitNumber',
+        'accessInstructions', v_location->>'accessInstructions',
+        'visitPhone', v_location->>'visitPhone'
+      ))
+      else null
+    end
+  );
+end;
+$$;
+
+revoke execute on function public.get_order_project_location(uuid) from public, anon, authenticated;
+grant execute on function public.get_order_project_location(uuid) to authenticated;
 
 -- ============================================================================
 -- Trigger to un-hide conversations when a new message is inserted
