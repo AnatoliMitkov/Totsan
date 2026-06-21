@@ -709,11 +709,11 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-4 border-t border-line pt-6">
-                <button type="button" onClick={() => hasMeaningfulContent && setIsEditing(false)} className="btn btn-ghost text-muted hover:text-ink">
+              <div className="sticky bottom-0 z-30 -mx-5 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-paper/92 px-5 py-4 shadow-[0_-18px_45px_-32px_rgba(13,35,64,0.55)] backdrop-blur md:-mx-7 md:px-7">
+                <button type="button" onClick={() => hasMeaningfulContent && setIsEditing(false)} className="btn btn-ghost justify-center text-muted hover:text-ink">
                   Отказ
                 </button>
-                <button type="submit" className="btn btn-primary px-8 py-3.5" disabled={saveStatus.type === 'saving'}>
+                <button type="submit" className="btn btn-primary justify-center px-8 py-3.5" disabled={saveStatus.type === 'saving'}>
                   <Save size={18} />
                   {saveStatus.type === 'saving' ? 'Запазва се…' : 'Запази'}
                 </button>
