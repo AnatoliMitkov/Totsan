@@ -550,7 +550,7 @@ function TrustPromise() {
                   {index === 3 ? <ShieldCheck size={30} className="text-accentDeep" /> : null}
                 </span>
               </div>
-              <div className="font-display text-[clamp(2rem,1.6rem+1vw,3.25rem)] leading-none text-accentDeep font-bold">
+              <div className={`font-display leading-none text-accentDeep font-bold flex justify-center text-center w-full ${index >= 2 ? 'text-[clamp(1.25rem,1vw+1rem,2.25rem)] tracking-tight' : 'text-[clamp(2rem,1.6rem+1vw,3.25rem)]'}`}>
                 {index === 1 ? '0.00€' : stat.value}
               </div>
               <div className="mt-3 font-display text-xl leading-tight text-ink">

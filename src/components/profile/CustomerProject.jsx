@@ -1,10 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Camera, CheckCircle2, FileSpreadsheet, FileText, FileType, ImagePlus, Play, Save, Trash2, UploadCloud,
-  Edit3, MapPin, Home, Banknote, Calendar, AlignLeft, Layers, Sparkles
+  Edit3, MapPin, Home, Banknote, Calendar, AlignLeft, Layers, ShieldCheck
 } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
-import { DEFAULT_PROJECT, PROJECT_MEDIA_KINDS, PROPERTY_TYPES, mergeQuizAnswer, isMeaningfulProject } from '../../lib/projects.js'
+import {
+  DEFAULT_PROJECT,
+  LOCATION_ACCESS_OPTIONS,
+  PROJECT_MEDIA_KINDS,
+  PROPERTY_TYPES,
+  getLocationAccessLabel,
+  getLocationAccessSummary,
+  getProjectLocationAccess,
+  mergeQuizAnswer,
+  isMeaningfulProject,
+  withProjectLocationAccess,
+} from '../../lib/projects.js'
 import TotsanSelect from '../ui/TotsanSelect.jsx'
 import { LocationCombobox } from '../ui/LocationCombobox.jsx'
 
@@ -57,6 +68,78 @@ function getDocumentIcon(item) {
   return FileText
 }
 
+function LocationAccessSelect({ label, value, onChange, options, helper = '' }) {
+  return (
+    <TotsanSelect
+      label={label}
+      value={value}
+      onChange={onChange}
+      options={[{ value: '', label: 'Избери...' }, ...(options || [])]}
+      helper={helper}
+    />
+  )
+}
+
+function CheckboxGroup({ values = [], options = [], onToggle }) {
+  const selected = new Set(values)
+  return (
+    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      {options.map((option) => {
+        const active = selected.has(option.value)
+        return (
+          <label
+            key={option.value}
+            className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-3 py-2.5 text-sm transition ${active ? 'border-accentDeep bg-accentSoft text-accentDeep' : 'border-line bg-paper text-ink hover:border-ink/30'}`}
+          >
+            <input
+              type="checkbox"
+              checked={active}
+              onChange={() => onToggle(option.value)}
+              className="mt-1 h-4 w-4 rounded border-line text-accentDeep focus:ring-accentDeep"
+            />
+            {option.label}
+          </label>
+        )
+      })}
+    </div>
+  )
+}
+
+function ReadOnlyItem({ label, value, className = '' }) {
+  if (!String(value || '').trim()) return null
+  return (
+    <div className={className}>
+      <div className="text-[10px] font-bold uppercase tracking-wider text-muted">{label}</div>
+      <div className="mt-1 break-words text-sm font-medium text-ink">{value}</div>
+    </div>
+  )
+}
+
+function hasExactLocationDetails(access) {
+  return Boolean(
+    access?.exactAddress
+    || access?.googleMapsUrl
+    || access?.entrance
+    || access?.floor
+    || access?.unitNumber
+    || access?.accessInstructions
+    || access?.visitPhone
+  )
+}
+
+function exactLocationLabels(propertyType) {
+  if (propertyType === 'apartment') {
+    return { entrance: 'Вход', floor: 'Етаж', unit: 'Апартамент', showFloor: true, showEntrance: true, showUnit: true }
+  }
+  if (propertyType === 'house') {
+    return { entrance: 'Двор / портал', unit: 'Номер / ориентир', showFloor: false, showEntrance: true, showUnit: true }
+  }
+  if (propertyType === 'office' || propertyType === 'commercial') {
+    return { entrance: 'Вход / рецепция / охрана', floor: 'Етаж', unit: 'Офис / обект №', showFloor: true, showEntrance: true, showUnit: true }
+  }
+  return { entrance: 'Вход / достъп', floor: 'Етаж', unit: 'Номер / ориентир', showFloor: propertyType !== 'outdoor', showEntrance: true, showUnit: true }
+}
+
 function getDisplayFileName(item) {
   if (item?.fileName) return item.fileName
   const source = item?.path || getMediaUrl(item)
@@ -70,6 +153,15 @@ function formatFileSize(size) {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function cleanBudgetInput(value) {
+  return String(value || '').replace(/[^\d]/g, '')
+}
+
+function formatBudgetInput(value) {
+  const digits = cleanBudgetInput(value)
+  return digits ? Number(digits).toLocaleString('en-US') : ''
 }
 
 function isSupportedProjectFile(file) {
@@ -133,9 +225,11 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
   // UX View Mode State
   const hasMeaningfulContent = Boolean(project?.title || project?.ideaDescription || project?.addressCity)
   const [isEditing, setIsEditing] = useState(!hasMeaningfulContent)
+  const [exactLocationOpen, setExactLocationOpen] = useState(() => hasExactLocationDetails(getProjectLocationAccess(project)))
 
   useEffect(() => {
     setDraft(makeDraft(project))
+    setExactLocationOpen(hasExactLocationDetails(getProjectLocationAccess(project)))
     if (project?.title || project?.ideaDescription) {
       setIsEditing(false)
     }
@@ -278,6 +372,27 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
     setDraft(current => ({ ...current, [key]: value }))
   }
 
+  function updateLocationAccess(key, value) {
+    setDraft(current => withProjectLocationAccess(current, { [key]: value }))
+  }
+
+  function toggleLocationAccessChip(key, value) {
+    setDraft(current => {
+      const access = getProjectLocationAccess(current)
+      const currentValues = Array.isArray(access[key]) ? access[key] : []
+      let nextValues
+      if (value === 'unknown') {
+        nextValues = currentValues.includes(value) ? [] : ['unknown']
+      } else {
+        const withoutUnknown = currentValues.filter(item => item !== 'unknown')
+        nextValues = withoutUnknown.includes(value)
+          ? withoutUnknown.filter(item => item !== value)
+          : [...withoutUnknown, value]
+      }
+      return withProjectLocationAccess(current, { [key]: nextValues })
+    })
+  }
+
   async function saveDraft(options = {}) {
     if (!options.silent) setSaveStatus({ type: 'saving', message: 'Запазваме проекта…' })
     const savedProject = await onSave(draft, options)
@@ -291,6 +406,10 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
 
   async function submit(event) {
     event.preventDefault()
+    if (!String(draft.addressCity || '').trim() || !String(draft.propertyType || '').trim()) {
+      setSaveStatus({ type: 'error', message: 'Моля, попълни град и тип обект в секцията „Локация и достъп до обекта“.' })
+      return
+    }
     try {
       await saveDraft()
     } catch (error) {
@@ -340,6 +459,10 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
 
   const imageMedia = media.filter(isImageMedia)
   const documentMedia = media.filter(isDocumentMedia)
+  const locationAccess = getProjectLocationAccess(draft)
+  const logisticsSummary = getLocationAccessSummary(draft)
+  const exactLabels = exactLocationLabels(draft.propertyType)
+  const hasExactDetails = hasExactLocationDetails(locationAccess)
 
   return (
     <div className="grid gap-6 grid-cols-1 lg:grid-cols-12">
@@ -409,7 +532,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
                   <Home size={16} /> Параметри на имота
                 </div>
                 <div className="grid gap-4 md:grid-cols-3">
-                  <TotsanSelect label="Тип помещение" value={draft.propertyType} onChange={(val) => update('propertyType', val)} options={[{ value: '', label: 'Избери...' }, ...PROPERTY_TYPES]} />
+                  <TotsanSelect label="Тип обект" value={draft.propertyType} onChange={(val) => update('propertyType', val)} options={[{ value: '', label: 'Избери...' }, ...PROPERTY_TYPES]} />
                   <div>
                     <label className="block text-sm font-medium text-ink">Квадратура (кв.м)</label>
                     <input value={draft.areaSqm} onChange={e => update('areaSqm', e.target.value)} type="number" min="0" step="0.1" className={INPUT} placeholder="напр. 82.5" />
@@ -419,12 +542,127 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
                     <input value={draft.roomsCount} onChange={e => update('roomsCount', e.target.value)} type="number" min="0" className={INPUT} placeholder="напр. 3" />
                   </div>
                 </div>
-                <div className="grid gap-4 md:grid-cols-2 mt-4">
-                  <LocationCombobox label="Град" value={draft.addressCity} onChange={(value) => update('addressCity', value)} />
-                  <div>
-                    <label className="block text-sm font-medium text-ink">Район / Квартал</label>
-                    <input value={draft.addressRegion} onChange={e => update('addressRegion', e.target.value)} className={INPUT} placeholder="Младост 1" />
+                <div className="grid gap-4 md:grid-cols-12 mt-4">
+                  <LocationCombobox className="md:col-span-8" label="Населено място" value={draft.addressCity} onChange={(value) => update('addressCity', value)} />
+                  <div className="md:col-span-4">
+                    <label className="block text-sm font-medium text-ink">Район / квартал</label>
+                    <input value={draft.addressRegion} onChange={e => update('addressRegion', e.target.value)} className={INPUT} placeholder="централна част, квартал или ориентир" />
                   </div>
+                </div>
+              </div>
+
+              <div className="space-y-5 rounded-2xl border border-line/50 bg-soft/50 p-5">
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wider text-muted flex items-center gap-2">
+                    <MapPin size={16} /> Локация и достъп до обекта
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-muted">
+                    Тези детайли помагат на специалиста да прецени оглед, транспорт, материали и време. Точният адрес остава скрит и се споделя само с избрания партньор след потвърдена поръчка или след ваше разрешение за оглед.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <LocationAccessSelect label="Паркиране" helper="Има ли къде да се паркира?" value={locationAccess.parkingAvailability} onChange={(value) => updateLocationAccess('parkingAvailability', value)} options={LOCATION_ACCESS_OPTIONS.parkingAvailability} />
+                  <LocationAccessSelect label="Място за материали" value={locationAccess.materialStorage} onChange={(value) => updateLocationAccess('materialStorage', value)} options={LOCATION_ACCESS_OPTIONS.materialStorage} />
+                  <LocationAccessSelect label="Място за отпадъци" value={locationAccess.wasteSpace} onChange={(value) => updateLocationAccess('wasteSpace', value)} options={LOCATION_ACCESS_OPTIONS.wasteSpace} />
+                  <LocationAccessSelect label="Ограничения за работа" value={locationAccess.workTimeRestrictions} onChange={(value) => updateLocationAccess('workTimeRestrictions', value)} options={LOCATION_ACCESS_OPTIONS.workTimeRestrictions} />
+                </div>
+
+                <div>
+                  <div className="text-sm font-medium text-ink">Има ли нещо специфично при достъпа?</div>
+                  <CheckboxGroup
+                    values={locationAccess.specialAccess}
+                    options={LOCATION_ACCESS_OPTIONS.specialAccess}
+                    onToggle={(value) => toggleLocationAccessChip('specialAccess', value)}
+                  />
+                </div>
+
+                {draft.propertyType === 'apartment' && (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <LocationAccessSelect label="Етажност" value={locationAccess.floorLevel} onChange={(value) => updateLocationAccess('floorLevel', value)} options={LOCATION_ACCESS_OPTIONS.floorLevel} />
+                    <LocationAccessSelect label="Асансьор" value={locationAccess.elevator} onChange={(value) => updateLocationAccess('elevator', value)} options={LOCATION_ACCESS_OPTIONS.elevator} />
+                    <LocationAccessSelect label="Асансьор за материали" value={locationAccess.elevatorForMaterials} onChange={(value) => updateLocationAccess('elevatorForMaterials', value)} options={LOCATION_ACCESS_OPTIONS.elevatorForMaterials} />
+                    <LocationAccessSelect label="Достъп до входа" value={locationAccess.entranceAccess} onChange={(value) => updateLocationAccess('entranceAccess', value)} options={LOCATION_ACCESS_OPTIONS.entranceAccess} />
+                  </div>
+                )}
+
+                {draft.propertyType === 'house' && (
+                  <div className="grid gap-4 md:grid-cols-1">
+                    <LocationAccessSelect label="Достъп с автомобил" helper="Може ли автомобил/бус да стигне близо до обекта?" value={locationAccess.vehicleAccess} onChange={(value) => updateLocationAccess('vehicleAccess', value)} options={LOCATION_ACCESS_OPTIONS.vehicleAccess} />
+                  </div>
+                )}
+
+                {draft.propertyType === 'roof' && (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <LocationAccessSelect label="Достъп до покрив / тераса" value={locationAccess.roofAccess} onChange={(value) => updateLocationAccess('roofAccess', value)} options={LOCATION_ACCESS_OPTIONS.roofAccess} />
+                    <LocationAccessSelect label="Нужно разрешение" value={locationAccess.roofPermissionNeeded} onChange={(value) => updateLocationAccess('roofPermissionNeeded', value)} options={LOCATION_ACCESS_OPTIONS.roofPermissionNeeded} />
+                  </div>
+                )}
+
+                {(draft.propertyType === 'office' || draft.propertyType === 'commercial') && (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <LocationAccessSelect label="Работа в бизнес часове" value={locationAccess.businessHoursWork} onChange={(value) => updateLocationAccess('businessHoursWork', value)} options={LOCATION_ACCESS_OPTIONS.businessHoursWork} />
+                    <LocationAccessSelect label="Товарен достъп" value={locationAccess.loadingAccess} onChange={(value) => updateLocationAccess('loadingAccess', value)} options={LOCATION_ACCESS_OPTIONS.loadingAccess} />
+                  </div>
+                )}
+
+                <div className="rounded-2xl border border-line/70 bg-paper p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-accentDeep">
+                        <ShieldCheck size={15} /> Точна локация
+                      </div>
+                      <p className="mt-2 text-xs leading-relaxed text-muted">
+                        Скрито за партньори до потвърждение. Видимо само за избрания партньор след потвърдена поръчка или разрешен оглед.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setExactLocationOpen(current => !current)}
+                      className="btn btn-ghost shrink-0 justify-center"
+                    >
+                      {exactLocationOpen ? 'Скрий точния адрес' : hasExactDetails ? 'Редактирай точния адрес' : 'Добави точен адрес'}
+                    </button>
+                  </div>
+
+                  {exactLocationOpen && (
+                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-ink">Точен адрес</label>
+                        <input value={locationAccess.exactAddress} onChange={e => updateLocationAccess('exactAddress', e.target.value)} className={INPUT} placeholder="ул., номер, блок или местност" />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-ink">Google Maps линк</label>
+                        <input value={locationAccess.googleMapsUrl} onChange={e => updateLocationAccess('googleMapsUrl', e.target.value)} className={INPUT} placeholder="https://maps.google.com/..." />
+                      </div>
+                      {exactLabels.showEntrance && (
+                        <div>
+                          <label className="block text-sm font-medium text-ink">{exactLabels.entrance}</label>
+                          <input value={locationAccess.entrance} onChange={e => updateLocationAccess('entrance', e.target.value)} className={INPUT} />
+                        </div>
+                      )}
+                      {exactLabels.showFloor && (
+                        <div>
+                          <label className="block text-sm font-medium text-ink">{exactLabels.floor}</label>
+                          <input value={locationAccess.floor} onChange={e => updateLocationAccess('floor', e.target.value)} className={INPUT} />
+                        </div>
+                      )}
+                      {exactLabels.showUnit && (
+                        <div>
+                          <label className="block text-sm font-medium text-ink">{exactLabels.unit}</label>
+                          <input value={locationAccess.unitNumber} onChange={e => updateLocationAccess('unitNumber', e.target.value)} className={INPUT} />
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-sm font-medium text-ink">Телефон за оглед</label>
+                        <input value={locationAccess.visitPhone} onChange={e => updateLocationAccess('visitPhone', e.target.value)} className={INPUT} />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-ink">Инструкции за достъп</label>
+                        <textarea value={locationAccess.accessInstructions} onChange={e => updateLocationAccess('accessInstructions', e.target.value)} rows={3} className={TEXTAREA} placeholder="Къде се влиза, с кого да се говори, удобен час за оглед..." />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -436,16 +674,22 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
                     <label className="block text-sm font-medium text-ink">Бюджет от (€)</label>
-                    <input value={draft.budgetMin} onChange={e => update('budgetMin', e.target.value)} type="number" min="0" className={INPUT} placeholder="0" />
+                    <input value={formatBudgetInput(draft.budgetMin)} onChange={e => update('budgetMin', cleanBudgetInput(e.target.value))} type="text" inputMode="numeric" className={INPUT} placeholder="0" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-ink">Бюджет до (€)</label>
-                    <input value={draft.budgetMax} onChange={e => update('budgetMax', e.target.value)} type="number" min="0" className={INPUT} placeholder="100000" />
+                    <input value={formatBudgetInput(draft.budgetMax)} onChange={e => update('budgetMax', cleanBudgetInput(e.target.value))} type="text" inputMode="numeric" className={INPUT} placeholder="100,000" />
                   </div>
                 </div>
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-ink">Желан старт на проекта</label>
-                  <input value={draft.desiredStartDate} onChange={e => update('desiredStartDate', e.target.value)} type="date" className={INPUT} />
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-ink">Желан старт на проекта</label>
+                    <input value={draft.desiredStartDate} onChange={e => update('desiredStartDate', e.target.value)} type="date" className={INPUT} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-ink">Желан край на проекта</label>
+                    <input value={draft.desiredEndDate} onChange={e => update('desiredEndDate', e.target.value)} type="date" className={INPUT} />
+                  </div>
                 </div>
               </div>
 
@@ -496,7 +740,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
                   </div>
                   <ul className="space-y-3">
                     <li className="flex justify-between items-center text-sm border-b border-line/50 pb-2">
-                      <span className="text-muted">Тип имот</span>
+                      <span className="text-muted">Тип обект</span>
                       <span className="font-medium text-ink">{PROPERTY_TYPES.find(p => p.value === draft.propertyType)?.label || 'Не е посочен'}</span>
                     </li>
                     <li className="flex justify-between items-center text-sm border-b border-line/50 pb-2">
@@ -535,8 +779,44 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
                         {draft.desiredStartDate ? new Date(draft.desiredStartDate).toLocaleDateString('bg-BG') : 'Не е посочен'}
                       </span>
                     </li>
+                    <li className="flex justify-between items-center text-sm">
+                      <span className="text-muted">Желан край</span>
+                      <span className="font-medium text-ink flex items-center gap-1.5">
+                        <Calendar size={14} className="text-muted" />
+                        {draft.desiredEndDate ? new Date(draft.desiredEndDate).toLocaleDateString('bg-BG') : 'Не е посочен'}
+                      </span>
+                    </li>
                   </ul>
                 </div>
+              </div>
+
+              <div className="rounded-2xl border border-line/60 bg-soft/30 p-6 transition hover:shadow-sm">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted flex items-center gap-2 mb-4">
+                  <MapPin size={14} /> Локация и достъп до обекта
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <ReadOnlyItem label="Тип обект" value={PROPERTY_TYPES.find(p => p.value === draft.propertyType)?.label || ''} />
+                  <ReadOnlyItem label="Локация" value={[draft.addressCity, draft.addressRegion].filter(Boolean).join(', ')} />
+                  <ReadOnlyItem label="Достъп" value={logisticsSummary} />
+                  <ReadOnlyItem label="Паркиране" value={getLocationAccessLabel('parkingAvailability', locationAccess.parkingAvailability)} />
+                </div>
+                {(locationAccess.exactAddress || locationAccess.googleMapsUrl || locationAccess.entrance || locationAccess.floor || locationAccess.unitNumber || locationAccess.accessInstructions || locationAccess.visitPhone) && (
+                  <div className="mt-5 rounded-2xl border border-line bg-paper p-4">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-accentDeep">
+                      <ShieldCheck size={14} /> Частна точна локация
+                    </div>
+                    <p className="mt-2 text-xs leading-relaxed text-muted">
+                      Тези данни са видими за теб и за избрания партньор само след потвърдена поръчка или разрешен оглед.
+                    </p>
+                    <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                      <ReadOnlyItem label="Адрес" value={locationAccess.exactAddress} />
+                      <ReadOnlyItem label="Вход / етаж" value={[locationAccess.entrance, locationAccess.floor].filter(Boolean).join(', ')} />
+                      <ReadOnlyItem label={exactLabels.unit} value={locationAccess.unitNumber} />
+                      <ReadOnlyItem label="Телефон за оглед" value={locationAccess.visitPhone} />
+                      <ReadOnlyItem label="Инструкции" value={locationAccess.accessInstructions} className="sm:col-span-2" />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Vision Card */}

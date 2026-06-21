@@ -2,6 +2,20 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { buildInquiryEmail } from '../_shared/totsan-email.js'
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
+const CONTACT_ROUTES: Record<string, { to: string; subject: string }> = {
+  support: { to: 'support@totsan.com', subject: '[SUPPORT] Проблем със сайта' },
+  feedback: { to: 'support@totsan.com', subject: '[FEEDBACK] Идея или предложение' },
+  client: { to: 'sales@totsan.com', subject: '[CLIENT] Запитване за проект' },
+  partner: { to: 'manager@totsan.com', subject: '[PARTNER] Кандидат за Totsan партньор' },
+  payment: { to: 'payment@totsan.com', subject: '[PAYMENT] Плащане или фактура' },
+  active_project: { to: 'support@totsan.com', subject: '[ACTIVE PROJECT] Помощ по активен проект' },
+  other: { to: 'support@totsan.com', subject: '[OTHER] Контакт през сайта' },
+}
+
+function getContactRoute(record: Record<string, unknown>) {
+  const key = String(record?.route_key || '').trim()
+  return CONTACT_ROUTES[key] || CONTACT_ROUTES.other
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,6 +38,7 @@ serve(async (req) => {
     }
 
     const htmlContent = buildInquiryEmail(record)
+    const route = getContactRoute(record)
 
     if (!RESEND_API_KEY) {
       console.warn('RESEND_API_KEY is not set. Simulating email send.')
@@ -41,8 +56,8 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         from: 'Totsan Inquiries <onboarding@resend.dev>', // Update this when domain is verified
-        to: 'a.mitkov@totsan.com',
-        subject: `Ново запитване от ${record.name}`,
+        to: route.to,
+        subject: `${route.subject} - ${record.name}`,
         html: htmlContent,
       }),
     })

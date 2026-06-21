@@ -72,6 +72,25 @@ export async function signOutAndRedirect(userId = '') {
   }
 }
 
+export async function deleteOwnAccount(emailConfirmation = '') {
+  const { data, error } = await supabase.functions.invoke('account-action', {
+    body: {
+      action: 'delete_own_account',
+      payload: { emailConfirmation },
+    },
+  })
+
+  if (error) {
+    throw new Error(
+      error.message === 'Failed to send a request to the Edge Function'
+        ? 'Не успяхме да достигнем защитната функция за изтриване. Опитай отново след малко.'
+        : error.message || 'Заявката за изтриване не можа да бъде изпратена.'
+    )
+  }
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
 export function useAccount() {
   const [session, setSession] = useState(null)
   const [account, setAccount] = useState(null)

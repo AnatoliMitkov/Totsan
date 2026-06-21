@@ -34,6 +34,7 @@ import { LAYERS } from '../data/layers.js'
 import {
   formatProjectBudget,
   formatProjectLocation,
+  getLocationAccessSummary,
   getProjectLayerLabel,
   getProjectPropertyTypeLabel,
   getProjectStageLabel,
@@ -213,10 +214,12 @@ export default function SharedProject() {
   const activeLayer = LAYERS.find((layer) => layer.slug === project?.currentLayerSlug) || LAYERS[0]
   const layerLabel = getProjectLayerLabel(project, LAYERS) || `Слой ${activeLayer.number}`
   const locationLabel = formatProjectLocation(project)
+  const accessSummary = getLocationAccessSummary(project)
   const budgetLabel = formatProjectBudget(project)
   const propertyTypeLabel = getProjectPropertyTypeLabel(project)
   const stageLabel = getProjectStageLabel(project)
   const desiredStartLabel = formatProjectDate(project?.desiredStartDate)
+  const desiredEndLabel = formatProjectDate(project?.desiredEndDate)
   const areaLabel = formatArea(project?.areaSqm)
   const roomsLabel = formatRooms(project?.roomsCount)
   const displayName = account.display_name || account.full_name || 'Клиент'
@@ -243,10 +246,12 @@ export default function SharedProject() {
   const parameterItems = [
     { key: 'layer', label: 'Категория', value: layerLabel, icon: Layers3 },
     { key: 'location', label: 'Локация', value: locationLabel, icon: MapPin },
-    { key: 'property', label: 'Тип помещение', value: propertyTypeLabel, icon: Home },
+    { key: 'property', label: 'Тип обект', value: propertyTypeLabel, icon: Home },
+    { key: 'access', label: 'Достъп', value: accessSummary, icon: ShieldCheck },
     { key: 'area', label: 'Квадратура', value: areaLabel, icon: Ruler },
     { key: 'rooms', label: 'Стаи', value: roomsLabel, icon: LayoutList },
     { key: 'start', label: 'Желан старт', value: desiredStartLabel, icon: CalendarDays },
+    { key: 'end', label: 'Желан край', value: desiredEndLabel, icon: CalendarDays },
     { key: 'stage', label: 'Етап', value: stageLabel, icon: Sparkles },
   ].filter((item) => hasValue(item.value))
 
@@ -259,11 +264,13 @@ export default function SharedProject() {
   const quickItems = [
     { key: 'budget', label: 'Бюджет', value: budgetLabel },
     { key: 'location', label: 'Локация', value: locationLabel },
+    { key: 'access', label: 'Достъп', value: accessSummary },
     { key: 'layer', label: 'Услуга', value: layerLabel },
     { key: 'object', label: 'Обект', value: objectLabel },
     { key: 'area', label: 'Размер', value: areaLabel },
     { key: 'files', label: 'Качени файлове', value: uploadedFilesLabel },
     { key: 'start', label: 'Старт', value: desiredStartLabel },
+    { key: 'end', label: 'Край', value: desiredEndLabel },
   ].filter((item) => hasValue(item.value))
 
   const clarificationItems = [
@@ -502,6 +509,16 @@ export default function SharedProject() {
                   </div>
                 </div>
               )}
+
+              <div className="mt-7 rounded-[1.5rem] border border-line bg-soft/45 p-5">
+                <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-accentDeep">
+                  <ShieldCheck size={15} />
+                  Поверителност на адреса
+                </div>
+                <p className="mt-2 text-sm leading-relaxed text-ink/76">
+                  Точният адрес ще бъде видим след потвърдена поръчка или разрешен оглед.
+                </p>
+              </div>
 
               <div className="mt-7 rounded-[1.5rem] border border-accent/15 bg-accentSoft/35 p-5">
                 <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-accentDeep">

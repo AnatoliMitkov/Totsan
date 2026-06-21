@@ -7,10 +7,127 @@ export const PROPERTY_TYPES = [
   { value: 'apartment', label: 'Апартамент' },
   { value: 'house', label: 'Къща' },
   { value: 'office', label: 'Офис' },
-  { value: 'commercial', label: 'Търговски обект' },
-  { value: 'outdoor', label: 'Външна зона' },
+  { value: 'commercial', label: 'Магазин' },
+  { value: 'outdoor', label: 'Двор / външна зона' },
+  { value: 'roof', label: 'Покрив / тераса' },
   { value: 'other', label: 'Друго' },
 ]
+
+export const LOCATION_ACCESS_KEY = 'locationAccess'
+
+export const LOCATION_ACCESS_OPTIONS = {
+  parkingAvailability: [
+    { value: 'front', label: 'Има място за паркиране пред обекта' },
+    { value: 'nearby', label: 'Има паркиране наблизо' },
+    { value: 'difficult', label: 'Паркирането е трудно' },
+    { value: 'unknown', label: 'Не знам' },
+  ],
+  materialStorage: [
+    { value: 'available', label: 'Има място за материали' },
+    { value: 'limited', label: 'Има ограничено място' },
+    { value: 'none', label: 'Няма място' },
+    { value: 'unknown', label: 'Не знам' },
+  ],
+  wasteSpace: [
+    { value: 'available', label: 'Има място за временно събиране на отпадъци' },
+    { value: 'limited', label: 'Ограничено място' },
+    { value: 'none', label: 'Няма място' },
+    { value: 'unknown', label: 'Не знам' },
+  ],
+  workTimeRestrictions: [
+    { value: 'standard', label: 'Може да се работи стандартно' },
+    { value: 'specific_hours', label: 'Само в определени часове' },
+    { value: 'after_hours', label: 'Само извън работно време' },
+    { value: 'weekend', label: 'Само уикенд' },
+    { value: 'clarify', label: 'Трябва да се уточни' },
+  ],
+  specialAccess: [
+    { value: 'manager', label: 'Нужна е уговорка с домоуправител' },
+    { value: 'security', label: 'Има охрана / пропуск' },
+    { value: 'narrow', label: 'Има тесен вход или тесни стълби' },
+    { value: 'steps', label: 'Има праг / стъпала / труден достъп' },
+    { value: 'unknown', label: 'Не съм сигурен/а' },
+  ],
+  floorLevel: [
+    { value: 'ground', label: 'Партер' },
+    { value: '1_2', label: '1-2 етаж' },
+    { value: '3_5', label: '3-5 етаж' },
+    { value: '6_plus', label: '6+ етаж' },
+    { value: 'unknown', label: 'Не знам' },
+  ],
+  elevator: [
+    { value: 'yes', label: 'Да, има асансьор' },
+    { value: 'small', label: 'Да, но е малък' },
+    { value: 'no', label: 'Не' },
+    { value: 'unknown', label: 'Не знам' },
+  ],
+  elevatorForMaterials: [
+    { value: 'yes', label: 'Да' },
+    { value: 'small_items', label: 'Само за дребни неща' },
+    { value: 'no', label: 'Не' },
+    { value: 'ask_manager', label: 'Трябва да се пита домоуправител' },
+  ],
+  entranceAccess: [
+    { value: 'normal', label: 'Нормален достъп' },
+    { value: 'narrow', label: 'Тесен вход / тесни стълби' },
+    { value: 'difficult', label: 'Има праг / труден достъп' },
+    { value: 'unknown', label: 'Не знам' },
+  ],
+  vehicleAccess: [
+    { value: 'front', label: 'Може да се спре до обекта' },
+    { value: 'nearby', label: 'Може да се спре наблизо' },
+    { value: 'limited', label: 'Достъпът е ограничен' },
+    { value: 'unknown', label: 'Не знам' },
+  ],
+  roofAccess: [
+    { value: 'easy', label: 'Лесен достъп' },
+    { value: 'common_parts', label: 'През общи части' },
+    { value: 'special', label: 'Само със стълба / специален достъп' },
+    { value: 'unclear', label: 'Няма ясен достъп' },
+    { value: 'unknown', label: 'Не знам' },
+  ],
+  roofPermissionNeeded: [
+    { value: 'yes', label: 'Да, от вход / домоуправител / съседи' },
+    { value: 'no', label: 'Не' },
+    { value: 'unknown', label: 'Не знам' },
+  ],
+  businessHoursWork: [
+    { value: 'yes', label: 'Да' },
+    { value: 'after_hours', label: 'Само извън работно време' },
+    { value: 'weekend', label: 'Само през уикенд' },
+    { value: 'clarify', label: 'Трябва да се уточни' },
+  ],
+  loadingAccess: [
+    { value: 'loading_entrance', label: 'Има удобен товарен вход' },
+    { value: 'normal_entrance', label: 'Има нормален вход' },
+    { value: 'difficult', label: 'Достъпът е труден' },
+    { value: 'unknown', label: 'Не знам' },
+  ],
+}
+
+export const DEFAULT_LOCATION_ACCESS = {
+  exactAddress: '',
+  googleMapsUrl: '',
+  entrance: '',
+  floor: '',
+  unitNumber: '',
+  accessInstructions: '',
+  visitPhone: '',
+  parkingAvailability: '',
+  materialStorage: '',
+  wasteSpace: '',
+  workTimeRestrictions: '',
+  specialAccess: [],
+  floorLevel: '',
+  elevator: '',
+  elevatorForMaterials: '',
+  entranceAccess: '',
+  vehicleAccess: '',
+  roofAccess: '',
+  roofPermissionNeeded: '',
+  businessHoursWork: '',
+  loadingAccess: '',
+}
 
 export const PROJECT_MEDIA_KINDS = [
   { value: 'photo', label: 'Снимка' },
@@ -29,6 +146,7 @@ export const DEFAULT_PROJECT = {
   addressRegion: '',
   currentLayerSlug: 'ideya',
   desiredStartDate: '',
+  desiredEndDate: '',
   budgetMin: '',
   budgetMax: '',
   budgetCurrency: 'EUR',
@@ -78,6 +196,112 @@ function isRecord(value) {
 function labelFromMap(value, labels) {
   if (!hasText(value)) return ''
   return labels[value] || ''
+}
+
+function labelFromOptions(key, value) {
+  const options = LOCATION_ACCESS_OPTIONS[key] || []
+  return options.find((item) => item.value === value)?.label || ''
+}
+
+function cleanArray(value) {
+  if (!Array.isArray(value)) return []
+  return value.map((item) => String(item || '').trim()).filter(Boolean)
+}
+
+function cleanLocationAccess(value, { trim = false } = {}) {
+  const source = isRecord(value) ? value : {}
+  const cleanString = (nextValue) => {
+    const text = String(nextValue ?? '')
+    return trim ? text.trim() : text
+  }
+  return {
+    ...DEFAULT_LOCATION_ACCESS,
+    ...Object.fromEntries(
+      Object.keys(DEFAULT_LOCATION_ACCESS)
+        .filter((key) => key !== 'specialAccess')
+        .map((key) => [key, cleanString(source[key])]),
+    ),
+    specialAccess: cleanArray(source.specialAccess),
+  }
+}
+
+function hasLocationAccessValue(locationAccess) {
+  return Object.entries(locationAccess || {}).some(([key, value]) => {
+    if (key === 'specialAccess') return Array.isArray(value) && value.length > 0
+    return hasText(value)
+  })
+}
+
+function validExternalUrl(value) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  try {
+    const url = new URL(text)
+    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : ''
+  } catch {
+    return ''
+  }
+}
+
+export function getProjectLocationAccess(project) {
+  const quizAnswers = isRecord(project?.quizAnswers) ? project.quizAnswers : {}
+  return cleanLocationAccess(quizAnswers[LOCATION_ACCESS_KEY])
+}
+
+export function withProjectLocationAccess(project, updates) {
+  const nextLocationAccess = cleanLocationAccess({ ...getProjectLocationAccess(project), ...(updates || {}) })
+  const quizAnswers = isRecord(project?.quizAnswers) ? project.quizAnswers : {}
+  return {
+    ...(project || DEFAULT_PROJECT),
+    quizAnswers: {
+      ...quizAnswers,
+      [LOCATION_ACCESS_KEY]: nextLocationAccess,
+    },
+  }
+}
+
+export function getLocationAccessLabel(key, value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => labelFromOptions(key, item)).filter(Boolean).join(', ')
+  }
+  return labelFromOptions(key, value)
+}
+
+export function getLocationAccessSummary(projectOrAccess, { includeExact = false } = {}) {
+  const locationAccess = projectOrAccess?.quizAnswers
+    ? getProjectLocationAccess(projectOrAccess)
+    : cleanLocationAccess(projectOrAccess)
+
+  const items = [
+    getLocationAccessLabel('floorLevel', locationAccess.floorLevel),
+    getLocationAccessLabel('elevator', locationAccess.elevator),
+    getLocationAccessLabel('parkingAvailability', locationAccess.parkingAvailability),
+    getLocationAccessLabel('vehicleAccess', locationAccess.vehicleAccess),
+    getLocationAccessLabel('roofAccess', locationAccess.roofAccess),
+    getLocationAccessLabel('businessHoursWork', locationAccess.businessHoursWork),
+    getLocationAccessLabel('loadingAccess', locationAccess.loadingAccess),
+    getLocationAccessLabel('materialStorage', locationAccess.materialStorage),
+    getLocationAccessLabel('wasteSpace', locationAccess.wasteSpace),
+    getLocationAccessLabel('workTimeRestrictions', locationAccess.workTimeRestrictions),
+    getLocationAccessLabel('specialAccess', locationAccess.specialAccess),
+  ].filter(Boolean)
+
+  if (includeExact && hasText(locationAccess.accessInstructions)) {
+    items.push(locationAccess.accessInstructions)
+  }
+
+  return [...new Set(items)].slice(0, includeExact ? 12 : 5).join(', ')
+}
+
+export function getSafeGoogleMapsUrl(projectOrAccess) {
+  const locationAccess = projectOrAccess?.quizAnswers
+    ? getProjectLocationAccess(projectOrAccess)
+    : cleanLocationAccess(projectOrAccess)
+  return validExternalUrl(locationAccess.googleMapsUrl)
+}
+
+export function hasProjectLocationAccess(project) {
+  return hasLocationAccessValue(getProjectLocationAccess(project))
 }
 
 function findGuidedBriefAnswers(project) {
@@ -138,6 +362,7 @@ export function normalizeProject(row) {
     addressRegion: row.address_region || '',
     currentLayerSlug: row.current_layer_slug || 'ideya',
     desiredStartDate: row.desired_start_date || '',
+    desiredEndDate: row.desired_end_date || '',
     budgetMin: row.budget_min ?? '',
     budgetMax: row.budget_max ?? '',
     budgetCurrency: row.budget_currency || 'EUR',
@@ -174,6 +399,13 @@ export function normalizeProjectMedia(row) {
 }
 
 function projectToDb(project, userId) {
+  const quizAnswers = project.quizAnswers && typeof project.quizAnswers === 'object' ? project.quizAnswers : {}
+  const locationAccess = cleanLocationAccess(quizAnswers[LOCATION_ACCESS_KEY], { trim: true })
+  const nextQuizAnswers = {
+    ...quizAnswers,
+    [LOCATION_ACCESS_KEY]: locationAccess,
+  }
+
   return {
     user_id: userId,
     title: cleanText(project.title),
@@ -184,11 +416,12 @@ function projectToDb(project, userId) {
     address_region: cleanText(project.addressRegion),
     current_layer_slug: cleanText(project.currentLayerSlug),
     desired_start_date: cleanText(project.desiredStartDate),
+    desired_end_date: cleanText(project.desiredEndDate),
     budget_min: numberOrNull(project.budgetMin),
     budget_max: numberOrNull(project.budgetMax),
     budget_currency: cleanText(project.budgetCurrency) || 'EUR',
     idea_description: cleanText(project.ideaDescription),
-    quiz_answers: project.quizAnswers && typeof project.quizAnswers === 'object' ? project.quizAnswers : {},
+    quiz_answers: nextQuizAnswers,
     is_active: project.isActive !== false,
   }
 }
@@ -471,7 +704,7 @@ export function calculateClientProfileCompleteness({ account, session, project, 
     { key: 'city', label: 'Град', weight: 5, complete: hasText(account?.city) },
     { key: 'bio', label: 'Кратко био', weight: 5, complete: hasText(account?.bio) },
     { key: 'project-title', label: 'Заглавие на проекта', weight: 5, complete: hasText(project?.title) },
-    { key: 'property-type', label: 'Тип помещение', weight: 5, complete: hasText(project?.propertyType) },
+    { key: 'property-type', label: 'Тип обект', weight: 5, complete: hasText(project?.propertyType) },
     { key: 'area', label: 'Квадратура', weight: 5, complete: Number(project?.areaSqm) > 0 },
     { key: 'budget', label: 'Бюджет', weight: 5, complete: Number(project?.budgetMin) > 0 || Number(project?.budgetMax) > 0 },
     { key: 'idea', label: 'Идея над 80 знака', weight: 10, complete: String(project?.ideaDescription || '').trim().length >= 80 },
@@ -514,7 +747,8 @@ export function isMeaningfulProject(project, media = []) {
 
   if (project.title && !project.title.startsWith('Проект: Слой')) return true
   if (project.ideaDescription && !project.ideaDescription.includes('Начален резултат от Totsan quiz:')) return true
-  if (project.propertyType || project.areaSqm || project.roomsCount || project.budgetMin || project.budgetMax || project.addressCity || project.addressRegion || project.desiredStartDate) return true
+  if (project.propertyType || project.areaSqm || project.roomsCount || project.budgetMin || project.budgetMax || project.addressCity || project.addressRegion || project.desiredStartDate || project.desiredEndDate) return true
+  if (hasProjectLocationAccess(project)) return true
   if (media && media.length > 0) return true
   
   const quizAnswers = project.quizAnswers || {}

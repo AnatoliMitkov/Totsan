@@ -88,8 +88,14 @@ export default function Layout() {
       if (el) document.documentElement.style.setProperty('--header-h', `${el.offsetHeight}px`)
     }
     setHeaderHeight()
+    const el = document.querySelector('header')
+    const ro = el && 'ResizeObserver' in window ? new ResizeObserver(setHeaderHeight) : null
+    if (el && ro) ro.observe(el)
     window.addEventListener('resize', setHeaderHeight)
-    return () => window.removeEventListener('resize', setHeaderHeight)
+    return () => {
+      ro?.disconnect()
+      window.removeEventListener('resize', setHeaderHeight)
+    }
   }, [])
 
   return (
@@ -169,7 +175,8 @@ function Header() {
 
   return (
     <>
-      <header className={`site-header fixed inset-x-0 top-0 z-40 border-b ${headerSurfaceClass} ${open ? 'site-header--menu-open' : ''}`}>
+      <header className={`site-header fixed inset-x-0 top-0 z-40 border-b ${headerSurfaceClass} ${open ? 'site-header--menu-open' : ''} ${isScrolled && !open ? 'site-header--announcement-hidden' : ''}`}>
+        <AnnouncementBar />
         <div className="container-header grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 py-4 px-4 sm:px-6 lg:px-8 xl:gap-4 2xl:gap-12">
           <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 [text-shadow:0_10px_28px_rgba(0,0,0,0.48)] ${isTopOverlayMode ? 'text-paper' : 'text-ink'}`} onClick={close}>Totsan</Link>
 
@@ -286,6 +293,20 @@ function Header() {
         </div>
       )}
     </>
+  )
+}
+
+function AnnouncementBar() {
+  return (
+    <div className="site-announcement" role="status" aria-live="polite">
+      <div className="container-header px-4 sm:px-6 lg:px-8">
+        <p>
+          Изграждаме Totsan стъпка по стъпка. Възможно е някои неща още да се променят. Благодарим, че сте тук в началото.
+          <span className="site-announcement__separator" aria-hidden="true">|</span>
+          <span>Забелязахте проблем? <Link to="/kontakt">Пишете ни тук.</Link></span>
+        </p>
+      </div>
+    </div>
   )
 }
 

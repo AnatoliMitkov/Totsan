@@ -82,6 +82,48 @@ body { font-family: theme('fontFamily.sans'); font-size: var(--step-sm); line-he
   -webkit-backdrop-filter: none;
 }
 
+.site-announcement {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(13, 35, 64, 0.9);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: clamp(0.76rem, 0.72rem + 0.18vw, 0.86rem);
+  line-height: 1.35;
+}
+
+.site-announcement p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.6rem;
+  margin: 0;
+  padding-block: 0.48rem;
+  text-align: center;
+}
+
+.site-announcement a {
+  color: #fff;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+  transition: color .2s ease, text-decoration-color .2s ease;
+}
+
+.site-announcement a:hover {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.site-announcement__separator {
+  opacity: 0.42;
+}
+
+.site-header--solid .site-announcement,
+.site-header--menu-open .site-announcement {
+  border-bottom-color: rgba(13, 35, 64, 0.08);
+  background: rgba(13, 35, 64, 0.94);
+}
+
 .h-display { font-family: theme('fontFamily.display'); font-weight: 500; font-size: var(--step-2xl); line-height: 1.02; letter-spacing: -0.015em; }
 .h-section { font-family: theme('fontFamily.display'); font-weight: 500; font-size: var(--step-xl); line-height: 1.05; letter-spacing: -0.01em; }
 .h-card { font-family: theme('fontFamily.display'); font-weight: 500; font-size: var(--step-lg); line-height: 1.1; }
@@ -1125,6 +1167,10 @@ body { font-family: theme('fontFamily.sans'); font-size: var(--step-sm); line-he
 }
 
 @media (max-width: 767px) {
+  .site-header--announcement-hidden .site-announcement {
+    display: none;
+  }
+
   header > .container-page {
     gap: 0.55rem !important;
     padding-inline: 1rem !important;
@@ -1335,67 +1381,81 @@ body { font-family: theme('fontFamily.sans'); font-size: var(--step-sm); line-he
   -webkit-text-fill-color: transparent;
 }
 
-/* Global Modern Scrollbar (Based on Asset 2) */
+/* Global Totsan scrollbar inspired by Public/svg/Asset 2.svg */
+:root {
+  --scrollbar-size: 12px;
+  --scrollbar-track: rgba(248, 251, 255, 0.62);
+  --scrollbar-track-line: rgba(90, 122, 158, 0.24);
+  --scrollbar-thumb: rgba(90, 122, 158, 0.58);
+  --scrollbar-thumb-hover: rgba(13, 35, 64, 0.74);
+  --scrollbar-arrow: rgba(13, 35, 64, 0.52);
+}
+
 * {
   scrollbar-width: thin;
-  scrollbar-color: #adadad transparent;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 ::-webkit-scrollbar {
-  width: 14px;
-  height: 14px;
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px #999;
-  border-radius: 20px;
+  background: var(--scrollbar-track);
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px var(--scrollbar-track-line);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #adadad;
-  border-radius: 20px;
-  /* Fake border to make the thumb look like it has its own stroke as per SVG */
-  box-shadow: inset 0 0 0 1px #999;
+  min-height: 2.75rem;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background:
+    linear-gradient(var(--scrollbar-thumb), var(--scrollbar-thumb)) padding-box,
+    linear-gradient(180deg, rgba(255,255,255,0.84), rgba(90,122,158,0.22)) border-box;
+  box-shadow: inset 0 0 0 1px rgba(13, 35, 64, 0.08);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  background:
+    linear-gradient(var(--scrollbar-thumb-hover), var(--scrollbar-thumb-hover)) padding-box,
+    linear-gradient(180deg, rgba(255,255,255,0.9), rgba(13,35,64,0.18)) border-box;
 }
 
 /* Scrollbar up/down arrows */
 ::-webkit-scrollbar-button:single-button:vertical:decrement {
-  height: 20px;
-  width: 14px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 76 76' fill='none' stroke='%23999' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22.5 47.3 38 22.5 53.4 47.3'%3E%3C/polyline%3E%3C/svg%3E");
-  background-size: contain;
+  height: 16px;
+  width: var(--scrollbar-size);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 76 76' fill='none' stroke='%230d2340' stroke-opacity='0.52' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22.5 47.3 38 22.5 53.4 47.3'%3E%3C/polyline%3E%3C/svg%3E");
+  background-size: 74%;
   background-position: center bottom;
   background-repeat: no-repeat;
 }
 
 ::-webkit-scrollbar-button:single-button:vertical:increment {
-  height: 20px;
-  width: 14px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 76 76' fill='none' stroke='%23999' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22.5 28.7 38 53.5 53.4 28.7'%3E%3C/polyline%3E%3C/svg%3E");
-  background-size: contain;
+  height: 16px;
+  width: var(--scrollbar-size);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 76 76' fill='none' stroke='%230d2340' stroke-opacity='0.52' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='22.5 28.7 38 53.5 53.4 28.7'%3E%3C/polyline%3E%3C/svg%3E");
+  background-size: 74%;
   background-position: center top;
   background-repeat: no-repeat;
 }
 
 ::-webkit-scrollbar-button:single-button:horizontal:decrement {
-  height: 14px;
-  width: 20px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 76 76' fill='none' stroke='%23999' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='47.3 22.5 22.5 38 47.3 53.4'%3E%3C/polyline%3E%3C/svg%3E");
-  background-size: contain;
+  height: var(--scrollbar-size);
+  width: 16px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 76 76' fill='none' stroke='%230d2340' stroke-opacity='0.52' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='47.3 22.5 22.5 38 47.3 53.4'%3E%3C/polyline%3E%3C/svg%3E");
+  background-size: 74%;
   background-position: right center;
   background-repeat: no-repeat;
 }
 
 ::-webkit-scrollbar-button:single-button:horizontal:increment {
-  height: 14px;
-  width: 20px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 76 76' fill='none' stroke='%23999' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='28.7 22.5 53.5 38 28.7 53.4'%3E%3C/polyline%3E%3C/svg%3E");
-  background-size: contain;
+  height: var(--scrollbar-size);
+  width: 16px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 76 76' fill='none' stroke='%230d2340' stroke-opacity='0.52' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='28.7 22.5 53.5 38 28.7 53.4'%3E%3C/polyline%3E%3C/svg%3E");
+  background-size: 74%;
   background-position: left center;
   background-repeat: no-repeat;
 }
@@ -1403,7 +1463,7 @@ body { font-family: theme('fontFamily.sans'); font-size: var(--step-sm); line-he
 /* Backward compatibility for the old .totsan-scrollbar class */
 .totsan-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #adadad transparent;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
 /* Custom premium CTA button animations */

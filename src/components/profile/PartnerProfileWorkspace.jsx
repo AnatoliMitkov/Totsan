@@ -38,6 +38,7 @@ import { saveCustomerAccountProfile } from '../../lib/projects.js'
 import { refreshProfileAiSummary } from '../../lib/profile-ai-summary.js'
 import { deleteStorageRefs, diffStorageRefs, mediaAndCoverStorageRefs } from '../../lib/storage-media-cleanup.js'
 import TotpMfaManager from '../auth/TotpMfa.jsx'
+import AccountDangerZone from './AccountDangerZone.jsx'
 import {
   DEFAULT_PORTFOLIO_ITEM,
   appendPortfolioMedia,
@@ -219,8 +220,7 @@ function makeProfileDraft(profile) {
     phone: profile.phone || '',
     emailPublic: profile.emailPublic || '',
     website: profile.website || '',
-    instagram: profile.instagram || '',
-    facebook: profile.facebook || '',
+    socialLinks: Array.isArray(profile.socialLinks) ? profile.socialLinks : [],
     languagesText: csv(profile.languages?.length ? profile.languages : ['bg']),
     serviceAreasText: csv(profile.serviceAreas?.length ? profile.serviceAreas : (profile.city ? [profile.city] : [])),
     responseTimeHours: profile.responseTimeHours === null ? '' : profile.responseTimeHours,
@@ -677,6 +677,27 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     }
   }
 
+  function addSocialLink() {
+    setProfileDraft(current => ({
+      ...current,
+      socialLinks: [...current.socialLinks, { id: `social-${Date.now()}`, url: '' }]
+    }))
+  }
+
+  function updateSocialLink(id, url) {
+    setProfileDraft(current => ({
+      ...current,
+      socialLinks: current.socialLinks.map(link => link.id === id ? { ...link, url } : link)
+    }))
+  }
+
+  function removeSocialLink(id) {
+    setProfileDraft(current => ({
+      ...current,
+      socialLinks: current.socialLinks.filter(link => link.id !== id)
+    }))
+  }
+
   async function saveProfile(event) {
     event?.preventDefault()
     setSaveState({ status: 'saving', message: 'Запазваме профила…' })
@@ -702,8 +723,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       phone: profileDraft.phone.trim() || null,
       email_public: profileDraft.emailPublic.trim() || null,
       website: profileDraft.website.trim() || null,
-      instagram: profileDraft.instagram.trim() || null,
-      facebook: profileDraft.facebook.trim() || null,
+      social_links: profileDraft.socialLinks.map(link => ({ id: link.id, url: link.url.trim() })).filter(link => link.url),
       languages: fromCsv(profileDraft.languagesText, ['bg']),
       service_areas: fromLocationCsv(profileDraft.serviceAreasText, []),
       response_time_hours: profileDraft.responseTimeHours === '' ? null : Number(profileDraft.responseTimeHours),
@@ -961,6 +981,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
             {activeTab === 'security' && (
               <div className="space-y-5">
                 <TotpMfaManager session={session} />
+                <AccountDangerZone account={account} session={session} />
               </div>
             )}
 
@@ -1609,7 +1630,7 @@ function ProfileForm({
           </label>
 
           <div className="xl:col-span-3">
-            <Field label="Слой"><TotsanSelect value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} /></Field>
+            <TotsanSelect label="Слой" value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} />
           </div>
           <div className="xl:col-span-5">
             <LocationCombobox label="Град и основен район" value={draft.city} onChange={(value) => onChange('city', value)} required helper="" />
@@ -1649,9 +1670,31 @@ function ProfileForm({
           <Field label="Публичен имейл"><input value={draft.emailPublic} onChange={event => onChange('emailPublic', event.target.value)} type="email" className={INPUT} /></Field>
           <Field label="Сайт"><input value={draft.website} onChange={event => onChange('website', event.target.value)} className={INPUT} placeholder="https://" /></Field>
         </div>
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Instagram"><input value={draft.instagram} onChange={event => onChange('instagram', event.target.value)} className={INPUT} /></Field>
-          <Field label="Facebook"><input value={draft.facebook} onChange={event => onChange('facebook', event.target.value)} className={INPUT} /></Field>
+        <div className="rounded-3xl border border-line bg-soft/60 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-ink">Допълнителни социални мрежи</div>
+            </div>
+            {draft.socialLinks.length < 3 && (
+              <button type="button" onClick={addSocialLink} className="btn btn-ghost justify-center">
+                <Plus size={18} />
+                Добави
+              </button>
+            )}
+          </div>
+          {draft.socialLinks.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {draft.socialLinks.map(link => (
+                <div key={link.id} className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                  <Field label="Линк"><input value={link.url} onChange={event => updateSocialLink(link.id, event.target.value)} className={INPUT} placeholder="https://" /></Field>
+                  <button type="button" onClick={() => removeSocialLink(link.id)} className="btn btn-ghost justify-center text-red-700">
+                    <Trash2 size={18} />
+                    Махни
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <div className="rounded-2xl border border-line bg-soft/65 px-4 py-3 text-sm text-muted">
           Тези данни са публични и ще помогнат на клиентите да се свържат с Вас по-лесно.

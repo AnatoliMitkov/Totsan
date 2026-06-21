@@ -49,6 +49,19 @@ function normalizeAccountParty(row = {}) {
   }
 }
 
+function normalizeOrderProjectLocation(row = {}) {
+  if (!row || typeof row !== 'object') return null
+  return {
+    projectId: row.projectId || row.project_id || '',
+    canViewExact: Boolean(row.canViewExact ?? row.can_view_exact),
+    city: row.city || '',
+    district: row.district || '',
+    objectType: row.objectType || row.object_type || '',
+    access: row.access && typeof row.access === 'object' ? row.access : {},
+    exact: row.exact && typeof row.exact === 'object' ? row.exact : null,
+  }
+}
+
 export function normalizeOrder(row = {}) {
   return {
     id: row.id || '',
@@ -207,9 +220,20 @@ export async function loadOrderDetails(orderId) {
     }
   }
 
+  let projectLocation = null
+  if (orderWithParties?.id) {
+    const { data: locationData, error: locationError } = await supabase.rpc('get_order_project_location', { p_order_id: orderWithParties.id })
+    if (!locationError) {
+      projectLocation = normalizeOrderProjectLocation(locationData)
+    } else if (!String(locationError.message || '').includes('get_order_project_location')) {
+      throw locationError
+    }
+  }
+
   return {
     order: orderWithParties ? normalizeOrder(orderWithParties) : null,
     events: (events || []).map(normalizeOrderEvent),
     payments: (payments || []).map(normalizePayment),
+    projectLocation,
   }
 }

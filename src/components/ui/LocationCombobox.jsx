@@ -29,14 +29,14 @@ function valueForMode(city, storageMode) {
 }
 
 export function LocationCombobox({
-  label = 'Град',
+  label = 'Населено място',
   value = '',
   onChange,
   onSelect,
   required = false,
   storageMode = 'name',
-  placeholder = 'Избери град',
-  helper = 'Избери град от официалния списък.',
+  placeholder = 'Избери населено място',
+  helper = '',
   className = '',
   topRightSlot = null,
 }) {
@@ -53,9 +53,9 @@ export function LocationCombobox({
   const queryMatchesSelection = Boolean(selectedCity && query.trim() === selectedCity.name)
   const hasOfficialSelection = Boolean(selectedCity)
   const error = hasQuery && !queryMatchesSelection
-    ? 'Избери град от официалния списък.'
+    ? 'Избери населено място от официалния списък.'
     : required && !hasOfficialSelection
-      ? 'Избери град.'
+      ? 'Избери населено място.'
       : ''
 
   useEffect(() => {
@@ -113,10 +113,10 @@ export function LocationCombobox({
 
   return (
     <div ref={rootRef} className={`relative min-w-0 ${className || ''}`.trim()}>
-      <div className="grid min-w-0 gap-4 sm:grid-cols-3">
-        <div className="sm:col-span-1">
+      <div className="grid min-w-0 gap-4 sm:grid-cols-5">
+        <div className="sm:col-span-2">
           <TotsanSelect
-            label="Област (град)"
+            label="Област"
             value={region}
             onChange={(nextRegion) => {
               setRegion(nextRegion)
@@ -127,7 +127,7 @@ export function LocationCombobox({
             options={BULGARIA_REGIONS.map((item) => ({ value: item, label: item }))}
           />
         </div>
-        <div className="min-w-0 sm:col-span-2">
+        <div className="min-w-0 sm:col-span-3">
           <label htmlFor={id} className="block text-sm font-medium text-ink">{label}</label>
           <div className="flex flex-wrap items-start gap-3">
             <div className="relative flex-1 min-w-[200px]">

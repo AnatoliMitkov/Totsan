@@ -85,9 +85,9 @@ export function buildInquiryEmail(record) {
                                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                   ${optionalRow('Име', record.name)}
                                   ${optionalRow('Контакт', record.contact)}
+                                  ${optionalRow('Тема', record.route_label)}
                                   ${optionalRow('Източник', record.source)}
                                   ${optionalRow('Слой', record.layer_slug)}
-                                  ${optionalRow('Насочено към', record.target_slug)}
                                 </table>
                               </td>
                             </tr>
