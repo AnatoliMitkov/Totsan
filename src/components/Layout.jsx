@@ -124,6 +124,7 @@ function Header() {
   const isCatalogActive = pathname === '/katalog'
   const isProActive = pathname === '/pro' || pathname === '/totsan-pro'
   const isVisualizationActive = pathname === '/vizualizacia'
+  const isInboxPage = pathname === '/inbox' || pathname.startsWith('/inbox/')
   const isTopOverlayMode = !isScrolled && !open
   const headerSurfaceClass = isTopOverlayMode ? 'site-header--hero' : 'site-header--solid'
   const loginHref = `/login?next=${encodeURIComponent(`${pathname}${search}${hash}`)}`
@@ -175,7 +176,7 @@ function Header() {
 
   return (
     <>
-      <header className={`site-header fixed inset-x-0 top-0 z-40 border-b ${headerSurfaceClass} ${open ? 'site-header--menu-open' : ''} ${isScrolled && !open ? 'site-header--announcement-hidden' : ''}`}>
+      <header className={`site-header fixed inset-x-0 top-0 z-40 border-b ${headerSurfaceClass} ${isInboxPage ? 'site-header--inbox' : ''} ${open ? 'site-header--menu-open' : ''} ${isScrolled && !open ? 'site-header--announcement-hidden' : ''}`}>
         <AnnouncementBar />
         <div className="container-header grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 py-4 px-4 sm:px-6 lg:px-8 xl:gap-4 2xl:gap-12">
           <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 [text-shadow:0_10px_28px_rgba(0,0,0,0.48)] ${isTopOverlayMode ? 'text-paper' : 'text-ink'}`} onClick={close}>Totsan</Link>

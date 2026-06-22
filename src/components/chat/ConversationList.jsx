@@ -7,11 +7,11 @@ export default function ConversationList({ conversations, activeId, userId, stat
   const [openMenuId, setOpenMenuId] = useState(null)
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-3xl border border-line bg-paper p-3 lg:p-3.5">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-none border-0 bg-paper p-2.5 sm:rounded-3xl sm:border sm:border-line lg:p-3.5">
       <div className="min-w-0 border-b border-line/80 px-2.5 py-2.5">
         <h2 className="break-words font-display text-2xl text-ink">Съобщения</h2>
       </div>
-      <div className="min-h-0 min-w-0 flex-1 space-y-1.5 overflow-y-auto overflow-x-hidden pt-2 pr-1 max-lg:max-h-[36svh]">
+      <div className="min-h-0 min-w-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 pr-1">
         {conversations.map((conversation) => {
           const unread = isUnread(conversation, userId)
           const active = conversation.id === activeId
@@ -22,14 +22,17 @@ export default function ConversationList({ conversations, activeId, userId, stat
           const compactPreview = compactSystemText(conversation.last_message_preview || 'Няма съобщения още.')
           const latestOrder = statusByConversation?.get?.(conversation.id)
           const hasActiveOrder = latestOrder && ['paid', 'in_progress', 'delivered', 'completed'].includes(latestOrder.status)
+          const contextLine = getConversationContextLine(conversation)
 
           return (
             <div
               key={conversation.id}
               className={`group relative w-full min-w-0 rounded-2xl border transition ${
                 active
-                  ? 'border-ink/20 bg-soft shadow-[0_10px_30px_-24px_rgba(15,23,42,0.32)]'
-                  : 'border-transparent hover:border-line hover:bg-soft/70'
+                  ? 'border-accentDeep/25 bg-accentSoft/70 shadow-[0_10px_30px_-24px_rgba(15,23,42,0.32)]'
+                  : unread
+                    ? 'border-accentDeep/15 bg-soft/80 hover:border-accentDeep/25'
+                    : 'border-transparent hover:border-line hover:bg-soft/70'
               }`}
             >
               <button
@@ -42,11 +45,14 @@ export default function ConversationList({ conversations, activeId, userId, stat
                   <Avatar src={avatarUrl} srcCandidates={avatarCandidates} name={displayName} size={44} />
                   <div className="min-w-0 flex-1 pr-6">
                     <div className="flex min-w-0 items-center justify-between gap-3">
-                      <span className="min-w-0 truncate font-medium text-ink">{displayName}</span>
-                      <span className="shrink-0 text-xs text-muted pr-1">
+                      <span className={`min-w-0 truncate text-ink ${unread ? 'font-semibold' : 'font-medium'}`}>{displayName}</span>
+                      <span className={`shrink-0 pr-1 text-xs ${unread ? 'font-medium text-accentDeep' : 'text-muted'}`}>
                         {formatChatTime(conversation.last_message_at || conversation.created_at)}
                       </span>
                     </div>
+                    {contextLine && (
+                      <div className="mt-0.5 min-w-0 truncate text-xs text-muted">{contextLine}</div>
+                    )}
                     <div className="mt-0.5 flex min-w-0 items-center gap-2 text-sm text-muted">
                       {unread && <span className="h-2 w-2 shrink-0 rounded-full bg-accentDeep" />}
                       {hasActiveOrder && (
@@ -54,7 +60,7 @@ export default function ConversationList({ conversations, activeId, userId, stat
                           Активна
                         </span>
                       )}
-                      <span className="min-w-0 flex-1 truncate">{compactPreview}</span>
+                      <span className={`min-w-0 flex-1 truncate ${unread ? 'font-medium text-ink' : ''}`}>{compactPreview}</span>
                     </div>
                   </div>
                 </div>
@@ -123,4 +129,10 @@ export default function ConversationList({ conversations, activeId, userId, stat
       </div>
     </div>
   )
+}
+
+function getConversationContextLine(conversation) {
+  const projectTitle = String(conversation?.sharedProject?.title || '').trim()
+  if (projectTitle) return projectTitle
+  return String(conversation?.subject || '').trim()
 }
