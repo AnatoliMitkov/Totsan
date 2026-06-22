@@ -1,7 +1,7 @@
 import { CANONICAL_ORIGIN, getAnalyticsPath, shouldAutoTrackPath, toAbsoluteUrl, toCanonicalPath } from './site-routes.js'
 import { getStoredConsent } from '../utils/consentMode.js'
 
-const GA_MEASUREMENT_ID = String(import.meta.env.VITE_GA_MEASUREMENT_ID || '').trim()
+const GA_MEASUREMENT_ID = String(import.meta.env.VITE_GA_MEASUREMENT_ID || 'G-39RQFR7N0G').trim()
 const REQUIRE_CONSENT = String(import.meta.env.VITE_GA_REQUIRE_CONSENT || 'true').trim().toLowerCase() !== 'false'
 
 let initialized = false
@@ -31,7 +31,11 @@ export function initializeAnalytics() {
     window.dataLayer.push(arguments)
   }
 
-  if (!document.querySelector(`script[data-totsan-ga="${GA_MEASUREMENT_ID}"]`)) {
+  const existingGoogleTag = document.querySelector(
+    `script[data-totsan-ga="${GA_MEASUREMENT_ID}"], script[src*="googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_MEASUREMENT_ID)}"]`
+  )
+
+  if (!existingGoogleTag) {
     const script = document.createElement('script')
     script.async = true
     script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_MEASUREMENT_ID)}`
