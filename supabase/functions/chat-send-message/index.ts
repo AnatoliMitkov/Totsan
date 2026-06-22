@@ -185,6 +185,15 @@ async function auditMasked(adminClient: ReturnType<typeof createClient>, actorId
   if (error) console.error('chat-send-message audit error', error)
 }
 
+async function hasActivePartnerAccess(adminClient: ReturnType<typeof createClient>, partnerId: string, profileId: string | null) {
+  const { data, error } = await adminClient.rpc('has_active_partner_access', {
+    check_user_id: partnerId,
+    check_profile_id: profileId,
+  })
+  if (error) throw error
+  return Boolean(data)
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return jsonResponse(405, { error: 'Only POST is supported.' })
@@ -226,13 +235,16 @@ Deno.serve(async (req) => {
     if (action === 'create_conversation') {
       const profileId = optionalUuid(payload.profileId)
       let partnerId = optionalUuid(payload.partnerId)
+      let partnerProfileId = profileId
       const projectId = optionalUuid(payload.projectId)
       const subject = String(payload.subject || '').trim() || 'Разговор в Totsan'
 
       if (profileId) {
-        const { data: profile, error } = await adminClient.from('profiles').select('user_id, name').eq('id', profileId).maybeSingle()
+        const { data: profile, error } = await adminClient.from('profiles').select('id, user_id, name').eq('id', profileId).maybeSingle()
         if (error) throw error
+        if (!profile?.id) throw new Error('Партньорският профил не беше намерен.')
         partnerId = profile?.user_id || null
+        partnerProfileId = profile?.id || profileId
       }
 
       if (!partnerId) throw new Error('Профилът още няма свързан партньорски акаунт.')
@@ -249,6 +261,11 @@ Deno.serve(async (req) => {
       const { data: existing, error: existingError } = await query.maybeSingle()
       if (existingError) throw existingError
       if (existing) return jsonResponse(200, { ok: true, conversation: existing, reused: true })
+
+      const partnerCanReceiveNewChats = await hasActivePartnerAccess(adminClient, partnerId, partnerProfileId)
+      if (!partnerCanReceiveNewChats) {
+        throw new Error('Профилът на партньора е на пауза и в момента не приема нови клиентски запитвания.')
+      }
 
       const { data: conversation, error } = await adminClient.from('conversations').insert({
         client_id: user.id,

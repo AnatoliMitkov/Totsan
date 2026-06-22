@@ -104,7 +104,7 @@ export default function ComposeBar({
             rows={1}
             disabled={disabled}
             placeholder="Напиши съобщение..."
-            className="max-h-[9.5rem] min-h-[2.85rem] min-w-0 w-full flex-1 resize-none overflow-y-auto rounded-2xl border border-line bg-soft/95 px-4 py-3 text-sm leading-relaxed outline-none transition placeholder:text-muted/80 focus:border-ink disabled:cursor-not-allowed disabled:opacity-70"
+            className="chat-compose-textarea max-h-[9.5rem] min-h-[2.85rem] min-w-0 w-full flex-1 resize-none overflow-y-auto rounded-2xl border border-line bg-soft/95 px-4 py-3 text-sm leading-relaxed outline-none transition placeholder:text-muted/80 focus:border-ink disabled:cursor-not-allowed disabled:opacity-70"
           />
           <div
             className={`grid min-w-0 gap-2 md:flex md:w-auto md:pb-1 ${canSendOffer ? 'grid-cols-[auto_1fr_1fr]' : 'grid-cols-[auto_1fr]'}`}

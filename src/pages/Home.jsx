@@ -526,12 +526,9 @@ function TrustPromise() {
   }, [])
 
   return (
-    <section className="section bg-soft border-y border-line">
+    <section className="section !pt-10 !pb-10 bg-soft border-y border-line">
       <div className="container-page">
         <div className="mb-6 flex justify-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-line bg-paper px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted">
-            <Sparkles size={14} className="text-accent" /> Ранен достъп · пилотна фаза
-          </span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
           <AnimatedStatCounter key="published-services" end={stats.publishedServices} label="Публични услуги" />
@@ -607,7 +604,7 @@ function LayersTimelineExplorer() {
   const activeLayer = LAYERS[activeIndex]
 
   return (
-    <section id="layers-explorer" className="section bg-paper">
+    <section id="layers-explorer" className="section bg-paper !pt-10 !pb-10">
       <div className="container-page">
         <div className="max-w-3xl mb-12">
           <div className="eyebrow reveal">Петте слоя на създаването</div>
@@ -858,7 +855,7 @@ function DreamBuilderQuiz() {
   const progressPercent = (step / 3) * 100
 
   return (
-    <section id="start" className="section bg-soft border-y border-line" ref={quizRef}>
+    <section id="start" className="section !pt-10 !pb-10 bg-soft border-y border-line" ref={quizRef}>
       <div className="container-page max-w-3xl">
         <div className="text-center mb-10">
           <div className="eyebrow reveal">Започни оттук · безплатно</div>
@@ -1083,7 +1080,7 @@ function Projects() {
     { t: 'Ресторант в морска градина', who: 'Дизайн + декорация', layer: 'Слоеве 01, 04, 05', img: HOME_PROJECTS[2] }
   ]
   return (
-    <section className="section bg-paper">
+    <section className="section bg-paper !pt-5 !pb-5">
       <div className="container-page">
         <div className="flex items-end justify-between mb-10 reveal">
           <div>
@@ -1121,7 +1118,7 @@ function HowItWorks() {
     { n: '04', t: 'Свърши работата спокойно', d: 'Заяви услуга или приеми оферта през Totsan. Плащането е защитено и се освобождава едва след като потвърдиш завършването.' }
   ]
   return (
-    <section className="section bg-soft border-y border-line">
+    <section className="section bg-soft border-y border-line !pt-10 !pb-10 ">
       <div className="container-page">
         <div className="eyebrow reveal">Как работи Totsan</div>
         <h2 className="h-section mt-2 reveal max-w-3xl">Четири лесни стъпки. Без излишен шум.</h2>
@@ -1273,7 +1270,7 @@ function FAQItem({ question, answer }) {
 
 function FAQ() {
   return (
-    <section className="section bg-paper">
+    <section className="section bg-paper  !pt-10 !pb-10">
       <div className="container-page max-w-4xl">
         <div className="eyebrow reveal">Често задавани въпроси</div>
         <h2 className="h-section mt-2 reveal">Кратко, ясно и прозрачно.</h2>
@@ -1289,7 +1286,7 @@ function FAQ() {
 
 function CTA() {
   return (
-    <section className="section bg-paper">
+    <section className="section bg-paper !pt-10 !pb-10">
       <div className="container-page rounded-3xl bg-ink text-paper p-10 md:p-16 grid md:grid-cols-12 gap-8 items-center relative overflow-hidden shadow-xl">
         <div className="hidden sm:block absolute top-0 right-0 w-80 h-80 bg-accent/20 rounded-full blur-[100px] pointer-events-none" />
         <div className="hidden sm:block absolute bottom-0 left-0 w-80 h-80 bg-trustPurple/10 rounded-full blur-[100px] pointer-events-none" />

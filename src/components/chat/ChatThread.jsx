@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, ImageOff, LoaderCircle, MessageCircle, ShieldCheck, X } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Download, ImageOff, LoaderCircle, MessageCircle, ShieldCheck, X } from 'lucide-react'
 import MessageBubble from './MessageBubble.jsx'
 import Avatar from '../Avatar.jsx'
 import { compactSystemText, getConversationTitle, getOtherParticipant, getOtherParticipantRole, getParticipantPublicHref, getRoleLabel } from '../../lib/chat.js'
@@ -8,6 +8,7 @@ import { createChatAttachmentSignedUrl, isDeletedAttachment, isImageAttachment }
 
 const ACTIVE_ORDER_STATUSES = new Set(['paid', 'in_progress'])
 const BOTTOM_STICK_THRESHOLD = 96
+const JUMP_TO_LATEST_THRESHOLD = 220
 const TOP_LOAD_THRESHOLD = 72
 
 function conversationStateLabel(status = '') {
@@ -71,6 +72,8 @@ export default function ChatThread({
   hasOlder = false,
   isLoadingOlder = false,
   status = 'ready',
+  forceScrollToken = 0,
+  layoutVersion = '',
 }) {
   const threadBodyRef = useRef(null)
   const stickToBottomRef = useRef(true)
@@ -78,7 +81,97 @@ export default function ChatThread({
   const previousConversationIdRef = useRef('')
   const previousMessageCountRef = useRef(0)
   const prependAnchorRef = useRef(null)
+  const scrollAnimationRef = useRef(0)
   const [activeMediaIndex, setActiveMediaIndex] = useState(null)
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false)
+
+  function animateThreadScrollTo(targetTop, { duration = 320 } = {}) {
+    const container = threadBodyRef.current
+    if (!container) return
+
+    window.cancelAnimationFrame(scrollAnimationRef.current)
+    const maxTop = Math.max(0, container.scrollHeight - container.clientHeight)
+    const startTop = container.scrollTop
+    const nextTop = Math.max(0, Math.min(maxTop, targetTop))
+    const distance = nextTop - startTop
+
+    if (Math.abs(distance) < 2) {
+      container.scrollTop = nextTop
+      return
+    }
+
+    const startedAt = performance.now()
+    const easeInOutCubic = (value) => (
+      value < 0.5
+        ? 4 * value * value * value
+        : 1 - Math.pow(-2 * value + 2, 3) / 2
+    )
+
+    const step = (now) => {
+      const progress = Math.min(1, (now - startedAt) / duration)
+      container.scrollTop = startTop + distance * easeInOutCubic(progress)
+      if (progress < 1) {
+        scrollAnimationRef.current = window.requestAnimationFrame(step)
+      }
+    }
+
+    scrollAnimationRef.current = window.requestAnimationFrame(step)
+  }
+
+  function scrollToBottom(behavior = 'smooth') {
+    const container = threadBodyRef.current
+    if (!container) return
+    window.cancelAnimationFrame(scrollAnimationRef.current)
+    const targetTop = container.scrollHeight
+    if (behavior === 'auto') {
+      container.scrollTop = targetTop
+    } else {
+      animateThreadScrollTo(targetTop)
+    }
+    stickToBottomRef.current = true
+    setShowJumpToLatest(false)
+  }
+
+  function scheduleScrollToBottom(behavior = 'smooth') {
+    let followupFrame = 0
+    const frame = window.requestAnimationFrame(() => {
+      scrollToBottom(behavior)
+      followupFrame = window.requestAnimationFrame(() => scrollToBottom(behavior))
+    })
+    return () => {
+      window.cancelAnimationFrame(frame)
+      if (followupFrame) window.cancelAnimationFrame(followupFrame)
+    }
+  }
+
+  function scrollElementIntoThreadView(element) {
+    const container = threadBodyRef.current
+    if (!container || !(element instanceof Element)) return false
+
+    const containerRect = container.getBoundingClientRect()
+    const elementRect = element.getBoundingClientRect()
+    const overflowBottom = elementRect.bottom - containerRect.bottom + 20
+    const overflowTop = containerRect.top - elementRect.top + 20
+
+    if (overflowBottom > 0) {
+      animateThreadScrollTo(container.scrollTop + overflowBottom, { duration: 280 })
+      return true
+    }
+
+    if (overflowTop > 0) {
+      animateThreadScrollTo(container.scrollTop - overflowTop, { duration: 280 })
+      return true
+    }
+
+    return false
+  }
+
+  function revealInlineControls(targetElement) {
+    const container = threadBodyRef.current
+    if (!container) return
+    if (scrollElementIntoThreadView(targetElement)) return
+    if (stickToBottomRef.current) scheduleScrollToBottom('smooth')
+  }
 
   const visibleMessages = useMemo(() => {
     const seenSystemKeys = new Set()
@@ -163,6 +256,7 @@ export default function ChatThread({
     const handleScroll = () => {
       const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
       stickToBottomRef.current = distanceFromBottom <= BOTTOM_STICK_THRESHOLD
+      setShowJumpToLatest(distanceFromBottom > JUMP_TO_LATEST_THRESHOLD)
 
       const nearTop = container.scrollTop <= TOP_LOAD_THRESHOLD
       if (!nearTop) {
@@ -200,6 +294,33 @@ export default function ChatThread({
     prependAnchorRef.current = null
   }, [isLoadingOlder, visibleMessages])
 
+  useEffect(() => {
+    if (status !== 'ready' || !forceScrollToken) return undefined
+    return scheduleScrollToBottom('smooth')
+  }, [forceScrollToken, status])
+
+  useEffect(() => {
+    if (status !== 'ready' || !stickToBottomRef.current) return undefined
+    return scheduleScrollToBottom('smooth')
+  }, [layoutVersion, status])
+
+  useEffect(() => {
+    if (status !== 'ready') return undefined
+
+    const handleResize = () => {
+      if (stickToBottomRef.current) scheduleScrollToBottom('auto')
+    }
+
+    window.addEventListener('resize', handleResize)
+    window.visualViewport?.addEventListener('resize', handleResize)
+    window.visualViewport?.addEventListener('scroll', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      window.visualViewport?.removeEventListener('resize', handleResize)
+      window.visualViewport?.removeEventListener('scroll', handleResize)
+    }
+  }, [status])
+
   useLayoutEffect(() => {
     const container = threadBodyRef.current
     if (!container || status !== 'ready') return
@@ -213,26 +334,10 @@ export default function ChatThread({
     }
 
     const behavior = conversationChanged ? 'auto' : 'smooth'
-    const scrollToBottom = () => {
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior,
-      })
-    }
-
-    let followupFrame = 0
-    const frame = window.requestAnimationFrame(() => {
-      scrollToBottom()
-      followupFrame = window.requestAnimationFrame(scrollToBottom)
-    })
-
     stickToBottomRef.current = true
     previousMessageCountRef.current = visibleMessages.length
     previousConversationIdRef.current = conversation?.id || ''
-    return () => {
-      window.cancelAnimationFrame(frame)
-      if (followupFrame) window.cancelAnimationFrame(followupFrame)
-    }
+    return scheduleScrollToBottom(behavior)
   }, [conversation?.id, status, visibleMessages])
 
   if (!conversation) {
@@ -256,7 +361,7 @@ export default function ChatThread({
   const IdentityTag = participantHref ? Link : 'div'
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-paper shadow-[0_18px_50px_-42px_rgba(15,23,42,0.28)] sm:rounded-3xl sm:border sm:border-line">
+    <div className="relative flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-paper shadow-[0_18px_50px_-42px_rgba(15,23,42,0.28)] sm:rounded-3xl sm:border sm:border-line">
       <div className="z-10 shrink-0 border-b border-line bg-paper/96 px-3 py-2.5 backdrop-blur-sm md:px-5 md:py-3">
         <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,48%)] lg:items-start">
           <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
@@ -331,6 +436,7 @@ export default function ChatThread({
                 groupedWithNext={item.groupedWithNext}
                 mediaItems={mediaItems}
                 onOpenMedia={setActiveMediaIndex}
+                onRevealInlineControls={revealInlineControls}
               />
             )
           ))}
@@ -341,6 +447,16 @@ export default function ChatThread({
           )}
         </div>
       </div>
+      {showJumpToLatest && (
+        <button
+          type="button"
+          onClick={() => scrollToBottom('smooth')}
+          className="absolute bottom-4 left-1/2 z-20 grid h-9 w-9 -translate-x-1/2 place-items-center rounded-full border border-paper/15 bg-ink/58 text-paper shadow-[0_16px_34px_-20px_rgba(15,23,42,0.68)] backdrop-blur-xl transition hover:bg-ink/72 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paper/30 md:bottom-5"
+          aria-label="Към най-новите съобщения"
+        >
+          <ChevronDown size={20} strokeWidth={2.5} />
+        </button>
+      )}
       <ChatMediaViewer
         items={mediaItems}
         activeIndex={activeMediaIndex}

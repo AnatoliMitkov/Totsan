@@ -38,6 +38,7 @@ export default function Layout() {
   const { account } = useAccount()
   const isAuthPage = pathname === '/login'
   const isInboxPage = pathname === '/inbox' || pathname.startsWith('/inbox/')
+  const isInboxThreadPage = /^\/inbox\/[^/?#]+/.test(pathname)
   const isBlockedAccount = BLOCKED_ACCOUNT_STATUSES.has(account?.account_status)
   const isHeroPage = hasHeroBanner(pathname)
 
@@ -98,11 +99,31 @@ export default function Layout() {
     }
   }, [])
 
+  useEffect(() => {
+    const setAppViewportHeight = () => {
+      const viewportHeight = window.visualViewport?.height || window.innerHeight
+      document.documentElement.style.setProperty('--app-vh', `${Math.round(viewportHeight)}px`)
+    }
+
+    setAppViewportHeight()
+    window.addEventListener('resize', setAppViewportHeight)
+    window.addEventListener('orientationchange', setAppViewportHeight)
+    window.visualViewport?.addEventListener('resize', setAppViewportHeight)
+    window.visualViewport?.addEventListener('scroll', setAppViewportHeight)
+
+    return () => {
+      window.removeEventListener('resize', setAppViewportHeight)
+      window.removeEventListener('orientationchange', setAppViewportHeight)
+      window.visualViewport?.removeEventListener('resize', setAppViewportHeight)
+      window.visualViewport?.removeEventListener('scroll', setAppViewportHeight)
+    }
+  }, [])
+
   return (
-    <div className={isInboxPage ? 'flex h-[100dvh] min-h-0 flex-col overflow-hidden' : 'min-h-screen flex flex-col'}>
+    <div className={isInboxPage ? `app-shell--inbox ${isInboxThreadPage ? 'app-shell--inbox-thread' : ''} flex h-[100dvh] min-h-0 flex-col overflow-hidden` : 'min-h-screen flex flex-col'}>
       <Header />
       <main
-        className={isInboxPage ? 'h-[100dvh] min-h-0 flex-none overflow-hidden' : `flex-1 min-h-0 ${isHeroPage ? 'homepage-main' : ''}`}
+        className={isInboxPage ? `app-main--inbox h-[100dvh] min-h-0 flex-none overflow-hidden ${isInboxThreadPage ? 'mobile-inbox-thread-main' : ''}` : `flex-1 min-h-0 ${isHeroPage ? 'homepage-main' : ''}`}
         style={{ paddingTop: isHeroPage ? '0px' : 'var(--header-h, 64px)' }}>
         <Outlet />
       </main>
@@ -125,6 +146,7 @@ function Header() {
   const isProActive = pathname === '/pro' || pathname === '/totsan-pro'
   const isVisualizationActive = pathname === '/vizualizacia'
   const isInboxPage = pathname === '/inbox' || pathname.startsWith('/inbox/')
+  const isInboxThreadPage = /^\/inbox\/[^/?#]+/.test(pathname)
   const isTopOverlayMode = !isScrolled && !open
   const headerSurfaceClass = isTopOverlayMode ? 'site-header--hero' : 'site-header--solid'
   const loginHref = `/login?next=${encodeURIComponent(`${pathname}${search}${hash}`)}`
@@ -176,7 +198,7 @@ function Header() {
 
   return (
     <>
-      <header className={`site-header fixed inset-x-0 top-0 z-40 border-b ${headerSurfaceClass} ${isInboxPage ? 'site-header--inbox' : ''} ${open ? 'site-header--menu-open' : ''} ${isScrolled && !open ? 'site-header--announcement-hidden' : ''}`}>
+      <header className={`site-header fixed inset-x-0 top-0 z-40 border-b ${headerSurfaceClass} ${isInboxPage ? 'site-header--inbox' : ''} ${isInboxThreadPage ? 'site-header--inbox-thread' : ''} ${open ? 'site-header--menu-open' : ''} ${isScrolled && !open ? 'site-header--announcement-hidden' : ''}`}>
         <AnnouncementBar />
         <div className="container-header grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 py-4 px-4 sm:px-6 lg:px-8 xl:gap-4 2xl:gap-12">
           <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 [text-shadow:0_10px_28px_rgba(0,0,0,0.48)] ${isTopOverlayMode ? 'text-paper' : 'text-ink'}`} onClick={close}>Totsan</Link>

@@ -49,6 +49,11 @@ import {
   uploadPortfolioImage,
 } from '../../lib/portfolio.js'
 import { createConnectOnboarding, getConnectStatus } from '../../lib/payments.js'
+import {
+  createPartnerSubscriptionPortal,
+  getPartnerSubscriptionEndLabel,
+  loadOwnPartnerSubscription,
+} from '../../lib/subscriptions.js'
 import { loadPartnerInquiries, loadInquiryProjects } from '../../lib/partner-inquiries.js'
 import { loadPartnerServicesForProfile } from '../../lib/partner-services.js'
 import { formatMoneyRange } from '../../lib/money.js'
@@ -270,6 +275,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
   const [saveState, setSaveState] = useState({ status: 'idle', message: '' })
   const [portfolioState, setPortfolioState] = useState({ status: 'idle', message: '' })
   const [paymentState, setPaymentState] = useState({ status: 'idle', message: '' })
+  const [subscriptionState, setSubscriptionState] = useState({ status: 'loading', subscription: null, message: '' })
   const [avatarEditor, setAvatarEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'avatar.jpg' })
   const [bannerEditor, setBannerEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'banner.jpg', positionY: 50 })
 
@@ -477,6 +483,43 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     loadDashboardData()
     return () => { active = false }
   }, [profile?.id, profile?.slug])
+
+  useEffect(() => {
+    if (!profile?.id) return undefined
+
+    let active = true
+    async function loadSubscription() {
+      setSubscriptionState(current => ({ ...current, status: 'loading', message: '' }))
+      try {
+        const params = new URLSearchParams(window.location.search)
+        const subscriptionParam = params.get('subscription')
+        const subscription = await loadOwnPartnerSubscription()
+        if (!active) return
+
+        const message = subscriptionParam === 'success'
+          ? 'Stripe checkout приключи. Статусът ще се обнови след webhook потвърждение.'
+          : subscriptionParam === 'portal_return'
+            ? 'Върнахте се от Stripe управлението на абонамента.'
+            : ''
+
+        setSubscriptionState({ status: 'ready', subscription, message })
+
+        if (subscriptionParam) {
+          params.delete('subscription')
+          params.delete('session_id')
+          const query = params.toString()
+          const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash || ''}`
+          window.history.replaceState({}, '', nextUrl)
+        }
+      } catch (error) {
+        if (!active) return
+        setSubscriptionState({ status: 'error', subscription: null, message: error.message || 'Абонаментният статус не успя да зареди.' })
+      }
+    }
+
+    loadSubscription()
+    return () => { active = false }
+  }, [profile?.id])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -838,6 +881,20 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     }
   }
 
+  async function openSubscriptionPortal() {
+    setSubscriptionState(current => ({ ...current, status: 'opening', message: 'Отваряме Stripe Billing Portal...' }))
+    try {
+      const result = await createPartnerSubscriptionPortal()
+      if (result.portalUrl) {
+        window.location.href = result.portalUrl
+        return
+      }
+      setSubscriptionState(current => ({ ...current, status: 'error', message: 'Stripe не върна адрес за управление на абонамента.' }))
+    } catch (error) {
+      setSubscriptionState(current => ({ ...current, status: 'error', message: error.message || 'Абонаментът не може да бъде управляван в момента.' }))
+    }
+  }
+
   if (!profile?.id || !currentProfile?.id) {
     return (
       <section className="section bg-soft min-h-screen">
@@ -871,7 +928,10 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       />
       <div className="relative z-10 flex flex-col bg-soft pb-16 md:pb-24">
         <div className="container-page -mt-8 w-full space-y-5 px-4 sm:-mt-12 md:-mt-24 md:px-6">
-        <PublicProfilePanel className="transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.04)]">
+        <PublicProfilePanel className="relative transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.04)]">
+          <div className="absolute right-4 top-4 z-10 rounded-full border border-accent/25 bg-accent px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-paper shadow-[0_12px_30px_rgba(36,111,232,0.22)] md:right-6 md:top-6">
+            PRO
+          </div>
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex flex-col items-center gap-4 text-center lg:flex-row lg:items-end lg:text-left">
               <button
@@ -921,7 +981,9 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
                 portfolio={portfolio}
                 completion={profileCompletion}
                 dashboardState={dashboardState}
+                subscriptionState={subscriptionState}
                 onAction={openWorkspaceTarget}
+                onManageSubscription={openSubscriptionPortal}
               />
             )}
 
@@ -1267,7 +1329,7 @@ function WorkspaceSidebar({ tabs, activeTab, profile, completion, portfolioCount
   )
 }
 
-function OverviewDashboard({ preview, stats, portfolio, completion, dashboardState, onAction }) {
+function OverviewDashboard({ preview, stats, portfolio, completion, dashboardState, subscriptionState, onAction, onManageSubscription }) {
   const safePreview = preview || {}
   const safeCompletion = completion || { percent: 0, done: 0, total: 1, missing: [] }
   const safePortfolio = Array.isArray(portfolio) ? portfolio : []
@@ -1364,6 +1426,7 @@ function OverviewDashboard({ preview, stats, portfolio, completion, dashboardSta
         <LatestInquiryCard inquiry={latestInquiry} project={latestProject} status={dashboardState?.status} onOpen={() => onAction('inquiries')} onImprove={() => onAction('profile')} />
 
         <div className="space-y-5">
+          <SubscriptionStatusCard state={subscriptionState} onManage={onManageSubscription} />
           <TrustCard
             preview={safePreview}
             completion={safeCompletion}
@@ -1378,6 +1441,86 @@ function OverviewDashboard({ preview, stats, portfolio, completion, dashboardSta
         </div>
       </div>
     </div>
+  )
+}
+
+function SubscriptionStatusCard({ state, onManage }) {
+  const subscription = state?.subscription
+  const isLoading = state?.status === 'loading'
+  const isOpening = state?.status === 'opening'
+  const active = Boolean(subscription?.active)
+  const canManage = Boolean(subscription?.stripeCustomerId)
+  const endLabel = getPartnerSubscriptionEndLabel(subscription)
+  const planLabel = subscription?.plan?.planName || (subscription?.status === 'founding_free' ? 'Активен партньор' : 'Няма активен план')
+  const statusLabel = subscription?.statusLabel || 'На пауза'
+  const endPrefix = subscription?.status === 'founding_free'
+    ? 'Промо до'
+    : subscription?.status === 'trialing'
+      ? 'Пробен период до'
+      : subscription?.cancelAtPeriodEnd
+        ? 'Активен до'
+        : 'Следващо подновяване'
+
+  if (isLoading) {
+    return (
+      <section className="rounded-[1.75rem] border border-line bg-paper p-5">
+        <div className="h-4 w-32 rounded-full bg-soft" />
+        <div className="mt-4 h-7 w-48 rounded-full bg-soft" />
+        <div className="mt-3 h-4 w-full rounded-full bg-soft" />
+      </section>
+    )
+  }
+
+  return (
+    <section className={`rounded-[1.75rem] border p-5 shadow-[0_20px_60px_-52px_rgba(13,35,64,0.35)] ${active ? 'border-emerald-100 bg-emerald-50/70' : 'border-amber-100 bg-amber-50/70'}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Абонамент</div>
+          <h3 className="mt-2 text-xl font-semibold text-ink">{active ? 'Партньорският достъп е активен' : 'Профилът ви е на пауза'}</h3>
+        </div>
+        <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${active ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+          {active ? <Check size={18} /> : <Lock size={18} />}
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+        <div className="rounded-2xl bg-paper/75 px-3 py-2">
+          <div className="text-xs text-muted">План</div>
+          <div className="mt-1 font-semibold text-ink">{planLabel}</div>
+        </div>
+        <div className="rounded-2xl bg-paper/75 px-3 py-2">
+          <div className="text-xs text-muted">Статус</div>
+          <div className="mt-1 font-semibold text-ink">{statusLabel}</div>
+        </div>
+      </div>
+
+      {endLabel && (
+        <p className="mt-3 text-sm leading-6 text-muted">{endPrefix}: <span className="font-semibold text-ink">{endLabel}</span></p>
+      )}
+
+      {!active && (
+        <p className="mt-3 text-sm leading-6 text-muted">
+          Профилът остава запазен, но не е активен за нови клиентски запитвания. Активирайте партньорски план, за да бъде видим за клиенти.
+        </p>
+      )}
+
+      {state?.message && (
+        <div className={`mt-3 rounded-2xl px-3 py-2 text-sm ${state.status === 'error' ? 'bg-red-50 text-red-700' : 'bg-paper/80 text-muted'}`}>
+          {state.message}
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        {canManage && (
+          <button type="button" onClick={onManage} disabled={isOpening} className="btn btn-primary justify-center">
+            <CreditCard size={18} /> {isOpening ? 'Отваря се...' : 'Управлявай'}
+          </button>
+        )}
+        <Link to="/pro#pro-plans" className={`btn justify-center ${canManage ? 'btn-ghost' : 'btn-primary'}`}>
+          Избери план
+        </Link>
+      </div>
+    </section>
   )
 }
 
