@@ -59,6 +59,7 @@ export default function Inbox() {
   const [error, setError] = useState('')
   const [draft, setDraft] = useState('')
   const [draftFiles, setDraftFiles] = useState([])
+  const [scrollToLatestToken, setScrollToLatestToken] = useState(0)
   const [replyTarget, setReplyTarget] = useState(null)
   const [offerOpen, setOfferOpen] = useState(false)
   const initialLoadRef = useRef(false)
@@ -495,6 +496,7 @@ export default function Inbox() {
         const nextMessage = await loadFreshMessage(result.message.id, result.message)
         if (nextMessage) mergeIncomingMessages(activeConversationId, [nextMessage])
       }
+      setScrollToLatestToken((value) => value + 1)
       setDraft('')
       setDraftFiles([])
       setReplyTarget(null)
@@ -516,6 +518,7 @@ export default function Inbox() {
         const nextMessage = await loadFreshMessage(result.message.id, { ...result.message, offer: result.offer || null })
         if (nextMessage) mergeIncomingMessages(activeConversationId, [nextMessage])
       }
+      setScrollToLatestToken((value) => value + 1)
       setOfferOpen(false)
       setMessageStatus('idle')
       scheduleConversationRefresh()
@@ -670,6 +673,8 @@ export default function Inbox() {
               hasOlder={pagination.hasOlder}
               isLoadingOlder={pagination.isLoadingOlder}
               status={threadStatus}
+              forceScrollToken={scrollToLatestToken}
+              layoutVersion={`${draft.length}:${draftFiles.length}:${replyTarget?.id || ''}:${messageStatus}`}
             />
             {activeConversation && activeConversation.status === 'open' && threadStatus === 'ready' && (
               <ComposeBar

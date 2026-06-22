@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CornerUpLeft, Download, FileText, ImageOff, SmilePlus, X } from 'lucide-react'
 import OfferCard from './OfferCard.jsx'
 import Avatar from '../Avatar.jsx'
@@ -21,7 +21,9 @@ export default function MessageBubble({
   groupedWithNext = false,
   mediaItems = [],
   onOpenMedia,
+  onRevealInlineControls,
 }) {
+  const bubbleRef = useRef(null)
   const own = message.sender_id === userId
   const system = message.kind === 'system'
   const offer = message.kind === 'offer' && message.offer
@@ -49,8 +51,16 @@ export default function MessageBubble({
   const wrapperSpacingClass = groupedWithPrevious ? 'mt-1.5' : 'mt-4 first:mt-0'
   const alignmentClass = own ? 'items-end' : 'items-start'
 
+  useEffect(() => {
+    if (!reactionPickerOpen) return undefined
+    const timeout = window.setTimeout(() => {
+      onRevealInlineControls?.(bubbleRef.current)
+    }, 30)
+    return () => window.clearTimeout(timeout)
+  }, [onRevealInlineControls, reactionPickerOpen])
+
   return (
-    <div className={`group flex w-full min-w-0 gap-3 ${own ? 'justify-end' : 'justify-start'} ${wrapperSpacingClass}`}>
+    <div ref={bubbleRef} className={`group flex w-full min-w-0 gap-3 ${own ? 'justify-end' : 'justify-start'} ${wrapperSpacingClass}`}>
       {!own && (
         showAvatar
           ? <Avatar src={avatarUrl} srcCandidates={avatarCandidates} name={participantName} size={32} className="self-end" />

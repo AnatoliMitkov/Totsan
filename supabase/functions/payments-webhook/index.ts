@@ -22,6 +22,10 @@ function adminClient() {
   return createClient(supabaseUrl, serviceRoleKey)
 }
 
+function cleanText(value: unknown, fallback = '') {
+  return String(value ?? '').trim() || fallback
+}
+
 function signatureParts(header: string) {
   const parts = new Map<string, string>()
   header.split(',').forEach((part) => {
@@ -183,6 +187,249 @@ async function markRefunded(charge: Record<string, unknown>) {
   return { ok: true, order: updatedOrder }
 }
 
+function toIsoFromUnix(value: unknown) {
+  const seconds = Number(value || 0)
+  if (!Number.isFinite(seconds) || seconds <= 0) return null
+  return new Date(seconds * 1000).toISOString()
+}
+
+function stripeObjectId(value: unknown) {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'object' && !Array.isArray(value)) return cleanText((value as Record<string, unknown>).id)
+  return ''
+}
+
+function stripePriceIdFromSubscription(subscription: Record<string, unknown>) {
+  const items = subscription.items as { data?: Array<Record<string, unknown>> } | undefined
+  const price = items?.data?.[0]?.price as Record<string, unknown> | undefined
+  return cleanText(price?.id)
+}
+
+function stripePriceIdFromInvoice(invoice: Record<string, unknown>) {
+  const lines = invoice.lines as { data?: Array<Record<string, unknown>> } | undefined
+  const line = lines?.data?.[0]
+  const price = line?.price as Record<string, unknown> | undefined
+  return cleanText(price?.id)
+}
+
+function stripeInvoicePeriod(invoice: Record<string, unknown>) {
+  const lines = invoice.lines as { data?: Array<Record<string, unknown>> } | undefined
+  const period = lines?.data?.[0]?.period as Record<string, unknown> | undefined
+  return {
+    start: toIsoFromUnix(period?.start),
+    end: toIsoFromUnix(period?.end),
+  }
+}
+
+function planKeyFromPriceId(priceId: string) {
+  const pairs: Array<[string, string]> = [
+    ['active_partner_monthly', Deno.env.get('STRIPE_PRICE_PARTNER_ACTIVE_MONTHLY') || ''],
+    ['active_partner_yearly', Deno.env.get('STRIPE_PRICE_PARTNER_ACTIVE_YEARLY') || ''],
+    ['company_team_monthly', Deno.env.get('STRIPE_PRICE_PARTNER_COMPANY_MONTHLY') || ''],
+    ['company_team_yearly', Deno.env.get('STRIPE_PRICE_PARTNER_COMPANY_YEARLY') || ''],
+  ]
+  return pairs.find(([, configuredPriceId]) => configuredPriceId && configuredPriceId === priceId)?.[0] || ''
+}
+
+function billingIntervalFromPlanKey(planKey: string) {
+  if (planKey.endsWith('_yearly')) return 'yearly'
+  if (planKey.endsWith('_monthly')) return 'monthly'
+  return ''
+}
+
+function mapStripeSubscriptionStatus(value: unknown) {
+  const status = cleanText(value).toLowerCase()
+  if (status === 'active') return 'active'
+  if (status === 'trialing') return 'trialing'
+  if (status === 'canceled') return 'canceled'
+  if (status === 'incomplete_expired') return 'expired'
+  if (status === 'past_due' || status === 'unpaid' || status === 'incomplete') return 'past_due'
+  return 'inactive'
+}
+
+function stripeSecret() {
+  return cleanText(Deno.env.get('STRIPE_SECRET_KEY'))
+}
+
+async function stripeGet(path: string) {
+  const secret = stripeSecret()
+  if (!secret) return null
+  const response = await fetch(`https://api.stripe.com/v1/${path}`, {
+    headers: { Authorization: `Bearer ${secret}` },
+  })
+  const data = await response.json()
+  if (!response.ok) {
+    console.error('payments-webhook stripe lookup error', data)
+    return null
+  }
+  return data as Record<string, unknown>
+}
+
+async function updateSubscriptionRows(admin: ReturnType<typeof createClient>, match: { subscriptionId?: string; checkoutSessionId?: string }, patch: Record<string, unknown>) {
+  if (match.subscriptionId) {
+    const { data, error } = await admin
+      .from('partner_subscriptions')
+      .update(patch)
+      .eq('stripe_subscription_id', match.subscriptionId)
+      .select('*')
+    if (error) throw error
+    if (data?.length) return data[0]
+  }
+
+  if (match.checkoutSessionId) {
+    const { data, error } = await admin
+      .from('partner_subscriptions')
+      .update(patch)
+      .eq('stripe_checkout_session_id', match.checkoutSessionId)
+      .select('*')
+    if (error) throw error
+    if (data?.length) return data[0]
+  }
+
+  return null
+}
+
+async function upsertPartnerSubscriptionFromStripeSubscription(subscription: Record<string, unknown>, fallback: Record<string, unknown> = {}) {
+  const admin = adminClient()
+  const metadata = {
+    ...((fallback.metadata as Record<string, unknown> | undefined) || {}),
+    ...((subscription.metadata as Record<string, unknown> | undefined) || {}),
+  }
+  const subscriptionId = cleanText(subscription.id || fallback.stripe_subscription_id)
+  if (!subscriptionId) return { skipped: true, reason: 'missing_subscription_id' }
+
+  const { data: existing, error: existingError } = await admin
+    .from('partner_subscriptions')
+    .select('*')
+    .eq('stripe_subscription_id', subscriptionId)
+    .maybeSingle()
+  if (existingError) throw existingError
+
+  const priceId = stripePriceIdFromSubscription(subscription) || cleanText(fallback.stripe_price_id || existing?.stripe_price_id)
+  const planKey = cleanText(metadata.plan_key || fallback.plan_key || existing?.plan_key || planKeyFromPriceId(priceId), 'active_partner_monthly')
+  const billingInterval = cleanText(metadata.billing_interval || fallback.billing_interval || existing?.billing_interval || billingIntervalFromPlanKey(planKey), 'monthly')
+  const userId = cleanText(metadata.user_id || fallback.user_id || existing?.user_id)
+  if (!userId) return { skipped: true, reason: 'missing_user_id' }
+
+  const patch = {
+    user_id: userId,
+    partner_profile_id: cleanText(metadata.partner_profile_id || fallback.partner_profile_id || existing?.partner_profile_id) || null,
+    plan_key: planKey,
+    billing_interval: billingInterval,
+    status: mapStripeSubscriptionStatus(subscription.status),
+    stripe_customer_id: stripeObjectId(subscription.customer || fallback.stripe_customer_id || existing?.stripe_customer_id) || null,
+    stripe_subscription_id: subscriptionId,
+    stripe_price_id: priceId || null,
+    current_period_start: toIsoFromUnix(subscription.current_period_start),
+    current_period_end: toIsoFromUnix(subscription.current_period_end),
+    trial_start: toIsoFromUnix(subscription.trial_start),
+    trial_end: toIsoFromUnix(subscription.trial_end),
+    cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
+    metadata: {
+      source: 'stripe_subscription_webhook',
+      stripe_status: cleanText(subscription.status),
+    },
+  }
+
+  const updated = await updateSubscriptionRows(admin, {
+    subscriptionId,
+    checkoutSessionId: cleanText(fallback.stripe_checkout_session_id),
+  }, patch)
+  if (updated) return { ok: true, subscription: updated }
+
+  const { data: inserted, error: insertError } = await admin
+    .from('partner_subscriptions')
+    .insert({
+      ...patch,
+      stripe_checkout_session_id: cleanText(fallback.stripe_checkout_session_id) || null,
+    })
+    .select('*')
+    .single()
+  if (insertError) throw insertError
+  return { ok: true, subscription: inserted }
+}
+
+async function upsertPartnerSubscriptionFromSession(session: Record<string, unknown>) {
+  const metadata = (session.metadata as Record<string, unknown> | undefined) || {}
+  if (metadata.source !== 'partner_subscription') return { skipped: true, reason: 'not_partner_subscription' }
+
+  const subscriptionId = stripeObjectId(session.subscription)
+  if (subscriptionId) {
+    const subscription = await stripeGet(`subscriptions/${encodeURIComponent(subscriptionId)}`)
+    if (subscription) {
+      return upsertPartnerSubscriptionFromStripeSubscription(subscription, {
+        metadata,
+        stripe_checkout_session_id: session.id,
+        stripe_customer_id: stripeObjectId(session.customer),
+      })
+    }
+  }
+
+  const userId = cleanText(metadata.user_id)
+  if (!userId) return { skipped: true, reason: 'missing_user_id' }
+
+  const admin = adminClient()
+  const patch = {
+    user_id: userId,
+    partner_profile_id: cleanText(metadata.partner_profile_id) || null,
+    plan_key: cleanText(metadata.plan_key, 'active_partner_monthly'),
+    billing_interval: cleanText(metadata.billing_interval, 'monthly'),
+    status: cleanText(session.payment_status) === 'paid' ? 'active' : 'inactive',
+    stripe_customer_id: stripeObjectId(session.customer) || null,
+    stripe_subscription_id: subscriptionId || null,
+    stripe_checkout_session_id: cleanText(session.id),
+    metadata: {
+      source: 'checkout_session_completed',
+      payment_status: cleanText(session.payment_status),
+    },
+  }
+
+  const updated = await updateSubscriptionRows(admin, {
+    subscriptionId,
+    checkoutSessionId: cleanText(session.id),
+  }, patch)
+  if (updated) return { ok: true, subscription: updated }
+
+  const { data: inserted, error } = await admin
+    .from('partner_subscriptions')
+    .insert(patch)
+    .select('*')
+    .single()
+  if (error) throw error
+  return { ok: true, subscription: inserted }
+}
+
+async function updatePartnerSubscriptionFromInvoice(invoice: Record<string, unknown>, nextStatus: 'active' | 'past_due') {
+  const subscriptionId = stripeObjectId(invoice.subscription)
+  if (!subscriptionId) return { skipped: true, reason: 'missing_subscription_id' }
+
+  const period = stripeInvoicePeriod(invoice)
+  const priceId = stripePriceIdFromInvoice(invoice)
+  const patch: Record<string, unknown> = {
+    status: nextStatus,
+    stripe_customer_id: stripeObjectId(invoice.customer) || null,
+    metadata: {
+      source: 'stripe_invoice_webhook',
+      invoice_id: cleanText(invoice.id),
+      stripe_status: cleanText(invoice.status),
+    },
+  }
+  if (period.start) patch.current_period_start = period.start
+  if (period.end) patch.current_period_end = period.end
+  if (priceId) patch.stripe_price_id = priceId
+
+  const admin = adminClient()
+  const { data, error } = await admin
+    .from('partner_subscriptions')
+    .update(patch)
+    .eq('stripe_subscription_id', subscriptionId)
+    .select('*')
+  if (error) throw error
+  if (!data?.length) return { skipped: true, reason: 'subscription_not_found' }
+  return { ok: true, subscription: data[0] }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return jsonResponse(405, { error: 'Only POST is supported.' })
@@ -194,6 +441,22 @@ Deno.serve(async (req) => {
     const type = String(event.type || '')
     const object = event?.data?.object || {}
 
+    if (type === 'checkout.session.completed' && object.mode === 'subscription' && object.metadata?.source === 'partner_subscription') {
+      const result = await upsertPartnerSubscriptionFromSession(object)
+      return jsonResponse(200, { received: true, handled: type, result })
+    }
+    if (type === 'customer.subscription.created' || type === 'customer.subscription.updated' || type === 'customer.subscription.deleted') {
+      const result = await upsertPartnerSubscriptionFromStripeSubscription(object)
+      return jsonResponse(200, { received: true, handled: type, result })
+    }
+    if (type === 'invoice.payment_succeeded' && object.subscription) {
+      const result = await updatePartnerSubscriptionFromInvoice(object, 'active')
+      return jsonResponse(200, { received: true, handled: type, result })
+    }
+    if (type === 'invoice.payment_failed' && object.subscription) {
+      const result = await updatePartnerSubscriptionFromInvoice(object, 'past_due')
+      return jsonResponse(200, { received: true, handled: type, result })
+    }
     if (type === 'checkout.session.completed' && object.payment_status === 'paid') {
       const result = await markPaid(object)
       return jsonResponse(200, { received: true, handled: type, result })
