@@ -19,12 +19,14 @@ import {
   mergeMessagesById,
   MESSAGE_PAGE_SIZE,
   sendOffer,
+  sendAttachmentMessage,
   sendTextMessage,
   subscribeToConversation,
   subscribeToConversationList,
   toggleMessageReaction,
   updateOfferStatus,
 } from '../lib/chat.js'
+import { normalizeAttachmentFiles, uploadChatAttachments } from '../lib/chat-attachments.js'
 import { startCheckout } from '../lib/payments.js'
 
 const EMPTY_PAGINATION = {
@@ -56,6 +58,7 @@ export default function Inbox() {
   const [conversationStatuses, setConversationStatuses] = useState(new Map())
   const [error, setError] = useState('')
   const [draft, setDraft] = useState('')
+  const [draftFiles, setDraftFiles] = useState([])
   const [replyTarget, setReplyTarget] = useState(null)
   const [offerOpen, setOfferOpen] = useState(false)
   const initialLoadRef = useRef(false)
@@ -68,7 +71,7 @@ export default function Inbox() {
     conversationsRef.current = conversations
   }, [conversations])
 
-  const activeConversationId = selectedConversationId || conversations[0]?.id || ''
+  const activeConversationId = selectedConversationId
   const activeConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === activeConversationId) || null,
     [conversations, activeConversationId],
@@ -296,10 +299,13 @@ export default function Inbox() {
 
     try {
       const nextConversations = await loadConversationCollection()
-      const nextSelectedId = selectedConversationId || nextConversations[0]?.id || ''
+      const nextSelectedId = selectedConversationId && nextConversations.some((conversation) => conversation.id === selectedConversationId)
+        ? selectedConversationId
+        : ''
       setStatus('ready')
-      if (nextSelectedId && nextSelectedId !== selectedConversationId) {
+      if (nextSelectedId !== selectedConversationId) {
         setSelectedConversationId(nextSelectedId)
+        if (!nextSelectedId) navigate('/inbox', { replace: true })
       }
       await loadThread(nextSelectedId)
     } catch (loadError) {
@@ -307,7 +313,7 @@ export default function Inbox() {
       setStatus('error')
       setThreadStatus('error')
     }
-  }, [loadConversationCollection, loadThread, selectedConversationId, userId])
+  }, [loadConversationCollection, loadThread, navigate, selectedConversationId, userId])
 
   const refreshConversationCollection = useCallback(async () => {
     if (!userId) return
@@ -376,22 +382,23 @@ export default function Inbox() {
   }, [loading, userId, loadAll])
 
   useEffect(() => {
-    if (!conversations.length) return
-    if (selectedConversationId && conversations.some((conversation) => conversation.id === selectedConversationId)) return
-
-    const fallbackId = conversations[0]?.id || ''
-    if (!fallbackId) return
-    setSelectedConversationId(fallbackId)
-    window.history.replaceState(window.history.state, '', buildInboxPath(fallbackId))
-  }, [conversations, selectedConversationId])
+    setSelectedConversationId(initialConversationId || '')
+  }, [initialConversationId])
 
   useEffect(() => {
     if (!initialLoadRef.current) return
+    if (!activeConversationId) {
+      setMessages([])
+      setThreadStatus('idle')
+      setPagination(EMPTY_PAGINATION)
+      return
+    }
     loadThread(activeConversationId, { showLoading: !threadCacheRef.current.get(`${userId}:${activeConversationId}`)?.messages?.length })
   }, [activeConversationId, loadThread, userId])
 
   useEffect(() => {
     setReplyTarget(null)
+    setDraftFiles([])
   }, [activeConversationId])
 
   useEffect(() => {
@@ -465,20 +472,31 @@ export default function Inbox() {
 
   async function submitMessage(event) {
     event.preventDefault()
-    if (!activeConversationId || !draft.trim()) return
+    if (!activeConversationId || (!draft.trim() && draftFiles.length === 0)) return
     setMessageStatus('sending')
 
     try {
-      const result = await sendTextMessage({
-        conversationId: activeConversationId,
-        body: draft,
-        replyToMessageId: replyTarget?.id || '',
-      })
+      const attachments = draftFiles.length
+        ? await uploadChatAttachments({ conversationId: activeConversationId, userId, files: draftFiles })
+        : []
+      const result = attachments.length
+        ? await sendAttachmentMessage({
+          conversationId: activeConversationId,
+          body: draft,
+          attachments,
+          replyToMessageId: replyTarget?.id || '',
+        })
+        : await sendTextMessage({
+          conversationId: activeConversationId,
+          body: draft,
+          replyToMessageId: replyTarget?.id || '',
+        })
       if (result?.message?.id) {
         const nextMessage = await loadFreshMessage(result.message.id, result.message)
         if (nextMessage) mergeIncomingMessages(activeConversationId, [nextMessage])
       }
       setDraft('')
+      setDraftFiles([])
       setReplyTarget(null)
       setMessageStatus('idle')
       scheduleConversationRefresh()
@@ -548,6 +566,20 @@ export default function Inbox() {
     setReplyTarget(message)
   }
 
+  function handleDraftFilesChange(files) {
+    try {
+      const nextFiles = normalizeAttachmentFiles([...draftFiles, ...Array.from(files || [])])
+      setDraftFiles(nextFiles)
+      setError('')
+    } catch (fileError) {
+      setError(fileError.message || 'File cannot be attached.')
+    }
+  }
+
+  function handleRemoveDraftFile(index) {
+    setDraftFiles((current) => current.filter((_, currentIndex) => currentIndex !== index))
+  }
+
   async function handleToggleReaction(messageId, emoji, active) {
     if (!activeConversationId || !messageId || !emoji) return
     try {
@@ -567,17 +599,29 @@ export default function Inbox() {
       setConversations(nextConversations)
       
       if (conversation.id === selectedConversationId) {
-        const nextId = nextConversations[0]?.id || ''
-        setSelectedConversationId(nextId)
-        window.history.replaceState(window.history.state, '', buildInboxPath(nextId))
+        setSelectedConversationId('')
+        navigate('/inbox', { replace: true })
       }
     } catch (err) {
       setError(err.message || 'Грешка при архивиране на разговора.')
     }
-  }, [userId, selectedConversationId])
+  }, [navigate, userId, selectedConversationId])
 
 
   if (loading) return <InboxShell><Panel title="Зареждаме..." /></InboxShell>
+
+  const hasSelectedConversation = Boolean(activeConversationId)
+
+  function handleSelectConversation(id) {
+    if (!id || id === activeConversationId) return
+    setSelectedConversationId(id)
+    navigate(buildInboxPath(id))
+  }
+
+  function handleBackToList() {
+    setSelectedConversationId('')
+    navigate('/inbox')
+  }
 
   if (!session) {
     return (
@@ -601,25 +645,24 @@ export default function Inbox() {
           <button type="button" onClick={() => loadAll()} className="btn btn-ghost mt-5">Опитай пак</button>
         </Panel>
       ) : (
-        <div className="grid min-h-0 min-w-0 flex-1 gap-3 overflow-hidden lg:grid-cols-[minmax(18rem,20rem)_minmax(0,1.35fr)] lg:gap-3 xl:grid-cols-[minmax(19rem,21rem)_minmax(0,1.5fr)]">
-          <ConversationList
-            conversations={conversations}
-            activeId={activeConversationId}
-            userId={userId}
-            statusByConversation={conversationStatuses}
-            onSelect={(id) => {
-              if (!id || id === activeConversationId) return
-              setSelectedConversationId(id)
-              window.history.pushState(window.history.state, '', buildInboxPath(id))
-            }}
-            onArchive={handleArchiveConversation}
-          />
-          <div className="flex min-h-0 min-w-0 flex-col gap-2.5 overflow-hidden lg:gap-3">
+        <div className="grid min-h-0 min-w-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)] lg:gap-3 xl:grid-cols-[minmax(20rem,23rem)_minmax(0,1fr)]">
+          <div className={`${hasSelectedConversation ? 'hidden lg:flex' : 'flex'} min-h-0 min-w-0`}>
+            <ConversationList
+              conversations={conversations}
+              activeId={activeConversationId}
+              userId={userId}
+              statusByConversation={conversationStatuses}
+              onSelect={handleSelectConversation}
+              onArchive={handleArchiveConversation}
+            />
+          </div>
+          <div className={`${hasSelectedConversation ? 'flex' : 'hidden lg:flex'} min-h-0 min-w-0 flex-col overflow-hidden lg:gap-3`}>
             <ChatThread
               conversation={activeConversation}
               messages={messages}
               userId={userId}
               orderStatus={conversationStatuses.get(activeConversationId) || null}
+              onBack={handleBackToList}
               onOfferAction={handleOfferAction}
               onReplyToMessage={handleReplyToMessage}
               onToggleReaction={handleToggleReaction}
@@ -639,6 +682,9 @@ export default function Inbox() {
                 onClearReply={() => setReplyTarget(null)}
                 conversation={activeConversation}
                 status={messageStatus}
+                files={draftFiles}
+                onFilesChange={handleDraftFilesChange}
+                onRemoveFile={handleRemoveDraftFile}
               />
             )}
           </div>
@@ -652,8 +698,8 @@ export default function Inbox() {
 
 function InboxShell({ children }) {
   return (
-    <section className="h-full min-h-0 overflow-hidden bg-soft px-[var(--pad-x)] py-2 sm:py-3">
-      <div className="container-page flex h-full min-h-0 min-w-0 max-w-screen-2xl flex-col gap-3 overflow-hidden">
+    <section className="h-full min-h-0 overflow-hidden bg-soft px-0 py-0 sm:px-[var(--pad-x)] sm:py-3">
+      <div className="container-page flex h-full min-h-0 min-w-0 max-w-screen-2xl flex-col gap-0 overflow-hidden sm:gap-3">
         {children}
       </div>
     </section>

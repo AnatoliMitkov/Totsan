@@ -814,6 +814,17 @@ export async function sendTextMessage({ conversationId, body, replyToMessageId =
   return result
 }
 
+export async function sendAttachmentMessage({ conversationId, body = '', attachments = [], replyToMessageId = '' }) {
+  const result = await invokeChatAction('send_message', {
+    conversationId,
+    body,
+    kind: 'attachment',
+    attachments,
+    replyToMessageId,
+  })
+  return result
+}
+
 export async function toggleMessageReaction({ messageId, emoji, userId, active }) {
   if (!messageId || !emoji || !userId) throw new Error('Липсва реакция или съобщение.')
 

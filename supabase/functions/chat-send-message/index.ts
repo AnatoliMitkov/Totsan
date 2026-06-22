@@ -4,6 +4,23 @@ const MASK = '[скрито от Totsan - общувайте в платформ
 const MESSAGE_KINDS = new Set(['text', 'attachment'])
 const OFFER_STATUSES = new Set(['accepted', 'declined', 'withdrawn'])
 const MAX_MESSAGES_PER_MINUTE = 30
+const CHAT_ATTACHMENTS_BUCKET = 'chat-attachments'
+const MAX_ATTACHMENTS_PER_MESSAGE = 10
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+  'text/plain',
+  'text/csv',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/zip',
+])
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -81,6 +98,57 @@ function normalizeOfferStages(value: unknown) {
 
 function previewFor(value: string) {
   return value.replace(/\s+/g, ' ').trim().slice(0, 140)
+}
+
+function sanitizeAttachmentName(value: unknown) {
+  const text = String(value || 'file').trim().replace(/\s+/g, ' ')
+  return text.slice(0, 160) || 'file'
+}
+
+function normalizeAttachments(value: unknown, conversationId: string, senderId: string) {
+  const input = Array.isArray(value) ? value : []
+  if (input.length > MAX_ATTACHMENTS_PER_MESSAGE) throw new Error('Too many attachments.')
+
+  return input.map((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error('Attachment is invalid.')
+    const record = item as Record<string, unknown>
+    const bucket = String(record.bucket || '')
+    const path = String(record.path || '')
+    const type = String(record.type || '')
+    const size = Number(record.size || 0)
+    const originalSize = Number(record.original_size || 0)
+    const width = Number(record.width || 0)
+    const height = Number(record.height || 0)
+
+    if (bucket !== CHAT_ATTACHMENTS_BUCKET) throw new Error('Attachment bucket is invalid.')
+    if (!path.startsWith(`conversations/${conversationId}/${senderId}/`)) throw new Error('Attachment path is invalid.')
+    if (!ALLOWED_ATTACHMENT_TYPES.has(type)) throw new Error('Attachment type is not supported.')
+    if (!Number.isFinite(size) || size <= 0 || size > MAX_ATTACHMENT_BYTES) throw new Error('Attachment size is invalid.')
+
+    return {
+      bucket,
+      path,
+      name: sanitizeAttachmentName(record.name),
+      size: Math.round(size),
+      type,
+      kind: type.startsWith('image/') ? 'image' : 'file',
+      original_name: sanitizeAttachmentName(record.original_name || record.name),
+      original_size: Number.isFinite(originalSize) && originalSize > 0 ? Math.round(originalSize) : Math.round(size),
+      original_type: ALLOWED_ATTACHMENT_TYPES.has(String(record.original_type || '')) ? String(record.original_type) : type,
+      optimized: Boolean(record.optimized),
+      width: Number.isFinite(width) && width > 0 ? Math.round(width) : null,
+      height: Number.isFinite(height) && height > 0 ? Math.round(height) : null,
+    }
+  })
+}
+
+function attachmentPreview(attachments: Array<Record<string, unknown>>) {
+  if (!attachments.length) return ''
+  if (attachments.length === 1) {
+    const name = sanitizeAttachmentName(attachments[0].name)
+    return String(attachments[0].kind || '') === 'image' ? `Image: ${name}` : `File: ${name}`
+  }
+  return `${attachments.length} attachments`
 }
 
 function isParticipant(conversation: { client_id: string; partner_id: string }, userId: string) {
@@ -223,7 +291,8 @@ Deno.serve(async (req) => {
 
       const bodyResult = maskText(payload.body)
       if (!bodyResult.masked.trim() && kind === 'text') throw new Error('Съобщението е празно.')
-      const attachments = Array.isArray(payload.attachments) ? payload.attachments : []
+      const attachments = normalizeAttachments(payload.attachments, conversationId, user.id)
+      if (kind === 'attachment' && attachments.length === 0) throw new Error('Attachment message requires at least one file.')
 
       const { data: message, error: messageError } = await adminClient.from('messages').insert({
         conversation_id: conversationId,
@@ -238,7 +307,7 @@ Deno.serve(async (req) => {
 
       await adminClient.from('conversations').update({
         last_message_at: message.created_at,
-        last_message_preview: previewFor(bodyResult.masked),
+        last_message_preview: previewFor(bodyResult.masked || attachmentPreview(attachments)),
         ...nextReadFlags(conversation, user.id),
       }).eq('id', conversationId)
 

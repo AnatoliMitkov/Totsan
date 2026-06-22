@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { AlertTriangle, CornerUpLeft, SmilePlus, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { AlertTriangle, CornerUpLeft, Download, FileText, ImageOff, SmilePlus, X } from 'lucide-react'
 import OfferCard from './OfferCard.jsx'
 import Avatar from '../Avatar.jsx'
 import { compactSystemText, getParticipantDisplayName, getOtherParticipant } from '../../lib/chat.js'
+import { createChatAttachmentSignedUrl, formatAttachmentSize, isDeletedAttachment, isImageAttachment } from '../../lib/chat-attachments.js'
 
 const EMOJI_OPTIONS = ['👍', '❤️', '😂', '😮', '🙏']
 
@@ -18,12 +19,15 @@ export default function MessageBubble({
   groupPosition = 'single',
   groupedWithPrevious = false,
   groupedWithNext = false,
+  mediaItems = [],
+  onOpenMedia,
 }) {
   const own = message.sender_id === userId
   const system = message.kind === 'system'
   const offer = message.kind === 'offer' && message.offer
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
   const reactions = Array.isArray(message.reactions) ? message.reactions : []
+  const attachments = Array.isArray(message.attachments) ? message.attachments : []
   const reactionSummary = summarizeReactions(reactions, userId)
   const replyPreview = buildReplyPreview(message, conversation)
 
@@ -37,8 +41,11 @@ export default function MessageBubble({
   const participantName = getParticipantDisplayName(participant)
   const bubbleRadiusClass = bubbleRadius(own, groupPosition)
   const bubbleSurfaceClass = own
-    ? 'border-ink/90 bg-ink text-paper shadow-[0_14px_34px_-24px_rgba(15,23,42,0.65)]'
+    ? 'border-accentDeep bg-accentDeep text-paper shadow-[0_14px_34px_-24px_rgba(22,62,162,0.62)]'
     : 'border-line/90 bg-soft/95 text-ink shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] backdrop-blur-sm'
+  const bubbleSizeClass = offer
+    ? 'w-full max-w-[min(92vw,42rem)] sm:max-w-[min(78%,44rem)] lg:max-w-[min(72%,46rem)]'
+    : 'w-fit max-w-[min(82vw,34rem)] sm:max-w-[min(74%,38rem)] lg:max-w-[min(62%,42rem)]'
   const wrapperSpacingClass = groupedWithPrevious ? 'mt-1.5' : 'mt-4 first:mt-0'
   const alignmentClass = own ? 'items-end' : 'items-start'
 
@@ -49,8 +56,8 @@ export default function MessageBubble({
           ? <Avatar src={avatarUrl} srcCandidates={avatarCandidates} name={participantName} size={32} className="self-end" />
           : <div className="w-8 shrink-0" aria-hidden="true" />
       )}
-      <div className={`flex min-w-0 flex-col ${alignmentClass}`}>
-        <div className={`min-w-0 overflow-hidden border px-4 py-3 ${bubbleRadiusClass} ${bubbleSurfaceClass} ${offer ? 'w-[min(100%,42rem)] sm:w-[min(78%,44rem)] lg:w-[min(76%,48rem)]' : 'max-w-[88%] sm:max-w-[min(42rem,78%)] lg:max-w-[min(46rem,76%)]'}`}>
+      <div className={`flex min-w-0 max-w-full flex-1 flex-col ${alignmentClass}`}>
+        <div className={`min-w-0 overflow-hidden border px-4 py-3 ${bubbleRadiusClass} ${bubbleSurfaceClass} ${bubbleSizeClass}`}>
           {replyPreview && (
             <div className={`mb-3 rounded-2xl border px-3 py-2 text-xs ${own ? 'border-paper/15 bg-paper/10 text-paper/85' : 'border-line/70 bg-paper/80 text-muted'}`}>
               <div className={`truncate font-medium ${own ? 'text-paper' : 'text-ink'}`}>{replyPreview.senderLabel}</div>
@@ -59,8 +66,21 @@ export default function MessageBubble({
           )}
           {offer ? (
             <OfferCard offer={message.offer} conversation={conversation} userId={userId} onAction={onOfferAction} compact={own} messageCreatedAt={message.created_at} />
-          ) : (
+          ) : message.body ? (
             <p className="break-words whitespace-pre-wrap text-sm leading-relaxed [overflow-wrap:anywhere]">{message.body}</p>
+          ) : null}
+          {attachments.length > 0 && (
+            <div className={`${message.body ? 'mt-3' : ''} grid gap-2`}>
+              {attachments.map((attachment, index) => (
+                <AttachmentPreview
+                  key={`${attachment.path || attachment.name}-${index}`}
+                  attachment={attachment}
+                  own={own}
+                  mediaItems={mediaItems}
+                  onOpenMedia={onOpenMedia}
+                />
+              ))}
+            </div>
           )}
           {message.was_masked && (
             <div className={`mt-3 flex min-w-0 items-start gap-2 text-xs ${own ? 'text-paper/72' : 'text-amber-800'}`}>
@@ -68,7 +88,7 @@ export default function MessageBubble({
             </div>
           )}
           {showTimestamp && (
-            <div className={`mt-2 text-[11px] ${own ? 'text-paper/60' : 'text-muted'} ${groupedWithNext ? 'hidden' : 'block'}`}>
+            <div className={`mt-2 text-right text-[11px] ${own ? 'text-paper/68' : 'text-muted'} ${groupedWithNext ? 'hidden' : 'block'}`}>
               {new Date(message.created_at).toLocaleTimeString('bg-BG', { hour: '2-digit', minute: '2-digit' })}
             </div>
           )}
@@ -135,6 +155,112 @@ export default function MessageBubble({
   )
 }
 
+function AttachmentPreview({ attachment, own, mediaItems, onOpenMedia }) {
+  const [signedUrl, setSignedUrl] = useState('')
+  const [urlStatus, setUrlStatus] = useState('idle')
+  const isImage = isImageAttachment(attachment)
+  const deleted = isDeletedAttachment(attachment)
+
+  useEffect(() => {
+    if (deleted) {
+      setSignedUrl('')
+      setUrlStatus('missing')
+      return undefined
+    }
+
+    let active = true
+    setSignedUrl('')
+    setUrlStatus('loading')
+    createChatAttachmentSignedUrl(attachment).then((url) => {
+      if (!active) return
+      setSignedUrl(url)
+      setUrlStatus(url ? 'ready' : 'missing')
+    })
+    return () => {
+      active = false
+    }
+  }, [attachment, deleted])
+
+  const name = String(attachment?.name || 'Attachment')
+  const size = formatAttachmentSize(attachment?.size || 0)
+  const mediaIndex = isImage && !deleted
+    ? mediaItems.findIndex((item) => item.attachment?.path && item.attachment.path === attachment?.path)
+    : -1
+  const linkClass = own
+    ? 'border-paper/15 bg-paper/10 text-paper hover:bg-paper/15'
+    : 'border-line bg-paper/90 text-ink hover:bg-paper'
+  const mutedClass = own
+    ? 'border-paper/15 bg-paper/10 text-paper/72'
+    : 'border-line bg-paper/80 text-muted'
+
+  if (deleted) {
+    const deletedTitle = isImage ? 'Снимката вече не е налична' : 'Файлът вече не е наличен'
+    return (
+      <div className={`flex min-w-0 items-center gap-3 rounded-2xl border px-3 py-3 text-sm ${mutedClass}`}>
+        <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${own ? 'bg-paper/10' : 'bg-soft'}`}>
+          <ImageOff size={18} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-medium">{deletedTitle}</span>
+          <span className="block text-xs opacity-75">Премахната е според политиката за пазене.</span>
+        </span>
+      </div>
+    )
+  }
+
+  if (isImage) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          if (mediaIndex >= 0) {
+            onOpenMedia?.(mediaIndex)
+            return
+          }
+          if (signedUrl) window.open(signedUrl, '_blank', 'noopener,noreferrer')
+        }}
+        className={`block w-full overflow-hidden rounded-2xl border text-left transition ${linkClass}`}
+        aria-label={`Open ${name}`}
+      >
+        {urlStatus === 'ready' && signedUrl ? (
+          <img src={signedUrl} alt={name} className="max-h-72 w-full object-cover" loading="lazy" />
+        ) : urlStatus === 'missing' ? (
+          <div className="grid h-40 place-items-center gap-2 text-center text-sm opacity-75">
+            <ImageOff size={22} />
+            <span>Снимката не може да се зареди</span>
+          </div>
+        ) : (
+          <div className="grid h-40 place-items-center text-sm opacity-75">Loading image...</div>
+        )}
+        <div className="flex min-w-0 items-center justify-between gap-3 px-3 py-2 text-xs">
+          <span className="min-w-0 truncate">{name}</span>
+          <span className="shrink-0 opacity-75">{size}</span>
+        </div>
+      </button>
+    )
+  }
+
+  return (
+    <a
+      href={signedUrl || undefined}
+      target="_blank"
+      rel="noreferrer"
+      download={name}
+      className={`flex min-w-0 items-center gap-3 rounded-2xl border px-3 py-2.5 text-sm transition ${linkClass}`}
+      aria-label={`Download ${name}`}
+    >
+      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${own ? 'bg-paper/10' : 'bg-soft'}`}>
+        <FileText size={18} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-medium">{name}</span>
+        <span className="block text-xs opacity-75">{size}</span>
+      </span>
+      <Download size={17} className="shrink-0 opacity-75" />
+    </a>
+  )
+}
+
 function bubbleRadius(own, groupPosition) {
   if (groupPosition === 'single') return 'rounded-[1.55rem]'
 
@@ -188,6 +314,9 @@ function formatReplySnippet(message) {
   if (!message) return 'Съобщението не е налично'
   if (message.kind === 'offer') return 'Оферта'
   if (message.kind === 'system') return compactSystemText(message.body || '')
+  if (Array.isArray(message.attachments) && message.attachments.length) {
+    return message.attachments.length === 1 ? 'Прикачен файл' : `${message.attachments.length} прикачени файла`
+  }
   const text = String(message.body || '').trim()
   if (!text) return 'Съобщението не е налично'
   return text.length > 120 ? `${text.slice(0, 117)}...` : text

@@ -1167,6 +1167,10 @@ body { font-family: theme('fontFamily.sans'); font-size: var(--step-sm); line-he
 }
 
 @media (max-width: 767px) {
+  .site-header--inbox .site-announcement {
+    display: none;
+  }
+
   .site-header--announcement-hidden .site-announcement {
     display: none;
   }
