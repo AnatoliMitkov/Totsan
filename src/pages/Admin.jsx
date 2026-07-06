@@ -74,7 +74,13 @@ export default function Admin() {
   const location = useLocation()
 
   if (loading) return <div className="flex h-screen items-center justify-center bg-soft"><div className="text-muted">Проверяваме достъпа…</div></div>
-  if (!session) return <LoginPanel />
+  if (!session) {
+    const params = new URLSearchParams(location.search || '')
+    if (params.get('signup') === 'true' && params.get('role') === 'pro') {
+      return <Navigate to="/pro/start" replace />
+    }
+    return <LoginPanel />
+  }
 
   if (location.pathname === '/login') {
     if (mfaRequired) return null
@@ -568,6 +574,10 @@ function LoginPanel() {
     }
   }
 
+  if (isSignup && requestedSignupRole === 'pro') {
+    return <Navigate to="/pro/start" replace />
+  }
+
   return (
     <div className="grid h-full overflow-hidden lg:grid-cols-2">
       <div className={`flex flex-col px-6 sm:px-12 lg:px-20 xl:px-24 ${(isLogin || isRecoveryMode) ? 'justify-center overflow-y-auto py-8 lg:py-10' : 'justify-start overflow-y-auto py-5 lg:py-6'}`}>
@@ -598,7 +608,7 @@ function LoginPanel() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setSignupRole('pro')}
+                    onClick={() => navigate('/pro/start')}
                     className={`rounded-2xl border px-4 py-3 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink/15 active:scale-[0.99] ${signupRole === 'pro' ? 'border-ink bg-soft text-ink' : 'border-line text-muted hover:border-ink/40'}`}
                   >
                     <div className="font-medium">Специалист</div>

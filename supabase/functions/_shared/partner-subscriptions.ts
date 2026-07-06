@@ -88,6 +88,25 @@ export function hasActiveDatabaseAccess(subscription: Record<string, unknown> | 
   return false
 }
 
+export async function syncPartnerProfileSubscriptionAccess(
+  admin: any,
+  subscription: Record<string, unknown> | null | undefined,
+  wasActive = false,
+) {
+  if (!subscription) return
+  const isActive = hasActiveDatabaseAccess(subscription)
+  if (isActive === wasActive) return
+
+  const profileId = cleanText(subscription.partner_profile_id)
+  const userId = cleanText(subscription.user_id)
+  if (!profileId && !userId) return
+
+  let query = admin.from('profiles').update({ is_published: isActive })
+  query = profileId ? query.eq('id', profileId) : query.eq('user_id', userId)
+  const { error } = await query
+  if (error) throw error
+}
+
 export function stripeSecret() {
   const secret = cleanText(Deno.env.get('STRIPE_SECRET_KEY'))
   if (!secret) throw new Error('Липсва STRIPE_SECRET_KEY за Stripe Billing.')
@@ -206,6 +225,7 @@ export async function upsertPartnerSubscription(
     'monthly',
   )
   const period = stripeSubscriptionPeriod(subscription)
+  const wasActive = hasActiveDatabaseAccess(existing)
   const patch = {
     user_id: userId,
     partner_profile_id: cleanText(
@@ -234,6 +254,7 @@ export async function upsertPartnerSubscription(
       .select('*')
       .single()
     if (error) throw error
+    await syncPartnerProfileSubscriptionAccess(admin, data, wasActive)
     return data
   }
 
@@ -252,8 +273,10 @@ export async function upsertPartnerSubscription(
       .select('*')
       .maybeSingle()
     if (racedError || !raced) throw error
+    await syncPartnerProfileSubscriptionAccess(admin, raced, false)
     return raced
   }
+  await syncPartnerProfileSubscriptionAccess(admin, data, false)
   return data
 }
 

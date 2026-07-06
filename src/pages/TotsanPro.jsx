@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
   Building2,
@@ -19,15 +19,20 @@ import {
   X,
 } from 'lucide-react'
 import { trackEvent } from '../lib/analytics.js'
+import { useAccount } from '../lib/account.js'
 import { VAT_STATUS_NOTE } from '../lib/legalInfo.js'
 import { formatEurWithBgn } from '../lib/money.js'
 import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
 import {
   PARTNER_BILLING_INTERVALS,
   PARTNER_SUBSCRIPTION_PLANS,
+  buildPartnerFlowPath,
+  clearPendingPartnerSubscriptionIntent,
+  getPartnerSubscriptionIntentFromSearch,
   getPartnerPlanPrice,
   loadOwnPartnerSubscription,
   reconcilePartnerSubscription,
+  savePendingPartnerSubscriptionIntent,
   startPartnerSubscriptionCheckout,
 } from '../lib/subscriptions.js'
 
@@ -213,6 +218,9 @@ const workspaceFeatures = [
 
 export default function TotsanPro() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const { session, account, loading: accountLoading } = useAccount()
+  const checkoutIntentHandled = useRef(false)
   const [billingInterval, setBillingInterval] = useState('monthly')
   const [consents, setConsents] = useState({
     terms: false,
@@ -223,8 +231,18 @@ export default function TotsanPro() {
   const [checkoutState, setCheckoutState] = useState({ status: 'idle', planKey: '', message: '' })
   const [selectedSubscription, setSelectedSubscription] = useState(null)
   const [currentSubscription, setCurrentSubscription] = useState({ status: 'loading', subscription: null })
+  const requestedCheckoutIntent = useMemo(
+    () => getPartnerSubscriptionIntentFromSearch(location.search),
+    [location.search],
+  )
 
   useEffect(() => {
+    if (accountLoading) return undefined
+    if (!session) {
+      setCurrentSubscription({ status: 'ready', subscription: null })
+      return undefined
+    }
+
     let active = true
 
     async function loadSubscription() {
@@ -247,7 +265,7 @@ export default function TotsanPro() {
 
     loadSubscription()
     return () => { active = false }
-  }, [])
+  }, [accountLoading, session])
 
   useSeo({
     canonicalPath: '/pro',
@@ -273,6 +291,60 @@ export default function TotsanPro() {
   ), [])
   const acceptedConsents = subscriptionConsentItems.every((item) => consents[item.id])
 
+  useEffect(() => {
+    if (
+      checkoutIntentHandled.current
+      || !requestedCheckoutIntent
+      || accountLoading
+      || currentSubscription.status === 'loading'
+    ) return
+
+    if (currentSubscription.subscription?.active) {
+      clearPendingPartnerSubscriptionIntent()
+      checkoutIntentHandled.current = true
+      return
+    }
+
+    const intent = savePendingPartnerSubscriptionIntent(requestedCheckoutIntent)
+    if (!session) {
+      checkoutIntentHandled.current = true
+      navigate(buildPartnerFlowPath('/pro/start', intent), { replace: true })
+      return
+    }
+
+    const isApprovedSpecialist = account?.role === 'specialist' && account?.specialist_status === 'approved'
+    if (!isApprovedSpecialist) {
+      checkoutIntentHandled.current = true
+      navigate(buildPartnerFlowPath('/pro/onboarding', intent), { replace: true })
+      return
+    }
+
+    const plan = planCards.find((item) => item.id === intent.plan.planId)
+    const price = getPartnerPlanPrice(plan, intent.billingInterval)
+    if (!plan || !price) return
+
+    setBillingInterval(intent.billingInterval)
+    setConsents({
+      terms: false,
+      renewal: false,
+      noGuarantee: false,
+      pausedProfile: false,
+    })
+    setCheckoutState({ status: 'idle', planKey: price.key, message: '' })
+    setSelectedSubscription({ plan, billingInterval: intent.billingInterval, price })
+    checkoutIntentHandled.current = true
+  }, [
+    account?.role,
+    account?.specialist_status,
+    accountLoading,
+    currentSubscription.status,
+    currentSubscription.subscription?.active,
+    navigate,
+    planCards,
+    requestedCheckoutIntent,
+    session,
+  ])
+
   function updateConsent(id, checked) {
     setConsents((current) => ({ ...current, [id]: checked }))
   }
@@ -281,6 +353,22 @@ export default function TotsanPro() {
     if (currentSubscription.subscription?.active) return
     const price = getPartnerPlanPrice(plan, billingInterval)
     if (!price?.key) return
+    const intent = savePendingPartnerSubscriptionIntent({
+      planKey: price.key,
+      billingInterval,
+    })
+
+    if (!session) {
+      navigate(buildPartnerFlowPath('/pro/start', intent))
+      return
+    }
+
+    const isApprovedSpecialist = account?.role === 'specialist' && account?.specialist_status === 'approved'
+    if (!isApprovedSpecialist) {
+      navigate(buildPartnerFlowPath('/pro/onboarding', intent))
+      return
+    }
+
     setConsents({
       terms: false,
       renewal: false,
@@ -331,6 +419,7 @@ export default function TotsanPro() {
         consents,
       })
       if (result.checkoutUrl) {
+        clearPendingPartnerSubscriptionIntent()
         window.location.href = result.checkoutUrl
         return
       }
@@ -351,9 +440,6 @@ export default function TotsanPro() {
         return
       }
       setCheckoutState({ status: 'error', planKey: price.key, message })
-      if (message.includes('Влез в профила')) {
-        window.setTimeout(() => navigate(`/login?next=${encodeURIComponent('/pro')}`), 600)
-      }
     }
   }
 
@@ -477,7 +563,7 @@ export default function TotsanPro() {
                   plan={plan}
                   price={price}
                   billingInterval={billingInterval}
-                  disabled={checkoutState.status === 'opening' || currentSubscription.status === 'loading' || Boolean(currentSubscription.subscription?.active)}
+                  disabled={accountLoading || checkoutState.status === 'opening' || currentSubscription.status === 'loading' || Boolean(currentSubscription.subscription?.active)}
                   busy={isBusy}
                   activeSubscription={currentSubscription.subscription}
                   onCheckout={() => openSubscriptionConfirmation(plan)}

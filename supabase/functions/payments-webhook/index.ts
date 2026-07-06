@@ -1,6 +1,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.8'
 import {
+  hasActiveDatabaseAccess,
   sendActivationEmailIfNeeded,
+  syncPartnerProfileSubscriptionAccess,
   upsertPartnerSubscription as sharedUpsertPartnerSubscription,
 } from '../_shared/partner-subscriptions.ts'
 
@@ -262,7 +264,10 @@ async function upsertPartnerSubscriptionFromSession(session: Record<string, unkn
     subscriptionId,
     checkoutSessionId: cleanText(session.id),
   }, patch)
-  if (updated) return { ok: true, subscription: updated }
+  if (updated) {
+    await syncPartnerProfileSubscriptionAccess(admin, updated, false)
+    return { ok: true, subscription: updated }
+  }
 
   const { data: inserted, error } = await admin
     .from('partner_subscriptions')
@@ -270,6 +275,7 @@ async function upsertPartnerSubscriptionFromSession(session: Record<string, unkn
     .select('*')
     .single()
   if (error) throw error
+  await syncPartnerProfileSubscriptionAccess(admin, inserted, false)
   return { ok: true, subscription: inserted }
 }
 
@@ -309,6 +315,7 @@ async function updatePartnerSubscriptionFromInvoice(invoice: Record<string, unkn
     .select('*')
   if (error) throw error
   if (!data?.length) return { skipped: true, reason: 'subscription_not_found' }
+  await syncPartnerProfileSubscriptionAccess(admin, data[0], hasActiveDatabaseAccess(existing))
   return { ok: true, subscription: data[0] }
 }
 

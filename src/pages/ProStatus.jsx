@@ -4,6 +4,10 @@ import { ArrowRight, Check, Clock3, FileText, MailCheck, ShieldCheck, Sparkles, 
 import { useAccount } from '../lib/account.js'
 import { supabase } from '../lib/supabase.js'
 import { normalizeProfile, runProfileSelectWithLayer01Fallback } from '../lib/profiles.js'
+import {
+  buildPartnerFlowPath,
+  loadPendingPartnerSubscriptionIntent,
+} from '../lib/subscriptions.js'
 
 const TIMELINE = [
   'Акаунт създаден',
@@ -17,6 +21,7 @@ const TIMELINE = [
 export default function ProStatus() {
   const { session, account, loading } = useAccount()
   const [state, setState] = useState({ status: 'idle', application: null, profile: null, message: '' })
+  const [pendingPlan] = useState(() => loadPendingPartnerSubscriptionIntent())
 
   useEffect(() => {
     if (loading || !session?.user?.id) return
@@ -89,14 +94,14 @@ export default function ProStatus() {
   return (
     <StatusShell>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <ApplicationState application={state.application} profile={state.profile} />
+        <ApplicationState application={state.application} profile={state.profile} pendingPlan={pendingPlan} />
         <TimelineCard application={state.application} profile={state.profile} />
       </div>
     </StatusShell>
   )
 }
 
-function ApplicationState({ application, profile }) {
+function ApplicationState({ application, profile, pendingPlan }) {
   const status = String(application?.status || '').toLowerCase()
   const isApproved = status === 'approved' || Boolean(profile?.id)
   const isPublished = Boolean(profile?.id && profile.isPublished)
@@ -149,10 +154,14 @@ function ApplicationState({ application, profile }) {
         icon: ShieldCheck,
         badge: 'Одобрена',
         title: 'Одобрени сте като партньор',
-        text: 'Остава да подготвите публичния си профил, преди да бъде видим в каталога.',
+        text: pendingPlan
+          ? 'Одобрението е готово. Активирайте избрания план, за да отключите и публикувате партньорския си профил.'
+          : 'Остава да изберете партньорски план и да подготвите публичния си профил.',
         tone: 'success',
-        primaryTo: '/moy-profil',
-        primaryLabel: 'Към моя профил',
+        primaryTo: buildPartnerFlowPath('/pro', pendingPlan),
+        primaryLabel: pendingPlan ? 'Активирай избрания план' : 'Избери абонамент',
+        secondaryTo: '/moy-profil',
+        secondaryLabel: 'Към моя профил',
       }
     }
 
@@ -165,7 +174,7 @@ function ApplicationState({ application, profile }) {
       primaryTo: '/moy-profil',
       primaryLabel: 'Към моя профил',
     }
-  }, [application, isApproved, isPublished, profile, status])
+  }, [application, isApproved, isPublished, pendingPlan, profile, status])
 
   const Icon = content.icon
   return (
@@ -192,6 +201,15 @@ function ApplicationState({ application, profile }) {
           )}
         </div>
       </div>
+
+      {pendingPlan && !isPublished && (
+        <div className="mt-4 rounded-2xl border border-accent/20 bg-accentSoft px-4 py-3 text-sm text-ink">
+          Избран план: <strong>{pendingPlan.plan.planName}</strong>.{' '}
+          {isApproved
+            ? 'Плащането вече е достъпно.'
+            : 'Плащането ще бъде достъпно след прегледа от Totsan.'}
+        </div>
+      )}
 
       <div className="mt-7 flex flex-col gap-3 sm:flex-row">
         {content.primaryTo && <Link to={content.primaryTo} className="btn btn-primary justify-center">{content.primaryLabel}<ArrowRight size={18} /></Link>}

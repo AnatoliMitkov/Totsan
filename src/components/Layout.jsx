@@ -512,7 +512,7 @@ function Footer({ isAuthPage = false }) {
           <div className="eyebrow mb-3">За професионалисти</div>
           <ul className="space-y-1.5 text-sm text-muted">
             <li><Link to="/pro" className="hover:text-ink">Totsan Pro</Link></li>
-            <li><Link to="/login?signup=true&role=pro" className="hover:text-ink">Стани партньор</Link></li>
+            <li><Link to="/pro/start" className="hover:text-ink">Стани партньор</Link></li>
           </ul>
         </div>
         <div>
