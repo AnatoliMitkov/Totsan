@@ -1,4 +1,5 @@
 import { CheckCircle2, Clock3, PackageCheck, XCircle } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { conversationRole } from '../../lib/chat.js'
 import { formatEurWithBgn } from '../../lib/money.js'
 
@@ -16,13 +17,20 @@ export default function ServiceRequestCard({ request, conversation, userId, onAc
   const canPartnerAct = role === 'partner' && request.status === 'requested'
   const canClientCancel = role === 'client' && ['requested', 'negotiating'].includes(request.status)
   const features = Array.isArray(snapshot.features) ? snapshot.features : []
+  const serviceHref = snapshot.service_slug ? `/uslugi/${encodeURIComponent(snapshot.service_slug)}` : ''
 
   return (
     <div className={compact ? 'text-paper' : 'text-ink'}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-xs uppercase tracking-[0.14em] opacity-65">Заявка за услуга</div>
-          <h3 className="mt-1 font-display text-2xl leading-tight">{snapshot.service_title || 'Услуга'}</h3>
+          {serviceHref ? (
+            <Link to={serviceHref} className="mt-1 inline-flex font-display text-2xl leading-tight underline decoration-current/20 underline-offset-4 transition hover:decoration-current">
+              {snapshot.service_title || 'Услуга'}
+            </Link>
+          ) : (
+            <h3 className="mt-1 font-display text-2xl leading-tight">{snapshot.service_title || 'Услуга'}</h3>
+          )}
         </div>
         <span className="rounded-full border border-current/15 bg-current/5 px-3 py-1 text-xs font-medium">
           {STATUS_LABELS[request.status] || request.status}

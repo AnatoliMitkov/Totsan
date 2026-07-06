@@ -36,6 +36,7 @@ import Bathroom from './pages/Bathroom.jsx'
 import LightingAndTextiles from './pages/LightingAndTextiles.jsx'
 import SharedProject from './pages/SharedProject.jsx'
 import Portfolio from './pages/Portfolio.jsx'
+import PortfolioProject from './pages/PortfolioProject.jsx'
 import { CheckEmailPage, ProStartPage, WelcomePage } from './pages/OnboardingPages.jsx'
 import ProOnboarding from './pages/ProOnboarding.jsx'
 import ProStatus from './pages/ProStatus.jsx'
@@ -280,6 +281,7 @@ function AppRoutes() {
             <Route path="/pro/status" element={<ProStatus />} />
             <Route path="/totsan-pro" element={<Navigate to="/pro" replace />} />
             <Route path="/produkt/:slug" element={<Product />} />
+            <Route path="/portfolio/:profileSlug/:projectId" element={<PortfolioProject />} />
             <Route path="/kak-raboti" element={<HowItWorks />} />
             <Route path="/za-nas" element={<About />} />
             <Route path="/kontakt" element={<Contact />} />

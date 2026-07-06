@@ -4,10 +4,12 @@ const MASK = '[скрито от Totsan - общувайте в платформ
 const MESSAGE_KINDS = new Set(['text', 'attachment'])
 const OFFER_STATUSES = new Set(['accepted', 'declined', 'withdrawn'])
 const SERVICE_REQUEST_STATUSES = new Set(['negotiating', 'declined', 'cancelled'])
+const REFERENCE_TYPES = new Set(['service', 'portfolio'])
 const MAX_MESSAGES_PER_MINUTE = 30
 const CHAT_ATTACHMENTS_BUCKET = 'chat-attachments'
 const MAX_ATTACHMENTS_PER_MESSAGE = 10
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+const CHAT_REFERENCE_PREFIX = '__totsan_ref__:'
 const ALLOWED_ATTACHMENT_TYPES = new Set([
   'image/jpeg',
   'image/png',
@@ -99,6 +101,45 @@ function normalizeOfferStages(value: unknown) {
 
 function previewFor(value: string) {
   return value.replace(/\s+/g, ' ').trim().slice(0, 140)
+}
+
+function encodeReferenceBody(payload: Record<string, unknown>) {
+  return `${CHAT_REFERENCE_PREFIX}${JSON.stringify(payload)}`
+}
+
+function pickCoverUrl(row: Record<string, unknown>) {
+  const coverUrl = String(row.cover_url || '')
+  if (coverUrl) return coverUrl
+  const media = Array.isArray(row.media) ? row.media : []
+  const firstMedia = media.find((item) => item && typeof item === 'object' && !Array.isArray(item) && String((item as Record<string, unknown>).url || '').trim())
+  return String((firstMedia as Record<string, unknown> | undefined)?.url || '')
+}
+
+function activePackageMeta(packages: Array<Record<string, unknown>>) {
+  const active = packages.filter((item) => item && item.is_active !== false)
+  if (!active.length) return { priceLabel: '', deliveryLabel: '' }
+
+  const cheapest = active.reduce<Record<string, unknown> | null>((best, item) => {
+    const nextPrice = Number(item.price_amount || 0)
+    if (!best) return item
+    const bestPrice = Number(best.price_amount || 0)
+    if (nextPrice <= 0) return best
+    if (bestPrice <= 0) return item
+    return nextPrice < bestPrice ? item : best
+  }, null)
+
+  const deliveryDays = active.reduce<number | null>((best, item) => {
+    const value = Number(item.delivery_days || 0)
+    if (!Number.isFinite(value) || value <= 0) return best
+    return best === null ? value : Math.min(best, value)
+  }, null)
+
+  const priceAmount = Number(cheapest?.price_amount || 0)
+  const currency = String(cheapest?.currency || 'EUR').trim().toUpperCase() || 'EUR'
+  const priceLabel = priceAmount > 0 ? `От ${priceAmount} ${currency}` : ''
+  const deliveryLabel = deliveryDays ? `${deliveryDays} ${deliveryDays === 1 ? 'ден' : 'дни'}` : ''
+
+  return { priceLabel, deliveryLabel }
 }
 
 function sanitizeAttachmentName(value: unknown) {
@@ -423,6 +464,150 @@ Deno.serve(async (req) => {
       }).eq('id', serviceRequest.conversation_id)
 
       return jsonResponse(200, { ok: true, serviceRequest: updatedRequest, message })
+    }
+
+    if (action === 'send_reference') {
+      const conversationId = assertUuid(payload.conversationId, 'Conversation id')
+      const referenceType = String(payload.referenceType || '').trim()
+      const referenceId = assertUuid(payload.referenceId, 'Reference id')
+      if (!REFERENCE_TYPES.has(referenceType)) throw new Error('Reference type is invalid.')
+
+      const { data: conversation, error: conversationError } = await adminClient
+        .from('conversations')
+        .select('*')
+        .eq('id', conversationId)
+        .single()
+      if (conversationError) throw conversationError
+      if (!isParticipant(conversation, user.id)) throw new Error('Conversation access denied.')
+      if (conversation.status !== 'open') throw new Error('Conversation is not open.')
+
+      const since = new Date(Date.now() - 60_000).toISOString()
+      const { count, error: countError } = await adminClient
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('sender_id', user.id)
+        .gte('created_at', since)
+      if (countError) throw countError
+      if ((count || 0) >= MAX_MESSAGES_PER_MINUTE) throw new Error('Изпращаш твърде много съобщения. Изчакай малко.')
+
+      let body = ''
+      let preview = ''
+
+      if (referenceType === 'service') {
+        const { data: service, error: serviceError } = await adminClient
+          .from('partner_services')
+          .select('id, slug, title, subtitle, cover_url, media, layer_slug, delivery_areas, is_published, moderation_status, partner_id, profile:profiles!partner_services_profile_id_fkey(id, slug)')
+          .eq('id', referenceId)
+          .maybeSingle()
+        if (serviceError) throw serviceError
+        if (!service?.id || service.partner_id !== conversation.partner_id) {
+          throw new Error('Услугата не принадлежи на този разговор.')
+        }
+        if (!service.is_published || service.moderation_status !== 'approved') {
+          throw new Error('Услугата не е публична в момента.')
+        }
+
+        const { data: packages, error: packagesError } = await adminClient
+          .from('partner_service_packages')
+          .select('price_amount, currency, delivery_days, is_active')
+          .eq('service_id', referenceId)
+        if (packagesError) throw packagesError
+
+        const meta = activePackageMeta((packages || []) as Array<Record<string, unknown>>)
+        body = encodeReferenceBody({
+          type: 'service',
+          entityId: service.id,
+          title: service.title,
+          subtitle: service.subtitle || '',
+          coverUrl: pickCoverUrl(service as Record<string, unknown>),
+          layerLabel: service.layer_slug || '',
+          city: Array.isArray(service.delivery_areas) ? String(service.delivery_areas[0] || '') : '',
+          priceLabel: meta.priceLabel,
+          deliveryLabel: meta.deliveryLabel,
+          slug: service.slug,
+          profileSlug: String((service.profile as Record<string, unknown> | null)?.slug || ''),
+        })
+        preview = `Споделена услуга: ${service.title}`
+      }
+
+      if (referenceType === 'portfolio') {
+        const { data: item, error: itemError } = await adminClient
+          .from('profile_portfolio')
+          .select('id, title, description, cover_url, media, layer_slug, year, city, budget_band, is_published, profile:profiles!profile_portfolio_profile_id_fkey(id, slug, user_id)')
+          .eq('id', referenceId)
+          .maybeSingle()
+        if (itemError) throw itemError
+
+        const profile = item?.profile as Record<string, unknown> | null
+        if (!item?.id || !profile || String(profile.user_id || '') !== conversation.partner_id) {
+          throw new Error('Портфолио проектът не принадлежи на този разговор.')
+        }
+        if (!item.is_published) {
+          throw new Error('Портфолио проектът не е публичен в момента.')
+        }
+
+        body = encodeReferenceBody({
+          type: 'portfolio',
+          entityId: item.id,
+          projectId: item.id,
+          title: item.title,
+          description: item.description || '',
+          coverUrl: pickCoverUrl(item as Record<string, unknown>),
+          layerLabel: item.layer_slug || '',
+          city: item.city || '',
+          year: item.year ? String(item.year) : '',
+          badge: item.budget_band || '',
+          profileSlug: String(profile.slug || ''),
+        })
+        preview = `Споделено портфолио: ${item.title}`
+      }
+
+      if (!body || !preview) {
+        throw new Error('Reference payload could not be created.')
+      }
+
+      const { data: recentDuplicate, error: duplicateError } = await adminClient
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .eq('sender_id', user.id)
+        .eq('kind', 'text')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (duplicateError) throw duplicateError
+
+      if (recentDuplicate) {
+        const createdAt = new Date(recentDuplicate.created_at || '').getTime()
+        if (recentDuplicate.body === body && Number.isFinite(createdAt) && Date.now() - createdAt < 10 * 60_000) {
+          return jsonResponse(200, { ok: true, message: recentDuplicate, reused: true })
+        }
+      }
+
+      const { data: message, error: messageError } = await adminClient
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_id: user.id,
+          kind: 'text',
+          body,
+          attachments: [],
+          was_masked: false,
+        })
+        .select('*')
+        .single()
+      if (messageError) throw messageError
+
+      await adminClient
+        .from('conversations')
+        .update({
+          last_message_at: message.created_at,
+          last_message_preview: previewFor(preview),
+          ...nextReadFlags(conversation, user.id),
+        })
+        .eq('id', conversationId)
+
+      return jsonResponse(200, { ok: true, message, reused: false })
     }
 
     if (action === 'send_message') {

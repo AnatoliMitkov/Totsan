@@ -41,6 +41,7 @@ import {
   uploadPartnerServiceImage,
 } from '../../lib/partner-services.js'
 import { getBgnEquivalentText } from '../../lib/money.js'
+import { deleteStorageRefs, diffStorageRefs, mediaAndCoverStorageRefs } from '../../lib/storage-media-cleanup.js'
 import FallbackImage from '../FallbackImage.jsx'
 import TotsanSelect from '../ui/TotsanSelect.jsx'
 import { LocationMultiCombobox } from '../ui/LocationCombobox.jsx'
@@ -231,6 +232,40 @@ function makeNeutralServiceDraft(profile) {
   }
 }
 
+function serializeServiceDraftForCompare(draft) {
+  const source = draft || {}
+  const primaryPackage = source.packages?.[0] || makeEmptyPackage('basic')
+  return {
+    id: source.id || '',
+    layerSlug: source.layerSlug || '',
+    title: String(source.title || '').trim(),
+    subtitle: String(source.subtitle || '').trim(),
+    descriptionMd: String(source.descriptionMd || '').trim(),
+    coverUrl: String(source.coverUrl || '').trim(),
+    tags: String(source.tagsText || '').split(',').map(item => item.trim()).filter(Boolean),
+    deliveryAreas: String(source.deliveryAreasText || '').split(',').map(item => item.trim()).filter(Boolean),
+    media: (Array.isArray(source.media) ? source.media : []).map(item => ({
+      type: item?.type || '',
+      provider: item?.provider || '',
+      url: item?.url || '',
+      path: item?.path || '',
+      thumbnail: item?.thumbnail || '',
+      caption: item?.caption || '',
+      bucket: item?.bucket || '',
+    })),
+    package: {
+      title: String(primaryPackage.title || '').trim(),
+      description: String(primaryPackage.description || '').trim(),
+      priceAmount: String(primaryPackage.priceAmount ?? '').trim(),
+      features: (Array.isArray(primaryPackage.features) ? primaryPackage.features : []).map(item => String(item || '').trim()),
+    },
+    faq: (Array.isArray(source.faq) ? source.faq : []).map(item => ({
+      question: String(item?.question || '').trim(),
+      answer: String(item?.answer || '').trim(),
+    })),
+  }
+}
+
 export default function PartnerServiceEditor({ profile, userId, onProfileSummaryRefresh }) {
   const [items, setItems] = useState([])
   const [draft, setDraft] = useState(() => makeNeutralServiceDraft(profile))
@@ -324,6 +359,13 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
     if (serviceFilter === 'rejected') return items.filter(item => item.moderationStatus === 'rejected')
     return items
   }, [items, serviceFilter])
+  const persistedDraft = useMemo(() => {
+    const selected = draft.id ? items.find(item => item.id === draft.id) || null : null
+    return selected ? makePartnerServiceDraft(profile, selected) : makeNeutralServiceDraft(profile)
+  }, [draft.id, items, profile])
+  const hasUnsavedChanges = useMemo(() => (
+    JSON.stringify(serializeServiceDraftForCompare(draft)) !== JSON.stringify(serializeServiceDraftForCompare(persistedDraft))
+  ), [draft, persistedDraft])
 
   const previewService = useMemo(() => ({
     ...draft,
@@ -479,36 +521,22 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
     setAttemptedSubmit(false)
   }
 
-  function draftHasContent() {
-    const emptyDraft = makeNeutralServiceDraft(profile)
-    const emptyPackage = emptyDraft.packages[0] || makeEmptyPackage('basic')
-    const hasPackageContent = Boolean(
-      (primaryPackage.title?.trim() && primaryPackage.title !== emptyPackage.title)
-      || primaryPackage.description?.trim()
-      || Number(primaryPackage.priceAmount) > 0
-      || (primaryPackage.features || []).some(feature => feature?.trim())
-    )
-    return Boolean(
-      draft.id
-      || draft.title.trim()
-      || draft.subtitle.trim()
-      || draft.tagsText.trim()
-      || draft.descriptionMd.trim()
-      || (draft.deliveryAreasText.trim() && draft.deliveryAreasText !== emptyDraft.deliveryAreasText)
-      || draft.coverUrl
-      || draft.media?.length
-      || draft.faq.some(item => item.question.trim() || item.answer.trim())
-      || hasPackageContent
-    )
-  }
-
   async function closeEditorSafely() {
     if (state.status === 'saving') return
-    if (draftHasContent()) {
-      await handleSave(false)
-      return
+    if (hasUnsavedChanges) {
+      const shouldDiscard = window.confirm('Има незапазени промени. Ако затворите сега, те няма да бъдат записани.')
+      if (!shouldDiscard) return
+      await deleteStorageRefs(diffStorageRefs(
+        mediaAndCoverStorageRefs(draft, 'service-media'),
+        mediaAndCoverStorageRefs(persistedDraft, 'service-media'),
+      ))
     }
+    setDraft(persistedDraft)
+    setActiveSection('info')
+    setShowPreview(true)
+    setAttemptedSubmit(false)
     setIsEditorOpen(false)
+    setState(current => (current.status === 'error' ? current : { status: 'ready', message: '' }))
   }
 
   function handleEditorBackdropMouseDown(event) {

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, MessageSquare, ShieldCheck, Star, Layers3, MapPin, CalendarDays, RefreshCcw, WalletCards, Package, Image as ImageIcon, LayoutList, CheckCircle2, MessageCircle } from 'lucide-react'
 import FallbackImage from '../components/FallbackImage.jsx'
-import { createConversationFromProfile, createServiceRequest } from '../lib/chat.js'
+import { createConversationFromProfile, createServiceRequest, sendCatalogReference } from '../lib/chat.js'
 import { getProfileImageCandidates, getProfileImageStyle, normalizeProfile } from '../lib/profiles.js'
 import { formatServicePrice, loadPartnerServiceBySlug, packagePriceLabel } from '../lib/partner-services.js'
 import { getPartnerServiceCoverCandidates } from '../lib/service-media.js'
@@ -207,6 +207,7 @@ export default function PartnerService() {
     setChatState({ status: 'opening', message: 'Отваряме защитен чат…' })
     try {
       const conversation = await createConversationFromProfile({ profileId: service.profileId, subject: `Въпрос за услуга: ${service.title}` })
+      await sendCatalogReference({ conversationId: conversation.id, referenceType: 'service', referenceId: service.id })
       navigate(`/inbox/${conversation.id}`)
     } catch (error) {
       setChatState({ status: 'error', message: error.message || 'Чатът не се отвори.' })

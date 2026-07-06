@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   BriefcaseBusiness,
@@ -60,7 +61,7 @@ import {
   resumePartnerSubscriptionRenewal,
   syncPartnerSubscriptionSession,
 } from '../../lib/subscriptions.js'
-import { loadPartnerInquiries, loadInquiryProjects } from '../../lib/partner-inquiries.js'
+import { getInquirySourceLabel, getInquiryStatusLabel, inquirySupportsProjectContext, loadPartnerInquiries, loadInquiryProjects } from '../../lib/partner-inquiries.js'
 import { loadPartnerServicesForProfile } from '../../lib/partner-services.js'
 import { formatMoneyRange } from '../../lib/money.js'
 import ImageCropperModal from './ImageCropperModal.jsx'
@@ -1460,7 +1461,9 @@ function OverviewDashboard({
   const activeInquiries = inquiries.filter(item => item.status === 'new' || item.status === 'seen')
   const newInquiries = inquiries.filter(item => item.status === 'new')
   const latestInquiry = inquiries[0] || null
-  const latestProject = latestInquiry?.client_id ? inquiryProjects[latestInquiry.client_id] : null
+  const latestProject = inquirySupportsProjectContext(latestInquiry) && latestInquiry?.client_id
+    ? inquiryProjects[latestInquiry.client_id]
+    : null
   const reviewCount = Number(stats?.reviews_count || 0)
   const rating = Number(stats?.avg_rating || 0)
   const publishedServices = services.filter(item => item.isPublished || item.is_published)
@@ -1544,7 +1547,15 @@ function OverviewDashboard({
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
-        <LatestInquiryCard inquiry={latestInquiry} project={latestProject} status={dashboardState?.status} onOpen={() => onAction('inquiries')} onImprove={() => onAction('profile')} />
+        <LatestInquiryCardEnhanced
+          inquiry={latestInquiry}
+          project={latestProject}
+          services={services}
+          profileSlug={safePreview.slug}
+          status={dashboardState?.status}
+          onOpen={() => onAction('inquiries')}
+          onImprove={() => onAction('profile')}
+        />
 
         <div className="space-y-5">
           <SubscriptionStatusCard
@@ -1899,6 +1910,80 @@ function LatestInquiryCard({ inquiry, project, status, onOpen, onImprove }) {
   )
 }
 
+function LatestInquiryCardEnhanced({ inquiry, project, services = [], profileSlug = '', status, onOpen, onImprove }) {
+  if (!inquiry) {
+    return (
+      <section className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_18px_55px_rgba(13,35,64,0.05)] md:p-7">
+        <div className="eyebrow">Последен клиентски контекст</div>
+        <div className="mt-8 rounded-[1.75rem] border border-dashed border-line bg-soft/70 p-7 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-paper text-accentDeep shadow-sm">
+            <Mail size={24} />
+          </div>
+          <h3 className="mt-4 font-display text-3xl text-ink">Първата подходяща заявка ще се появи тук.</h3>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted">
+            {status === 'loading' ? 'Проверяваме за реални заявки...' : 'Няма да показваме примерни клиенти или измислени бюджети.'}
+          </p>
+          <button type="button" onClick={onImprove} className="btn btn-primary mt-6 justify-center">Подобри профила</button>
+        </div>
+      </section>
+    )
+  }
+
+  const isProjectInquiry = inquirySupportsProjectContext(inquiry)
+  const targetService = Array.isArray(services) ? services.find((item) => item.slug === inquiry.target_slug) : null
+  const targetLabel = targetService?.title || (inquiry.target_slug && inquiry.target_slug !== profileSlug ? inquiry.target_slug : 'Профил')
+  const city = isProjectInquiry ? (project?.address_city || project?.city || '') : ''
+  const budget = isProjectInquiry && project?.budget_min
+    ? formatMoneyRange(project.budget_min, project.budget_max, project.budget_currency)
+    : ''
+  const context = isProjectInquiry
+    ? (project?.idea_description || inquiry.message || '')
+    : (inquiry.message || '')
+  const title = isProjectInquiry
+    ? (project?.title || inquiry.name || 'Клиентска заявка')
+    : (targetService ? `Запитване за ${targetService.title}` : inquiry.name || 'Клиентска заявка')
+  const factItems = [
+    { label: 'Тип', value: getInquirySourceLabel(inquiry.source) },
+    { label: 'Към', value: targetLabel },
+    { label: 'Статус', value: getInquiryStatusLabel(inquiry.status) },
+    city ? { label: 'Град', value: city } : null,
+    budget ? { label: 'Бюджет', value: budget } : null,
+  ].filter(Boolean)
+
+  return (
+    <section className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_18px_55px_rgba(13,35,64,0.05)] md:p-7">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="eyebrow">Последна заявка</div>
+          <h3 className="mt-2 break-words font-display text-3xl text-ink">{title}</h3>
+        </div>
+        {inquiry.status === 'new' && <span className="inline-flex w-fit rounded-full bg-accent px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white">Ново</span>}
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        {factItems.map((item) => <MiniFact key={`${item.label}-${item.value}`} label={item.label} value={item.value} />)}
+      </div>
+
+      {inquiry.contact && (
+        <div className="mt-5 rounded-3xl border border-line bg-paper px-4 py-3 text-sm text-muted">
+          Контакт: <span className="font-medium text-ink">{inquiry.contact}</span>
+        </div>
+      )}
+
+      {context && (
+        <div className="mt-5 rounded-3xl border border-line bg-soft/70 p-4">
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Контекст</div>
+          <p className="mt-2 line-clamp-4 text-sm leading-6 text-ink">{context}</p>
+        </div>
+      )}
+
+      <button type="button" onClick={onOpen} className="btn btn-primary mt-6 justify-center">
+        Виж заявката
+      </button>
+    </section>
+  )
+}
+
 function TrustCard({ preview, completion, portfolioCount, serviceCount, publishedServiceCount, rating, reviewCount, accountStatus }) {
   const items = [
     { label: 'Готовност', value: `${completion.percent}%`, ok: completion.percent >= 80 },
@@ -2114,9 +2199,55 @@ function ProfileForm({
   )
 }
 
+const PORTFOLIO_GUIDE_STEPS = [
+  { id: 'basics', label: 'Карта', icon: FolderKanban, helper: 'Заглавие, слой, град, година и акцент за бързата карта.' },
+  { id: 'story', label: 'История', icon: FileText, helper: 'Кратко описание какво беше, какво направи и какъв е резултатът.' },
+  { id: 'media', label: 'Медии', icon: Camera, helper: 'Снимки и видео, които продават проекта визуално.' },
+  { id: 'publish', label: 'Видимост', icon: Globe2, helper: 'Дали проектът е публичен в портфолиото и как ще се показва.' },
+]
+
 function PortfolioEditor({ items, draft, state, onSelect, onNew, onChange, onSubmit, onUpload, onDelete }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [portfolioFilter, setPortfolioFilter] = useState('all')
   const sortedItems = Array.isArray(items) ? items : []
+  const publicCount = sortedItems.filter(item => item.isPublished).length
+  const hiddenCount = sortedItems.filter(item => !item.isPublished).length
+  const withVideoCount = sortedItems.filter(item => Array.isArray(item.media) && item.media.some(mediaItem => isVideoMedia(mediaItem))).length
+  const filteredItems = useMemo(() => {
+    if (portfolioFilter === 'public') return sortedItems.filter(item => item.isPublished)
+    if (portfolioFilter === 'hidden') return sortedItems.filter(item => !item.isPublished)
+    if (portfolioFilter === 'video') return sortedItems.filter(item => Array.isArray(item.media) && item.media.some(mediaItem => isVideoMedia(mediaItem)))
+    return sortedItems
+  }, [portfolioFilter, sortedItems])
+
+  useEffect(() => {
+    if (!isModalOpen) return undefined
+    const scrollY = window.scrollY
+    const previousHtmlOverflow = document.documentElement.style.overflow
+    const previousBodyOverflow = document.body.style.overflow
+    const previousBodyPosition = document.body.style.position
+    const previousBodyTop = document.body.style.top
+    const previousBodyLeft = document.body.style.left
+    const previousBodyRight = document.body.style.right
+    const previousBodyWidth = document.body.style.width
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.left = '0'
+    document.body.style.right = '0'
+    document.body.style.width = '100%'
+    return () => {
+      document.body.style.overflow = previousBodyOverflow
+      document.documentElement.style.overflow = previousHtmlOverflow
+      document.body.style.position = previousBodyPosition
+      document.body.style.top = previousBodyTop
+      document.body.style.left = previousBodyLeft
+      document.body.style.right = previousBodyRight
+      document.body.style.width = previousBodyWidth
+      window.scrollTo(0, scrollY)
+    }
+  }, [isModalOpen])
 
   function openNewProject() {
     onNew()
@@ -2130,6 +2261,7 @@ function PortfolioEditor({ items, draft, state, onSelect, onNew, onChange, onSub
 
   async function handleDelete() {
     if (!draft.id) return
+    if (!window.confirm('Сигурни ли сте, че искате да изтриете този проект?')) return
     await onDelete(draft.id)
     setIsModalOpen(false)
   }
@@ -2155,6 +2287,13 @@ function PortfolioEditor({ items, draft, state, onSelect, onNew, onChange, onSub
           </div>
         </div>
 
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <PortfolioStatTile label="Всички" value={sortedItems.length} active={portfolioFilter === 'all'} onClick={() => setPortfolioFilter('all')} />
+          <PortfolioStatTile label="Публични" value={publicCount} tone="green" active={portfolioFilter === 'public'} onClick={() => setPortfolioFilter('public')} />
+          <PortfolioStatTile label="Скрити" value={hiddenCount} tone="blue" active={portfolioFilter === 'hidden'} onClick={() => setPortfolioFilter('hidden')} />
+          <PortfolioStatTile label="С видео" value={withVideoCount} active={portfolioFilter === 'video'} onClick={() => setPortfolioFilter('video')} />
+        </div>
+
         <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <button
             type="button"
@@ -2176,14 +2315,14 @@ function PortfolioEditor({ items, draft, state, onSelect, onNew, onChange, onSub
             </div>
           </button>
 
-          {sortedItems.map(item => (
-            <PortfolioProjectCard key={item.id} item={item} onOpen={() => openProject(item)} />
+          {filteredItems.map(item => (
+            <PortfolioProjectCard key={item.id} item={item} active={draft.id === item.id && isModalOpen} onOpen={() => openProject(item)} />
           ))}
         </div>
       </section>
 
-      {isModalOpen && (
-        <PortfolioProjectModal
+      {isModalOpen && createPortal(
+        <PortfolioProjectDialog
           draft={draft}
           state={state}
           onClose={() => setIsModalOpen(false)}
@@ -2191,7 +2330,8 @@ function PortfolioEditor({ items, draft, state, onSelect, onNew, onChange, onSub
           onSubmit={handleSubmit}
           onUpload={onUpload}
           onDelete={handleDelete}
-        />
+        />,
+        document.body,
       )}
     </div>
   )
@@ -2271,7 +2411,7 @@ function getPortfolioMeta(item = {}) {
   return [item.city, item.year].filter(Boolean).join(' · ')
 }
 
-function PortfolioProjectCard({ item, onOpen }) {
+function PortfolioProjectCard({ item, active = false, onOpen }) {
   const image = getPortfolioImage(item)
   const layer = getPortfolioLayer(item)
   const meta = getPortfolioMeta(item)
@@ -2281,7 +2421,7 @@ function PortfolioProjectCard({ item, onOpen }) {
     <button
       type="button"
       onClick={onOpen}
-      className="group overflow-hidden rounded-[1.75rem] border border-white/75 bg-paper text-left shadow-[0_14px_44px_rgba(13,35,64,0.06)] transition duration-300 hover:-translate-y-1 hover:scale-[1.015] hover:border-ink/15 hover:shadow-[0_28px_75px_rgba(13,35,64,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+      className={`group overflow-hidden rounded-[1.75rem] border text-left shadow-[0_14px_44px_rgba(13,35,64,0.06)] transition duration-300 hover:-translate-y-1 hover:scale-[1.015] hover:shadow-[0_28px_75px_rgba(13,35,64,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 ${active ? 'border-ink bg-soft' : 'border-white/75 bg-paper hover:border-ink/15'}`}
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-soft">
         {image ? (
@@ -2295,7 +2435,7 @@ function PortfolioProjectCard({ item, onOpen }) {
         <span className={`absolute left-4 top-4 rounded-full px-3 py-1 text-xs font-semibold shadow-sm ${item.isPublished ? 'bg-white/90 text-ink' : 'bg-amber-100 text-amber-800'}`}>
           {item.isPublished ? 'Публичен' : 'Скрит'}
         </span>
-        <span className="absolute bottom-4 left-4 right-4 truncate rounded-full bg-white/88 px-3 py-1.5 text-xs font-semibold text-ink shadow-sm backdrop-blur">
+        <span className="absolute bottom-4 left-4 right-4 truncate rounded-full border border-white/15 bg-ink/28 px-3 py-1.5 text-xs font-semibold text-paper shadow-[0_14px_35px_rgba(7,31,55,0.18)] backdrop-blur-md">
           {accent}
         </span>
       </div>
@@ -2319,6 +2459,8 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
   const image = getPortfolioImage(draft)
   const layer = getPortfolioLayer(draft)
   const meta = getPortfolioMeta(draft)
+  const [activeSection, setActiveSection] = useState('basics')
+  const [showPreview, setShowPreview] = useState(true)
   const [videoUrl, setVideoUrl] = useState('')
   const [videoError, setVideoError] = useState('')
   const [attemptedSubmit, setAttemptedSubmit] = useState(false)
@@ -2329,12 +2471,14 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
   const dragPointerIdRef = useRef(null)
   const isDraggingRef = useRef(false)
   const mediaListRef = useRef(null)
+  const checklist = getPortfolioChecklist(draft, media)
   const requiredChecks = getPortfolioRequiredChecks(draft, media)
   const missingRequired = requiredChecks.filter(item => !item.done)
+  const completionPercent = Math.round((checklist.filter(item => item.done).length / checklist.length) * 100)
 
   useEffect(() => {
     function handleEscape(event) {
-      if (event.key === 'Escape' && !isDraggingRef.current) onClose()
+      if (event.key === 'Escape' && !isDraggingRef.current && state.status !== 'saving') onClose()
     }
 
     document.addEventListener('keydown', handleEscape)
@@ -2344,7 +2488,7 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
     }
-  }, [onClose])
+  }, [onClose, state.status])
 
   function captureMediaRects() {
     const list = mediaListRef.current
@@ -2510,6 +2654,7 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
     event.preventDefault()
     if (missingRequired.length > 0) {
       setAttemptedSubmit(true)
+      setActiveSection(missingRequired[0]?.step || 'basics')
       return
     }
     onSubmit(event)
@@ -2715,22 +2860,506 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
   )
 }
 
+function PortfolioProjectDialog({ draft, state, onClose, onChange, onSubmit, onUpload, onDelete }) {
+  const media = Array.isArray(draft.media) ? draft.media : []
+  const layer = getPortfolioLayer(draft)
+  const [activeSection, setActiveSection] = useState('basics')
+  const [showPreview, setShowPreview] = useState(true)
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false)
+  const checklist = getPortfolioChecklist(draft, media)
+  const requiredChecks = getPortfolioRequiredChecks(draft, media)
+  const missingRequired = requiredChecks.filter(item => !item.done)
+  const completionPercent = Math.round((checklist.filter(item => item.done).length / checklist.length) * 100)
+
+  useEffect(() => {
+    function handleEscape(event) {
+      if (event.key === 'Escape' && state.status !== 'saving') onClose()
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [onClose, state.status])
+
+  function handleSave(event) {
+    event.preventDefault()
+    if (missingRequired.length > 0) {
+      setAttemptedSubmit(true)
+      setActiveSection(missingRequired[0]?.step || 'basics')
+      return
+    }
+    onSubmit(event)
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] h-[100dvh] w-screen overflow-hidden bg-ink/65 p-0 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label={draft.id ? 'Редакция на портфолио проект' : 'Нов портфолио проект'}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && state.status !== 'saving') onClose()
+      }}
+    >
+      <div className="flex h-full w-full items-stretch">
+        <div className="relative flex h-full w-full flex-col overflow-hidden border border-line bg-paper shadow-2xl">
+          <div className="shrink-0 border-b border-line bg-paper/95 px-4 py-3 backdrop-blur sm:px-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="eyebrow">Портфолио</div>
+                <h3 className="mt-1 font-display text-3xl leading-none text-ink">{draft.id ? 'Редактирай проект' : 'Нов портфолио проект'}</h3>
+              </div>
+              <button type="button" onClick={onClose} disabled={state.status === 'saving'} className="rounded-full p-2 text-muted transition hover:bg-soft hover:text-ink disabled:cursor-not-allowed disabled:opacity-60" aria-label="Затвори">
+                <X size={22} />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid min-h-0 flex-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_21rem]">
+            <div className="min-w-0 p-4 sm:p-5 lg:p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-medium text-ink">
+                    {(() => {
+                      const ActiveIcon = PORTFOLIO_GUIDE_STEPS.find(step => step.id === activeSection)?.icon || FolderKanban
+                      return <ActiveIcon size={18} className="text-accentDeep" />
+                    })()}
+                    Редакция
+                  </div>
+                  <h3 className="mt-2 font-display text-3xl text-ink">{PORTFOLIO_GUIDE_STEPS.find(step => step.id === activeSection)?.label}</h3>
+                </div>
+                <button type="button" onClick={() => setShowPreview(value => !value)} className="btn btn-ghost">
+                  <Eye size={18} /> {showPreview ? 'Скрий преглед' : 'Покажи преглед'}
+                </button>
+              </div>
+
+              <div className="mt-5 grid gap-2 md:grid-cols-4">
+                {PORTFOLIO_GUIDE_STEPS.map((step, index) => (
+                  <PortfolioGuideStepButton
+                    key={step.id}
+                    step={step}
+                    index={index}
+                    active={activeSection === step.id}
+                    done={stepDone(step.id, checklist)}
+                    onClick={() => setActiveSection(step.id)}
+                  />
+                ))}
+              </div>
+
+              <form onSubmit={handleSave} className="mt-5 space-y-5">
+                {activeSection === 'basics' && (
+                  <>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Field label="Заглавие"><input value={draft.title} onChange={event => onChange('title', event.target.value)} className={INPUT} placeholder="Хармония в едно помещение" /></Field>
+                      <Field label="Слой"><TotsanSelect className="mt-2" value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} placeholder="Избери слой" options={LAYERS.map(item => ({ value: item.slug, label: `Слой ${item.number} · ${item.title}` }))} /></Field>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                      <div className="min-w-0 xl:col-span-2">
+                        <LocationCombobox
+                          label={<LabelWithHelp text="Град" help="Избери град от официалния списък." />}
+                          value={draft.city}
+                          onChange={(value) => onChange('city', value)}
+                          helper=""
+                        />
+                      </div>
+                      <Field label="Година"><input type="number" min="1900" max="2100" value={draft.year} onChange={event => onChange('year', event.target.value)} className={INPUT} placeholder="2025" /></Field>
+                      <Field label="Силен акцент"><input value={draft.budgetBand} onChange={event => onChange('budgetBand', event.target.value)} className={INPUT} placeholder="55 кв.м. · Преди/След" /></Field>
+                    </div>
+                  </>
+                )}
+
+                {activeSection === 'story' && (
+                  <>
+                    <div className="rounded-3xl border border-line bg-soft/70 p-4">
+                      <div className="text-sm font-semibold text-ink">Бърза формула</div>
+                      <p className="mt-1 text-sm leading-6 text-muted">Проблем → Роля → Решение → Резултат. Достатъчно е кратко, но конкретно.</p>
+                    </div>
+                    <Field label="Кратко описание"><textarea rows={6} value={draft.description} onChange={event => onChange('description', event.target.value)} className={INPUT} placeholder="Опиши накратко: какъв беше проблемът, каква беше твоята роля, какво решение даде и какъв е резултатът." /></Field>
+                  </>
+                )}
+
+                {activeSection === 'media' && <PortfolioMediaWorkspace draft={draft} onChange={onChange} onUpload={onUpload} />}
+
+                {activeSection === 'publish' && (
+                  <div className="space-y-4">
+                    <div className="rounded-3xl border border-line bg-soft/70 p-4">
+                      <div className="text-sm font-semibold text-ink">Публичност</div>
+                      <p className="mt-1 text-sm leading-6 text-muted">Когато проектът е публичен, се показва в портфолиото на профила. Ако е скрит, остава само за вътрешна работа.</p>
+                    </div>
+                    <label className="flex items-start gap-3 rounded-2xl border border-line bg-soft p-4 text-sm text-muted">
+                      <input type="checkbox" checked={draft.isPublished} onChange={event => onChange('isPublished', event.target.checked)} className="mt-1 accent-black" />
+                      <span>Публикуван проект в публичното портфолио.</span>
+                    </label>
+                  </div>
+                )}
+
+                {showPreview && (
+                  <div className="mt-7 rounded-3xl border border-line bg-soft/60 p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="eyebrow">Преглед</div>
+                        <h3 className="mt-2 font-display text-3xl text-ink">Как ще изглежда за клиента</h3>
+                      </div>
+                    </div>
+                    <div className="pointer-events-none mt-5 max-w-[26rem]">
+                      <PortfolioProjectCard item={draft} onOpen={() => {}} />
+                    </div>
+                  </div>
+                )}
+              </form>
+            </div>
+
+            <aside className="space-y-4 border-t border-line bg-soft/50 p-4 sm:p-5 lg:border-l lg:border-t-0">
+              <PortfolioValidationPanel checks={requiredChecks} attempted={attemptedSubmit} onSelectStep={setActiveSection} />
+              <PortfolioReadinessPanel checklist={checklist} percent={completionPercent} />
+              <PortfolioVisibilityPanel draft={draft} state={state} />
+              <PortfolioHelpPanel section={activeSection} layer={layer} />
+            </aside>
+          </div>
+
+          <div className="shrink-0 border-t border-line bg-paper/95 px-4 py-3 shadow-[0_-18px_40px_rgba(7,31,55,0.08)] backdrop-blur sm:px-6">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div className={`text-sm ${state.status === 'error' ? 'text-red-700' : 'text-muted'}`}>{state.message || 'Запази проекта, за да се покаже като продуктова карта в портфолиото.'}</div>
+              <div className="flex flex-wrap gap-2">
+                {draft.id && <button type="button" onClick={onDelete} disabled={state.status === 'saving'} className="btn btn-ghost"><Trash2 size={18} /> Изтрий</button>}
+                <button type="button" onClick={handleSave} className="btn btn-primary" disabled={state.status === 'saving'}><Save size={18} /> {state.status === 'saving' ? 'Запазва се…' : 'Запази'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PortfolioMediaWorkspace({ draft, onChange, onUpload }) {
+  const media = Array.isArray(draft.media) ? draft.media : []
+  const [videoUrl, setVideoUrl] = useState('')
+  const [videoError, setVideoError] = useState('')
+  const [dragIndex, setDragIndex] = useState(null)
+  const [dragOverIndex, setDragOverIndex] = useState(null)
+  const mediaListRef = useRef(null)
+  const dragIndexRef = useRef(null)
+  const dragOverIndexRef = useRef(null)
+  const dragPointerIdRef = useRef(null)
+  const isDraggingRef = useRef(false)
+
+  useEffect(() => () => {
+    removePointerDragListeners()
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+  }, [])
+
+  function captureMediaRects() {
+    const list = mediaListRef.current
+    if (!list) return null
+    return new Map(Array.from(list.querySelectorAll('[data-media-key]')).map((node) => [node.dataset.mediaKey, node.getBoundingClientRect()]))
+  }
+
+  function animateMediaList(snapshot) {
+    if (!snapshot) return
+    window.requestAnimationFrame(() => {
+      const list = mediaListRef.current
+      if (!list) return
+      Array.from(list.querySelectorAll('[data-media-key]')).forEach((node) => {
+        const before = snapshot.get(node.dataset.mediaKey)
+        if (!before) return
+        const after = node.getBoundingClientRect()
+        const deltaX = before.left - after.left
+        const deltaY = before.top - after.top
+        if (Math.abs(deltaX) < 1 && Math.abs(deltaY) < 1) return
+
+        node.style.transition = 'none'
+        node.style.transform = `translate(${deltaX}px, ${deltaY}px)`
+        node.style.zIndex = '2'
+
+        window.requestAnimationFrame(() => {
+          node.style.transition = 'transform 240ms cubic-bezier(0.22, 1, 0.36, 1)'
+          node.style.transform = ''
+          window.setTimeout(() => {
+            node.style.transition = ''
+            node.style.zIndex = ''
+          }, 260)
+        })
+      })
+    })
+  }
+
+  function updateMedia(nextMedia, options = {}) {
+    const snapshot = options.animate ? captureMediaRects() : null
+    onChange('media', nextMedia)
+    onChange('coverUrl', getCoverFromMedia(nextMedia))
+    animateMediaList(snapshot)
+  }
+
+  function handleReorder(fromIndex, toIndex) {
+    const from = Number(fromIndex)
+    const to = Number(toIndex)
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from === to || from < 0 || to < 0) return
+    const nextMedia = [...media]
+    const [moved] = nextMedia.splice(from, 1)
+    if (!moved) return
+    const insertionIndex = from < to ? to - 1 : to
+    nextMedia.splice(insertionIndex, 0, moved)
+    updateMedia(nextMedia, { animate: true })
+  }
+
+  function updateDropIndex(index) {
+    if (dragIndexRef.current === null) return
+    dragOverIndexRef.current = index
+    setDragOverIndex(index)
+  }
+
+  function getDropIndex(clientY) {
+    const rows = Array.from(mediaListRef.current?.querySelectorAll('[data-media-key]') || [])
+    if (!rows.length) return 0
+    const targetIndex = rows.findIndex((node) => {
+      const rect = node.getBoundingClientRect()
+      return clientY < rect.top + rect.height / 2
+    })
+    return targetIndex === -1 ? rows.length : targetIndex
+  }
+
+  function handlePointerDragStart(event, index) {
+    if (event.button !== undefined && event.button !== 0) return
+    event.preventDefault()
+    dragIndexRef.current = index
+    dragOverIndexRef.current = index
+    dragPointerIdRef.current = event.pointerId
+    isDraggingRef.current = true
+    setDragIndex(index)
+    setDragOverIndex(index)
+    document.body.style.cursor = 'grabbing'
+    document.body.style.userSelect = 'none'
+    window.addEventListener('pointermove', handlePointerDragMove)
+    window.addEventListener('pointerup', handlePointerDragEnd)
+    window.addEventListener('pointercancel', handlePointerDragEnd)
+  }
+
+  function handlePointerDragMove(event) {
+    if (!isDraggingRef.current) return
+    if (dragPointerIdRef.current !== null && event.pointerId !== dragPointerIdRef.current) return
+    event.preventDefault()
+    updateDropIndex(getDropIndex(event.clientY))
+  }
+
+  function handlePointerDragEnd(event) {
+    if (!isDraggingRef.current) return
+    if (dragPointerIdRef.current !== null && event.pointerId !== dragPointerIdRef.current) return
+    event.preventDefault()
+    commitDrop(dragOverIndexRef.current ?? dragIndexRef.current)
+  }
+
+  function removePointerDragListeners() {
+    window.removeEventListener('pointermove', handlePointerDragMove)
+    window.removeEventListener('pointerup', handlePointerDragEnd)
+    window.removeEventListener('pointercancel', handlePointerDragEnd)
+  }
+
+  function finishDrag() {
+    removePointerDragListeners()
+    dragIndexRef.current = null
+    dragOverIndexRef.current = null
+    dragPointerIdRef.current = null
+    isDraggingRef.current = false
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    setDragIndex(null)
+    setDragOverIndex(null)
+  }
+
+  function commitDrop(index) {
+    const fromIndex = dragIndexRef.current
+    if (fromIndex !== null) handleReorder(fromIndex, index)
+    finishDrag()
+  }
+
+  function isDropSlotActive(index) {
+    if (dragIndex === null || dragOverIndex !== index) return false
+    return index !== dragIndex && index !== dragIndex + 1
+  }
+
+  function handleAddVideo() {
+    const cleanUrl = normalizeVideoUrl(videoUrl)
+    if (!cleanUrl) {
+      setVideoError('Добави валиден YouTube или видео линк.')
+      return
+    }
+    const youtubeId = getYoutubeVideoId(cleanUrl)
+    updateMedia([
+      ...media,
+      {
+        type: 'video',
+        provider: youtubeId ? 'youtube' : 'link',
+        url: cleanUrl,
+        thumbnail: youtubeId ? getYoutubeThumbnail(cleanUrl) : '',
+      },
+    ])
+    setVideoError('')
+    setVideoUrl('')
+  }
+
+  function handleRemoveMedia(index) {
+    updateMedia(media.filter((_, itemIndex) => itemIndex !== index), { animate: true })
+  }
+
+  return (
+    <div className="space-y-5">
+      <label className="btn btn-ghost w-full cursor-pointer justify-center">
+        <ImagePlus size={18} /> Качи снимки към проекта
+        <input type="file" accept="image/*" multiple className="sr-only" onChange={async (event) => { await onUpload(event.target.files); event.target.value = '' }} />
+      </label>
+
+      <div className="rounded-3xl border border-line bg-soft/70 p-4">
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-paper text-accentDeep shadow-sm">
+            <Video size={18} />
+          </span>
+          <div>
+            <div className="text-sm font-semibold text-ink">Добави видео с линк</div>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <input
+            type="text"
+            inputMode="url"
+            value={videoUrl}
+            onChange={(event) => {
+              setVideoUrl(event.target.value)
+              if (videoError) setVideoError('')
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                handleAddVideo()
+              }
+            }}
+            className="min-w-0 flex-1 rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink"
+            placeholder="youtube.com/watch?v=..."
+          />
+          <button type="button" onClick={handleAddVideo} disabled={!videoUrl.trim()} className="btn btn-ghost justify-center sm:w-auto">
+            <Link2 size={18} /> Добави
+          </button>
+        </div>
+        {videoError && <div className="mt-2 text-sm text-red-700">{videoError}</div>}
+      </div>
+
+      {media.length > 0 && (
+        <div className="rounded-3xl border border-line bg-paper/80 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-ink">Медии към проекта</div>
+              <p className="mt-1 text-sm leading-6 text-muted">Първата позиция е основната снимка/визия. Хвани ред и го премести нагоре или надолу.</p>
+            </div>
+            <span className="rounded-full bg-soft px-3 py-1 text-xs font-semibold text-muted">{media.length}</span>
+          </div>
+          <div ref={mediaListRef} className="mt-4 space-y-2">
+            {media.map((item, index) => (
+              <div key={getMediaSortKey(item, index)} className="space-y-2">
+                <DropSlot active={isDropSlotActive(index)} />
+                <PortfolioMediaManagerItem
+                  mediaKey={getMediaSortKey(item, index)}
+                  item={item}
+                  index={index}
+                  isDragging={dragIndex === index}
+                  isDragTarget={false}
+                  onPointerDown={(event) => handlePointerDragStart(event, index)}
+                  onRemove={() => handleRemoveMedia(index)}
+                />
+              </div>
+            ))}
+            <DropSlot active={isDropSlotActive(media.length)} />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PortfolioStatTile({ label, value, tone = 'neutral', active = false, onClick }) {
+  const toneClass = tone === 'green'
+    ? 'bg-trustGreen/10 text-trustGreen'
+    : tone === 'blue'
+      ? 'bg-accentSoft text-accentDeep'
+      : 'bg-soft text-ink'
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`rounded-2xl border bg-paper p-4 text-left transition hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-sm ${active ? 'border-ink shadow-sm ring-2 ring-ink/5' : 'border-line'}`}
+    >
+      <div className="text-xs uppercase tracking-[0.14em] text-muted">{label}</div>
+      <div className={`mt-2 inline-flex rounded-full px-3 py-1 font-display text-2xl ${toneClass}`}>{value}</div>
+    </button>
+  )
+}
+
+function PortfolioGuideStepButton({ step, index, active, done, onClick }) {
+  const Icon = step.icon
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-2xl border px-3 py-3 text-left transition ${active ? 'border-ink bg-ink text-paper' : 'border-line bg-soft text-ink hover:border-ink/30'}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className={`flex h-7 w-7 items-center justify-center rounded-full ${active ? 'bg-paper/12' : 'bg-paper'}`}>
+            <Icon size={15} />
+          </span>
+          <div>
+            <div className={`text-[11px] uppercase tracking-[0.14em] ${active ? 'text-paper/60' : 'text-muted'}`}>Стъпка {index + 1}</div>
+            <div className="font-medium">{step.label}</div>
+          </div>
+        </div>
+        {done && <Check size={18} className={active ? 'text-paper' : 'text-trustGreen'} />}
+      </div>
+      <p className={`mt-1.5 line-clamp-2 text-xs leading-5 ${active ? 'text-paper/65' : 'text-muted'}`}>{step.helper}</p>
+    </button>
+  )
+}
+
+function getPortfolioChecklist(draft, media) {
+  return [
+    { key: 'title', label: 'Има ясно заглавие', done: Boolean(String(draft.title || '').trim()) },
+    { key: 'layer', label: 'Избран е слой', done: Boolean(String(draft.layerSlug || '').trim()) },
+    { key: 'city', label: 'Има град', done: Boolean(String(draft.city || '').trim()) },
+    { key: 'year', label: 'Има година', done: Boolean(String(draft.year || '').trim()) },
+    { key: 'accent', label: 'Има силен акцент', done: Boolean(String(draft.budgetBand || '').trim()) },
+    { key: 'description', label: 'Има кратка история', done: Boolean(String(draft.description || '').trim()) },
+    { key: 'media', label: 'Има поне една медия', done: media.length > 0 },
+  ]
+}
+
 function getPortfolioRequiredChecks(draft, media) {
   return [
     {
       key: 'title',
+      step: 'basics',
       label: 'Заглавие',
       message: 'Добави заглавие на проекта.',
       done: Boolean(String(draft.title || '').trim()),
     },
     {
+      key: 'layer',
+      step: 'basics',
+      label: 'Слой',
+      message: 'Избери слой, за да подредим проекта правилно в профила.',
+      done: Boolean(String(draft.layerSlug || '').trim()),
+    },
+    {
       key: 'description',
+      step: 'story',
       label: 'Кратко описание',
       message: 'Опиши накратко проблем, роля, решение и резултат.',
       done: Boolean(String(draft.description || '').trim()),
     },
     {
       key: 'media',
+      step: 'media',
       label: 'Поне една медия',
       message: 'Добави поне една снимка или видео към проекта.',
       done: media.length > 0,
@@ -2738,7 +3367,7 @@ function getPortfolioRequiredChecks(draft, media) {
   ]
 }
 
-function PortfolioValidationPanel({ checks, attempted }) {
+function PortfolioValidationPanel({ checks, attempted, onSelectStep }) {
   const missing = checks.filter(item => !item.done)
   const complete = missing.length === 0
 
@@ -2747,21 +3376,132 @@ function PortfolioValidationPanel({ checks, attempted }) {
       <div className={`text-sm font-semibold ${complete ? 'text-emerald-800' : attempted ? 'text-red-700' : 'text-ink'}`}>
         {complete ? 'Готово за запазване' : attempted ? 'Остава още малко' : 'Задължително за портфолио'}
       </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+      <p className={`mt-1 text-sm leading-5 ${complete ? 'text-emerald-800/80' : attempted ? 'text-red-700/80' : 'text-muted'}`}>
+        {complete ? 'Всички задължителни елементи са попълнени.' : 'Можеш да запазиш проекта по всяко време, но за добра карта попълни тези полета.'}
+      </p>
+      <div className="mt-3 space-y-2">
         {checks.map(item => (
-          <div key={item.key} className={`rounded-2xl px-3 py-2 text-sm ${item.done ? 'bg-paper/70 text-ink' : attempted ? 'bg-white/70 text-red-700' : 'bg-soft text-muted'}`}>
-            <span className="flex items-center gap-2 font-medium">
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => onSelectStep?.(item.step)}
+            className={`flex w-full items-start gap-2 rounded-2xl px-3 py-2 text-left text-sm transition ${item.done ? 'bg-paper/70 text-ink' : attempted ? 'bg-white/70 text-red-700 hover:bg-white' : 'bg-soft text-muted hover:bg-paper'}`}
+          >
+            <span className="flex items-start gap-2 font-medium">
               <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${item.done ? 'bg-trustGreen text-paper' : attempted ? 'bg-red-100 text-red-700' : 'bg-paper text-muted'}`}>
                 {item.done ? <Check size={13} /> : <CircleDot size={13} />}
               </span>
-              {item.label}
+              <span>
+                <span className="block font-medium">{item.label}</span>
+                {!item.done && attempted && <span className="mt-1 block text-xs leading-5">{item.message}</span>}
+              </span>
             </span>
-            {!item.done && attempted && <span className="mt-1 block text-xs leading-5">{item.message}</span>}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function PortfolioReadinessPanel({ checklist, percent }) {
+  return (
+    <div className="rounded-3xl border border-line bg-paper p-4">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <div className="text-sm font-medium text-ink">Готовност</div>
+          <div className="mt-1 text-sm text-muted">{percent}% попълнено</div>
+        </div>
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-soft font-display text-xl text-ink">{percent}</div>
+      </div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-soft">
+        <div className="h-full rounded-full bg-accentDeep transition-all" style={{ width: `${percent}%` }} />
+      </div>
+      <div className="mt-4 space-y-2">
+        {checklist.map(item => (
+          <div key={item.key} className="flex items-start gap-2 text-sm">
+            <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${item.done ? 'bg-trustGreen text-paper' : 'bg-soft text-muted'}`}>
+              {item.done ? <Check size={13} /> : <CircleDot size={13} />}
+            </span>
+            <span className={item.done ? 'text-ink' : 'text-muted'}>{item.label}</span>
           </div>
         ))}
       </div>
     </div>
   )
+}
+
+function PortfolioVisibilityPanel({ draft, state }) {
+  return (
+    <div className={`rounded-3xl border p-5 ${draft.isPublished ? 'border-trustGreen/30 bg-trustGreen/5' : 'border-line bg-paper'}`}>
+      <div className="flex items-center gap-2 text-sm font-medium text-ink">
+        {draft.isPublished ? <Check size={18} className="text-trustGreen" /> : <CircleDot size={18} className="text-muted" />}
+        {draft.isPublished ? 'Видим за клиенти' : 'Скрит проект'}
+      </div>
+      <p className="mt-2 text-sm leading-6 text-muted">
+        {draft.isPublished ? 'Показва се в публичното портфолио на профила.' : 'Остава видим само за теб, докато не решиш да го публикуваш.'}
+      </p>
+      {state.message && state.status !== 'idle' && (
+        <div className={`mt-3 rounded-xl px-3 py-2 text-xs ${state.status === 'error' ? 'bg-red-50 text-red-700' : 'bg-soft text-muted'}`}>
+          {state.message}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PortfolioHelpPanel({ section, layer }) {
+  const content = {
+    basics: {
+      title: 'Какво вижда клиентът първо',
+      lines: ['Кратко и ясно заглавие.', 'Силен акцент, който хваща окото.', 'Град и слой, за да има контекст.'],
+    },
+    story: {
+      title: 'Как да разкажеш проекта',
+      lines: ['Какъв беше проблемът?', 'Какво пое ти като роля?', 'Какво стана след изпълнението?'],
+    },
+    media: {
+      title: 'Кои снимки помагат най-много',
+      lines: ['Широк кадър на помещението.', 'Детайл или материален акцент.', 'Видео, ако имаш процес или walkthrough.'],
+    },
+    publish: {
+      title: 'Кога да го пуснеш публично',
+      lines: ['Когато картата изглежда завършена.', 'Когато имаш силна основна снимка.', 'Когато описанието е конкретно и полезно.'],
+    },
+  }[section]
+
+  return (
+    <div className="rounded-3xl border border-line bg-soft p-5">
+      <div className="flex items-center gap-2 text-sm font-medium text-ink">
+        <FolderKanban size={18} className="text-accentDeep" />
+        {content.title}
+      </div>
+      <div className="mt-3 space-y-2">
+        {content.lines.map(line => (
+          <div key={line} className="flex gap-2 text-sm leading-6 text-muted">
+            <Check size={15} className="mt-1 shrink-0 text-accentDeep" />
+            <span>{line}</span>
+          </div>
+        ))}
+      </div>
+      {layer && (
+        <div className="mt-4 rounded-2xl border border-line bg-paper p-3 text-sm text-muted">
+          Текущ слой: <span className="font-medium text-ink">{layer.number}. {layer.title}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function stepDone(stepId, checklist) {
+  const keysByStep = {
+    basics: ['title', 'layer', 'city', 'year', 'accent'],
+    story: ['description'],
+    media: ['media'],
+    publish: [],
+  }
+  const keys = keysByStep[stepId] || []
+  if (!keys.length) return stepId === 'publish'
+  return keys.every(key => checklist.find(item => item.key === key)?.done)
 }
 
 function PortfolioMediaManagerItem({ item, index, mediaKey, isDragging, isDragTarget, onPointerDown, onRemove }) {

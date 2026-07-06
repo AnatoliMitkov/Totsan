@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { CheckCircle2, Mail, User, Clock } from 'lucide-react'
-import { loadPartnerInquiries, updatePartnerInquiryStatus, loadInquiryProjects } from '../../lib/partner-inquiries.js'
+import { getInquirySourceLabel, getInquiryStatusLabel, inquirySupportsProjectContext, loadPartnerInquiries, updatePartnerInquiryStatus, loadInquiryProjects } from '../../lib/partner-inquiries.js'
 import { formatAdminDate } from '../../lib/admin.js'
 import { createConversationWithClient } from '../../lib/chat.js'
 import { useNavigate } from 'react-router-dom'
@@ -23,8 +23,10 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
       try {
         const rows = await loadPartnerInquiries(profileSlug, partnerId)
         
-        // Fetch client projects for inquiries that have a client_id
-        const clientIds = rows.map(r => r.client_id).filter(Boolean)
+        const clientIds = rows
+          .filter((row) => inquirySupportsProjectContext(row))
+          .map((row) => row.client_id)
+          .filter(Boolean)
         const uniqueClientIds = [...new Set(clientIds)]
         
         let projectMap = {}
@@ -113,9 +115,16 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
         <div className="space-y-3">
           <h3 className="font-display text-2xl text-ink">Активни запитвания ({activeInquiries.length})</h3>
           {activeInquiries.map(inq => {
-            const project = inq.client_id ? projects[inq.client_id] : null
+            const isProjectInquiry = inquirySupportsProjectContext(inq)
+            const project = isProjectInquiry && inq.client_id ? projects[inq.client_id] : null
             const isOpeningChat = chatAction.id === inq.id && chatAction.status === 'opening'
             const chatError = chatAction.id === inq.id && chatAction.status === 'error' ? chatAction.message : ''
+            const metaItems = [
+              { label: 'Тип', value: getInquirySourceLabel(inq.source) },
+              { label: 'Статус', value: getInquiryStatusLabel(inq.status) },
+              inq.layer_slug ? { label: 'Слой', value: getLayerTitle(inq.layer_slug) } : null,
+              inq.target_slug ? { label: 'Към', value: inq.target_slug } : null,
+            ].filter(Boolean)
 
             return (
               <div key={inq.id} className={`overflow-hidden rounded-3xl border p-5 transition-colors md:p-7 ${inq.status === 'new' ? 'border-accent/30 bg-accent/5' : 'border-line bg-paper'}`}>
@@ -130,6 +139,13 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
                     </div>
                     <div className="mt-2 flex items-center gap-2 text-xs text-muted">
                       <Clock size={14} /> {formatAdminDate(inq.created_at)}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {metaItems.map((item) => (
+                        <span key={`${item.label}-${item.value}`} className="rounded-full border border-line bg-soft px-3 py-1 text-[11px] font-medium text-muted">
+                          {item.label}: <span className="text-ink">{item.value}</span>
+                        </span>
+                      ))}
                     </div>
                   </div>
                   <div className="flex w-full flex-col gap-2 md:w-[13rem] md:min-w-[13rem]">
@@ -155,7 +171,7 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
                     {inq.message}
                   </div>
 
-                  {project && (
+                  {isProjectInquiry && project && (
                     <div className="rounded-2xl bg-soft p-4 md:p-5 border border-line">
                       <div className="mb-3 text-xs font-medium text-muted uppercase tracking-wider">Данни за имота на клиента</div>
                       <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -202,7 +218,7 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
                     </div>
                   )}
                   
-                  {!project && inq.client_id && (
+                  {isProjectInquiry && !project && inq.client_id && (
                     <div className="text-xs text-muted italic">Клиентът е регистриран, но все още не е попълнил данни за проекта си.</div>
                   )}
                 </div>
