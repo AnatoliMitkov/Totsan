@@ -538,7 +538,10 @@ function TrustPromise() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
           {staticStats.map((stat, index) => (
-            <div key={stat.label} className="rounded-2xl border border-line bg-paper/60 px-5 py-6 text-center shadow-sm">
+            <div
+              key={stat.label}
+              className="flex h-full flex-col items-center justify-center rounded-2xl border border-line bg-paper/60 px-3 py-6 text-center shadow-sm sm:px-5"
+            >
               <div className="mb-5 flex justify-center">
                 <span className="inline-flex h-16 w-16 items-center justify-center rounded-[1.4rem] bg-accentSoft">
                   {index === 0 ? <Compass size={30} className="text-accentDeep" /> : null}
@@ -547,10 +550,16 @@ function TrustPromise() {
                   {index === 3 ? <ShieldCheck size={30} className="text-accentDeep" /> : null}
                 </span>
               </div>
-              <div className="font-display text-[clamp(2rem,1.6rem+1vw,3.25rem)] leading-none text-accentDeep font-bold">
+              <div
+                className={`w-full font-display leading-none text-accentDeep font-bold ${
+                  index >= 2
+                    ? 'text-[1.55rem] sm:text-[clamp(2rem,1.6rem+1vw,3.25rem)]'
+                    : 'text-[clamp(2rem,1.6rem+1vw,3.25rem)]'
+                }`}
+              >
                 {index === 1 ? '0.00€' : stat.value}
               </div>
-              <div className="mt-3 font-display text-xl leading-tight text-ink">
+              <div className="mt-3 w-full font-display text-xl leading-tight text-ink">
                 {stat.label}
               </div>
               <p className="mt-3 text-sm leading-relaxed text-muted">

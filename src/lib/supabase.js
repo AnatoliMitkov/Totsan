@@ -2,6 +2,89 @@ import { createClient } from '@supabase/supabase-js'
 
 const url = import.meta.env.VITE_SUPABASE_URL
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+const AUTH_PERSISTENCE_MODE_KEY = 'totsan.auth.persistence'
+const AUTH_REMEMBER_UNTIL_KEY = 'totsan.auth.remember-until'
+const AUTH_REMEMBER_DURATION_MS = 30 * 24 * 60 * 60 * 1000
+
+function getBrowserStorage(type) {
+  if (typeof window === 'undefined') return null
+
+  try {
+    return type === 'session' ? window.sessionStorage : window.localStorage
+  } catch {
+    return null
+  }
+}
+
+function usesSessionOnlyStorage() {
+  return getBrowserStorage('session')?.getItem(AUTH_PERSISTENCE_MODE_KEY) === 'session'
+}
+
+function getRememberUntil() {
+  const storage = getBrowserStorage('local')
+  if (!storage) return 0
+
+  const storedDeadline = Number(storage.getItem(AUTH_REMEMBER_UNTIL_KEY))
+  if (Number.isFinite(storedDeadline) && storedDeadline > 0) return storedDeadline
+
+  const deadline = Date.now() + AUTH_REMEMBER_DURATION_MS
+  storage.setItem(AUTH_REMEMBER_UNTIL_KEY, String(deadline))
+  return deadline
+}
+
+const authSessionStorage = {
+  getItem(key) {
+    const localStorage = getBrowserStorage('local')
+    const sessionStorage = getBrowserStorage('session')
+    if (!localStorage || !sessionStorage) return null
+
+    if (usesSessionOnlyStorage()) {
+      return sessionStorage.getItem(key)
+    }
+
+    if (Date.now() >= getRememberUntil()) {
+      localStorage.removeItem(key)
+      return null
+    }
+
+    return localStorage.getItem(key)
+  },
+  setItem(key, value) {
+    const localStorage = getBrowserStorage('local')
+    const sessionStorage = getBrowserStorage('session')
+    if (!localStorage || !sessionStorage) return
+
+    if (usesSessionOnlyStorage()) {
+      sessionStorage.setItem(key, value)
+      localStorage.removeItem(key)
+      return
+    }
+
+    localStorage.setItem(key, value)
+    sessionStorage.removeItem(key)
+  },
+  removeItem(key) {
+    getBrowserStorage('local')?.removeItem(key)
+    getBrowserStorage('session')?.removeItem(key)
+  },
+}
+
+export function setAuthPersistencePreference(rememberFor30Days) {
+  const localStorage = getBrowserStorage('local')
+  const sessionStorage = getBrowserStorage('session')
+  if (!localStorage || !sessionStorage) return
+
+  if (rememberFor30Days) {
+    sessionStorage.removeItem(AUTH_PERSISTENCE_MODE_KEY)
+    localStorage.setItem(AUTH_PERSISTENCE_MODE_KEY, 'remember')
+    localStorage.setItem(AUTH_REMEMBER_UNTIL_KEY, String(Date.now() + AUTH_REMEMBER_DURATION_MS))
+    return
+  }
+
+  sessionStorage.setItem(AUTH_PERSISTENCE_MODE_KEY, 'session')
+  localStorage.removeItem(AUTH_PERSISTENCE_MODE_KEY)
+  localStorage.removeItem(AUTH_REMEMBER_UNTIL_KEY)
+}
 
 // Validate config consistency
 if (!url && anonKey) {
@@ -90,9 +173,33 @@ export const supabase = hasSupabaseConfig
       auth: {
         persistSession: true,
         autoRefreshToken: true,
+        storage: authSessionStorage,
       },
     })
   : createMockSupabaseClient()
+
+if (hasSupabaseConfig && typeof window !== 'undefined') {
+  let deadlineSignOutPending = false
+
+  const enforceRememberDeadline = async () => {
+    if (deadlineSignOutPending || usesSessionOnlyStorage()) return
+
+    const deadline = Number(getBrowserStorage('local')?.getItem(AUTH_REMEMBER_UNTIL_KEY))
+    if (!Number.isFinite(deadline) || deadline <= 0 || Date.now() < deadline) return
+
+    deadlineSignOutPending = true
+    try {
+      await supabase.auth.signOut()
+    } finally {
+      deadlineSignOutPending = false
+    }
+  }
+
+  window.setInterval(enforceRememberDeadline, 60_000)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void enforceRememberDeadline()
+  })
+}
 
 export const brand = {
   name: import.meta.env.VITE_BRAND_NAME || 'Totsan',

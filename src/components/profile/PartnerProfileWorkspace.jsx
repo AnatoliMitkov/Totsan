@@ -1299,7 +1299,12 @@ function BannerPositionModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/60 p-3 backdrop-blur-sm sm:p-6">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/60 p-3 backdrop-blur-sm sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Редакция на банер"
+    >
       <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-line bg-paper shadow-2xl">
         <div className="flex items-center justify-between border-b border-line px-4 py-4 sm:px-6">
           <div>
@@ -2647,6 +2652,9 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
   return (
     <div
       className="fixed inset-0 z-[100] bg-ink/60 p-3 backdrop-blur-sm sm:p-5 lg:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label={draft.id ? 'Редакция на портфолио проект' : 'Нов портфолио проект'}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !isDraggingRef.current) {
           event.preventDefault()

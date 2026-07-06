@@ -239,6 +239,9 @@ export default function MediaCarousel({
       {lightboxOpen && activeImage && (
         <div
           className="fixed inset-0 z-[999] bg-ink/94 px-4 py-5 text-paper backdrop-blur-xl sm:px-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Преглед на снимка"
           onClick={() => setLightboxOpen(false)}
         >
           <button

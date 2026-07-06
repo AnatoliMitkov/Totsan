@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowRight, BarChart3, ClipboardList, CreditCard, FileClock, FolderKanban, KeyRound, Mail, MessagesSquare, PackageCheck, ScrollText, Search, ShieldCheck, Sparkles, Star, Tags, UserCog, Users, CheckCircle2, Circle, Eye, EyeOff } from 'lucide-react'
-import { brand, supabase } from '../lib/supabase.js'
+import { brand, setAuthPersistencePreference, supabase } from '../lib/supabase.js'
 import { HERO_COLLAGE, HOME_PROJECTS } from '../data/images.js'
 import { getAccountDisplayName, useAccount } from '../lib/account.js'
 
@@ -365,6 +365,7 @@ function LoginPanel() {
     setStatus('sending')
     setPendingAction(provider)
     setMessage('')
+    if (isLogin) setAuthPersistencePreference(rememberFor30Days)
 
     const loginRedirect = new URL('/login', getAuthRedirectOrigin())
     if (nextPath) loginRedirect.searchParams.set('next', nextPath)
@@ -521,6 +522,7 @@ function LoginPanel() {
 
     let result
     if (isLogin) {
+      setAuthPersistencePreference(rememberFor30Days)
       result = await supabase.auth.signInWithPassword({ email: email.trim(), password })
     } else {
       // Ролята отива в raw_user_meta_data → trigger handle_new_user я чете

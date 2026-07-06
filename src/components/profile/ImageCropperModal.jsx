@@ -237,7 +237,12 @@ export default function ImageCropperModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/60 p-3 backdrop-blur-sm sm:p-6">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/60 p-3 backdrop-blur-sm sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
       <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] border border-line bg-paper shadow-2xl">
         <div className="flex items-center justify-between border-b border-line px-4 py-4 sm:px-6">
           <div>

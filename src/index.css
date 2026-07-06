@@ -56,6 +56,12 @@ body { font-family: theme('fontFamily.sans'); font-size: var(--step-sm); line-he
     -webkit-backdrop-filter .3s ease;
 }
 
+body:has([aria-modal='true']) .site-header,
+body:has([aria-modal='true']) .mobile-nav-shell {
+  z-index: 0;
+  pointer-events: none;
+}
+
 .site-header--hero {
   border-color: rgba(255, 255, 255, 0.06);
   background:

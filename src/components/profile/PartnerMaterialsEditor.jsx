@@ -229,7 +229,12 @@ export default function PartnerMaterialsEditor({ profile }) {
       </section>
 
       {isEditorOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-ink/60 p-3 backdrop-blur-sm md:items-center md:p-6">
+        <div
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-ink/60 p-3 backdrop-blur-sm md:items-center md:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Редакция на материали и марки"
+        >
           <div className="max-h-[calc(100dvh-4rem)] w-[90vw] max-w-[1500px] overflow-hidden rounded-[32px] border border-line bg-paper shadow-2xl">
             <form onSubmit={saveCapability} className="flex h-full max-h-[92vh] flex-col">
               <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-4 md:px-7">
