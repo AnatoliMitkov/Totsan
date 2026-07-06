@@ -298,13 +298,13 @@ Deno.serve(async (req) => {
           image_y: 50,
           user_id: app.user_id,
           role: 'pro',
-          is_published: true,
+          is_published: false,
         }).select('id').single()
         if (profileError) throw profileError
         profileId = profile.id
       } else {
         const profilePayload: Record<string, unknown> = {
-          is_published: true,
+          is_published: false,
           layer_slug: app.layer_slug || 'postroyka',
           name: app.name || 'Нов специалист',
           tag: profileTag,

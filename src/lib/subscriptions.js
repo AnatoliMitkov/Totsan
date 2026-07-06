@@ -111,6 +111,79 @@ export const PARTNER_SUBSCRIPTION_PLAN_BY_KEY = PARTNER_SUBSCRIPTION_PLANS.reduc
   return map
 }, {})
 
+const PENDING_PARTNER_PLAN_STORAGE_KEY = 'totsan.pendingPartnerPlan'
+const PENDING_PARTNER_PLAN_MAX_AGE_MS = 45 * 24 * 60 * 60 * 1000
+
+export function normalizePartnerSubscriptionIntent(value = {}) {
+  const planKey = String(value?.planKey || '').trim()
+  const plan = PARTNER_SUBSCRIPTION_PLAN_BY_KEY[planKey]
+  if (!plan) return null
+
+  const expectedInterval = planKey.endsWith('_yearly') ? 'yearly' : 'monthly'
+  const billingInterval = value?.billingInterval === expectedInterval
+    ? value.billingInterval
+    : expectedInterval
+
+  return {
+    planKey,
+    billingInterval,
+    plan,
+    createdAt: Number(value?.createdAt) || Date.now(),
+  }
+}
+
+export function getPartnerSubscriptionIntentFromSearch(search = '') {
+  const params = new URLSearchParams(String(search || '').replace(/^\?/, ''))
+  return normalizePartnerSubscriptionIntent({
+    planKey: params.get('plan'),
+    billingInterval: params.get('billing'),
+  })
+}
+
+export function buildPartnerFlowPath(path, intent) {
+  const normalized = normalizePartnerSubscriptionIntent(intent)
+  if (!normalized) return path
+  const params = new URLSearchParams({
+    plan: normalized.planKey,
+    billing: normalized.billingInterval,
+  })
+  return `${path}?${params.toString()}`
+}
+
+export function savePendingPartnerSubscriptionIntent(intent) {
+  const normalized = normalizePartnerSubscriptionIntent(intent)
+  if (!normalized || typeof window === 'undefined') return normalized
+  window.localStorage.setItem(PENDING_PARTNER_PLAN_STORAGE_KEY, JSON.stringify({
+    planKey: normalized.planKey,
+    billingInterval: normalized.billingInterval,
+    createdAt: normalized.createdAt,
+  }))
+  return normalized
+}
+
+export function loadPendingPartnerSubscriptionIntent() {
+  if (typeof window === 'undefined') return null
+  try {
+    const normalized = normalizePartnerSubscriptionIntent(
+      JSON.parse(window.localStorage.getItem(PENDING_PARTNER_PLAN_STORAGE_KEY) || 'null'),
+    )
+    if (!normalized || Date.now() - normalized.createdAt > PENDING_PARTNER_PLAN_MAX_AGE_MS) {
+      window.localStorage.removeItem(PENDING_PARTNER_PLAN_STORAGE_KEY)
+      return null
+    }
+    return normalized
+  } catch {
+    window.localStorage.removeItem(PENDING_PARTNER_PLAN_STORAGE_KEY)
+    return null
+  }
+}
+
+export function clearPendingPartnerSubscriptionIntent() {
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(PENDING_PARTNER_PLAN_STORAGE_KEY)
+  }
+}
+
 export const PARTNER_SUBSCRIPTION_STATUS_LABELS = {
   inactive: 'На пауза',
   founding_free: 'Промо достъп',

@@ -3,6 +3,11 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { ArrowRight, CheckCircle2, Circle, Eye, EyeOff, KeyRound, Lightbulb, Loader2, RefreshCw, Search, ShieldCheck, Sparkles, UserRound, Wrench } from 'lucide-react'
 import { signOutAndRedirect, useAccount } from '../lib/account.js'
 import { supabase } from '../lib/supabase.js'
+import {
+  buildPartnerFlowPath,
+  getPartnerSubscriptionIntentFromSearch,
+  savePendingPartnerSubscriptionIntent,
+} from '../lib/subscriptions.js'
 
 const INPUT_CLASS = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const TERMS_REQUIRED_MESSAGE = 'Първо потвърди, че се съгласяваш с общите условия и политиката за поверителност.'
@@ -109,6 +114,15 @@ function getMailboxOptions(email = '') {
     }))
 }
 
+function safeConfirmationNextPath(value = '', accountType = 'customer') {
+  const path = String(value || '').trim()
+  const fallback = accountType === 'partner' ? '/pro/onboarding' : '/welcome'
+  if (!path.startsWith('/') || path.startsWith('//')) return fallback
+  if (accountType === 'partner' && !path.startsWith('/pro/onboarding')) return fallback
+  if (accountType !== 'partner' && path !== '/welcome') return fallback
+  return path
+}
+
 export function CheckEmailPage() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -120,7 +134,10 @@ export function CheckEmailPage() {
   const [message, setMessage] = useState('')
   const isBusy = status === 'checking' || status === 'resending'
   const normalizedCode = code.replace(/\D/g, '').slice(0, EMAIL_CODE_LENGTH)
-  const nextPath = accountType === 'partner' ? '/pro/onboarding' : '/welcome'
+  const nextPath = safeConfirmationNextPath(
+    searchParams.get('next') || location.state?.next || '',
+    accountType,
+  )
   const mailboxOptions = getMailboxOptions(email)
 
   async function verifyCode(event) {
@@ -356,7 +373,10 @@ export function PartnerOnboardingPage() {
 
 export function ProStartPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { session, account, loading } = useAccount()
+  const selectedPlanIntent = getPartnerSubscriptionIntentFromSearch(searchParams.toString())
+  const onboardingPath = buildPartnerFlowPath('/pro/onboarding', selectedPlanIntent)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -421,11 +441,14 @@ export function ProStartPage() {
     setMessage('')
 
     try {
+      if (selectedPlanIntent) {
+        savePendingPartnerSubscriptionIntent(selectedPlanIntent)
+      }
       const { error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
-          emailRedirectTo: new URL('/pro/onboarding', getAuthRedirectOrigin()).toString(),
+          emailRedirectTo: new URL(onboardingPath, getAuthRedirectOrigin()).toString(),
           data: {
             full_name: name.trim(),
             display_name: name.trim(),
@@ -452,9 +475,10 @@ export function ProStartPage() {
     const checkEmailParams = new URLSearchParams()
     checkEmailParams.set('type', 'partner')
     checkEmailParams.set('email', email.trim())
+    checkEmailParams.set('next', onboardingPath)
     navigate(`/check-email?${checkEmailParams.toString()}`, {
       replace: true,
-      state: { email: email.trim(), type: 'partner' },
+      state: { email: email.trim(), type: 'partner', next: onboardingPath },
     })
   }
 
@@ -516,6 +540,11 @@ export function ProStartPage() {
         <p className="mt-4 text-lg text-ink/80">
           След потвърждение на имейла ще продължите към кандидатурата си за партньор.
         </p>
+        {selectedPlanIntent && (
+          <div className="mt-5 rounded-2xl border border-accent/25 bg-accentSoft px-4 py-3 text-sm text-ink">
+            Избран план: <strong>{selectedPlanIntent.plan.planName}</strong>. Плащането ще бъде поискано едва след одобрение от Totsan.
+          </div>
+        )}
         <form onSubmit={submit} className="mt-8 space-y-4">
           <label className="block text-sm font-medium text-ink">
             Име / фирма

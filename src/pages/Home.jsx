@@ -1183,7 +1183,7 @@ function ProTeaser() {
             <Link to="/pro" className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep">
               Виж Totsan Pro <ArrowRight size={18} />
             </Link>
-            <Link to="/login?signup=true&role=pro" onClick={() => trackEvent('partner_application_start', { source: 'home_pro_teaser' })} className="btn btn-ghost !border-paper/25 !text-paper hover:!bg-paper/10">
+            <Link to="/pro/start" onClick={() => trackEvent('partner_application_start', { source: 'home_pro_teaser' })} className="btn btn-ghost !border-paper/25 !text-paper hover:!bg-paper/10">
               Стани партньор
             </Link>
           </div>

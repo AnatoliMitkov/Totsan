@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, BriefcaseBusiness, Camera, Check, CheckCircle2, ClipboardList, FileCheck2, ImagePlus, MapPin, Plus, ShieldCheck, Sparkles, Trash2, UserRound } from 'lucide-react'
 import { useAccount } from '../lib/account.js'
 import { supabase } from '../lib/supabase.js'
@@ -7,6 +7,10 @@ import { uploadPortfolioMedia, uploadProfileMedia } from '../lib/profile-media-u
 import TotsanSelect from '../components/ui/TotsanSelect.jsx'
 import { LocationCombobox, LocationMultiCombobox } from '../components/ui/LocationCombobox.jsx'
 import { normalizeLocationList, normalizeLocationValue } from '../lib/locations.js'
+import {
+  getPartnerSubscriptionIntentFromSearch,
+  savePendingPartnerSubscriptionIntent,
+} from '../lib/subscriptions.js'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const DRAFT_KEY_PREFIX = 'totsan.proOnboardingDraft'
@@ -196,6 +200,7 @@ function mergeSavedDraft(base, saved) {
 
 export default function ProOnboarding() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { session, account, loading } = useAccount()
   const [step, setStep] = useState(0)
   const [draft, setDraft] = useState(() => makeInitialDraft(null, null))
@@ -208,6 +213,11 @@ export default function ProOnboarding() {
   const [pulseStep, setPulseStep] = useState(null)
 
   const draftKey = session?.user?.id ? `${DRAFT_KEY_PREFIX}.${session.user.id}` : `${DRAFT_KEY_PREFIX}.guest`
+
+  useEffect(() => {
+    const intent = getPartnerSubscriptionIntentFromSearch(location.search)
+    if (intent) savePendingPartnerSubscriptionIntent(intent)
+  }, [location.search])
 
   useEffect(() => {
     if (loading) return
