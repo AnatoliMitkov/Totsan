@@ -1,4 +1,4 @@
-const DEFAULT_LOCALE = 'en-US'
+const DEFAULT_LOCALE = 'bg-BG'
 const DEFAULT_CURRENCY = 'EUR'
 export const EUR_LV_RATE = 1.95583
 
@@ -38,7 +38,14 @@ function formatNumber(value) {
 }
 
 export function currencySymbol(currency = DEFAULT_CURRENCY) {
-  return String(currency).toUpperCase() === 'BGN' ? ' лв.' : '€'
+  return String(currency).toUpperCase() === 'BGN' ? ' лв.' : ' €'
+}
+
+export function getBgnEquivalentText(amountEur) {
+  const numeric = toNumber(amountEur)
+  if (numeric === null) return ''
+  const leva = Math.round(numeric * EUR_LV_RATE * 100) / 100
+  return `≈ ${formatMoney(leva, 'BGN')}`
 }
 
 export function normalizeMoneyValue(value) {
@@ -52,8 +59,23 @@ export function formatMoney(amount, currency = DEFAULT_CURRENCY) {
   return symbol ? `${formatNumber(numeric)}${symbol}` : formatNumber(numeric)
 }
 
+export function formatEurWithBgnRange(min, max, { rate = EUR_LV_RATE } = {}) {
+  if (min === '' && max === '') return '—'
+  if (min !== '' && max !== '') {
+    const bgnMin = Math.round(Number(min) * rate * 100) / 100
+    const bgnMax = Math.round(Number(max) * rate * 100) / 100
+    return `${formatMoney(min, 'EUR')} – ${formatMoney(max, 'EUR')} · ${formatMoney(bgnMin, 'BGN')} – ${formatMoney(bgnMax, 'BGN')}`
+  }
+  if (min !== '') return `от ${formatEurWithBgn(min)}`
+  return `до ${formatEurWithBgn(max)}`
+}
+
 export function formatMoneyRange(min, max, currency = DEFAULT_CURRENCY) {
   if (min === '' && max === '') return '—'
+  if (shouldShowBgnEquivalent()) {
+    if (currency === 'BGN') return formatDualCurrencyRange(min, max)
+    if (currency === 'EUR') return formatEurWithBgnRange(min, max)
+  }
   if (min !== '' && max !== '') return `${formatMoney(min, currency)} – ${formatMoney(max, currency)}`
   if (min !== '') return `от ${formatMoney(min, currency)}`
   return `до ${formatMoney(max, currency)}`
@@ -105,7 +127,19 @@ export function formatMoneyText(value) {
     .replace(/(?:от|до)?\s*(\d[\d.,\s]*)\s*[-–]\s*(\d[\d.,\s]*)\s*(EUR|BGN|€|лв\.?|лв|lv\.?)\b/giu, (match, min, max, currencyToken) => {
       const currency = currencyFromToken(currencyToken)
       const prefix = match.trimStart().startsWith('до') ? 'до ' : match.trimStart().startsWith('от') ? 'от ' : ''
+      if (shouldShowBgnEquivalent()) {
+        if (currency === 'BGN') return `${prefix}${formatDualCurrencyRange(min, max)}`
+        // If EUR, we need a formatEurWithBgnRange (which we'll implement or just formatMoneyRange handles it if we update formatMoneyRange)
+        return `${prefix}${formatMoneyRange(min, max, currency)}`
+      }
       return `${prefix}${formatMoneyRange(min, max, currency)}`
     })
-    .replace(/(\d[\d.,\s]*)\s*(EUR|BGN|€|лв\.?|лв|lv\.?)\b/giu, (_, amount, currencyToken) => formatMoney(amount, currencyFromToken(currencyToken)))
+    .replace(/(\d[\d.,\s]*)\s*(EUR|BGN|€|лв\.?|лв|lv\.?)\b/giu, (_, amount, currencyToken) => {
+      const currency = currencyFromToken(currencyToken)
+      if (shouldShowBgnEquivalent()) {
+        if (currency === 'BGN') return formatDualCurrency(amount)
+        return formatEurWithBgn(amount)
+      }
+      return formatMoney(amount, currency)
+    })
 }

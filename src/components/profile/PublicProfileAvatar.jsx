@@ -1,3 +1,5 @@
+import { getProfileAvatarVariant } from '../../lib/profiles.js'
+
 export default function PublicProfileAvatar({
   src = '',
   alt = '',
@@ -9,15 +11,17 @@ export default function PublicProfileAvatar({
   fallbackClassName = 'bg-gradient-to-br from-accentSoft via-paper to-cloud text-accentDeep',
   sizeClassName = 'h-32 w-32',
   statusClassName = 'bottom-1 right-1 h-5 w-5 border-4',
+  variant = 'profile',
 }) {
   const FallbackIcon = fallbackIcon
   const initials = getInitials(name || alt)
+  const resolvedSrc = getProfileAvatarVariant(src, variant)
 
   return (
     <div className="relative group">
-      {src ? (
+      {resolvedSrc ? (
         <div className={`${sizeClassName} overflow-hidden rounded-3xl border-4 border-paper bg-paper shadow-md transition-transform duration-300 group-hover:scale-[1.02]`}>
-          <img src={src} alt={alt} className={imageClassName} style={imageStyle} />
+          <img src={resolvedSrc} alt={alt} className={imageClassName} style={imageStyle} />
         </div>
       ) : (
         <div className={`flex ${sizeClassName} items-center justify-center rounded-3xl border-4 border-paper shadow-md transition-transform duration-300 group-hover:scale-[1.02] ${fallbackClassName}`}>

@@ -32,7 +32,7 @@ import {
   X,
 } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
-import { uploadProfileMedia, uploadProfileCover } from '../../lib/profile-media-upload-client.js'
+import { uploadProfileMedia, uploadProfileCover, resizeImageToSize } from '../../lib/profile-media-upload-client.js'
 import { getProfileImageStyle, isMissingLayer01MetaColumn, normalizeProfile, PROFILE_SELECT_COLUMNS_BASE, PROFILE_SELECT_COLUMNS_WITH_LAYER01 } from '../../lib/profiles.js'
 import { supabase } from '../../lib/supabase.js'
 import { getAccountDisplayName } from '../../lib/account.js'
@@ -83,14 +83,6 @@ const COMPACT_INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-3 
 const MAX_BANNER_BYTES = 12 * 1024 * 1024
 const PROFILE_BIO_LIMIT = 300
 const PROFILE_DESCRIPTION_LIMIT = 500
-const PROFILE_PRICING_LIMIT = 300
-const PRICE_UNIT_OPTIONS = [
-  { value: 'sqm', label: 'на квадратен метър', suffix: 'м²' },
-  { value: 'hour', label: 'на час', suffix: 'час' },
-  { value: 'linear_meter', label: 'на линеен метър', suffix: 'л.м.' },
-  { value: 'day', label: 'на ден', suffix: 'ден' },
-  { value: 'project', label: 'на проект', suffix: 'проект' },
-]
 const SUPPORTED_PROFILE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const BANNER_DESCRIPTION = 'Широк банер работи най-добре около 3:1. Препоръчваме 1600 x 520 px за най-чист резултат.'
 
@@ -109,38 +101,6 @@ function readFileAsDataUrl(file) {
     reader.onerror = () => reject(new Error('Файлът не може да бъде прочетен.'))
     reader.readAsDataURL(file)
   })
-}
-
-function normalizePriceInput(value) {
-  return String(value || '')
-    .replace(',', '.')
-    .replace(/[^\d.]/g, '')
-    .replace(/(\..*)\./g, '$1')
-}
-
-function getPriceUnit(value) {
-  return PRICE_UNIT_OPTIONS.find((option) => option.value === value) || PRICE_UNIT_OPTIONS[0]
-}
-
-function detectPriceUnit(value) {
-  const text = String(value || '').toLowerCase()
-  if (text.includes('л.м') || text.includes('лине')) return 'linear_meter'
-  if (text.includes('час')) return 'hour'
-  if (text.includes('ден')) return 'day'
-  if (text.includes('проект')) return 'project'
-  return 'sqm'
-}
-
-function parsePriceGuide(value) {
-  const text = String(value || '')
-  const amount = normalizePriceInput(text.match(/\d+(?:[.,]\d+)?/)?.[0] || '')
-  return { amount, unit: detectPriceUnit(text) }
-}
-
-function formatPriceGuide(amount, unit) {
-  const normalizedAmount = normalizePriceInput(amount)
-  if (!normalizedAmount) return ''
-  return `${normalizedAmount}€/${getPriceUnit(unit).suffix}`
 }
 
 function stripCacheBust(url) {
@@ -399,8 +359,10 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
 
   async function saveAvatarAndProfile(croppedFile, cropInfo = {}) {
     closeAvatarEditor()
-    if (cropInfo.originalFile) {
-      await uploadAvatar(cropInfo.originalFile, cropInfo.displayCrop)
+    // Always upload the cropped image directly to ensure clean 512x512 output
+    // and reset the zoom/position coordinates since the image is already cropped.
+    if (croppedFile) {
+      await uploadAvatar(croppedFile, { imageZoom: 1, imageX: 50, imageY: 50 })
       return
     }
 
@@ -408,8 +370,6 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       await saveAvatarPosition(cropInfo.displayCrop)
       return
     }
-
-    await uploadAvatar(croppedFile, cropInfo.displayCrop)
   }
 
   useEffect(() => {
@@ -730,9 +690,23 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       const nextImageZoom = Number.isFinite(Number(displayCrop?.imageZoom)) ? Number(displayCrop.imageZoom) : 1
       const nextImageX = Number.isFinite(Number(displayCrop?.imageX)) ? Number(displayCrop.imageX) : 50
       const nextImageY = Number.isFinite(Number(displayCrop?.imageY)) ? Number(displayCrop.imageY) : 50
-      const result = await uploadProfileMedia({ file, target: userId })
-      const nextImageUrl = result.publicUrl || result.signedUrl || ''
-      if (!nextImageUrl) throw new Error('Снимката е качена, но липсва валиден адрес.')
+
+      // Generate variants client-side
+      const [cardFile, tinyFile] = await Promise.all([
+        resizeImageToSize(file, 256, 0.90),
+        resizeImageToSize(file, 96, 0.90),
+      ])
+
+      // Upload concurrently to edge function
+      const [result] = await Promise.all([
+        uploadProfileMedia({ file, target: userId }),
+        uploadProfileMedia({ file: cardFile, target: userId, variant: 'card' }),
+        uploadProfileMedia({ file: tinyFile, target: userId, variant: 'tiny' }),
+      ])
+
+      const nextImageUrlRaw = result.publicUrl || result.signedUrl || ''
+      if (!nextImageUrlRaw) throw new Error('Снимката е качена, но липсва валиден адрес.')
+      const nextImageUrl = `${nextImageUrlRaw.split('?')[0]}?v=${Date.now()}`
       updateProfile('imageUrl', nextImageUrl)
       updateProfile('imageZoom', nextImageZoom)
       updateProfile('imageX', nextImageX)
@@ -1129,7 +1103,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
 
             {activeTab === 'layer01' && profileDraft.layerSlug === 'ideya' && (
               <form onSubmit={saveProfile} className="space-y-5">
-                <Layer01SpecEditor draft={profileDraft.layer01Meta} onChange={updateLayer01} />
+                <Layer01SpecEditor draft={profileDraft.layer01Meta} onChange={updateLayer01} profileDraft={profileDraft} onProfileChange={updateProfile} />
                 <SavePanel
                   state={saveState}
                   idleMessage="Промените в Слой 01 се пазят след запис на профила."
@@ -2022,23 +1996,9 @@ function ProfileForm({
 }) {
   const bioLength = String(draft.bio || '').length
   const descriptionLength = String(draft.descriptionLong || '').length
-  const priceGuide = parsePriceGuide(draft.pricingNote)
 
   function updateLimitedText(key, value, limit) {
     onChange(key, String(value || '').slice(0, limit))
-  }
-
-  function updateRemotePrice(value) {
-    const normalized = String(value || '')
-      .replace(',', '.')
-      .replace(/[^\d.]/g, '')
-      .replace(/(\..*)\./g, '$1')
-    onChange('remotePricePerHour', normalized)
-    if (normalized) onChange('remoteIsFree', false)
-  }
-
-  function updatePriceGuide(nextAmount = priceGuide.amount, nextUnit = priceGuide.unit) {
-    onChange('pricingNote', formatPriceGuide(nextAmount, nextUnit).slice(0, PROFILE_PRICING_LIMIT))
   }
 
   return (
@@ -2084,7 +2044,10 @@ function ProfileForm({
 
         <div className="grid gap-4 xl:grid-cols-2">
           <Field label={<FieldLabelWithCounter label="Кратко позициониране" count={bioLength} limit={PROFILE_BIO_LIMIT} />}>
-            <textarea rows={4} maxLength={PROFILE_BIO_LIMIT} value={draft.bio} onChange={event => updateLimitedText('bio', event.target.value, PROFILE_BIO_LIMIT)} className={`${INPUT} min-h-32 resize-y`} placeholder="Обяснете с едно-две изречения за какви клиенти и проекти сте най-подходящи." />
+            <textarea rows={4} maxLength={PROFILE_BIO_LIMIT} value={draft.bio} onChange={event => updateLimitedText('bio', event.target.value, PROFILE_BIO_LIMIT)} className={`${INPUT} min-h-32 resize-y`} placeholder="Напишете с 1–2 изречения с какво помагате на клиентите. Например: „Помагам с интериорни концепции, разпределения и 3D визуализации за жилища.“" />
+            <p className="mt-2 text-xs font-normal text-muted">
+              Това описание се вижда публично. Използвайте само вярна информация.
+            </p>
           </Field>
           <Field label={<FieldLabelWithCounter label="С какво може да помогнете" count={descriptionLength} limit={PROFILE_DESCRIPTION_LIMIT} />}>
             <textarea rows={4} maxLength={PROFILE_DESCRIPTION_LIMIT} value={draft.descriptionLong} onChange={event => updateLimitedText('descriptionLong', event.target.value, PROFILE_DESCRIPTION_LIMIT)} className={`${INPUT} min-h-32 resize-y`} placeholder="Опишете конкретните задачи, услуги и тип обекти, с които помагате." />
@@ -2140,104 +2103,7 @@ function ProfileForm({
         </div>
       </ProfileSection>
 
-      <ProfileSection number="4" icon={CreditCard} title="Ценови ориентир и допълнителни настройки">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(18rem,1fr)]">
-          <div className="rounded-2xl border border-line bg-paper p-5 shadow-[0_14px_38px_rgba(13,35,64,0.06)]">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="text-base font-semibold leading-6 text-ink">Ценови ориентир</div>
-                <p className="mt-1 text-sm leading-6 text-muted">Въведете стартова стойност и база, по която обикновено калкулирате.</p>
-              </div>
-            </div>
-            <div className="mt-4 grid items-end gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(13rem,0.85fr)]">
-              <label className="flex min-w-0 flex-col">
-                <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted">Стартова цена</span>
-                <span className="relative mt-2 block h-[3.05rem]">
-                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-base font-semibold text-ink">€</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={priceGuide.amount}
-                    onChange={event => updatePriceGuide(event.target.value, priceGuide.unit)}
-                    className={`${INPUT} !mt-0 h-full w-full pl-10`}
-                    placeholder="80"
-                  />
-                </span>
-              </label>
-              <div className="flex min-w-0 flex-col">
-                <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted">База</span>
-                <div className="mt-2 h-[3.05rem]">
-                  <TotsanSelect
-                    value={priceGuide.unit}
-                    onChange={(value) => updatePriceGuide(priceGuide.amount, value)}
-                    options={PRICE_UNIT_OPTIONS.map(({ value, label }) => ({ value, label }))}
-                    className="h-full"
-                    buttonClassName="h-full min-h-0"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-line bg-paper p-5 shadow-[0_14px_38px_rgba(13,35,64,0.06)]">
-            <label className="flex cursor-pointer items-start gap-4">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-line bg-soft">
-                <img src="/svg/Asset%201.svg" alt="" className="h-7 w-7 object-contain" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-start justify-between gap-3">
-                  <span className="text-base font-semibold leading-6 text-ink">Дистанционни консултации</span>
-                  <input
-                    type="checkbox"
-                    checked={draft.acceptsRemote}
-                    onChange={event => {
-                      onChange('acceptsRemote', event.target.checked)
-                      if (!event.target.checked) {
-                        onChange('remoteIsFree', false)
-                        onChange('remotePricePerHour', '')
-                      }
-                    }}
-                    className="mt-1 h-4 w-4 rounded accent-black"
-                  />
-                </span>
-                <span className="mt-1 block text-sm leading-6 text-muted">Покажете дали предлагате разговор от разстояние и какъв е ориентирът на час.</span>
-              </span>
-            </label>
 
-            <div className={`mt-4 grid gap-3 border-t border-line/60 pt-4 transition ${draft.acceptsRemote ? 'opacity-100' : 'pointer-events-none opacity-45'}`}>
-              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-line bg-soft/65 px-4 py-3 text-sm text-ink">
-                <span className="font-medium">Безплатна консултация</span>
-                <input
-                  type="checkbox"
-                  checked={draft.remoteIsFree}
-                  disabled={!draft.acceptsRemote}
-                  onChange={event => {
-                    onChange('remoteIsFree', event.target.checked)
-                    if (event.target.checked) onChange('remotePricePerHour', '')
-                  }}
-                  className="h-4 w-4 rounded accent-black disabled:opacity-50"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted">Цена на час</span>
-                <span className="relative mt-2 block">
-                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-base font-semibold text-ink">€</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={draft.remotePricePerHour}
-                    disabled={!draft.acceptsRemote || draft.remoteIsFree}
-                    onChange={event => updateRemotePrice(event.target.value)}
-                    className={`${INPUT} w-full pl-10 pr-20 disabled:bg-soft disabled:text-muted`}
-                    placeholder="80"
-                  />
-                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted">/ час</span>
-                </span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </ProfileSection>
 
       <FloatingSaveBar
         state={saveState}

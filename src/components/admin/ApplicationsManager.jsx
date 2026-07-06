@@ -163,6 +163,7 @@ function ApplicationDetailsModal({ row, onClose }) {
   const proof = details.proof || {}
   const presentation = details.presentation || {}
   const basic = details.basic || {}
+  const legalProfile = details.legalProfile || {}
   const category = getCategoryLabel(row, details)
   const areaChips = splitTextList(areas.nearbyPlaces)
   const outsideCity = getOutsideCityValue(details, areas)
@@ -243,7 +244,9 @@ function ApplicationDetailsModal({ row, onClose }) {
             <Rows rows={[
               ['Основен град', areas.primaryCity],
               ['Приема проекти извън града', formatOutsideDecision(areas.outsideCityDecision) || formatBoolean(outsideCity)],
-              ['Радиус на работа', outsideCity ? areas.radius : ''],
+              ['Цялата страна', areas.worksNationwide ? 'Да' : ''],
+              ['Извън страната', areas.worksAbroad ? 'Да' : ''],
+              ['Радиус на работа', outsideCity && !areas.worksNationwide ? areas.radius : ''],
               ['Ограничава се до конкретни райони', formatBoolean(areas.limitToSpecificAreas)],
             ]} hideEmpty={areaChips.length > 0} />
             <TitledChips title="Райони / населени места" values={areaChips} />
@@ -270,6 +273,42 @@ function ApplicationDetailsModal({ row, onClose }) {
               ['Предпочитан тип проекти', cleanPresentationValue('Предпочитан тип проекти', presentation.preferredProjects)],
               ['Какво не приема', cleanPresentationValue('Какво не приема', presentation.rejectedProjects)],
             ]} />
+          </DetailSection>
+
+          <DetailSection title="Договори и фактури">
+            {!legalProfile.legalProfileType && <div className="text-sm text-muted">Няма въведени данни</div>}
+            {legalProfile.legalProfileType === 'individual' && (
+              <Rows rows={[
+                ['Тип лице', 'Физическо лице'],
+                ['Три имена', legalProfile.legalFullName],
+                ['Адрес', legalProfile.documentAddress],
+                ['Имейл', legalProfile.contactEmail],
+                ['Телефон', legalProfile.contactPhone],
+              ]} />
+            )}
+            {legalProfile.legalProfileType === 'company' && (
+              <Rows rows={[
+                ['Тип лице', 'Фирма (ЕООД/ООД)'],
+                ['Наименование', legalProfile.companyLegalName],
+                ['ЕИК / Булстат', legalProfile.eikBulstat],
+                ['Адрес', legalProfile.registeredAddress],
+                ['МОЛ / Управител', legalProfile.contactPersonName],
+                ['Имейл', legalProfile.contactEmail],
+                ['Телефон', legalProfile.contactPhone],
+                ['ЗДДС', legalProfile.vatRegistered ? `Да (${legalProfile.vatNumber})` : 'Не'],
+              ]} />
+            )}
+            {legalProfile.legalProfileType === 'sole_trader' && (
+              <Rows rows={[
+                ['Тип лице', 'Едноличен търговец (ЕТ)'],
+                ['Наименование', legalProfile.legalName],
+                ['ЕИК / Булстат', legalProfile.bulstat],
+                ['Адрес', legalProfile.documentAddress],
+                ['Имейл', legalProfile.contactEmail],
+                ['Телефон', legalProfile.contactPhone],
+                ['ЗДДС', legalProfile.vatRegistered ? `Да (${legalProfile.vatNumber})` : 'Не'],
+              ]} />
+            )}
           </DetailSection>
         </div>
       </div>

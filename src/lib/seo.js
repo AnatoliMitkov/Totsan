@@ -270,7 +270,7 @@ export function buildPersonSchema(profile, path) {
     '@context': 'https://schema.org',
     '@type': 'Person',
     name: profile?.name,
-    description: profile?.headline || profile?.descriptionLong || profile?.bio || undefined,
+    description: profile?.headline || profile?.descriptionLong || profile?.displayBio || undefined,
     image: profile?.imageUrl || profile?.image_url || undefined,
     jobTitle: profile?.tag || undefined,
     url: toAbsoluteUrl(path),

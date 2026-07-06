@@ -56,7 +56,7 @@ async function createCroppedImageBlob(imageSrc, pixelCrop, outputWidth, outputHe
         return
       }
       resolve(blob)
-    }, 'image/jpeg', 0.92)
+    }, 'image/webp', 0.90)
   })
 }
 
@@ -206,12 +206,19 @@ export default function ImageCropperModal({
   async function handleSave() {
     if (!hasImage || !croppedAreaPixels) return
 
+    // Avoid double compression if editing existing image without changing zoom/position
+    if (!file && zoom === 1 && crop.x === 0 && crop.y === 0) {
+      onClose()
+      return
+    }
+
     setIsSaving(true)
     setError('')
     let shouldClose = false
     try {
       const croppedBlob = await createCroppedImageBlob(imageSrc, croppedAreaPixels, outputWidth, outputHeight)
-      const croppedFile = new File([croppedBlob], fileName || 'avatar.jpg', { type: 'image/jpeg' })
+      const webpFileName = (fileName || 'avatar.jpg').replace(/\.[^.]+$/, '') + '.webp'
+      const croppedFile = new File([croppedBlob], webpFileName, { type: 'image/webp' })
       await saveHandler?.(croppedFile, {
         originalFile: file instanceof File ? file : null,
         croppedAreaPixels,
@@ -281,11 +288,19 @@ export default function ImageCropperModal({
           </div>
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <label className="btn btn-ghost w-full cursor-pointer justify-center sm:w-auto">
-              <Upload size={18} />
-              Качи нова
-              <input type="file" accept=".jpg,.jpeg,.png,.webp" className="sr-only" onChange={handleFileChange} disabled={isSaving} />
-            </label>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="btn btn-ghost w-full cursor-pointer justify-center sm:w-auto">
+                <Upload size={18} />
+                Качи нова
+                <input type="file" accept=".jpg,.jpeg,.png,.webp" className="sr-only" onChange={handleFileChange} disabled={isSaving} />
+              </label>
+
+              {hasImage && naturalSize && (naturalSize.width < 512 || naturalSize.height < 512) && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
+                  ⚠️ Снимката е с малък размер ({naturalSize.width}x{naturalSize.height} px). Препоръчваме поне 512x512 px.
+                </div>
+              )}
+            </div>
 
             {error && (
               <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

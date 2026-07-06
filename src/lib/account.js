@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase.js'
 import { loadMfaStatus } from './mfa.js'
 
@@ -183,7 +183,7 @@ export function useAccount() {
     }
   }, [])
 
-  async function refresh() {
+  const refresh = useCallback(async (broadcast = true) => {
     const { data } = await supabase.auth.getSession()
     sessionRef.current = {
       signInAt: data.session?.user?.last_sign_in_at || '',
@@ -222,7 +222,21 @@ export function useAccount() {
     }
     setAccount(nextAccount)
     setAccountLoading(false)
-  }
+
+    if (broadcast) {
+      window.dispatchEvent(new CustomEvent('totsan-account-updated'))
+    }
+  }, [])
+
+  useEffect(() => {
+    function handleAccountUpdate() {
+      refresh(false)
+    }
+    window.addEventListener('totsan-account-updated', handleAccountUpdate)
+    return () => {
+      window.removeEventListener('totsan-account-updated', handleAccountUpdate)
+    }
+  }, [refresh])
 
   async function refreshMfa() {
     const mfaStatus = await loadMfaStatus()

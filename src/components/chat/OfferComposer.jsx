@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Trash2, X } from 'lucide-react'
+import { getBgnEquivalentText } from '../../lib/money.js'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 
@@ -197,21 +198,28 @@ export default function OfferComposer({ open, onClose, onSubmit, status }) {
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Обща цена">
-              <div className="relative mt-2">
-                <input
-                  type="number"
-                  min="0"
-                  inputMode="decimal"
-                  value={draft.priceAmount}
-                  onChange={(event) => set('priceAmount', event.target.value)}
-                  className={`${INPUT} pr-12`}
-                />
-                <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm font-semibold text-muted">
-                  €
-                </span>
-              </div>
-            </Field>
+            <div>
+              <Field label="Обща цена (€)">
+                <div className="relative mt-2">
+                  <input
+                    type="number"
+                    min="0"
+                    inputMode="decimal"
+                    value={draft.priceAmount}
+                    onChange={(event) => set('priceAmount', event.target.value)}
+                    className={`${INPUT} pr-12`}
+                  />
+                  <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm font-semibold text-muted">
+                    €
+                  </span>
+                </div>
+              </Field>
+              {Number(draft.priceAmount) > 0 && (
+                <div className="mt-2 text-xs text-muted">
+                  Ще се показва като {draft.priceAmount} € / {getBgnEquivalentText(draft.priceAmount).replace('≈ ', '')}
+                </div>
+              )}
+            </div>
             <Field label="Дни">
               <input type="number" min="0" value={draft.deliveryDays} onChange={(event) => set('deliveryDays', event.target.value)} className={INPUT} />
             </Field>

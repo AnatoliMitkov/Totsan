@@ -27,6 +27,7 @@ import PortfolioGallery from '../components/profile/PortfolioGallery.jsx'
 import PublicProfileBanner from '../components/profile/PublicProfileBanner.jsx'
 import PublicProfilePanel from '../components/profile/PublicProfilePanel.jsx'
 import ReviewsList from '../components/reviews/ReviewsList.jsx'
+import { formatEurWithBgn } from '../lib/money.js'
 import { getPageLocation, trackEvent, trackPageView } from '../lib/analytics.js'
 import { buildBreadcrumbSchema, buildPersonSchema, useSeo } from '../lib/seo.js'
 
@@ -371,7 +372,7 @@ export default function Pro() {
   const inquiryStartLabel = getInquiryStartLabel(layer)
   const offerTimingLabel = getOfferTimingLabel(layer)
   const aiFitSummary = normalizeAiFitSummary(item.aiFitSummary)
-  const aboutText = compactText(item.descriptionLong || item.bio)
+  const aboutText = compactText(item.descriptionLong || item.displayBio)
   const showAboutText = aboutText && compactText(aboutText) !== compactText(aiFitSummary?.summary || helpText)
   const responseLabel = formatResponseLabel(stats?.response_time_hours ?? item.responseTimeHours)
   const reviewCount = Number(stats?.reviews_count || 0)
@@ -434,7 +435,7 @@ export default function Pro() {
                   <div className="flex flex-col items-center text-center">
                     <div className="relative group">
                       <div className="w-32 h-32 rounded-3xl overflow-hidden border-4 border-paper bg-paper shadow-md transition-transform duration-300 group-hover:scale-[1.02]">
-                        <img src={getProfileImage(item)} alt={item.name} className="img-cover" style={getProfileImageStyle(item)} />
+                        <img src={getProfileImage(item, 'profile')} alt={item.name} className="img-cover" style={getProfileImageStyle(item)} />
                       </div>
                       <span className="absolute bottom-1 right-1 flex h-5 w-5 rounded-full border-4 border-paper bg-trustGreen" title="Онлайн в Totsan" />
                     </div>
@@ -545,7 +546,7 @@ export default function Pro() {
                   <div className="text-right">
                     <div className="text-[10px] font-bold uppercase tracking-wider text-muted">Такса за консултация</div>
                     <div className="font-display text-3xl font-bold text-accentDeep mt-1">
-                      {Number(layer01Meta.consultation_fee) === 0 ? 'Безплатна' : `${Number(layer01Meta.consultation_fee)} лв.`}
+                      {Number(layer01Meta.consultation_fee) === 0 ? 'Безплатна' : formatEurWithBgn(layer01Meta.consultation_fee)}
                     </div>
                   </div>
                 </div>
@@ -598,6 +599,7 @@ function countLabel(count, singular, plural) {
 }
 
 function ProfileTrustSignals({
+  profile,
   responseLabel,
   serviceAreaLabel,
   serviceCount,
@@ -610,10 +612,13 @@ function ProfileTrustSignals({
 }) {
   const signals = [
     { key: 'verified', label: 'Проверен профил', icon: ShieldCheck },
-    { key: 'area', label: `Работи в ${serviceAreaLabel}`, icon: MapPin },
+    { key: 'since', label: `В Totsan от ${profile?.since || new Date().getFullYear()} г.`, icon: CheckCircle2 },
+    { key: 'area', label: `Обслужва: ${serviceAreaLabel}`, icon: MapPin },
     { key: 'response', label: responseLabel, icon: Clock },
     serviceCount > 0 ? { key: 'services', label: countLabel(serviceCount, 'услуга', 'услуги'), icon: BriefcaseBusiness, onClick: onServicesClick } : null,
-    projectCount > 0 ? { key: 'projects', label: countLabel(projectCount, 'проект в портфолиото', 'проекта в портфолиото'), icon: FileCheck2, onClick: onProjectsClick } : null,
+    projectCount > 0 
+      ? { key: 'projects', label: countLabel(projectCount, 'проект в портфолиото', 'проекта в портфолиото'), icon: FileCheck2, onClick: onProjectsClick } 
+      : { key: 'projects', label: 'Няма добавени проекти в Totsan', icon: FileCheck2 },
     reviewCount > 0 ? { key: 'reviews', label: `${Number(averageRating || 0).toFixed(1)} оценка от ${countLabel(reviewCount, 'отзив', 'отзива')}`, icon: UserCheck, onClick: onReviewsClick } : null,
   ].filter(Boolean)
 

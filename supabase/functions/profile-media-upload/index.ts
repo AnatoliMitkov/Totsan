@@ -124,7 +124,8 @@ serve(async (req: Request) => {
 
     if (isProfileImagePurpose) {
       bucket = "profile-images"
-      filename = `main.${extension}`
+      const variant = sanitizeSegment(String(formData.get("variant") || ""), "")
+      filename = variant ? `main-${variant}.${extension}` : `main.${extension}`
       path = `${target}/${purpose}/${filename}`
       upsert = true
     } else {

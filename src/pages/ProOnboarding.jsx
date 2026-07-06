@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, BriefcaseBusiness, Camera, Check, CheckCircle2, ClipboardList, FileCheck2, ImagePlus, MapPin, Plus, ShieldCheck, Sparkles, Trash2, UserRound } from 'lucide-react'
+import { ArrowLeft, ArrowRight, BriefcaseBusiness, Camera, Check, CheckCircle2, ClipboardList, FileCheck2, FileText, ImagePlus, MapPin, Plus, ShieldCheck, Sparkles, Trash2, UserRound } from 'lucide-react'
 import { useAccount } from '../lib/account.js'
 import { supabase } from '../lib/supabase.js'
 import { uploadPortfolioMedia, uploadProfileMedia } from '../lib/profile-media-upload-client.js'
@@ -36,6 +36,7 @@ const STEPS = [
   { title: 'Как работите', icon: ClipboardList },
   { title: 'Доказателства', icon: ShieldCheck },
   { title: 'Как да ви представим', icon: Sparkles },
+  { title: 'Оферти и документи', icon: FileText },
   { title: 'Преглед', icon: FileCheck2 },
 ]
 
@@ -54,7 +55,7 @@ const REQUIRED_FIELDS = [
   [
     { key: 'primaryCity', isComplete: draft => Boolean(draft.primaryCity.trim()), message: 'Добавете основен град.' },
     { key: 'outsideCityDecision', isComplete: draft => Boolean(draft.outsideCityDecision), message: 'Изберете дали приемате проекти извън града.' },
-    { key: 'workRadius', isComplete: draft => draft.outsideCityDecision !== 'yes' || Boolean(draft.workRadius.trim()), message: 'Добавете радиус на работа.' },
+    { key: 'workRadius', isComplete: draft => draft.outsideCityDecision !== 'yes' || draft.worksNationwide || Boolean(draft.workRadius.trim()), message: 'Добавете радиус на работа.' },
     { key: 'serviceAreas', isComplete: draft => !draft.limitToSpecificAreas || Boolean(draft.serviceAreas.trim()), message: 'Добавете конкретни райони.' },
   ],
   [
@@ -67,6 +68,7 @@ const REQUIRED_FIELDS = [
     { key: 'intro', isComplete: draft => Boolean(draft.intro.trim()), message: 'Добавете кратко професионално представяне.' },
     { key: 'strongestOrPreferred', isComplete: draft => Boolean(draft.strongestServices.trim() || draft.preferredProjects.trim()), message: 'Добавете най-силни услуги или предпочитан тип проекти.' },
   ],
+  [],  // index 6 — Оферти и документи (optional, does not block submission)
 ]
 
 function getStepCompletion(draft, index) {
@@ -90,6 +92,7 @@ function isStepStarted(draft, index) {
   if (index === 3) return Boolean(draft.workStyle.length || draft.customWorkStyleEnabled || draft.customWorkStyle.trim())
   if (index === 4) return draft.proofProjects.length > 0
   if (index === 5) return Boolean(draft.intro.trim() || draft.strongestServices.trim() || draft.preferredProjects.trim() || draft.rejectedProjects.trim())
+  if (index === 6) return Boolean(draft.legalProfileType)
   return false
 }
 
@@ -126,6 +129,64 @@ function getOverallProgress(draft) {
   return Math.round((complete / allFields.length) * 100)
 }
 
+const LEGAL_PROFILE_TYPE_LABELS = {
+  individual: 'Физическо лице',
+  company: 'Фирма',
+  sole_trader: 'ЕТ / свободна професия',
+}
+
+function computeLegalInfoStatus(draft) {
+  const type = draft.legalProfileType
+  if (!type) return 'missing'
+  if (type === 'individual') {
+    const filled = Boolean(
+      draft.legalFullName.trim() &&
+      draft.legalContactEmail.trim() &&
+      draft.legalContactPhone.trim() &&
+      draft.legalDocumentAddress.trim()
+    )
+    return filled ? 'complete' : 'incomplete'
+  }
+  if (type === 'company') {
+    const filled = Boolean(
+      draft.companyLegalName.trim() &&
+      draft.companyEikBulstat.trim() &&
+      draft.companyRegisteredAddress.trim() &&
+      draft.companyContactEmail.trim() &&
+      draft.companyContactPhone.trim()
+    )
+    const vatOk = !draft.companyVatRegistered || Boolean(draft.companyVatNumber.trim())
+    return filled && vatOk ? 'complete' : 'incomplete'
+  }
+  if (type === 'sole_trader') {
+    const filled = Boolean(
+      draft.soleTraderLegalName.trim() &&
+      draft.soleTraderBulstat.trim() &&
+      draft.soleTraderContactEmail.trim() &&
+      draft.soleTraderContactPhone.trim() &&
+      draft.soleTraderDocumentAddress.trim()
+    )
+    const vatOk = !draft.soleTraderVatRegistered || Boolean(draft.soleTraderVatNumber.trim())
+    return filled && vatOk ? 'complete' : 'incomplete'
+  }
+  return 'missing'
+}
+
+function buildLegalProfilePayload(draft) {
+  const type = draft.legalProfileType
+  const base = { legalProfileType: type, legalInfoStatus: computeLegalInfoStatus(draft) }
+  if (type === 'individual') {
+    return { ...base, legalFullName: draft.legalFullName.trim(), contactEmail: draft.legalContactEmail.trim(), contactPhone: draft.legalContactPhone.trim(), documentAddress: draft.legalDocumentAddress.trim(), city: draft.legalCity.trim(), region: draft.legalRegion.trim(), vatRegistered: draft.legalVatRegistered }
+  }
+  if (type === 'company') {
+    return { ...base, companyLegalName: draft.companyLegalName.trim(), eikBulstat: draft.companyEikBulstat.trim(), registeredAddress: draft.companyRegisteredAddress.trim(), contactPersonName: draft.companyContactPersonName.trim(), contactEmail: draft.companyContactEmail.trim(), contactPhone: draft.companyContactPhone.trim(), vatRegistered: draft.companyVatRegistered, vatNumber: draft.companyVatNumber.trim() }
+  }
+  if (type === 'sole_trader') {
+    return { ...base, legalName: draft.soleTraderLegalName.trim(), bulstat: draft.soleTraderBulstat.trim(), documentAddress: draft.soleTraderDocumentAddress.trim(), contactEmail: draft.soleTraderContactEmail.trim(), contactPhone: draft.soleTraderContactPhone.trim(), vatRegistered: draft.soleTraderVatRegistered, vatNumber: draft.soleTraderVatNumber.trim() }
+  }
+  return base
+}
+
 function makeInitialDraft(account, session) {
   const email = session?.user?.email || account?.email || ''
   const accountName = getPartnerAccountName(account, session)
@@ -147,6 +208,8 @@ function makeInitialDraft(account, session) {
     limitToSpecificAreas: false,
     acceptsOutsideCity: false,
     outsideCityDecision: '',
+    worksNationwide: false,
+    worksAbroad: false,
     workStyle: [],
     customWorkStyleEnabled: false,
     customWorkStyle: '',
@@ -165,6 +228,29 @@ function makeInitialDraft(account, session) {
     strongestServices: '',
     preferredProjects: '',
     rejectedProjects: '',
+    legalProfileType: '',
+    legalFullName: '',
+    legalContactEmail: '',
+    legalContactPhone: '',
+    legalDocumentAddress: '',
+    legalCity: '',
+    legalRegion: '',
+    legalVatRegistered: false,
+    companyLegalName: '',
+    companyEikBulstat: '',
+    companyRegisteredAddress: '',
+    companyContactPersonName: '',
+    companyContactEmail: '',
+    companyContactPhone: '',
+    companyVatRegistered: false,
+    companyVatNumber: '',
+    soleTraderLegalName: '',
+    soleTraderBulstat: '',
+    soleTraderDocumentAddress: '',
+    soleTraderContactEmail: '',
+    soleTraderContactPhone: '',
+    soleTraderVatRegistered: false,
+    soleTraderVatNumber: '',
     email,
   }
 }
@@ -490,6 +576,8 @@ export default function ProOnboarding() {
         limitToSpecificAreas: draft.limitToSpecificAreas,
         acceptsOutsideCity: draft.acceptsOutsideCity,
         outsideCityDecision: draft.outsideCityDecision,
+        worksNationwide: draft.worksNationwide,
+        worksAbroad: draft.worksAbroad,
       },
       workStyle: {
         modes: draft.workStyle,
@@ -513,6 +601,7 @@ export default function ProOnboarding() {
         preferredProjects: draft.preferredProjects.trim(),
         rejectedProjects: draft.rejectedProjects.trim(),
       },
+      legalProfile: buildLegalProfilePayload(draft),
     }
 
     const { error } = await supabase.from('partner_applications').insert({
@@ -651,7 +740,8 @@ export default function ProOnboarding() {
             {step === 3 && <WorkStyleStep draft={draft} update={update} toggleArray={toggleArray} attempted={attemptedSteps[3]} />}
             {step === 4 && <ProofStep draft={draft} attempted={attemptedSteps[4]} uploadState={proofUploadState} onAddProject={addProofProject} onRemoveProject={removeProofProject} onUpdateProject={updateProofProject} onProjectPhotos={handleProofProjectPhotos} onRemovePhoto={removeProofProjectPhoto} />}
             {step === 5 && <PresentationStep draft={draft} update={update} touchedFields={touchedFields} attempted={attemptedSteps[5]} markTouched={markTouched} />}
-            {step === 6 && <ReviewStep draft={draft} selectedCategory={selectedCategory} stepCompletion={stepCompletion} />}
+            {step === 6 && <LegalProfileStep draft={draft} update={update} touchedFields={touchedFields} markTouched={markTouched} />}
+            {step === 7 && <ReviewStep draft={draft} selectedCategory={selectedCategory} stepCompletion={stepCompletion} />}
           </div>
 
           <div className="mt-8 flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
@@ -827,7 +917,8 @@ function ServicesStep({ draft, update, toggleArray, attempted }) {
 function AreasStep({ draft, update, touchedFields, attempted, markTouched }) {
   const cityIsValid = Boolean(draft.primaryCity.trim())
   const outsideIsValid = Boolean(draft.outsideCityDecision)
-  const radiusIsValid = draft.outsideCityDecision !== 'yes' || Boolean(draft.workRadius.trim())
+  const radiusIsRequired = draft.outsideCityDecision === 'yes' && !draft.worksNationwide
+  const radiusIsValid = !radiusIsRequired || Boolean(draft.workRadius.trim())
   const serviceAreasIsValid = !draft.limitToSpecificAreas || Boolean(draft.serviceAreas.trim())
   return (
     <div className="space-y-5">
@@ -836,16 +927,24 @@ function AreasStep({ draft, update, touchedFields, attempted, markTouched }) {
         <div className="text-sm font-medium text-ink">Приемате ли проекти извън града?</div>
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
           <ToggleCard active={draft.outsideCityDecision === 'yes'} onClick={() => { update('outsideCityDecision', 'yes'); update('acceptsOutsideCity', true) }} label="Да, приемам извън града" />
-          <ToggleCard active={draft.outsideCityDecision === 'no'} onClick={() => { update('outsideCityDecision', 'no'); update('acceptsOutsideCity', false); update('workRadius', ''); update('limitToSpecificAreas', false); update('serviceAreas', '') }} label="Не, само в района" />
+          <ToggleCard active={draft.outsideCityDecision === 'no'} onClick={() => { update('outsideCityDecision', 'no'); update('acceptsOutsideCity', false); update('workRadius', ''); update('limitToSpecificAreas', false); update('serviceAreas', ''); update('worksNationwide', false); update('worksAbroad', false) }} label="Не, само в района" />
         </div>
         {attempted && !outsideIsValid && <div className="mt-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">Изберете дали приемате проекти извън града.</div>}
       </div>
       {draft.outsideCityDecision === 'yes' && (
         <>
-          <TextField label="Радиус на работа" value={draft.workRadius} onChange={event => update('workRadius', event.target.value)} onBlur={() => markTouched('workRadius')} placeholder="Напр. 30 км" required valid={() => radiusIsValid} touched={touchedFields.workRadius} attempted={attempted} errorText="Добавете радиус на работа." />
-          <ToggleCard active={draft.limitToSpecificAreas} onClick={() => update('limitToSpecificAreas', !draft.limitToSpecificAreas)} label="Искам да посоча конкретни райони" />
-          {draft.limitToSpecificAreas && (
-            <LocationMultiCombobox label="Райони / близки населени места" value={draft.serviceAreas} onChange={(value) => { update('serviceAreas', value); markTouched('serviceAreas') }} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ToggleCard active={draft.worksNationwide} onClick={() => { update('worksNationwide', !draft.worksNationwide); if (!draft.worksNationwide) { update('workRadius', ''); update('limitToSpecificAreas', false); update('serviceAreas', '') } }} label="Цялата страна" />
+            <ToggleCard active={draft.worksAbroad} onClick={() => update('worksAbroad', !draft.worksAbroad)} label="Извън страната" />
+          </div>
+          {!draft.worksNationwide && (
+            <>
+              <TextField label="Радиус на работа" value={draft.workRadius} onChange={event => update('workRadius', event.target.value)} onBlur={() => markTouched('workRadius')} placeholder="Напр. 30 км" required valid={() => radiusIsValid} touched={touchedFields.workRadius} attempted={attempted} errorText="Добавете радиус на работа." />
+              <ToggleCard active={draft.limitToSpecificAreas} onClick={() => update('limitToSpecificAreas', !draft.limitToSpecificAreas)} label="Искам да посоча конкретни райони" />
+              {draft.limitToSpecificAreas && (
+                <LocationMultiCombobox label="Райони / близки населени места" value={draft.serviceAreas} onChange={(value) => { update('serviceAreas', value); markTouched('serviceAreas') }} />
+              )}
+            </>
           )}
         </>
       )}
@@ -973,6 +1072,84 @@ function PresentationStep({ draft, update, touchedFields, attempted, markTouched
         <TextField label="Най-силни услуги" value={draft.strongestServices} onChange={event => update('strongestServices', event.target.value)} onBlur={() => markTouched('strongestServices')} rows={4} required valid={() => strongestOrPreferred} touched={touchedFields.strongestServices} attempted={attempted} errorText="Добавете най-силни услуги или предпочитан тип проекти." />
         <TextField label="Предпочитан тип проекти" value={draft.preferredProjects} onChange={event => update('preferredProjects', event.target.value)} onBlur={() => markTouched('preferredProjects')} rows={4} required valid={() => strongestOrPreferred} touched={touchedFields.preferredProjects} attempted={attempted} errorText="Добавете предпочитан тип проекти или най-силни услуги." />
         <TextField label="Какво не приемате" value={draft.rejectedProjects} onChange={event => update('rejectedProjects', event.target.value)} onBlur={() => markTouched('rejectedProjects')} rows={4} touched={touchedFields.rejectedProjects} />
+      </div>
+    </div>
+  )
+}
+
+function LegalProfileStep({ draft, update, touchedFields, markTouched }) {
+  const isCompany = draft.legalProfileType === 'company'
+  const isIndividual = draft.legalProfileType === 'individual'
+  const isSoleTrader = draft.legalProfileType === 'sole_trader'
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl border border-line bg-paper p-5 sm:p-6">
+        <h2 className="font-display text-xl text-ink">Данни за договори и фактуриране</h2>
+        <p className="mt-2 text-sm text-muted">
+          Тези данни се използват само за издаване на фактури към клиенти при платени услуги и за вътрешна проверка.
+        </p>
+        <div className="mt-6">
+          <Field label="Тип лице">
+            <div className="mt-2 grid gap-3 sm:grid-cols-3">
+              <ToggleCard active={isIndividual} onClick={() => update('legalProfileType', 'individual')} label="Физическо лице" />
+              <ToggleCard active={isCompany} onClick={() => update('legalProfileType', 'company')} label="Фирма (ЕООД/ООД)" />
+              <ToggleCard active={isSoleTrader} onClick={() => update('legalProfileType', 'sole_trader')} label="Едноличен търговец (ЕТ)" />
+            </div>
+          </Field>
+        </div>
+
+        {isIndividual && (
+          <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-bottom-2">
+            <TextField label="Три имена" value={draft.legalFullName} onChange={e => update('legalFullName', e.target.value)} onBlur={() => markTouched('legalFullName')} required touched={touchedFields.legalFullName} />
+            <TextField label="Адрес (по лична карта)" value={draft.legalDocumentAddress} onChange={e => update('legalDocumentAddress', e.target.value)} onBlur={() => markTouched('legalDocumentAddress')} required touched={touchedFields.legalDocumentAddress} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField label="Имейл за контакт" value={draft.legalContactEmail} onChange={e => update('legalContactEmail', e.target.value)} onBlur={() => markTouched('legalContactEmail')} required touched={touchedFields.legalContactEmail} />
+              <TextField label="Телефон за контакт" value={draft.legalContactPhone} onChange={e => update('legalContactPhone', e.target.value)} onBlur={() => markTouched('legalContactPhone')} required touched={touchedFields.legalContactPhone} />
+            </div>
+          </div>
+        )}
+
+        {isCompany && (
+          <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-bottom-2">
+            <TextField label="Наименование на фирмата" value={draft.companyLegalName} onChange={e => update('companyLegalName', e.target.value)} onBlur={() => markTouched('companyLegalName')} placeholder="напр. Строител 2000 ЕООД" required touched={touchedFields.companyLegalName} />
+            <TextField label="ЕИК / Булстат" value={draft.companyEikBulstat} onChange={e => update('companyEikBulstat', e.target.value)} onBlur={() => markTouched('companyEikBulstat')} required touched={touchedFields.companyEikBulstat} />
+            <TextField label="Адрес на регистрация" value={draft.companyRegisteredAddress} onChange={e => update('companyRegisteredAddress', e.target.value)} onBlur={() => markTouched('companyRegisteredAddress')} required touched={touchedFields.companyRegisteredAddress} />
+            <TextField label="Лице за контакт (МОЛ / Управител)" value={draft.companyContactPersonName} onChange={e => update('companyContactPersonName', e.target.value)} onBlur={() => markTouched('companyContactPersonName')} required touched={touchedFields.companyContactPersonName} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField label="Имейл за фактури" value={draft.companyContactEmail} onChange={e => update('companyContactEmail', e.target.value)} onBlur={() => markTouched('companyContactEmail')} required touched={touchedFields.companyContactEmail} />
+              <TextField label="Телефон за фактури" value={draft.companyContactPhone} onChange={e => update('companyContactPhone', e.target.value)} onBlur={() => markTouched('companyContactPhone')} required touched={touchedFields.companyContactPhone} />
+            </div>
+            <div className="mt-4">
+              <ToggleCard active={draft.companyVatRegistered} onClick={() => update('companyVatRegistered', !draft.companyVatRegistered)} label="Регистрация по ЗДДС" />
+              {draft.companyVatRegistered && (
+                <div className="mt-4">
+                  <TextField label="VAT номер" value={draft.companyVatNumber} onChange={e => update('companyVatNumber', e.target.value)} onBlur={() => markTouched('companyVatNumber')} placeholder="BG..." required touched={touchedFields.companyVatNumber} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {isSoleTrader && (
+          <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-bottom-2">
+            <TextField label="Наименование на ЕТ" value={draft.soleTraderLegalName} onChange={e => update('soleTraderLegalName', e.target.value)} onBlur={() => markTouched('soleTraderLegalName')} placeholder="напр. ЕТ Иван Иванов" required touched={touchedFields.soleTraderLegalName} />
+            <TextField label="ЕИК / Булстат" value={draft.soleTraderBulstat} onChange={e => update('soleTraderBulstat', e.target.value)} onBlur={() => markTouched('soleTraderBulstat')} required touched={touchedFields.soleTraderBulstat} />
+            <TextField label="Адрес на регистрация" value={draft.soleTraderDocumentAddress} onChange={e => update('soleTraderDocumentAddress', e.target.value)} onBlur={() => markTouched('soleTraderDocumentAddress')} required touched={touchedFields.soleTraderDocumentAddress} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField label="Имейл за контакт" value={draft.soleTraderContactEmail} onChange={e => update('soleTraderContactEmail', e.target.value)} onBlur={() => markTouched('soleTraderContactEmail')} required touched={touchedFields.soleTraderContactEmail} />
+              <TextField label="Телефон за контакт" value={draft.soleTraderContactPhone} onChange={e => update('soleTraderContactPhone', e.target.value)} onBlur={() => markTouched('soleTraderContactPhone')} required touched={touchedFields.soleTraderContactPhone} />
+            </div>
+            <div className="mt-4">
+              <ToggleCard active={draft.soleTraderVatRegistered} onClick={() => update('soleTraderVatRegistered', !draft.soleTraderVatRegistered)} label="Регистрация по ЗДДС" />
+              {draft.soleTraderVatRegistered && (
+                <div className="mt-4">
+                  <TextField label="VAT номер" value={draft.soleTraderVatNumber} onChange={e => update('soleTraderVatNumber', e.target.value)} onBlur={() => markTouched('soleTraderVatNumber')} placeholder="BG..." required touched={touchedFields.soleTraderVatNumber} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
