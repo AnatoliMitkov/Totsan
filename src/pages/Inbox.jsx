@@ -25,9 +25,9 @@ import {
   subscribeToConversationList,
   toggleMessageReaction,
   updateOfferStatus,
+  updateServiceRequestStatus,
 } from '../lib/chat.js'
 import { normalizeAttachmentFiles, uploadChatAttachments } from '../lib/chat-attachments.js'
-import { startCheckout } from '../lib/payments.js'
 
 const EMPTY_PAGINATION = {
   hasOlder: false,
@@ -532,29 +532,15 @@ export default function Inbox() {
     setMessageStatus('sending')
 
     try {
-      if (nextStatus === 'accepted') {
-        const result = await startCheckout({ type: 'offer', id: offer.id, provider: 'stripe' })
-        const checkoutUrl = result.checkoutUrl || ''
-        if (checkoutUrl) {
-          const url = new URL(checkoutUrl, window.location.origin)
-          if (url.origin === window.location.origin) {
-            navigate(`${url.pathname}${url.search}`)
-            return
-          }
-          window.location.href = checkoutUrl
-          return
-        }
-        if (result.order?.id) {
-          navigate(`/order/${result.order.id}`)
-          return
-        }
-      }
-
       const result = await updateOfferStatus({ offerId: offer.id, status: nextStatus })
       if (result?.offer) patchOfferMessage(activeConversationId, result.offer)
       if (result?.message?.id) {
         const nextMessage = await loadFreshMessage(result.message.id, { ...result.message, offer: null })
         if (nextMessage) mergeIncomingMessages(activeConversationId, [nextMessage])
+      }
+      if (nextStatus === 'accepted' && result?.order?.id) {
+        navigate(`/order/${result.order.id}`)
+        return
       }
       setMessageStatus('idle')
       scheduleConversationRefresh()
@@ -567,6 +553,21 @@ export default function Inbox() {
   function handleReplyToMessage(message) {
     if (!message?.id) return
     setReplyTarget(message)
+  }
+
+  async function handleServiceRequestAction(request, nextStatus) {
+    setMessageStatus('sending')
+    setError('')
+    try {
+      await updateServiceRequestStatus({ requestId: request.id, status: nextStatus })
+      await loadThread(activeConversationId, { showLoading: false })
+      setMessageStatus('idle')
+      scheduleConversationRefresh()
+      if (nextStatus === 'negotiating') setOfferOpen(true)
+    } catch (requestError) {
+      setError(requestError.message || 'Заявката не беше обновена.')
+      setMessageStatus('idle')
+    }
   }
 
   function handleDraftFilesChange(files) {
@@ -667,6 +668,7 @@ export default function Inbox() {
               orderStatus={conversationStatuses.get(activeConversationId) || null}
               onBack={handleBackToList}
               onOfferAction={handleOfferAction}
+              onServiceRequestAction={handleServiceRequestAction}
               onReplyToMessage={handleReplyToMessage}
               onToggleReaction={handleToggleReaction}
               onLoadOlder={loadOlderMessages}

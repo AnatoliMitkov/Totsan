@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
@@ -19,11 +19,15 @@ import {
   X,
 } from 'lucide-react'
 import { trackEvent } from '../lib/analytics.js'
+import { VAT_STATUS_NOTE } from '../lib/legalInfo.js'
+import { formatEurWithBgn } from '../lib/money.js'
 import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
 import {
   PARTNER_BILLING_INTERVALS,
   PARTNER_SUBSCRIPTION_PLANS,
   getPartnerPlanPrice,
+  loadOwnPartnerSubscription,
+  reconcilePartnerSubscription,
   startPartnerSubscriptionCheckout,
 } from '../lib/subscriptions.js'
 
@@ -218,6 +222,32 @@ export default function TotsanPro() {
   })
   const [checkoutState, setCheckoutState] = useState({ status: 'idle', planKey: '', message: '' })
   const [selectedSubscription, setSelectedSubscription] = useState(null)
+  const [currentSubscription, setCurrentSubscription] = useState({ status: 'loading', subscription: null })
+
+  useEffect(() => {
+    let active = true
+
+    async function loadSubscription() {
+      try {
+        let subscription = await loadOwnPartnerSubscription()
+        if (!subscription.active && subscription.row) {
+          try {
+            const reconciliation = await reconcilePartnerSubscription()
+            if (reconciliation?.subscription?.row) subscription = reconciliation.subscription
+          } catch (error) {
+            console.error('Could not reconcile the current subscription', error)
+          }
+        }
+        if (active) setCurrentSubscription({ status: 'ready', subscription })
+      } catch (error) {
+        console.error('Could not load the current subscription', error)
+        if (active) setCurrentSubscription({ status: 'error', subscription: null })
+      }
+    }
+
+    loadSubscription()
+    return () => { active = false }
+  }, [])
 
   useSeo({
     canonicalPath: '/pro',
@@ -248,6 +278,7 @@ export default function TotsanPro() {
   }
 
   function openSubscriptionConfirmation(plan) {
+    if (currentSubscription.subscription?.active) return
     const price = getPartnerPlanPrice(plan, billingInterval)
     if (!price?.key) return
     setConsents({
@@ -310,6 +341,15 @@ export default function TotsanPro() {
       })
     } catch (error) {
       const message = error.message || 'Абонаментът не можа да стартира.'
+      if (error.code === 'active_subscription') {
+        setCurrentSubscription({
+          status: 'ready',
+          subscription: error.subscription || currentSubscription.subscription,
+        })
+        setSelectedSubscription(null)
+        setCheckoutState({ status: 'idle', planKey: '', message: '' })
+        return
+      }
       setCheckoutState({ status: 'error', planKey: price.key, message })
       if (message.includes('Влез в профила')) {
         window.setTimeout(() => navigate(`/login?next=${encodeURIComponent('/pro')}`), 600)
@@ -414,6 +454,19 @@ export default function TotsanPro() {
 
           <BillingToggle interval={billingInterval} onChange={setBillingInterval} />
 
+          {currentSubscription.subscription?.active && (
+            <div className="mt-6 flex flex-col gap-4 rounded-[1.75rem] border border-emerald-200 bg-emerald-50 p-5 text-emerald-950 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">Активен абонамент</div>
+                <div className="mt-1 text-lg font-semibold">
+                  Вече използвате {currentSubscription.subscription.plan?.planName || 'партньорски план'}.
+                </div>
+                <p className="mt-1 text-sm text-emerald-800">Не е необходимо и не можете да закупите втори план, докато този е активен.</p>
+              </div>
+              <Link to="/moy-profil" className="btn btn-primary shrink-0 justify-center">Управлявай от профила</Link>
+            </div>
+          )}
+
           <div className="mt-8 grid gap-5 lg:grid-cols-2">
             {planCards.map((plan) => {
               const price = getPartnerPlanPrice(plan, billingInterval)
@@ -424,8 +477,9 @@ export default function TotsanPro() {
                   plan={plan}
                   price={price}
                   billingInterval={billingInterval}
-                  disabled={checkoutState.status === 'opening'}
+                  disabled={checkoutState.status === 'opening' || currentSubscription.status === 'loading' || Boolean(currentSubscription.subscription?.active)}
                   busy={isBusy}
+                  activeSubscription={currentSubscription.subscription}
                   onCheckout={() => openSubscriptionConfirmation(plan)}
                 />
               )
@@ -437,7 +491,7 @@ export default function TotsanPro() {
           <PricingFaq items={pricingFaqItems} />
 
           <p className="mx-auto mt-6 max-w-3xl text-center text-xs leading-relaxed text-muted">
-            Цените са ориентировъчни и могат да подлежат на ДДС според данъчния статус и фактурирането.
+            {VAT_STATUS_NOTE} Данъчният статус следва да бъде потвърден във фактурата.
           </p>
         </div>
       </section>
@@ -842,10 +896,14 @@ function ComparisonCard({ panel }) {
   )
 }
 
-function PlanCard({ plan, price, billingInterval, disabled, busy, onCheckout }) {
+function PlanCard({ plan, price, billingInterval, disabled, busy, activeSubscription, onCheckout }) {
   const isYearly = billingInterval === 'yearly'
   const displayAmount = price?.displayAmount || price?.amount
+  const displayNumericAmount = Number.parseFloat(String(displayAmount || '').replace(',', '.'))
+  const displayPrice = Number.isFinite(displayNumericAmount) ? formatEurWithBgn(displayNumericAmount) : displayAmount
   const displayPeriod = price?.displayPeriod || price?.period
+  const hasActiveSubscription = Boolean(activeSubscription?.active)
+  const isCurrentPlan = hasActiveSubscription && activeSubscription?.plan?.planId === plan.id
   return (
     <article className={`reveal relative flex min-h-[31rem] flex-col overflow-hidden rounded-[2rem] border p-6 shadow-[0_24px_80px_-66px_rgba(13,35,64,0.8)] ${plan.highlighted ? 'border-accent bg-paper ring-2 ring-accent/20' : 'border-line bg-paper'}`}>
       <img
@@ -873,7 +931,7 @@ function PlanCard({ plan, price, billingInterval, disabled, busy, onCheckout }) 
           </span>
         </div>
         <div className="mt-0 flex flex-wrap items-end gap-x-2 gap-y-1">
-          <span className="font-display text-5xl leading-none text-ink">{displayAmount}</span>
+          <span className="font-display text-[clamp(2rem,1.65rem+1vw,3rem)] leading-none text-ink">{displayPrice}</span>
           <span className="pb-1 text-sm text-muted">{displayPeriod}</span>
         </div>
         <div className="mt-3 px-1">
@@ -901,7 +959,12 @@ function PlanCard({ plan, price, billingInterval, disabled, busy, onCheckout }) 
           disabled={disabled || busy}
           className={`btn w-full justify-center disabled:cursor-not-allowed disabled:opacity-55 ${plan.highlighted ? 'btn-primary' : 'btn-ghost bg-paper/75'}`}
         >
-          {busy ? 'Отваря се...' : `Избери ${plan.name}`} <ArrowRight size={16} />
+          {busy
+            ? 'Отваря се...'
+            : hasActiveSubscription
+              ? (isCurrentPlan ? 'Текущ активен план' : 'Вече имате активен план')
+              : `Избери ${plan.name}`}
+          {!hasActiveSubscription && <ArrowRight size={16} />}
         </button>
       </div>
     </article>

@@ -42,8 +42,6 @@ export default function Order() {
   const actions = useMemo(() => buildActions(order, role), [order, role])
   const visibleEvents = useMemo(() => dedupeEvents(details.events), [details.events])
   const visiblePayments = useMemo(() => dedupePayments(details.payments), [details.payments])
-  const checkoutPath = order ? checkoutTarget(order) : ''
-  const canSeeFinancialBreakdown = role === 'partner' || isAdminView
   const projectLocation = details.projectLocation
 
   async function run(action) {
@@ -119,25 +117,34 @@ export default function Order() {
             <div className="rounded-3xl border border-line bg-paper p-5 md:p-6">
               <div className="eyebrow">Действия</div>
               <div className="mt-3 font-display text-4xl text-ink">{formatOrderMoney(order.amountTotal, order.currency)}</div>
-              {canSeeFinancialBreakdown ? (
-                <p className="mt-2 text-sm text-muted">Такса: {formatOrderMoney(order.platformFee, order.currency)} · към партньора: {formatOrderMoney(order.partnerPayout, order.currency)}</p>
-              ) : (
-                <p className="mt-2 text-sm text-muted">Плащането е защитено до потвърждение на завършването.</p>
-              )}
+              <p className="mt-2 text-sm text-muted">Договорена сума между клиента и партньора. Плащането се извършва директно към партньора.</p>
+              <p className="mt-3 rounded-2xl border border-line bg-soft p-3 text-xs leading-5 text-muted">
+                Totsan не приема и не прехвърля сумата. Статус или документ тук служи само като доказателствена следа, а партньорът потвърждава получаването.
+              </p>
               {message && <div className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">{message}</div>}
-              {checkoutPath && order.status === 'pending_payment' && <Link to={checkoutPath} className="btn btn-primary mt-5 w-full justify-center"><CreditCard size={18} /> Плати</Link>}
               {order.conversationId && <Link to={`/inbox/${order.conversationId}`} className="btn btn-ghost mt-3 w-full justify-center"><MessageSquare size={18} /> Чат</Link>}
               {actions.includes('request_revision') && <textarea rows={3} value={revisionNote} onChange={(event) => setRevisionNote(event.target.value)} className="mt-4 w-full rounded-2xl border border-line bg-soft px-4 py-3 text-sm outline-none transition focus:border-ink" placeholder="Какво трябва да се коригира" />}
               <div className="mt-4 grid gap-2">
-                {actions.map((action) => <button key={action} type="button" onClick={() => run(action)} disabled={status === 'saving'} className={action === 'confirm_completed' || action === 'mark_delivered' || action === 'start_work' ? 'btn btn-primary justify-center' : 'btn btn-ghost justify-center'}>{ORDER_ACTION_LABELS[action] || action}</button>)}
+                {actions.map((action) => (
+                  <button
+                    key={action}
+                    type="button"
+                    onClick={() => run(action)}
+                    disabled={status === 'saving'}
+                    className={['confirm_direct_payment', 'confirm_completed', 'mark_delivered', 'start_work'].includes(action) ? 'btn btn-primary justify-center' : 'btn btn-ghost justify-center'}
+                  >
+                    {ORDER_ACTION_LABELS[action] || action}
+                  </button>
+                ))}
               </div>
             </div>
 
             <div className="rounded-3xl border border-line bg-paper p-5 md:p-6">
-              <div className="eyebrow">Плащания</div>
+              <div className="eyebrow">Доказателствена следа</div>
+              <p className="mt-2 text-xs leading-5 text-muted">Записите са предоставена информация за директно плащане и не доказват обработка от Totsan.</p>
               <div className="mt-4 space-y-3">
                 {visiblePayments.map((payment) => <PaymentRow key={payment.id} payment={payment} />)}
-                {visiblePayments.length === 0 && <div className="rounded-2xl border border-dashed border-line p-4 text-center text-sm text-muted">Няма записи.</div>}
+                {visiblePayments.length === 0 && <div className="rounded-2xl border border-dashed border-line p-4 text-center text-sm text-muted">Няма добавено потвърждение или документ.</div>}
               </div>
             </div>
           </div>
@@ -150,17 +157,12 @@ export default function Order() {
 function buildActions(order, role) {
   if (!order || role === 'guest') return []
   const actions = []
+  if (role === 'partner' && order.status === 'pending_payment') actions.push('confirm_direct_payment')
   if (role === 'partner' && order.status === 'paid') actions.push('start_work')
   if (role === 'partner' && ['paid', 'in_progress'].includes(order.status)) actions.push('mark_delivered')
   if (role === 'client' && order.status === 'delivered') actions.push('confirm_completed', 'request_revision')
   if (role === 'client' && order.status === 'pending_payment') actions.push('cancel_pending')
   return actions
-}
-
-function checkoutTarget(order) {
-  if (order.offerId) return `/checkout/offer/${order.offerId}`
-  if (order.servicePackageId) return `/checkout/service/${order.servicePackageId}`
-  return ''
 }
 
 function shortId(value = '') {
@@ -321,7 +323,6 @@ function EventRow({ event }) {
 function PaymentRow({ payment }) {
   const count = Number(payment.repeatCount || 1)
   const typeLabel = paymentTypeLabel(payment.type)
-  const providerLabel = paymentProviderLabel(payment.provider)
   const statusLabel = paymentStatusLabel(payment.status)
   const statusTone = paymentStatusTone(payment.status)
 
@@ -330,7 +331,7 @@ function PaymentRow({ payment }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-medium text-ink">
-            {typeLabel} · {providerLabel}
+            {typeLabel}
             {count > 1 && <span className="ml-2 rounded-full border border-line bg-paper px-2 py-0.5 text-[11px] font-normal text-muted">x{count}</span>}
           </div>
           <div className="mt-1 text-xs text-muted">{formatOrderDate(payment.createdAt)}</div>
@@ -346,19 +347,11 @@ function PaymentRow({ payment }) {
 
 function paymentTypeLabel(value = '') {
   const labels = {
-    charge: 'Плащане',
-    payout: 'Изплащане',
-    refund: 'Възстановяване',
+    charge: 'Отбелязано директно плащане',
+    payout: 'Потвърждение от партньора',
+    refund: 'Отбелязано възстановяване',
   }
-  return labels[value] || value || 'Транзакция'
-}
-
-function paymentProviderLabel(value = '') {
-  const labels = {
-    stripe: 'Stripe',
-    mock: 'Demo',
-  }
-  return labels[value] || value || 'Провайдър'
+  return labels[value] || 'Платежен документ или потвърждение'
 }
 
 function paymentStatusLabel(value = '') {
@@ -383,10 +376,10 @@ function paymentStatusTone(value = '') {
 function orderEventMessage(event) {
   const messages = {
     order_created: 'Поръчката е създадена',
-    checkout_refreshed: 'Сесията за плащане е обновена',
-    payment_succeeded: 'Плащането е потвърдено',
-    payment_succeeded_webhook: 'Плащането е потвърдено',
-    payment_intent_succeeded_webhook: 'Плащането е потвърдено',
+    checkout_refreshed: 'Стар платежен запис е обновен',
+    payment_succeeded: 'Добавено е потвърждение за плащане',
+    payment_succeeded_webhook: 'Добавено е автоматично потвърждение',
+    payment_intent_succeeded_webhook: 'Добавено е автоматично потвърждение',
     admin_status_update: 'Админ промени статуса',
     start_work: 'Работата е започната',
     mark_delivered: 'Поръчката е маркирана като предадена',

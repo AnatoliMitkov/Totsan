@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import {
   ArrowUpRight,
@@ -35,6 +36,7 @@ import {
   loadPartnerServicesForProfile,
   makeEmptyPackage,
   makePartnerServiceDraft,
+  resolveServiceModerationAttachments,
   savePartnerService,
   uploadPartnerServiceImage,
 } from '../../lib/partner-services.js'
@@ -234,27 +236,44 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
   const [activeSection, setActiveSection] = useState('info')
   const [showPreview, setShowPreview] = useState(true)
   const [isEditorOpen, setIsEditorOpen] = useState(false)
+  const [serviceFilter, setServiceFilter] = useState('all')
   const [attemptedSubmit, setAttemptedSubmit] = useState(false)
   const [state, setState] = useState({ status: 'loading', message: 'Зареждаме услугите...' })
+  const loadedProfileRef = useRef('')
 
   useEffect(() => {
     let active = true
-    async function load() {
-      setState({ status: 'loading', message: 'Зареждаме услугите...' })
+    async function load(showLoading = false) {
+      if (showLoading) setState({ status: 'loading', message: 'Зареждаме услугите...' })
       try {
         const rows = await loadPartnerServicesForProfile(profile.id)
         if (!active) return
         setItems(rows)
-        setDraft(rows[0] ? makePartnerServiceDraft(profile, rows[0]) : makeNeutralServiceDraft(profile))
+        setDraft(current => {
+          const selected = rows.find(item => item.id === current.id) || rows[0] || null
+          return selected ? makePartnerServiceDraft(profile, selected) : makeNeutralServiceDraft(profile)
+        })
+        loadedProfileRef.current = profile.id
         setState({ status: 'ready', message: '' })
       } catch (error) {
         if (!active) return
         setState({ status: 'error', message: error.message || 'Услугите не успяха да заредят.' })
       }
     }
-    load()
-    return () => { active = false }
-  }, [profile.id, profile.updatedAt])
+
+    function refreshWhenVisible() {
+      if (!isEditorOpen && document.visibilityState === 'visible') void load(false)
+    }
+
+    if (!isEditorOpen) void load(loadedProfileRef.current !== profile.id)
+    window.addEventListener('focus', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      active = false
+      window.removeEventListener('focus', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
+  }, [profile.id, profile.updatedAt, isEditorOpen])
 
   useEffect(() => {
     if (!isEditorOpen) return undefined
@@ -294,6 +313,16 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
   const canSubmit = missingRequired.length === 0
   const publishedCount = items.filter(item => item.isPublished && item.moderationStatus === 'approved').length
   const pendingCount = items.filter(item => item.moderationStatus === 'pending').length
+  const rejectedCount = items.filter(item => item.moderationStatus === 'rejected').length
+  const filteredItems = useMemo(() => {
+    if (serviceFilter === 'published') {
+      return items.filter(item => item.isPublished && item.moderationStatus === 'approved')
+    }
+    if (serviceFilter === 'pending') return items.filter(item => item.moderationStatus === 'pending')
+    if (serviceFilter === 'draft') return items.filter(item => item.moderationStatus === 'draft')
+    if (serviceFilter === 'rejected') return items.filter(item => item.moderationStatus === 'rejected')
+    return items
+  }, [items, serviceFilter])
 
   const previewService = useMemo(() => ({
     ...draft,
@@ -520,24 +549,31 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
           </div>
         </div>
 
-        <div className="mt-6 grid gap-3 md:grid-cols-4">
-          <StatTile label="Всички услуги" value={items.length} />
-          <StatTile label="Публични" value={publishedCount} tone="green" />
-          <StatTile label="За преглед" value={pendingCount} tone="blue" />
-          <StatTile label="Чернови" value={items.filter(item => item.moderationStatus === 'draft').length} />
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <StatTile label="Всички услуги" value={items.length} active={serviceFilter === 'all'} onClick={() => setServiceFilter('all')} />
+          <StatTile label="Публични" value={publishedCount} tone="green" active={serviceFilter === 'published'} onClick={() => setServiceFilter('published')} />
+          <StatTile label="За преглед" value={pendingCount} tone="blue" active={serviceFilter === 'pending'} onClick={() => setServiceFilter('pending')} />
+          <StatTile label="Чернови" value={items.filter(item => item.moderationStatus === 'draft').length} active={serviceFilter === 'draft'} onClick={() => setServiceFilter('draft')} />
+          <StatTile label="Върнати" value={rejectedCount} tone="red" active={serviceFilter === 'rejected'} onClick={() => setServiceFilter('rejected')} />
         </div>
 
         {items.length > 0 ? (
-          <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {items.map(item => (
-              <ServicePickerCard
-                key={item.id}
-                item={item}
-                active={draft.id === item.id}
-                onSelect={() => selectService(item.id)}
-              />
-            ))}
-          </div>
+          filteredItems.length > 0 ? (
+            <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {filteredItems.map(item => (
+                <ServicePickerCard
+                  key={item.id}
+                  item={item}
+                  active={draft.id === item.id}
+                  onSelect={() => selectService(item.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="mt-6 rounded-3xl border border-dashed border-line bg-soft/60 p-6 text-center text-sm text-muted">
+              Няма услуги с този статус.
+            </div>
+          )
         ) : (
           <div className="mt-6 rounded-[1.75rem] border border-dashed border-line bg-soft/70 p-6 text-center">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-paper text-accentDeep shadow-sm">
@@ -550,17 +586,19 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
         )}
       </section>
 
-      {isEditorOpen && (
+      {isEditorOpen && createPortal(
         <div
           className="fixed inset-0 z-[100] h-[100dvh] w-screen overflow-hidden bg-ink/65 p-0 backdrop-blur-sm"
           onMouseDown={handleEditorBackdropMouseDown}
+          role="dialog"
+          aria-modal="true"
         >
           <div
-            className="mx-auto flex h-full w-full items-stretch px-1 pb-[2rem] pt-[4.5rem]"
+            className="flex h-full w-full items-stretch"
             onMouseDown={handleEditorBackdropMouseDown}
           >
-          <div className="mx-auto flex h-full w-[90vw] max-w-[1700px] items-stretch">
-            <div className="relative flex h-full w-full flex-col overflow-hidden rounded-[2rem] border border-line bg-paper shadow-2xl">
+          <div className="flex h-full w-full items-stretch">
+            <div className="relative flex h-full w-full flex-col overflow-hidden border border-line bg-paper shadow-2xl">
               <div className="shrink-0 border-b border-line bg-paper/95 px-4 py-3 backdrop-blur sm:px-6">
                 <div className="flex items-center justify-between gap-4">
                 <div>
@@ -640,18 +678,18 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
                     {state.message || (canSubmit ? 'Готово за запазване и изпращане.' : 'Можеш да запазиш чернова. За изпращане попълни задължителните полета.')}
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={handleClearDraft} disabled={state.status === 'saving'} className="btn btn-ghost justify-center">
+                    <button type="button" onClick={handleClearDraft} disabled={state.status === 'saving'} className="btn justify-center border border-amber-300 bg-amber-100 text-amber-950 hover:border-amber-400 hover:bg-amber-200">
                       <X size={18} /> Изчисти
                     </button>
                     {draft.isPublished && <Link to={`/uslugi/${draft.slug}`} className="btn btn-ghost justify-center"><Eye size={18} /> Виж публично</Link>}
-                    <button type="button" onClick={() => handleSave(false)} disabled={state.status === 'saving'} className="btn btn-primary justify-center">
+                    <button type="button" onClick={() => handleSave(false)} disabled={state.status === 'saving'} className="btn btn-ghost justify-center bg-paper hover:bg-soft">
                       <Save size={18} /> Запази
                     </button>
-                    <button type="button" onClick={() => handleSave(true)} disabled={state.status === 'saving'} className="btn btn-ghost justify-center">
+                    <button type="button" onClick={() => handleSave(true)} disabled={state.status === 'saving'} className="btn btn-primary justify-center">
                       <ClipboardList size={18} /> Изпрати
                     </button>
                     {draft.id && (
-                      <button type="button" onClick={handleDeleteWithConfirm} disabled={state.status === 'saving'} className="btn btn-ghost justify-center">
+                      <button type="button" onClick={handleDeleteWithConfirm} disabled={state.status === 'saving'} className="btn justify-center border border-red-600 bg-red-600 text-white hover:border-red-700 hover:bg-red-700">
                         <Trash2 size={18} /> Изтрий
                       </button>
                     )}
@@ -662,6 +700,7 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
           </div>
           </div>
         </div>
+        , document.body
       )}
     </div>
   )
@@ -754,6 +793,9 @@ function VisibilityPanel({ draft, state }) {
           Бележка от модерация: {draft.moderationNote}
         </div>
       )}
+      {draft.moderationAttachments?.length > 0 && (
+        <ModerationFeedbackImages attachments={draft.moderationAttachments} />
+      )}
       {isPublic && (
         <Link to={`/uslugi/${draft.slug}`} className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-ink underline underline-offset-4">
           Отвори страницата <ArrowUpRight size={16} />
@@ -764,6 +806,36 @@ function VisibilityPanel({ draft, state }) {
           {state.message}
         </div>
       )}
+    </div>
+  )
+}
+
+function ModerationFeedbackImages({ attachments }) {
+  const [images, setImages] = useState([])
+
+  useEffect(() => {
+    let active = true
+    resolveServiceModerationAttachments(attachments)
+      .then((nextImages) => {
+        if (active) setImages(nextImages.filter(item => item.url))
+      })
+      .catch(() => {
+        if (active) setImages([])
+      })
+    return () => { active = false }
+  }, [attachments])
+
+  if (!images.length) return null
+  return (
+    <div className="mt-3">
+      <div className="mb-2 text-xs font-medium uppercase tracking-[0.12em] text-amber-800">Приложени снимки</div>
+      <div className="grid grid-cols-2 gap-2">
+        {images.map(image => (
+          <a key={image.path} href={image.url} target="_blank" rel="noreferrer" className="aspect-[4/3] overflow-hidden rounded-2xl border border-amber-200 bg-paper">
+            <img src={image.url} alt={image.name || 'Снимка от модерацията'} className="h-full w-full object-cover transition hover:scale-[1.03]" />
+          </a>
+        ))}
+      </div>
     </div>
   )
 }
@@ -907,7 +979,7 @@ function InfoSection({ draft, onChange, onStarter }) {
             <input value={draft.subtitle} onChange={event => onChange('subtitle', event.target.value)} className={INPUT} placeholder="Подготовка, чисто изпълнение и финално почистване" />
           </Field>
           <Field label="Слой">
-            <TotsanSelect value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} placeholder="Избери слой" options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} />
+            <TotsanSelect className="mt-2" value={draft.layerSlug} onChange={(value) => onChange('layerSlug', value)} placeholder="Избери слой" options={LAYERS.map(layer => ({ value: layer.slug, label: `Слой ${layer.number} · ${layer.title}` }))} />
           </Field>
           <Field label="Тагове" hint="Раздели с запетая. Използват се за търсене.">
             <input value={draft.tagsText} onChange={event => onChange('tagsText', event.target.value)} className={INPUT} placeholder="боя, шпакловка, освежаване" />
@@ -1449,13 +1521,24 @@ function GuideStepButton({ step, index, active, done, onClick }) {
   )
 }
 
-function StatTile({ label, value, tone = 'neutral' }) {
-  const toneClass = tone === 'green' ? 'bg-trustGreen/10 text-trustGreen' : tone === 'blue' ? 'bg-accentSoft text-accentDeep' : 'bg-soft text-ink'
+function StatTile({ label, value, tone = 'neutral', active = false, onClick }) {
+  const toneClass = tone === 'green'
+    ? 'bg-trustGreen/10 text-trustGreen'
+    : tone === 'blue'
+      ? 'bg-accentSoft text-accentDeep'
+      : tone === 'red'
+        ? 'bg-red-50 text-red-700 ring-1 ring-red-100'
+        : 'bg-soft text-ink'
   return (
-    <div className="rounded-2xl border border-line bg-paper p-4">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`rounded-2xl border bg-paper p-4 text-left transition hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-sm ${active ? 'border-ink shadow-sm ring-2 ring-ink/5' : 'border-line'}`}
+    >
       <div className="text-xs uppercase tracking-[0.14em] text-muted">{label}</div>
       <div className={`mt-2 inline-flex rounded-full px-3 py-1 font-display text-2xl ${toneClass}`}>{value}</div>
-    </div>
+    </button>
   )
 }
 

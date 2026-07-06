@@ -1,13 +1,21 @@
 import { supabase } from './supabase.js'
 
-export async function loadPartnerInquiries(targetSlug) {
-  if (!targetSlug) return []
-  
-  const { data, error } = await supabase
+export async function loadPartnerInquiries(targetSlug, partnerId) {
+  if (!targetSlug && !partnerId) return []
+
+  let query = supabase
     .from('inquiries')
     .select('*')
-    .eq('target_slug', targetSlug)
-    .order('created_at', { ascending: false })
+
+  if (partnerId && targetSlug) {
+    query = query.or(`assigned_partner_id.eq.${partnerId},target_slug.eq.${targetSlug}`)
+  } else if (partnerId) {
+    query = query.eq('assigned_partner_id', partnerId)
+  } else {
+    query = query.eq('target_slug', targetSlug)
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false })
 
   if (error) {
     console.error('Failed to load partner inquiries:', error)

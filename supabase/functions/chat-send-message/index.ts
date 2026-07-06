@@ -3,6 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.49.8'
 const MASK = '[скрито от Totsan - общувайте в платформата]'
 const MESSAGE_KINDS = new Set(['text', 'attachment'])
 const OFFER_STATUSES = new Set(['accepted', 'declined', 'withdrawn'])
+const SERVICE_REQUEST_STATUSES = new Set(['negotiating', 'declined', 'cancelled'])
 const MAX_MESSAGES_PER_MINUTE = 30
 const CHAT_ATTACHMENTS_BUCKET = 'chat-attachments'
 const MAX_ATTACHMENTS_PER_MESSAGE = 10
@@ -278,6 +279,152 @@ Deno.serve(async (req) => {
       return jsonResponse(200, { ok: true, conversation, reused: false })
     }
 
+    if (action === 'create_service_request') {
+      const serviceId = assertUuid(payload.serviceId, 'Service id')
+      const requestedPackageId = optionalUuid(payload.servicePackageId)
+      const { data: service, error: serviceError } = await adminClient
+        .from('partner_services')
+        .select('id, profile_id, partner_id, slug, title, subtitle, is_published, moderation_status')
+        .eq('id', serviceId)
+        .single()
+      if (serviceError) throw serviceError
+      if (!service.is_published || service.moderation_status !== 'approved') {
+        throw new Error('Услугата вече не е достъпна за заявяване.')
+      }
+      if (service.partner_id === user.id) throw new Error('Не можеш да заявиш собствената си услуга.')
+
+      let packageQuery = adminClient
+        .from('partner_service_packages')
+        .select('id, title, description, features, price_amount, currency, is_active')
+        .eq('service_id', serviceId)
+        .eq('is_active', true)
+      packageQuery = requestedPackageId ? packageQuery.eq('id', requestedPackageId) : packageQuery.order('created_at').limit(1)
+      const { data: servicePackage, error: packageError } = await packageQuery.maybeSingle()
+      if (packageError) throw packageError
+      if (!servicePackage) throw new Error('Пакетът вече не е активен.')
+
+      const partnerCanReceiveNewChats = await hasActivePartnerAccess(adminClient, service.partner_id, service.profile_id)
+      if (!partnerCanReceiveNewChats) {
+        throw new Error('Партньорът в момента не приема нови заявки.')
+      }
+
+      let { data: conversation, error: conversationError } = await adminClient
+        .from('conversations')
+        .select('*')
+        .eq('client_id', user.id)
+        .eq('partner_id', service.partner_id)
+        .eq('status', 'open')
+        .is('project_id', null)
+        .maybeSingle()
+      if (conversationError) throw conversationError
+
+      if (!conversation) {
+        const created = await adminClient.from('conversations').insert({
+          client_id: user.id,
+          partner_id: service.partner_id,
+          subject: `Заявка за услуга: ${service.title}`,
+        }).select('*').single()
+        if (created.error) throw created.error
+        conversation = created.data
+      }
+
+      const { data: activeRequest, error: activeRequestError } = await adminClient
+        .from('service_requests')
+        .select('*')
+        .eq('conversation_id', conversation.id)
+        .in('status', ['requested', 'negotiating'])
+        .maybeSingle()
+      if (activeRequestError) throw activeRequestError
+      if (activeRequest) {
+        if (activeRequest.service_id !== serviceId) {
+          throw new Error('В този разговор вече има активна заявка. Приключете я преди нова услуга.')
+        }
+        return jsonResponse(200, { ok: true, conversation, serviceRequest: activeRequest, reused: true })
+      }
+
+      const snapshot = {
+        service_title: service.title,
+        service_subtitle: service.subtitle,
+        service_slug: service.slug,
+        package_title: servicePackage.title,
+        package_description: servicePackage.description,
+        features: Array.isArray(servicePackage.features) ? servicePackage.features : [],
+        starting_price: servicePackage.price_amount,
+        currency: servicePackage.currency || 'EUR',
+      }
+      const { data: serviceRequest, error: requestError } = await adminClient.from('service_requests').insert({
+        conversation_id: conversation.id,
+        service_id: serviceId,
+        service_package_id: servicePackage.id,
+        client_id: user.id,
+        partner_id: service.partner_id,
+        snapshot,
+      }).select('*').single()
+      if (requestError) throw requestError
+
+      const messageBody = `Заявка за услуга: ${service.title}`
+      const { data: message, error: messageError } = await adminClient.from('messages').insert({
+        conversation_id: conversation.id,
+        sender_id: user.id,
+        kind: 'service_request',
+        body: messageBody,
+        service_request_id: serviceRequest.id,
+      }).select('*').single()
+      if (messageError) throw messageError
+
+      await adminClient.from('conversations').update({
+        subject: `Заявка за услуга: ${service.title}`,
+        last_message_at: message.created_at,
+        last_message_preview: previewFor(messageBody),
+        ...nextReadFlags(conversation, user.id),
+      }).eq('id', conversation.id)
+
+      return jsonResponse(200, { ok: true, conversation, serviceRequest, message, reused: false })
+    }
+
+    if (action === 'update_service_request_status') {
+      const requestId = assertUuid(payload.requestId, 'Service request id')
+      const status = String(payload.status || '')
+      if (!SERVICE_REQUEST_STATUSES.has(status)) throw new Error('Service request status is invalid.')
+      const { data: serviceRequest, error: requestError } = await adminClient
+        .from('service_requests')
+        .select('*')
+        .eq('id', requestId)
+        .single()
+      if (requestError) throw requestError
+      if (status === 'cancelled' && serviceRequest.client_id !== user.id) throw new Error('Само клиентът може да отмени заявката.')
+      if (status !== 'cancelled' && serviceRequest.partner_id !== user.id) throw new Error('Само партньорът може да обработи заявката.')
+
+      const { data: updatedRequest, error: updateError } = await adminClient
+        .from('service_requests')
+        .update({ status })
+        .eq('id', requestId)
+        .select('*')
+        .single()
+      if (updateError) throw updateError
+
+      const labels: Record<string, string> = {
+        negotiating: 'Партньорът прие заявката за уточняване и подготвя финална оферта.',
+        declined: 'Партньорът отказа заявката.',
+        cancelled: 'Клиентът отмени заявката.',
+      }
+      const { data: message, error: messageError } = await adminClient.from('messages').insert({
+        conversation_id: serviceRequest.conversation_id,
+        sender_id: user.id,
+        kind: 'system',
+        body: labels[status],
+        service_request_id: requestId,
+      }).select('*').single()
+      if (messageError) throw messageError
+
+      await adminClient.from('conversations').update({
+        last_message_at: message.created_at,
+        last_message_preview: labels[status],
+      }).eq('id', serviceRequest.conversation_id)
+
+      return jsonResponse(200, { ok: true, serviceRequest: updatedRequest, message })
+    }
+
     if (action === 'send_message') {
       const conversationId = assertUuid(payload.conversationId, 'Conversation id')
       const kind = String(payload.kind || 'text')
@@ -352,6 +499,13 @@ Deno.serve(async (req) => {
       const priceAmount = Number(payload.priceAmount || 0)
       const deliveryDays = Number(payload.deliveryDays || 0)
       const revisions = Number(payload.revisions || 0)
+      const { data: activeServiceRequest, error: activeRequestError } = await adminClient
+        .from('service_requests')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .in('status', ['requested', 'negotiating'])
+        .maybeSingle()
+      if (activeRequestError) throw activeRequestError
 
       const { data: offer, error: offerError } = await adminClient.from('offers').insert({
         conversation_id: conversationId,
@@ -368,8 +522,19 @@ Deno.serve(async (req) => {
         execution_mode: executionMode,
         stages,
         expires_at: payload.expiresAt || null,
+        service_request_id: activeServiceRequest?.id || null,
+        service_id: activeServiceRequest?.service_id || null,
+        service_package_id: activeServiceRequest?.service_package_id || null,
       }).select('*').single()
       if (offerError) throw offerError
+
+      if (activeServiceRequest?.status === 'requested') {
+        const { error: requestUpdateError } = await adminClient
+          .from('service_requests')
+          .update({ status: 'negotiating' })
+          .eq('id', activeServiceRequest.id)
+        if (requestUpdateError) throw requestUpdateError
+      }
 
       const messageBody = `Оферта: ${offer.title}`
       const { data: message, error: messageError } = await adminClient.from('messages').insert({
@@ -407,6 +572,7 @@ Deno.serve(async (req) => {
 
       const { data: offer, error: offerLoadError } = await adminClient.from('offers').select('*').eq('id', offerId).single()
       if (offerLoadError) throw offerLoadError
+      if (offer.status !== 'sent') throw new Error('Офертата вече е обработена.')
       if (status === 'withdrawn' && offer.partner_id !== user.id) throw new Error('Само партньорът може да изтегли оферта.')
       if (status !== 'withdrawn' && offer.client_id !== user.id) throw new Error('Само клиентът може да приеме или откаже оферта.')
 
@@ -414,13 +580,33 @@ Deno.serve(async (req) => {
       if (conversationError) throw conversationError
       if (!isParticipant(conversation, user.id)) throw new Error('Conversation access denied.')
 
-      const patch: Record<string, unknown> = { status }
-      if (status === 'accepted') patch.accepted_at = new Date().toISOString()
-      const { data: updatedOffer, error: updateError } = await adminClient.from('offers').update(patch).eq('id', offerId).select('*').single()
-      if (updateError) throw updateError
+      let updatedOffer = null
+      let order = null
+      if (status === 'accepted' && offer.service_request_id) {
+        const { data: accepted, error: acceptError } = await adminClient.rpc('accept_service_offer', {
+          p_offer_id: offerId,
+          p_client_id: user.id,
+        })
+        if (acceptError) throw acceptError
+        updatedOffer = accepted?.offer || null
+        order = accepted?.order || null
+      } else {
+        const patch: Record<string, unknown> = { status }
+        if (status === 'accepted') patch.accepted_at = new Date().toISOString()
+        const { data, error: updateError } = await adminClient
+          .from('offers')
+          .update(patch)
+          .eq('id', offerId)
+          .select('*')
+          .single()
+        if (updateError) throw updateError
+        updatedOffer = data
+      }
 
       const labels: Record<string, string> = {
-        accepted: 'Офертата е приета. Скоро ще можеш да платиш директно в сайта.',
+        accepted: order
+          ? 'Финалната оферта е приета. Създадена е поръчка, която очаква директно плащане към партньора.'
+          : 'Офертата е приета. Плащането се уговаря и извършва директно между клиента и партньора.',
         declined: 'Офертата е отказана.',
         withdrawn: 'Офертата е изтеглена от партньора.',
       }
@@ -439,7 +625,7 @@ Deno.serve(async (req) => {
         ...nextReadFlags(conversation, user.id),
       }).eq('id', offer.conversation_id)
 
-      return jsonResponse(200, { ok: true, offer: updatedOffer, message })
+      return jsonResponse(200, { ok: true, offer: updatedOffer, message, order })
     }
 
     return jsonResponse(400, { error: 'Unsupported chat action.' })

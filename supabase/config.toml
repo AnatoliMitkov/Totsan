@@ -384,6 +384,17 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
+[functions.payments-webhook]
+# Stripe cannot send a Supabase JWT. The function verifies every request with
+# STRIPE_WEBHOOK_SECRET before processing any event.
+verify_jwt = false
+
+[functions.subscriptions-checkout]
+verify_jwt = true
+
+[functions.subscriptions-portal]
+verify_jwt = true
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 

@@ -1397,7 +1397,7 @@ create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
   conversation_id uuid not null references public.conversations(id) on delete cascade,
   sender_id uuid not null references auth.users(id) on delete cascade,
-  kind text not null default 'text' check (kind in ('text','offer','system','attachment')),
+  kind text not null default 'text' check (kind in ('text','offer','system','attachment','service_request')),
   body text,
   attachments jsonb not null default '[]'::jsonb,
   offer_id uuid references public.offers(id) on delete set null,
@@ -1547,7 +1547,8 @@ create table if not exists public.partner_services (
   delivery_areas text[] not null default '{}'::text[],
   is_published boolean not null default false,
   moderation_status text not null default 'draft' check (moderation_status in ('draft','pending','approved','rejected')),
-  moderation_note text
+  moderation_note text,
+  moderation_attachments jsonb not null default '[]'::jsonb
 );
 
 create table if not exists public.partner_service_packages (
@@ -1576,6 +1577,28 @@ create table if not exists public.partner_service_faq (
   answer text not null,
   order_index integer not null default 0
 );
+
+create table if not exists public.service_requests (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.conversations(id) on delete cascade,
+  service_id uuid not null references public.partner_services(id) on delete cascade,
+  service_package_id uuid references public.partner_service_packages(id) on delete set null,
+  client_id uuid not null references auth.users(id) on delete cascade,
+  partner_id uuid not null references auth.users(id) on delete cascade,
+  status text not null default 'requested' check (status in ('requested','negotiating','declined','converted','cancelled')),
+  snapshot jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (client_id <> partner_id)
+);
+
+alter table public.messages
+  add column if not exists service_request_id uuid references public.service_requests(id) on delete set null;
+
+alter table public.offers
+  add column if not exists service_request_id uuid references public.service_requests(id) on delete set null,
+  add column if not exists service_id uuid references public.partner_services(id) on delete set null,
+  add column if not exists service_package_id uuid references public.partner_service_packages(id) on delete set null;
 
 drop trigger if exists set_partner_services_updated_at on public.partner_services;
 create trigger set_partner_services_updated_at
@@ -1775,6 +1798,42 @@ create policy "admins can manage partner service faq"
 insert into storage.buckets (id, name, public)
 values ('service-media', 'service-media', true)
 on conflict (id) do update set public = excluded.public;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'service-moderation-feedback',
+  'service-moderation-feedback',
+  false,
+  5242880,
+  array['image/jpeg', 'image/png', 'image/webp']
+)
+on conflict (id) do update
+set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists admins_manage_service_moderation_feedback on storage.objects;
+drop policy if exists service_owners_read_moderation_feedback on storage.objects;
+
+create policy admins_manage_service_moderation_feedback
+  on storage.objects for all
+  to authenticated
+  using (bucket_id = 'service-moderation-feedback' and public.is_admin())
+  with check (bucket_id = 'service-moderation-feedback' and public.is_admin());
+
+create policy service_owners_read_moderation_feedback
+  on storage.objects for select
+  to authenticated
+  using (
+    bucket_id = 'service-moderation-feedback'
+    and exists (
+      select 1
+      from public.partner_services service
+      where service.id::text = (storage.foldername(name))[1]
+        and service.partner_id = (select auth.uid())
+    )
+  );
 
 create or replace view public.vw_admin_dashboard as
 select

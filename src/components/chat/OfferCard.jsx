@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { CheckCircle2, Clock, CreditCard, Layers3, XCircle } from 'lucide-react'
 import { conversationRole } from '../../lib/chat.js'
-import { formatMoney } from '../../lib/money.js'
+import { formatEurWithBgn } from '../../lib/money.js'
 
 export default function OfferCard({ offer, conversation, userId, onAction, compact = false, messageCreatedAt = '' }) {
   const role = conversationRole(conversation, userId)
+  const providerName = conversation?.partner?.name || conversation?.partner?.display_name || 'Партньорът в разговора'
   const canClientAct = role === 'client' && offer.status === 'sent'
   const canPartnerAct = role === 'partner' && offer.status === 'sent'
   const [withdrawStatus, setWithdrawStatus] = useState('idle')
@@ -46,10 +47,11 @@ export default function OfferCard({ offer, conversation, userId, onAction, compa
       {offer.description && <p className="mt-3 break-words whitespace-pre-wrap text-sm opacity-80">{offer.description}</p>}
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
+        <InlineBadge compact={compact}>Партньорска оферта · доставчик: {providerName}</InlineBadge>
         <InlineBadge compact={compact}>
           {executionMode === 'staged' ? 'Поетапно изпълнение' : 'Еднократно изпълнение'}
         </InlineBadge>
-        <InlineBadge compact={compact}>Плащането е за цялата оферта.</InlineBadge>
+        <InlineBadge compact={compact}>Плащането се уговаря и извършва директно към партньора.</InlineBadge>
       </div>
 
       {executionMode === 'staged' && stages.length > 0 && (
@@ -91,13 +93,13 @@ export default function OfferCard({ offer, conversation, userId, onAction, compa
       )}
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <Info icon={CreditCard} label="Обща цена" value={offer.price_amount ? formatMoney(offer.price_amount, 'EUR') : 'По уговорка'} />
+        <Info icon={CreditCard} label="Обща цена" value={offer.price_amount ? formatEurWithBgn(offer.price_amount) : 'По уговорка'} />
         <Info icon={Clock} label="Срок" value={offer.delivery_days ? `${offer.delivery_days} дни` : 'По уговорка'} />
       </div>
 
       {(canClientAct || canPartnerAct) && (
         <div className="mt-4 flex flex-wrap gap-2">
-          {canClientAct && <button type="button" onClick={() => onAction?.(offer, 'accepted')} className="btn btn-primary !py-2 text-sm">Приеми и плати</button>}
+          {canClientAct && <button type="button" onClick={() => onAction?.(offer, 'accepted')} className="btn btn-primary !py-2 text-sm">Приеми офертата</button>}
           {canClientAct && <button type="button" onClick={() => onAction?.(offer, 'declined')} className="btn btn-ghost !py-2 text-sm"><XCircle size={17} /> Откажи</button>}
           {canPartnerAct && (
             <button

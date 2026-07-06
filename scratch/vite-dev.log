@@ -1,55 +1,187 @@
 
 > totsan-v2@0.1.0 dev
-> vite --host 0.0.0.0
+> vite
 
 
-  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m287[22m[2m[0m ms[22m
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m257[22m[2m[0m ms[22m
 
   [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
-  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.0.108:[1m5173[22m/[39m
-  [32m➜[39m  [1mNetwork[22m: [36mhttp://172.19.64.1:[1m5173[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.0.105:[1m5173[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://172.21.208.1:[1m5173[22m/[39m
   [32m➜[39m  [1mNetwork[22m: [36mhttp://172.26.208.1:[1m5173[22m/[39m
-[2m4:10:22 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
-[2m4:15:37 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
-[2m4:20:19 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
-[2m4:22:48 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
-[2m4:22:58 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
-[2m4:23:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
-[2m4:23:46 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
-[2m4:27:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/Services.jsx, /src/pages/Product.jsx, /src/pages/PartnerService.jsx, /src/pages/Catalog.jsx, /src/pages/ProStatus.jsx, /src/pages/Layer.jsx, /src/pages/Pro.jsx, /src/pages/MyProfile.jsx, /src/components/profile/PartnerProfileWorkspace.jsx, /src/components/profile/PartnerServiceEditor.jsx, /src/components/profile/PartnerMaterialsEditor.jsx, /src/pages/ProOnboarding.jsx, /src/pages/SharedProject.jsx, /src/components/profile/CustomerOverview.jsx, /src/components/profile/CustomerProject.jsx, /src/components/ProfessionalCard.jsx[22m
-[2m4:27:33 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
-[2m4:27:50 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
-[2m4:28:06 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ProfessionalCard.jsx, /src/index.css[22m
-[2m4:28:12 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Pro.jsx, /src/index.css[22m
-[2m4:28:17 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Catalog.jsx, /src/index.css[22m
-[2m4:31:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/Layer.jsx, /src/components/profile/CustomerProject.jsx[22m
-[2m4:31:33 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/Layer.jsx, /src/components/profile/CustomerProject.jsx[22m
-[2m4:32:57 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css, /src/components/profile/CustomerProject.jsx[22m
-[2m4:50:31 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/Layer.jsx, /src/components/profile/CustomerProject.jsx[22m
-[2m4:51:02 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css, /src/components/profile/CustomerProject.jsx[22m
-[2m4:51:11 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css, /src/components/profile/CustomerProject.jsx[22m
-[2m5:03:36 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css, /src/components/profile/CustomerProject.jsx[22m
-[2m5:05:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css, /src/components/profile/CustomerProject.jsx[22m
-[2m5:06:13 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css, /src/components/profile/CustomerProject.jsx[22m
-[2m5:08:16 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/main.jsx, /src/index.css, /src/pages/Legal.jsx, /src/pages/Contact.jsx, /src/pages/Product.jsx, /src/pages/PartnerService.jsx, /src/pages/TotsanPro.jsx, /src/pages/Start.jsx, /src/pages/Catalog.jsx, /src/pages/Layer.jsx, /src/pages/Pro.jsx, /src/pages/Home.jsx, /src/pages/HowItWorks.jsx, /src/components/Layout.jsx, /src/pages/MyProfile.jsx, /src/pages/SharedProject.jsx, /src/pages/Services.jsx, /src/pages/ProStatus.jsx, /src/components/profile/PartnerProfileWorkspace.jsx, /src/components/profile/PartnerServiceEditor.jsx, /src/components/profile/PartnerMaterialsEditor.jsx, /src/pages/ProOnboarding.jsx, /src/components/profile/CustomerOverview.jsx, /src/components/profile/CustomerProject.jsx, /src/components/ProfessionalCard.jsx, /src/components/profile/PortfolioGallery.jsx, /src/components/profile/PartnerInquiries.jsx[22m
-[2m5:08:16 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/main.jsx[22m Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
-[2m5:08:16 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
-[2m5:08:16 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/main.jsx[22m Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
-[2m5:08:16 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
-[2m5:08:17 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/main.jsx[22m Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
-[2m5:08:17 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
-[2m5:12:33 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css[22m
-[2m5:16:06 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/main.jsx, /src/index.css, /src/pages/Legal.jsx, /src/pages/Contact.jsx, /src/pages/Product.jsx, /src/pages/PartnerService.jsx, /src/pages/TotsanPro.jsx, /src/pages/Start.jsx, /src/pages/Catalog.jsx, /src/pages/Layer.jsx, /src/pages/Pro.jsx, /src/pages/Home.jsx, /src/pages/HowItWorks.jsx, /src/components/Layout.jsx, /src/pages/MyProfile.jsx, /src/pages/SharedProject.jsx, /src/pages/Services.jsx, /src/pages/ProStatus.jsx, /src/components/profile/PartnerProfileWorkspace.jsx, /src/components/profile/PartnerServiceEditor.jsx, /src/components/profile/PartnerMaterialsEditor.jsx, /src/pages/ProOnboarding.jsx, /src/components/profile/CustomerOverview.jsx, /src/components/profile/CustomerProject.jsx, /src/components/ProfessionalCard.jsx, /src/components/profile/PortfolioGallery.jsx, /src/components/profile/PartnerInquiries.jsx[22m
-[2m5:16:07 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/main.jsx[22m Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
-[2m5:16:07 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
-[2m5:16:07 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/main.jsx[22m Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
-[2m5:16:07 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
-[2m5:16:07 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/main.jsx[22m Could not Fast Refresh ("true" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
-[2m5:16:07 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
-[2m5:16:38 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css[22m
-[2m5:16:58 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css[22m
-[2m5:17:24 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css[22m
-[2m5:17:47 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css[22m
-[2m5:18:04 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css[22m
-[2m5:20:52 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css[22m
-[2m5:48:54 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Layer.jsx, /src/index.css, /src/components/profile/CustomerProject.jsx[22m
+[2m11:24:18 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m11:36:49 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/OnboardingPages.jsx, /src/index.css[22m
+[2m12:53:33 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Layout.jsx, /src/index.css[22m
+[2m12:53:39 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Layout.jsx, /src/index.css[22m
+[2m12:53:48 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Layout.jsx, /src/index.css[22m
+[2m1:08:41 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProOnboarding.jsx, /src/index.css[22m
+[2m1:09:33 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/OnboardingPages.jsx, /src/index.css[22m
+[2m1:09:49 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/OnboardingPages.jsx, /src/index.css[22m
+[2m1:10:01 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/OnboardingPages.jsx, /src/index.css[22m
+[2m1:26:25 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:26:30 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:26:52 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:27:01 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:27:08 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:27:16 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:27:26 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:27:38 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:28:06 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:28:14 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:28:34 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:28:42 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:28:52 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:29:08 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:29:15 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:29:25 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:29:31 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:29:38 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:29:46 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:29:58 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:34:34 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/TotsanPro.jsx, /src/components/profile/PartnerProfileWorkspace.jsx[22m
+[2m1:34:56 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:35:02 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m1:35:10 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:16:57 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/TotsanPro.jsx, /src/components/profile/PartnerProfileWorkspace.jsx[22m
+[2m4:17:09 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:17:18 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:17:38 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:17:46 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:18:20 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:18:35 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PublicProfileBanner.jsx, /src/index.css[22m
+[2m4:18:42 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:18:42 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m4:18:49 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Layout.jsx, /src/index.css[22m
+[2m4:18:49 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m4:19:14 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/TotsanPro.jsx, /src/index.css[22m
+[2m4:19:22 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/TotsanPro.jsx, /src/index.css[22m
+[2m4:19:31 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/TotsanPro.jsx, /src/index.css[22m
+[2m4:19:44 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css[22m
+[2m4:24:09 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:25:39 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:29:38 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/TotsanPro.jsx, /src/components/profile/PartnerProfileWorkspace.jsx[22m
+[2m4:30:00 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:30:09 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:30:20 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:34:51 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/TotsanPro.jsx, /src/components/profile/PartnerProfileWorkspace.jsx[22m
+[2m4:35:12 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:52:37 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PublicProfileBanner.jsx, /src/index.css[22m
+[2m4:52:57 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m4:53:37 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m7:27:54 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m7:34:48 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m8:55:45 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProOnboarding.jsx, /src/index.css[22m
+[2m8:56:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m8:57:03 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m8:57:23 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m8:57:43 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m8:57:52 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m8:58:09 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m8:58:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m8:58:28 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m8:58:35 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m8:58:42 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m8:58:48 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m8:58:54 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m8:58:59 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m8:59:02 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m8:59:09 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m8:59:16 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m8:59:25 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m9:04:59 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProOnboarding.jsx, /src/index.css[22m
+[2m9:15:23 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m9:15:27 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m9:15:35 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m9:22:06 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m9:22:13 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m9:33:18 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m9:33:40 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m9:36:37 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m9:39:04 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m9:39:13 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m9:45:43 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m9:45:58 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m9:53:15 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyProfile.jsx, /src/index.css[22m
+[2m9:53:27 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m9:57:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m10:11:00 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Product.jsx, /src/index.css, /src/pages/Bathroom.jsx, /src/pages/TerracesAndOutdoor.jsx, /src/pages/Kitchens.jsx, /src/pages/LightingAndTextiles.jsx, /src/pages/Catalog.jsx, /src/pages/BedroomAndLiving.jsx, /src/pages/MyOrders.jsx, /src/pages/Checkout.jsx, /src/pages/Order.jsx, /src/components/profile/PartnerOrders.jsx, /src/pages/Services.jsx, /src/pages/PartnerService.jsx, /src/pages/Pro.jsx, /src/components/profile/PartnerProfileWorkspace.jsx, /src/components/profile/PartnerServiceEditor.jsx, /src/components/admin/Dashboard.jsx, /src/pages/SharedProject.jsx, /src/pages/MyProfile.jsx, /src/components/profile/CustomerOverview.jsx, /src/components/profile/CustomerProject.jsx, /src/components/profile/PartnerInquiries.jsx, /src/components/chat/OfferCard.jsx[22m
+[2m10:12:46 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Legal.jsx, /src/index.css[22m
+[2m10:13:02 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Layout.jsx, /src/index.css[22m
+[2m10:13:02 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Contact.jsx, /src/index.css[22m
+[2m10:13:11 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Services.jsx, /src/index.css, /src/pages/PartnerService.jsx, /src/pages/Catalog.jsx, /src/pages/Pro.jsx, /src/components/profile/PartnerProfileWorkspace.jsx, /src/components/profile/PartnerServiceEditor.jsx, /src/components/admin/Dashboard.jsx[22m
+[2m10:13:39 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Checkout.jsx, /src/index.css[22m
+[2m10:14:10 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/chat/OfferComposer.jsx, /src/index.css[22m
+[2m10:14:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/chat/OfferCard.jsx, /src/index.css[22m
+[2m10:15:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.jsx, /src/index.css[22m
+[2m10:15:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HowItWorks.jsx, /src/index.css[22m
+[2m10:15:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PartnerService.jsx, /src/index.css[22m
+[2m10:15:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Services.jsx, /src/index.css[22m
+[2m10:15:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Order.jsx, /src/index.css[22m
+[2m10:15:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/chat/ChatThread.jsx, /src/index.css[22m
+[2m10:15:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/GardenAndYard.jsx, /src/index.css[22m
+[2m10:15:38 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyOrders.jsx, /src/index.css, /src/pages/Checkout.jsx, /src/pages/Order.jsx, /src/components/profile/PartnerOrders.jsx[22m
+[2m10:16:05 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/TotsanPro.jsx, /src/index.css[22m
+[2m10:16:05 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProOnboarding.jsx, /src/index.css[22m
+[2m10:16:14 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Contact.jsx, /src/index.css[22m
+[2m10:22:00 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Legal.jsx, /src/index.css[22m
+[2m10:22:26 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Checkout.jsx, /src/index.css[22m
+[2m10:22:46 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Inbox.jsx, /src/index.css[22m
+[2m10:22:46 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/chat/OfferCard.jsx, /src/index.css[22m
+[2m10:22:58 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/chat/OfferComposer.jsx, /src/index.css[22m
+[2m10:23:27 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PartnerService.jsx, /src/index.css[22m
+[2m10:23:27 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Services.jsx, /src/index.css[22m
+[2m10:23:27 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Home.jsx, /src/index.css[22m
+[2m10:23:27 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/HowItWorks.jsx, /src/index.css[22m
+[2m10:23:38 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Legal.jsx, /src/index.css[22m
+[2m10:23:39 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProOnboarding.jsx, /src/index.css[22m
+[2m10:24:07 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m10:24:53 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Order.jsx, /src/index.css[22m
+[2m10:25:12 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyOrders.jsx, /src/index.css, /src/pages/Checkout.jsx, /src/pages/Order.jsx, /src/components/profile/PartnerOrders.jsx[22m
+[2m10:25:12 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerOrders.jsx, /src/index.css[22m
+[2m10:25:12 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/chat/ChatThread.jsx, /src/index.css[22m
+[2m10:25:12 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/Admin.jsx[22m
+[2m10:25:12 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/main.jsx, /src/index.css, /src/pages/Contact.jsx, /src/pages/Product.jsx, /src/pages/Legal.jsx, /src/pages/PartnerService.jsx, /src/pages/Start.jsx, /src/pages/Layer.jsx, /src/pages/Catalog.jsx, /src/pages/Pro.jsx, /src/pages/TotsanPro.jsx, /src/pages/Home.jsx[22m
+[2m10:25:12 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/admin/Dashboard.jsx, /src/index.css[22m
+[2m10:25:42 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Checkout.jsx, /src/index.css, /src/pages/Inbox.jsx, /src/pages/Order.jsx, /src/components/profile/PartnerProfileWorkspace.jsx[22m
+[2m10:26:27 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyOrders.jsx, /src/index.css, /src/pages/Checkout.jsx, /src/pages/Order.jsx, /src/components/profile/PartnerOrders.jsx[22m
+[2m10:26:27 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Order.jsx, /src/index.css[22m
+[2m10:26:27 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Contact.jsx, /src/index.css[22m
+[2m10:27:04 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Contact.jsx, /src/index.css[22m
+[2m10:27:04 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/admin/Dashboard.jsx, /src/index.css[22m
+[2m10:27:27 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerProfileWorkspace.jsx, /src/index.css[22m
+[2m10:27:41 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Layout.jsx, /src/index.css[22m
+[2m10:32:08 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/MyOrders.jsx, /src/index.css, /src/pages/Checkout.jsx, /src/pages/Order.jsx, /src/components/profile/PartnerOrders.jsx[22m
+[2m10:32:27 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Order.jsx, /src/index.css[22m
+[2m10:32:39 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Order.jsx, /src/index.css[22m
+[2m10:36:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Admin.jsx, /src/index.css[22m
+[2m10:36:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/Admin.jsx[22m
+[2m9:14:44 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Layout.jsx, /src/index.css[22m
+[2m9:14:52 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Layout.jsx, /src/index.css[22m
+[2m9:18:57 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Layout.jsx, /src/index.css[22m
+[2m9:21:12 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerServiceEditor.jsx, /src/index.css[22m
+[2m9:21:52 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerServiceEditor.jsx, /src/index.css[22m
+[2m9:37:01 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ui/LocationCombobox.jsx, /src/index.css[22m
+[2m9:38:24 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ui/LocationCombobox.jsx, /src/index.css[22m
+[2m9:39:57 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerServiceEditor.jsx, /src/index.css[22m
+[2m9:42:41 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ui/LocationCombobox.jsx, /src/index.css[22m
+[2m9:45:06 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerServiceEditor.jsx, /src/index.css[22m
+[2m10:10:11 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/components/profile/PartnerInquiries.jsx, /src/components/admin/InquiriesManager.jsx, /src/components/admin/Dashboard.jsx[22m
+[2m10:10:17 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Services.jsx, /src/index.css, /src/pages/PartnerService.jsx, /src/pages/Catalog.jsx, /src/pages/Pro.jsx, /src/components/profile/PartnerProfileWorkspace.jsx, /src/components/profile/PartnerServiceEditor.jsx, /src/components/admin/Dashboard.jsx[22m
+[2m10:10:26 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Services.jsx, /src/index.css, /src/pages/PartnerService.jsx, /src/pages/Catalog.jsx, /src/pages/Pro.jsx, /src/components/profile/PartnerProfileWorkspace.jsx, /src/components/profile/PartnerServiceEditor.jsx, /src/components/admin/Dashboard.jsx[22m
+[2m10:10:42 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Services.jsx, /src/index.css, /src/pages/PartnerService.jsx, /src/pages/Catalog.jsx, /src/pages/Pro.jsx, /src/components/profile/PartnerProfileWorkspace.jsx, /src/components/profile/PartnerServiceEditor.jsx, /src/components/admin/Dashboard.jsx[22m
+[2m10:11:39 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/Admin.jsx[22m
+[2m10:12:39 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/Admin.jsx[22m
+[2m10:13:03 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerServiceEditor.jsx, /src/index.css[22m
+[2m10:13:15 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/Admin.jsx[22m
+[2m10:15:21 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Services.jsx, /src/index.css, /src/pages/PartnerService.jsx, /src/pages/Catalog.jsx, /src/pages/Pro.jsx, /src/components/profile/PartnerProfileWorkspace.jsx, /src/components/profile/PartnerServiceEditor.jsx, /src/components/admin/Dashboard.jsx[22m
+[2m10:16:06 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/Admin.jsx[22m
+[2m10:31:58 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Services.jsx, /src/index.css, /src/pages/PartnerService.jsx, /src/pages/Catalog.jsx, /src/pages/Pro.jsx, /src/components/profile/PartnerProfileWorkspace.jsx, /src/components/profile/PartnerServiceEditor.jsx, /src/components/admin/Dashboard.jsx[22m
+[2m10:31:58 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/Admin.jsx[22m
+[2m10:37:03 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/index.css, /src/pages/Admin.jsx[22m
+[2m10:48:03 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerServiceEditor.jsx, /src/index.css[22m
+[2m12:18:47 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/profile/PartnerServiceEditor.jsx, /src/index.css[22m
+[2m1:56:00 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PartnerService.jsx, /src/index.css, /src/components/Layout.jsx, /src/pages/Inbox.jsx, /src/pages/Pro.jsx, /src/pages/SharedProject.jsx, /src/components/chat/ComposeBar.jsx, /src/components/chat/ConversationList.jsx, /src/components/chat/ChatThread.jsx, /src/components/profile/CustomerOverview.jsx, /src/components/chat/MessageBubble.jsx, /src/components/profile/PartnerInquiries.jsx, /src/components/chat/OfferCard.jsx[22m
+[2m1:56:33 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/chat/MessageBubble.jsx, /src/index.css[22m
+[2m1:56:58 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/chat/ChatThread.jsx, /src/index.css[22m
+[2m1:56:58 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/Inbox.jsx, /src/index.css[22m
+[2m1:57:20 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PartnerService.jsx, /src/index.css[22m

@@ -5,12 +5,35 @@ export default function PublicProfileBanner({
   heightClass = 'aspect-[1600/520]',
   className = '',
   onClick = undefined,
+  onMouseEnter = undefined,
+  onMouseLeave = undefined,
+  onFocus = undefined,
+  onBlur = undefined,
   placeholderLabel = '',
   placeholderClassName = '',
+  editHintTitle = '',
+  editHintText = '',
   children = null,
 }) {
+  function handleKeyDown(event) {
+    if (!onClick || (event.key !== 'Enter' && event.key !== ' ')) return
+    event.preventDefault()
+    onClick(event)
+  }
+
   return (
-    <section onClick={onClick} className={`relative w-full overflow-hidden bg-soft ${heightClass} ${className}`}>
+    <section
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? (placeholderLabel || 'Редактирай банера') : undefined}
+      className={`relative w-full overflow-hidden bg-soft ${heightClass} ${className}`}
+    >
       {imageSrc ? (
         <img src={imageSrc} alt={imageAlt} className="img-cover" style={imageStyle} />
       ) : (
@@ -25,6 +48,14 @@ export default function PublicProfileBanner({
             </div>
           )}
         </>
+      )}
+      {onClick && editHintText && (
+        <div className="pointer-events-none absolute bottom-5 right-5 z-20 hidden max-w-xs translate-y-5 rounded-2xl border border-white/20 bg-ink/92 p-4 text-left text-paper opacity-0 shadow-[0_22px_60px_-24px_rgba(13,35,64,0.72)] backdrop-blur-md transition-all duration-300 ease-out group-hover:translate-y-0 group-hover:opacity-100 group-focus:translate-y-0 group-focus:opacity-100 md:block">
+          {editHintTitle && (
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-paper">{editHintTitle}</div>
+          )}
+          <p className="mt-1 text-sm leading-6 text-paper/90">{editHintText}</p>
+        </div>
       )}
       {children}
     </section>

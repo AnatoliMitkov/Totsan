@@ -8,6 +8,7 @@ import {
   Compass,
   CreditCard,
   Eye,
+  FileText,
   FolderKanban,
   GripVertical,
   Globe2,
@@ -16,6 +17,7 @@ import {
   Link2,
   Lock,
   LogOut,
+  Loader2,
   Mail,
   MapPin,
   MessagesSquare,
@@ -48,11 +50,15 @@ import {
   savePortfolioItem,
   uploadPortfolioImage,
 } from '../../lib/portfolio.js'
-import { createConnectOnboarding, getConnectStatus } from '../../lib/payments.js'
 import {
+  cancelPartnerSubscriptionAtPeriodEnd,
   createPartnerSubscriptionPortal,
+  ensurePartnerSubscriptionActivationEmail,
   getPartnerSubscriptionEndLabel,
   loadOwnPartnerSubscription,
+  reconcilePartnerSubscription,
+  resumePartnerSubscriptionRenewal,
+  syncPartnerSubscriptionSession,
 } from '../../lib/subscriptions.js'
 import { loadPartnerInquiries, loadInquiryProjects } from '../../lib/partner-inquiries.js'
 import { loadPartnerServicesForProfile } from '../../lib/partner-services.js'
@@ -250,19 +256,6 @@ function makePortfolioDraft(item = null, profile) {
   }
 }
 
-function paymentMessageFromStripe(result) {
-    switch (result?.status) {
-    case 'active':
-      return 'Stripe профилът е активен.'
-    case 'pending_review':
-      return 'Данните са изпратени към Stripe. Профилът чака преглед и може да отнеме малко време, преди плащанията да станат активни.'
-    case 'needs_information':
-      return 'Stripe има нужда от още данни, преди да активира плащанията.'
-    default:
-      return 'Проверихме Stripe профила.'
-  }
-}
-
 export default function PartnerProfileWorkspace({ profile, userId, account, session, refreshAccount, onSaved }) {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('overview')
@@ -274,10 +267,12 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
   const [portfolioDraft, setPortfolioDraft] = useState(() => makePortfolioDraft(null, profile))
   const [saveState, setSaveState] = useState({ status: 'idle', message: '' })
   const [portfolioState, setPortfolioState] = useState({ status: 'idle', message: '' })
-  const [paymentState, setPaymentState] = useState({ status: 'idle', message: '' })
-  const [subscriptionState, setSubscriptionState] = useState({ status: 'loading', subscription: null, message: '' })
+  const [subscriptionState, setSubscriptionState] = useState({ status: 'loading', subscription: null, message: '', checkoutSuccess: false, confirmingExpired: false })
+  const [subscriptionRefreshKey, setSubscriptionRefreshKey] = useState(0)
   const [avatarEditor, setAvatarEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'avatar.jpg' })
   const [bannerEditor, setBannerEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'banner.jpg', positionY: 50 })
+  const [bannerHintVisible, setBannerHintVisible] = useState(false)
+  const workspaceContentRef = useRef(null)
 
   function openBannerEditor() {
     const input = document.getElementById('partner-cover-upload')
@@ -488,21 +483,89 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     if (!profile?.id) return undefined
 
     let active = true
-    async function loadSubscription() {
-      setSubscriptionState(current => ({ ...current, status: 'loading', message: '' }))
+    let pollTimer = null
+    let pollAttempts = 0
+    const maxPollAttempts = 24
+    let isConfirmingPayment = (new URLSearchParams(window.location.search)).get('subscription') === 'success'
+
+    async function loadSubscription(isPoll = false) {
+      if (!isPoll) {
+        setSubscriptionState(current => ({ ...current, status: 'loading', message: '' }))
+      }
       try {
         const params = new URLSearchParams(window.location.search)
         const subscriptionParam = params.get('subscription')
-        const subscription = await loadOwnPartnerSubscription()
+        const sessionId = params.get('session_id')
+
+        if (subscriptionParam === 'success' && sessionId && !isPoll) {
+          try {
+            await syncPartnerSubscriptionSession(sessionId)
+          } catch (syncError) {
+            console.error('Failed to sync checkout session with backend', syncError)
+          }
+        }
+
+        let subscription = await loadOwnPartnerSubscription()
+        let repairedFromStripe = false
+
+        if (!subscription?.active && !isPoll) {
+          try {
+            const reconciliation = await reconcilePartnerSubscription()
+            if (reconciliation?.subscription?.row) {
+              subscription = reconciliation.subscription
+              repairedFromStripe = Boolean(reconciliation.repaired || subscription.active)
+            }
+          } catch (reconciliationError) {
+            console.error('Failed to reconcile subscription with Stripe', reconciliationError)
+          }
+        }
+        if (
+          subscription?.active
+          && !subscription?.row?.metadata?.activation_email_sent_at
+          && !isPoll
+        ) {
+          try {
+            const notification = await ensurePartnerSubscriptionActivationEmail()
+            if (notification?.subscription?.row) subscription = notification.subscription
+          } catch (notificationError) {
+            console.error('Failed to ensure the subscription confirmation email', notificationError)
+          }
+        }
         if (!active) return
 
-        const message = subscriptionParam === 'success'
-          ? 'Stripe checkout приключи. Статусът ще се обнови след webhook потвърждение.'
-          : subscriptionParam === 'portal_return'
-            ? 'Върнахте се от Stripe управлението на абонамента.'
-            : ''
+        const hasActiveAccess = Boolean(subscription?.active)
 
-        setSubscriptionState({ status: 'ready', subscription, message })
+        if (hasActiveAccess && isConfirmingPayment) {
+          isConfirmingPayment = false
+          refreshAccount?.()
+          onSaved?.()
+        }
+
+        if (isConfirmingPayment && !hasActiveAccess && pollAttempts < maxPollAttempts) {
+          pollAttempts++
+          pollTimer = setTimeout(() => {
+            if (active) loadSubscription(true)
+          }, 2500)
+        }
+
+        let message = ''
+        if (isConfirmingPayment) {
+          message = 'Абонаментното плащане се потвърждава...'
+        } else if (hasActiveAccess && (subscriptionParam === 'success' || pollAttempts > 0)) {
+          message = 'Абонаментът е активиран успешно!'
+        } else if (hasActiveAccess && repairedFromStripe) {
+          message = 'Абонаментът беше синхронизиран успешно със Stripe.'
+        } else if (subscriptionParam === 'portal_return') {
+          message = 'Върнахте се от управлението на абонамента.'
+        }
+
+        setSubscriptionState({
+          status: 'ready',
+          subscription,
+          message,
+          checkoutSuccess: isConfirmingPayment,
+          confirmingExpired: isConfirmingPayment && pollAttempts >= maxPollAttempts,
+        })
 
         if (subscriptionParam) {
           params.delete('subscription')
@@ -513,68 +576,22 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
         }
       } catch (error) {
         if (!active) return
-        setSubscriptionState({ status: 'error', subscription: null, message: error.message || 'Абонаментният статус не успя да зареди.' })
+        setSubscriptionState({
+          status: 'error',
+          subscription: null,
+          message: error.message || 'Абонаментният статус не успя да зареди.',
+          checkoutSuccess: false,
+          confirmingExpired: false,
+        })
       }
     }
 
     loadSubscription()
-    return () => { active = false }
-  }, [profile?.id])
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const paymentsState = params.get('payments')
-    if (!paymentsState || !account?.stripe_account_id) return undefined
-
-    let active = true
-    setPaymentState({ status: 'saving', message: 'Проверяваме Stripe профила…' })
-
-    async function loadStripeStatus() {
-      try {
-        const result = await getConnectStatus()
-        if (!active) return
-        setPaymentState({ status: result.status === 'needs_information' ? 'idle' : 'saved', message: paymentMessageFromStripe(result) })
-      } catch (error) {
-        if (!active) return
-        setPaymentState({ status: 'error', message: error.message || 'Не успяхме да проверим Stripe профила.' })
-      } finally {
-        params.delete('payments')
-        const query = params.toString()
-        const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash || ''}`
-        window.history.replaceState({}, '', nextUrl)
-      }
+    return () => {
+      active = false
+      if (pollTimer) clearTimeout(pollTimer)
     }
-
-    loadStripeStatus()
-    return () => { active = false }
-  }, [account?.stripe_account_id])
-
-  useEffect(() => {
-    if (!account?.stripe_account_id) return undefined
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('payments')) return undefined
-
-    let active = true
-
-    async function loadStripeStatusQuietly() {
-      try {
-        const result = await getConnectStatus()
-        if (!active || !result?.status || result.status === 'not_started') return
-        setPaymentState((current) => {
-          if (current.status === 'opening' || current.status === 'saving') return current
-          return {
-            status: result.status === 'needs_information' ? 'idle' : 'saved',
-            message: paymentMessageFromStripe(result),
-          }
-        })
-      } catch {
-        // Keep the page usable even if Stripe status cannot be loaded in the background.
-      }
-    }
-
-    loadStripeStatusQuietly()
-    return () => { active = false }
-  }, [account?.stripe_account_id])
+  }, [profile?.id, subscriptionRefreshKey])
 
   const preview = useMemo(() => normalizeProfile({
     ...currentProfile,
@@ -615,13 +632,34 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     setProfileDraft(current => ({ ...current, [key]: value }))
   }
 
+  function scrollToWorkspaceStart() {
+    window.setTimeout(() => {
+      try {
+        const element = workspaceContentRef.current
+        if (!element) return
+
+        const headerOffset = window.innerWidth >= 1024 ? 96 : 80
+        const top = Math.max(window.scrollY + element.getBoundingClientRect().top - headerOffset, 0)
+        window.scrollTo({ top, behavior: 'smooth' })
+      } catch (error) {
+        console.warn('[PartnerProfileWorkspace] Workspace scroll skipped:', error)
+      }
+    }, 0)
+  }
+
+  function changeActiveTab(nextTab, options = {}) {
+    setActiveTab(nextTab)
+    if (options.scroll === false) return
+    scrollToWorkspaceStart()
+  }
+
   function openWorkspaceTarget(target = 'profile', options = {}) {
     if (target === 'inbox') {
       navigate('/inbox')
       return
     }
 
-    setActiveTab(target)
+    changeActiveTab(target, { scroll: !options.focusId })
     if (!options.focusId) return
 
     window.setTimeout(() => {
@@ -859,28 +897,6 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     }
   }
 
-  async function startPaymentOnboarding() {
-    setPaymentState({ status: 'opening', message: 'Отваряме Stripe onboarding…' })
-    try {
-      const result = await createConnectOnboarding()
-      if (result.dashboardUrl) {
-        window.location.href = result.dashboardUrl
-        return
-      }
-      if (result.status && result.status !== 'active' && !result.onboardingUrl) {
-        setPaymentState({ status: result.status === 'needs_information' ? 'idle' : 'saved', message: paymentMessageFromStripe(result) })
-        return
-      }
-      if (result.onboardingUrl) {
-        window.location.href = result.onboardingUrl
-        return
-      }
-      setPaymentState({ status: 'saved', message: 'Плащанията са активирани.' })
-    } catch (error) {
-      setPaymentState({ status: 'error', message: error.message || 'Плащанията не се активираха.' })
-    }
-  }
-
   async function openSubscriptionPortal() {
     setSubscriptionState(current => ({ ...current, status: 'opening', message: 'Отваряме Stripe Billing Portal...' }))
     try {
@@ -892,6 +908,80 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       setSubscriptionState(current => ({ ...current, status: 'error', message: 'Stripe не върна адрес за управление на абонамента.' }))
     } catch (error) {
       setSubscriptionState(current => ({ ...current, status: 'error', message: error.message || 'Абонаментът не може да бъде управляван в момента.' }))
+    }
+  }
+
+  async function cancelSubscriptionAtPeriodEnd() {
+    setSubscriptionState(current => ({
+      ...current,
+      status: 'updating',
+      message: 'Спираме автоматичното подновяване…',
+    }))
+    try {
+      const result = await cancelPartnerSubscriptionAtPeriodEnd()
+      setSubscriptionState(current => ({
+        ...current,
+        status: 'ready',
+        subscription: result.subscription,
+      }))
+    } catch (error) {
+      setSubscriptionState(current => ({
+        ...current,
+        status: 'error',
+        message: error.message || 'Не успяхме да спрем подновяването.',
+      }))
+    }
+  }
+
+  async function resumeSubscriptionRenewal() {
+    setSubscriptionState(current => ({
+      ...current,
+      status: 'updating',
+      message: 'Възстановяваме автоматичното подновяване…',
+    }))
+    try {
+      const result = await resumePartnerSubscriptionRenewal()
+      setSubscriptionState(current => ({
+        ...current,
+        status: 'ready',
+        subscription: result.subscription,
+        message: 'Автоматичното подновяване е възстановено.',
+      }))
+    } catch (error) {
+      setSubscriptionState(current => ({
+        ...current,
+        status: 'error',
+        message: error.message || 'Не успяхме да възстановим подновяването.',
+      }))
+    }
+  }
+
+  async function resendSubscriptionConfirmation() {
+    setSubscriptionState(current => ({
+      ...current,
+      status: 'notifying',
+      message: 'Изпращаме потвърждението за абонамента…',
+    }))
+    try {
+      const result = await ensurePartnerSubscriptionActivationEmail({ force: true })
+      const reason = result?.email?.reason || ''
+      const message = result?.email?.sent
+        ? 'Потвърждението за абонамента е изпратено.'
+        : reason === 'stripe_test_mode_receipts_disabled'
+          ? 'Stripe не изпраща разписки за тестови плащания. За тестови имейли е нужен конфигуриран доставчик за транзакционна поща.'
+          : 'Потвърждението не беше изпратено. Проверете конфигурацията на доставчика за транзакционна поща.'
+      setSubscriptionState(current => ({
+        ...current,
+        status: result?.email?.sent ? 'ready' : 'email-error',
+        subscription: result?.subscription?.row ? result.subscription : current.subscription,
+        message,
+      }))
+    } catch (error) {
+      setSubscriptionState(current => ({
+        ...current,
+        status: 'email-error',
+        message: error.message || 'Не успяхме да изпратим потвърждението за абонамента.',
+      }))
     }
   }
 
@@ -911,9 +1001,13 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
         imageSrc={preview.coverUrl || ''}
         imageAlt=""
         imageStyle={{ objectPosition: `50% ${preview.coverY ?? 50}%` }}
-        heightClass="h-[clamp(12.5rem,52vw,15rem)] md:aspect-[1600/520] md:h-auto md:min-h-0"
+        heightClass="h-[clamp(15rem,68vw,19rem)] md:aspect-[1600/520] md:h-auto md:min-h-0"
         className="group cursor-pointer focus-within:ring-2 focus-within:ring-ink"
         onClick={openBannerEditor}
+        onMouseEnter={() => setBannerHintVisible(true)}
+        onMouseLeave={() => setBannerHintVisible(false)}
+        onFocus={() => setBannerHintVisible(true)}
+        onBlur={() => setBannerHintVisible(false)}
         placeholderLabel="Добавете банер"
         placeholderClassName="hidden md:grid"
       >
@@ -927,11 +1021,40 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
         onChange={handleCoverFileChange}
       />
       <div className="relative z-10 flex flex-col bg-soft pb-16 md:pb-24">
-        <div className="container-page -mt-8 w-full space-y-5 px-4 sm:-mt-12 md:-mt-24 md:px-6">
-        <PublicProfilePanel className="relative transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.04)]">
-          <div className="absolute right-4 top-4 z-10 rounded-full border border-accent/25 bg-accent px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-paper shadow-[0_12px_30px_rgba(36,111,232,0.22)] md:right-6 md:top-6">
-            PRO
+        <div className="container-page -mt-4 w-full space-y-5 px-4 sm:-mt-8 md:-mt-24 md:px-6">
+        {subscriptionState.message && (
+          <div
+            role={subscriptionState.status === 'error' ? 'alert' : 'status'}
+            className={`rounded-2xl border px-4 py-3 text-sm font-medium shadow-sm ${
+              subscriptionState.status === 'error'
+                ? 'border-red-200 bg-red-50 text-red-800'
+                : subscriptionState.status === 'email-error'
+                  ? 'border-amber-200 bg-amber-50 text-amber-900'
+                : subscriptionState.subscription?.active
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                  : 'border-blue-200 bg-blue-50 text-blue-800'
+            }`}
+          >
+            {subscriptionState.message}
           </div>
+        )}
+        <PublicProfilePanel className="relative transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.04)]">
+          <div
+            aria-hidden={!bannerHintVisible}
+            className={`pointer-events-none absolute right-5 -top-36 z-30 hidden w-[min(21rem,calc(100vw-3rem))] origin-bottom-right rounded-2xl border border-white/20 bg-ink/94 p-4 text-left text-paper shadow-[0_24px_70px_-22px_rgba(5,12,22,0.78)] backdrop-blur-md transition-all duration-300 ease-out md:block lg:right-6 ${
+              bannerHintVisible
+                ? 'translate-y-0 scale-100 opacity-100'
+                : 'translate-y-5 scale-[0.98] opacity-0'
+            }`}
+          >
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-paper">Размер на банера</div>
+            <p className="mt-1 text-sm leading-6 text-paper/90">{BANNER_DESCRIPTION}</p>
+          </div>
+          {subscriptionState.subscription?.active && (
+            <div className="absolute right-4 top-4 z-10 rounded-full border border-accent/25 bg-accent px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-paper shadow-[0_12px_30px_rgba(36,111,232,0.22)] md:right-6 md:top-6">
+              PRO
+            </div>
+          )}
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex flex-col items-center gap-4 text-center lg:flex-row lg:items-end lg:text-left">
               <button
@@ -957,7 +1080,6 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
             </div>
             <div className="flex w-full flex-col gap-3 pb-1 sm:flex-row sm:flex-wrap lg:w-auto lg:justify-end">
               {preview.isPublished && <Link to={`/profil/${preview.slug}`} className="btn btn-primary w-full justify-center sm:w-auto"><Eye size={18} /> Виж публично</Link>}
-              <button type="button" onClick={startPaymentOnboarding} disabled={paymentState.status === 'opening'} className="btn btn-ghost w-full justify-center sm:w-auto"><CreditCard size={18} /> {account?.stripe_account_id ? 'Плащания' : 'Активирай плащания'}</button>
               <button className="btn btn-ghost w-full justify-center sm:w-auto" onClick={() => supabase.auth.signOut()}><LogOut size={18} /> Изход</button>
             </div>
           </div>
@@ -970,10 +1092,10 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
             profile={preview}
             completion={profileCompletion}
             portfolioCount={portfolio.length}
-            onTabChange={setActiveTab}
+            onTabChange={changeActiveTab}
           />
 
-          <main className="min-w-0 space-y-5">
+          <main ref={workspaceContentRef} className="min-w-0 space-y-5">
             {activeTab === 'overview' && (
               <OverviewDashboard
                 preview={preview}
@@ -984,6 +1106,10 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
                 subscriptionState={subscriptionState}
                 onAction={openWorkspaceTarget}
                 onManageSubscription={openSubscriptionPortal}
+                onRefreshSubscription={() => setSubscriptionRefreshKey(key => key + 1)}
+                onCancelSubscription={cancelSubscriptionAtPeriodEnd}
+                onResumeSubscription={resumeSubscriptionRenewal}
+                onResendSubscriptionEmail={resendSubscriptionConfirmation}
               />
             )}
 
@@ -994,6 +1120,9 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
                 accountDisplayName={accountDisplayName}
                 hasNameMismatch={hasNameMismatch}
                 onChange={updateProfile}
+                onAddSocialLink={addSocialLink}
+                onUpdateSocialLink={updateSocialLink}
+                onRemoveSocialLink={removeSocialLink}
                 onSubmit={saveProfile}
               />
             )}
@@ -1048,7 +1177,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
             )}
 
             {activeTab === 'contact' && (
-              <ContactPreview profile={preview} onEdit={() => setActiveTab('profile')} />
+              <ContactPreview profile={preview} onEdit={() => changeActiveTab('profile')} />
             )}
           </main>
         </div>
@@ -1329,7 +1458,20 @@ function WorkspaceSidebar({ tabs, activeTab, profile, completion, portfolioCount
   )
 }
 
-function OverviewDashboard({ preview, stats, portfolio, completion, dashboardState, subscriptionState, onAction, onManageSubscription }) {
+function OverviewDashboard({
+  preview,
+  stats,
+  portfolio,
+  completion,
+  dashboardState,
+  subscriptionState,
+  onAction,
+  onManageSubscription,
+  onRefreshSubscription,
+  onCancelSubscription,
+  onResumeSubscription,
+  onResendSubscriptionEmail,
+}) {
   const safePreview = preview || {}
   const safeCompletion = completion || { percent: 0, done: 0, total: 1, missing: [] }
   const safePortfolio = Array.isArray(portfolio) ? portfolio : []
@@ -1426,7 +1568,14 @@ function OverviewDashboard({ preview, stats, portfolio, completion, dashboardSta
         <LatestInquiryCard inquiry={latestInquiry} project={latestProject} status={dashboardState?.status} onOpen={() => onAction('inquiries')} onImprove={() => onAction('profile')} />
 
         <div className="space-y-5">
-          <SubscriptionStatusCard state={subscriptionState} onManage={onManageSubscription} />
+          <SubscriptionStatusCard
+            state={subscriptionState}
+            onManage={onManageSubscription}
+            onRefresh={onRefreshSubscription}
+            onCancel={onCancelSubscription}
+            onResume={onResumeSubscription}
+            onResendEmail={onResendSubscriptionEmail}
+          />
           <TrustCard
             preview={safePreview}
             completion={safeCompletion}
@@ -1444,15 +1593,74 @@ function OverviewDashboard({ preview, stats, portfolio, completion, dashboardSta
   )
 }
 
-function SubscriptionStatusCard({ state, onManage }) {
+function SubscriptionStatusCard({ state, onManage, onRefresh, onCancel, onResume, onResendEmail }) {
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
   const subscription = state?.subscription
   const isLoading = state?.status === 'loading'
   const isOpening = state?.status === 'opening'
+  const isUpdating = state?.status === 'updating' || state?.status === 'notifying'
+
   const active = Boolean(subscription?.active)
   const canManage = Boolean(subscription?.stripeCustomerId)
   const endLabel = getPartnerSubscriptionEndLabel(subscription)
-  const planLabel = subscription?.plan?.planName || (subscription?.status === 'founding_free' ? 'Активен партньор' : 'Няма активен план')
-  const statusLabel = subscription?.statusLabel || 'На пауза'
+
+  const isConfirming = !active && state?.checkoutSuccess && !state?.confirmingExpired
+  const isConfirmedPending = active && state?.checkoutSuccess
+  const isConfirmFailed = !active && state?.checkoutSuccess && state?.confirmingExpired
+  const isActivePartner = active && !state?.checkoutSuccess
+  const isNoSubscription = !active && !state?.checkoutSuccess
+
+  let cardClass = 'border-amber-100 bg-amber-50/70'
+  let iconClass = 'border-amber-200 bg-amber-100 text-amber-700'
+  let icon = <Lock size={18} />
+
+  if (active) {
+    cardClass = 'border-emerald-200 bg-paper'
+    iconClass = 'border-emerald-200 bg-white/80 text-emerald-600'
+    icon = <Check size={18} />
+  } else if (isConfirmFailed) {
+    cardClass = 'border-red-200 bg-red-50/70'
+    iconClass = 'border-red-200 bg-red-100 text-red-700'
+    icon = <X size={18} />
+  } else if (isConfirming) {
+    cardClass = 'border-blue-200 bg-blue-50/70'
+    iconClass = 'border-blue-200 bg-blue-100 text-blue-700'
+    icon = <Loader2 size={18} className="animate-spin" />
+  }
+
+  let title = ''
+  let body = ''
+  let statusLabel = 'На пауза'
+  let planLabel = subscription?.plan?.planName || (subscription?.status === 'founding_free' ? 'Активен партньор' : 'Няма активен план')
+
+  if (isNoSubscription) {
+    title = 'Нямате активен партньорски план'
+    body = 'Изберете план, за да активирате профила си и да бъдете видими за клиенти.'
+    statusLabel = subscription?.statusLabel || 'На пауза'
+  } else if (isConfirming) {
+    title = 'Абонаментното плащане се потвърждава'
+    body = 'Ако вече сте завършили плащането, профилът ви ще се активира автоматично. Това обикновено отнема до 1 минута. Няма нужда да плащате повторно.'
+    statusLabel = 'Потвърждаване'
+  } else if (isConfirmedPending) {
+    title = 'Абонаментното плащане е получено'
+    body = 'Активираме партньорския ви профил. Това обикновено отнема до 1 минута. Няма нужда да плащате повторно.'
+    statusLabel = 'Активиране'
+  } else if (isActivePartner) {
+    title = subscription?.cancelAtPeriodEnd
+      ? 'Планът остава активен до края на периода'
+      : 'Профилът ви е активен'
+    body = subscription?.cancelAtPeriodEnd
+      ? 'Автоматичното подновяване е спряно. Профилът и партньорските функции остават активни до края на вече платения период.'
+      : 'Вече сте активен партньор в Totsan.'
+    statusLabel = subscription?.cancelAtPeriodEnd
+      ? 'Спира в края на периода'
+      : subscription?.statusLabel || 'Активен'
+  } else if (isConfirmFailed) {
+    title = 'Не успяхме да потвърдим абонаментното плащане'
+    body = 'Ако сумата е изтеглена, не плащайте повторно. Свържете се с нас и ще проверим веднага.'
+    statusLabel = 'Проблем с абонаментното плащане'
+  }
+
   const endPrefix = subscription?.status === 'founding_free'
     ? 'Промо до'
     : subscription?.status === 'trialing'
@@ -1472,54 +1680,134 @@ function SubscriptionStatusCard({ state, onManage }) {
   }
 
   return (
-    <section className={`rounded-[1.75rem] border p-5 shadow-[0_20px_60px_-52px_rgba(13,35,64,0.35)] ${active ? 'border-emerald-100 bg-emerald-50/70' : 'border-amber-100 bg-amber-50/70'}`}>
+    <section className={`rounded-[1.75rem] border p-5 shadow-[0_20px_60px_-52px_rgba(13,35,64,0.24)] ${cardClass}`}>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Абонамент</div>
-          <h3 className="mt-2 text-xl font-semibold text-ink">{active ? 'Партньорският достъп е активен' : 'Профилът ви е на пауза'}</h3>
+          <div className={`text-xs font-semibold uppercase tracking-[0.14em] ${active ? 'text-emerald-700' : isConfirmFailed ? 'text-red-700' : isConfirming ? 'text-blue-700' : 'text-muted'}`}>Абонамент</div>
+          <h3 className={`mt-2 text-xl font-semibold ${active ? 'text-emerald-950' : isConfirmFailed ? 'text-red-950' : isConfirming ? 'text-blue-950' : 'text-ink'}`}>{title}</h3>
         </div>
-        <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${active ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-          {active ? <Check size={18} /> : <Lock size={18} />}
+        <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${iconClass}`}>
+          {icon}
         </span>
       </div>
 
       <div className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-        <div className="rounded-2xl bg-paper/75 px-3 py-2">
-          <div className="text-xs text-muted">План</div>
-          <div className="mt-1 font-semibold text-ink">{planLabel}</div>
+        <div className={`rounded-2xl border px-3 py-2 ${active ? 'border-emerald-100 bg-white/75' : isConfirmFailed ? 'border-red-100 bg-paper/75' : isConfirming ? 'border-blue-100 bg-white/75' : 'border-amber-100 bg-paper/75'}`}>
+          <div className={`text-xs ${active ? 'text-emerald-700' : isConfirmFailed ? 'text-red-700' : isConfirming ? 'text-blue-700' : 'text-muted'}`}>План</div>
+          <div className={`mt-1 font-semibold ${active ? 'text-emerald-950' : isConfirmFailed ? 'text-red-950' : isConfirming ? 'text-blue-950' : 'text-ink'}`}>{planLabel}</div>
         </div>
-        <div className="rounded-2xl bg-paper/75 px-3 py-2">
-          <div className="text-xs text-muted">Статус</div>
-          <div className="mt-1 font-semibold text-ink">{statusLabel}</div>
+        <div className={`rounded-2xl border px-3 py-2 ${active ? 'border-emerald-100 bg-white/75' : isConfirmFailed ? 'border-red-100 bg-paper/75' : isConfirming ? 'border-blue-100 bg-white/75' : 'border-amber-100 bg-paper/75'}`}>
+          <div className={`text-xs ${active ? 'text-emerald-700' : isConfirmFailed ? 'text-red-700' : isConfirming ? 'text-blue-700' : 'text-muted'}`}>Статус</div>
+          <div className={`mt-1 font-semibold ${active ? 'text-emerald-950' : isConfirmFailed ? 'text-red-950' : isConfirming ? 'text-blue-950' : 'text-ink'}`}>{statusLabel}</div>
         </div>
       </div>
 
-      {endLabel && (
+      {endLabel && active && (
         <p className="mt-3 text-sm leading-6 text-muted">{endPrefix}: <span className="font-semibold text-ink">{endLabel}</span></p>
       )}
 
-      {!active && (
-        <p className="mt-3 text-sm leading-6 text-muted">
-          Профилът остава запазен, но не е активен за нови клиентски запитвания. Активирайте партньорски план, за да бъде видим за клиенти.
-        </p>
-      )}
+      <p className={`mt-3 text-sm leading-6 ${active ? 'text-emerald-800' : isConfirmFailed ? 'text-red-800' : isConfirming ? 'text-blue-800' : 'text-muted'}`}>
+        {body}
+      </p>
 
-      {state?.message && (
+      {state?.message && !isConfirming && !isConfirmedPending && !isConfirmFailed && (
         <div className={`mt-3 rounded-2xl px-3 py-2 text-sm ${state.status === 'error' ? 'bg-red-50 text-red-700' : 'bg-paper/80 text-muted'}`}>
           {state.message}
         </div>
       )}
 
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        {canManage && (
-          <button type="button" onClick={onManage} disabled={isOpening} className="btn btn-primary justify-center">
-            <CreditCard size={18} /> {isOpening ? 'Отваря се...' : 'Управлявай'}
+      <div className="mt-5 grid gap-2">
+        {isNoSubscription && (
+          <>
+            <Link to="/pro#pro-plans" className="btn btn-primary justify-center">
+              Избери план
+            </Link>
+            {canManage && (
+              <button type="button" onClick={onManage} disabled={isOpening} className="btn btn-ghost justify-center">
+                <CreditCard size={18} /> {isOpening ? 'Отваря се...' : 'Управлявай'}
+              </button>
+            )}
+          </>
+        )}
+
+        {(isConfirming || isConfirmedPending) && (
+          <button type="button" onClick={onRefresh} className="btn btn-primary justify-center">
+            <Loader2 size={18} className="animate-spin" /> Провери статуса
           </button>
         )}
-        <Link to="/pro#pro-plans" className={`btn justify-center ${canManage ? 'btn-ghost' : 'btn-primary'}`}>
-          Избери план
-        </Link>
+
+        {isActivePartner && (
+          <div className="grid min-w-0 gap-2">
+            {canManage && (
+              <button type="button" onClick={onManage} disabled={isOpening || isUpdating} className="btn btn-primary w-full justify-center">
+                <CreditCard size={18} /> {isOpening ? 'Отваря се...' : 'Управлявай'}
+              </button>
+            )}
+            {(subscription?.stripeSubscriptionId || subscription?.invoiceUrl) && (
+              <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+                {subscription?.stripeSubscriptionId && (
+                  <button type="button" onClick={onResendEmail} disabled={isUpdating} className="btn btn-ghost min-w-0 justify-center !px-3 text-sm">
+                    {state?.status === 'notifying' ? <Loader2 size={17} className="shrink-0 animate-spin" /> : <Mail size={17} className="shrink-0" />}
+                    <span className="truncate">{state?.status === 'notifying' ? 'Изпращаме…' : 'Потвърждение'}</span>
+                  </button>
+                )}
+                {subscription?.invoiceUrl && (
+                  <a
+                    href={subscription.invoiceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-ghost min-w-0 justify-center !px-3 text-sm"
+                  >
+                    <FileText size={17} className="shrink-0" /> <span className="truncate">Фактура</span>
+                  </a>
+                )}
+              </div>
+            )}
+            {subscription?.stripeSubscriptionId && subscription?.cancelAtPeriodEnd && (
+              <button type="button" onClick={onResume} disabled={isUpdating} className="btn btn-ghost w-full justify-center text-sm">
+                {isUpdating ? <Loader2 size={18} className="animate-spin" /> : <PlayCircle size={18} />}
+                {isUpdating ? 'Запазваме…' : 'Възстанови подновяването'}
+              </button>
+            )}
+            {subscription?.stripeSubscriptionId && !subscription?.cancelAtPeriodEnd && !confirmingCancel && (
+              <button type="button" onClick={() => setConfirmingCancel(true)} disabled={isUpdating} className="btn w-full justify-center border border-red-200 bg-red-50/70 text-sm text-red-700 hover:bg-red-100">
+                <CircleDot size={18} /> Спри подновяването
+              </button>
+            )}
+          </div>
+        )}
+
+        {isConfirmFailed && (
+          <Link to="/kontakt" className="btn btn-primary justify-center">
+            Пиши ни
+          </Link>
+        )}
       </div>
+
+      {isActivePartner && confirmingCancel && !subscription?.cancelAtPeriodEnd && (
+        <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4">
+          <div className="font-semibold text-red-900">Да спрем ли автоматичното подновяване?</div>
+          <p className="mt-1 text-sm leading-6 text-red-800">
+            Няма да губите достъп сега. Планът остава активен до {endLabel || 'края на платения период'} и след това няма да бъде таксуван отново.
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmingCancel(false)
+                onCancel()
+              }}
+              disabled={isUpdating}
+              className="btn justify-center border border-red-300 bg-red-600 text-white hover:bg-red-700"
+            >
+              {isUpdating ? 'Спираме…' : 'Да, спри подновяването'}
+            </button>
+            <button type="button" onClick={() => setConfirmingCancel(false)} disabled={isUpdating} className="btn btn-ghost justify-center">
+              Запази абонамента
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   )
 }
@@ -1722,6 +2010,9 @@ function ProfileForm({
   accountDisplayName,
   hasNameMismatch,
   onChange,
+  onAddSocialLink,
+  onUpdateSocialLink,
+  onRemoveSocialLink,
   onSubmit,
 }) {
   const bioLength = String(draft.bio || '').length
@@ -1819,7 +2110,7 @@ function ProfileForm({
               <div className="text-sm font-semibold text-ink">Допълнителни социални мрежи</div>
             </div>
             {draft.socialLinks.length < 3 && (
-              <button type="button" onClick={addSocialLink} className="btn btn-ghost justify-center">
+              <button type="button" onClick={onAddSocialLink} className="btn btn-ghost justify-center">
                 <Plus size={18} />
                 Добави
               </button>
@@ -1829,8 +2120,8 @@ function ProfileForm({
             <div className="mt-4 space-y-3">
               {draft.socialLinks.map(link => (
                 <div key={link.id} className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-                  <Field label="Линк"><input value={link.url} onChange={event => updateSocialLink(link.id, event.target.value)} className={INPUT} placeholder="https://" /></Field>
-                  <button type="button" onClick={() => removeSocialLink(link.id)} className="btn btn-ghost justify-center text-red-700">
+                  <Field label="Линк"><input value={link.url} onChange={event => onUpdateSocialLink(link.id, event.target.value)} className={INPUT} placeholder="https://" /></Field>
+                  <button type="button" onClick={() => onRemoveSocialLink(link.id)} className="btn btn-ghost justify-center text-red-700">
                     <Trash2 size={18} />
                     Махни
                   </button>

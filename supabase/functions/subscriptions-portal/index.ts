@@ -1,4 +1,9 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.8'
+import {
+  sendCancellationEmail,
+  stripeRequest,
+  upsertPartnerSubscription,
+} from '../_shared/partner-subscriptions.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -101,18 +106,80 @@ Deno.serve(async (req) => {
       return jsonResponse(403, { error: 'Този акаунт няма достъп до абонаментите.' })
     }
 
-    const { data: subscription, error: subscriptionError } = await admin
+    const { data: subscriptionRows, error: subscriptionError } = await admin
       .from('partner_subscriptions')
-      .select('stripe_customer_id')
+      .select('*')
       .eq('user_id', user.id)
       .not('stripe_customer_id', 'is', null)
       .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+      .limit(20)
     if (subscriptionError) throw subscriptionError
 
+    const rows = Array.isArray(subscriptionRows) ? subscriptionRows : []
+    const subscription = rows.find((row) => (
+      row.stripe_subscription_id
+      && (row.status === 'active' || row.status === 'trialing')
+    )) || rows[0]
     const customerId = cleanText(subscription?.stripe_customer_id)
     if (!customerId) throw new Error('Няма Stripe клиент за този партньорски абонамент.')
+
+    const action = cleanText(payload.action, 'portal')
+    if (action === 'cancel_at_period_end' || action === 'resume') {
+      const subscriptionId = cleanText(subscription?.stripe_subscription_id)
+      if (!subscriptionId) throw new Error('Няма активен Stripe абонамент за управление.')
+
+      const currentStripeSubscription = await stripeRequest(
+        `subscriptions/${encodeURIComponent(subscriptionId)}`,
+      )
+      const stripeCustomerId = cleanText(
+        typeof currentStripeSubscription.customer === 'string'
+          ? currentStripeSubscription.customer
+          : (currentStripeSubscription.customer as Record<string, unknown> | undefined)?.id,
+      )
+      if (stripeCustomerId !== customerId) {
+        throw new Error('Stripe абонаментът не съвпада с вашия профил.')
+      }
+
+      const nextCancelAtPeriodEnd = action === 'cancel_at_period_end'
+      const params = new URLSearchParams()
+      params.set('cancel_at_period_end', nextCancelAtPeriodEnd ? 'true' : 'false')
+      const updatedStripeSubscription = await stripeRequest(
+        `subscriptions/${encodeURIComponent(subscriptionId)}`,
+        { method: 'POST', body: params },
+      )
+      let updatedSubscription = await upsertPartnerSubscription(admin, updatedStripeSubscription, {
+        row_id: subscription.id,
+        user_id: user.id,
+        partner_profile_id: subscription.partner_profile_id,
+        stripe_customer_id: customerId,
+        sync_source: nextCancelAtPeriodEnd ? 'customer_cancellation' : 'customer_resumed_renewal',
+      })
+
+      let emailResult: Record<string, unknown> = {
+        sent: false,
+        skipped: true,
+        reason: 'not_requested',
+      }
+      if (nextCancelAtPeriodEnd) {
+        emailResult = await sendCancellationEmail(
+          admin,
+          updatedSubscription,
+          cleanText(user.email),
+        )
+        updatedSubscription = emailResult.subscription || updatedSubscription
+      }
+
+      return jsonResponse(200, {
+        ok: true,
+        action,
+        subscription: updatedSubscription,
+        email: {
+          sent: Boolean(emailResult.sent),
+          skipped: Boolean(emailResult.skipped),
+          reason: cleanText(emailResult.reason),
+        },
+      })
+    }
 
     const origin = siteOrigin(req, payload)
     const session = await createPortalSession(customerId, `${origin}/moy-profil?subscription=portal_return`)

@@ -38,7 +38,7 @@ function formatNumber(value) {
 }
 
 export function currencySymbol(currency = DEFAULT_CURRENCY) {
-  return '€'
+  return String(currency).toUpperCase() === 'BGN' ? ' лв.' : '€'
 }
 
 export function normalizeMoneyValue(value) {
@@ -63,6 +63,23 @@ export function formatDualCurrency(amount, rate = EUR_LV_RATE) {
   const numeric = toNumber(amount)
   if (numeric === null) return '—'
   return `${formatMoney(Math.round(numeric / rate), 'EUR')} / ${formatMoney(numeric, 'BGN')}`
+}
+
+export function shouldShowBgnEquivalent(now = new Date()) {
+  const time = now instanceof Date ? now.getTime() : new Date(now).getTime()
+  const endOfDualDisplay = new Date('2026-08-08T23:59:59+03:00').getTime()
+  return Number.isFinite(time) && time <= endOfDualDisplay
+}
+
+export function formatEurWithBgn(amount, { includeBgn = shouldShowBgnEquivalent(), rate = EUR_LV_RATE } = {}) {
+  const numeric = toNumber(amount)
+  if (numeric === null) return '—'
+
+  const euro = formatMoney(numeric, 'EUR')
+  if (!includeBgn) return euro
+
+  const leva = Math.round(numeric * rate * 100) / 100
+  return `${euro} / ${formatMoney(leva, 'BGN')}`
 }
 
 export function formatDualCurrencyRange(min, max, rate = EUR_LV_RATE) {

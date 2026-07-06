@@ -138,6 +138,7 @@ export function normalizePartnerSubscription(row = null) {
 
   const status = row.status || 'inactive'
   const active = hasActivePartnerAccess(row)
+  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {}
   return {
     id: row.id || '',
     userId: row.user_id || '',
@@ -149,11 +150,16 @@ export function normalizePartnerSubscription(row = null) {
     statusLabel: PARTNER_SUBSCRIPTION_STATUS_LABELS[status] || status,
     stripeCustomerId: row.stripe_customer_id || '',
     stripeSubscriptionId: row.stripe_subscription_id || '',
+    stripeCheckoutSessionId: row.stripe_checkout_session_id || '',
     currentPeriodStart: row.current_period_start || null,
     currentPeriodEnd: row.current_period_end || null,
     trialEnd: row.trial_end || null,
     campaignEnd: row.campaign_end || null,
     cancelAtPeriodEnd: Boolean(row.cancel_at_period_end),
+    invoiceUrl: metadata.activation_email_invoice_url || '',
+    invoicePdf: metadata.activation_email_invoice_pdf || '',
+    activationEmailSentAt: metadata.activation_email_sent_at || null,
+    activationEmailError: metadata.activation_email_error || '',
     active,
     row,
   }
@@ -219,7 +225,12 @@ async function invokeSubscriptionFunction(functionName, payload = {}) {
   })
 
   const data = await response.json().catch(() => ({}))
-  if (!response.ok || data?.error) throw new Error(data?.error || 'Абонаментното действие не беше успешно.')
+  if (!response.ok || data?.error) {
+    const error = new Error(data?.error || 'Абонаментното действие не беше успешно.')
+    error.code = data?.code || ''
+    error.subscription = data?.subscription ? normalizePartnerSubscription(data.subscription) : null
+    throw error
+  }
   return data
 }
 
@@ -254,6 +265,54 @@ export function startPartnerSubscriptionCheckout({ planKey, billingInterval, con
   })
 }
 
+export function syncPartnerSubscriptionSession(sessionId) {
+  return invokeSubscriptionFunction('subscriptions-checkout', {
+    action: 'sync',
+    sessionId,
+  })
+}
+
+export async function reconcilePartnerSubscription() {
+  const result = await invokeSubscriptionFunction('subscriptions-checkout', {
+    action: 'reconcile',
+  })
+  return {
+    ...result,
+    subscription: normalizePartnerSubscription(result?.subscription || null),
+  }
+}
+
+export async function ensurePartnerSubscriptionActivationEmail({ force = false } = {}) {
+  const result = await invokeSubscriptionFunction('subscriptions-checkout', {
+    action: 'notify',
+    force,
+  })
+  return {
+    ...result,
+    subscription: normalizePartnerSubscription(result?.subscription || null),
+  }
+}
+
 export function createPartnerSubscriptionPortal(origin = window.location.origin) {
   return invokeSubscriptionFunction('subscriptions-portal', { origin })
+}
+
+export async function cancelPartnerSubscriptionAtPeriodEnd() {
+  const result = await invokeSubscriptionFunction('subscriptions-portal', {
+    action: 'cancel_at_period_end',
+  })
+  return {
+    ...result,
+    subscription: normalizePartnerSubscription(result?.subscription || null),
+  }
+}
+
+export async function resumePartnerSubscriptionRenewal() {
+  const result = await invokeSubscriptionFunction('subscriptions-portal', {
+    action: 'resume',
+  })
+  return {
+    ...result,
+    subscription: normalizePartnerSubscription(result?.subscription || null),
+  }
 }

@@ -6,6 +6,8 @@ const SPECIALIST_STATUSES = new Set(['pending', 'approved', 'rejected'])
 const ACCOUNT_STATUSES = new Set(['active', 'banned'])
 const ORDER_STATUSES = new Set(['pending_payment', 'paid', 'in_progress', 'delivered', 'completed', 'disputed', 'refunded', 'cancelled'])
 const MATERIAL_MODERATION_STATUSES = new Set(['pending', 'approved', 'rejected', 'hidden'])
+const SERVICE_EDITOR_FIELDS = new Set(['title', 'subtitle', 'description_md', 'tags'])
+const SERVICE_FEEDBACK_BUCKET = 'service-moderation-feedback'
 const ADMIN_ROLE_MANAGER_EMAILS = new Set(['a.mitkov@totsan.com'])
 const AUTH_REDIRECT_ORIGINS = new Set(['https://totsan.com', 'https://www.totsan.com', 'http://localhost:3000', 'http://127.0.0.1:3000'])
 
@@ -28,6 +30,51 @@ function assertUuid(value: unknown, label: string) {
     throw new Error(`${label} is invalid.`)
   }
   return text
+}
+
+function cleanLimitedText(value: unknown, maxLength: number) {
+  return String(value ?? '').trim().slice(0, maxLength)
+}
+
+function normalizeServiceTags(value: unknown) {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => cleanLimitedText(item, 50))
+    .filter(Boolean)
+    .slice(0, 20)
+}
+
+function normalizeModerationAttachments(value: unknown, serviceId: string) {
+  if (!Array.isArray(value)) return []
+  return value.slice(0, 3).map((item) => {
+    const attachment = item && typeof item === 'object' ? item as Record<string, unknown> : {}
+    const bucket = String(attachment.bucket || '')
+    const path = String(attachment.path || '')
+    if (bucket !== SERVICE_FEEDBACK_BUCKET || !path.startsWith(`${serviceId}/`)) {
+      throw new Error('Moderation attachment is invalid.')
+    }
+    return {
+      bucket,
+      path,
+      name: cleanLimitedText(attachment.name, 160),
+      type: cleanLimitedText(attachment.type, 80),
+      size: Math.max(0, Number(attachment.size || 0)),
+    }
+  })
+}
+
+async function removeModerationAttachments(
+  adminClient: ReturnType<typeof createClient>,
+  value: unknown,
+) {
+  if (!Array.isArray(value)) return
+  const paths = value
+    .filter((item) => item && typeof item === 'object' && (item as Record<string, unknown>).bucket === SERVICE_FEEDBACK_BUCKET)
+    .map((item) => String((item as Record<string, unknown>).path || ''))
+    .filter(Boolean)
+  if (!paths.length) return
+  const { error } = await adminClient.storage.from(SERVICE_FEEDBACK_BUCKET).remove(paths)
+  if (error) console.error('moderation attachment cleanup error', error)
 }
 
 function slugify(value = '') {
@@ -127,6 +174,92 @@ Deno.serve(async (req) => {
       if (error) throw error
       await writeAudit(adminClient, user.id, action, 'inquiry', id, { status, actor_email: actorEmail })
       return jsonResponse(200, { ok: true, row: data })
+    }
+
+    if (action === 'delete_inquiry') {
+      const id = assertUuid(payload.id, 'Inquiry id')
+      const { data, error } = await adminClient
+        .from('inquiries')
+        .delete()
+        .eq('id', id)
+        .select('id, source, layer_slug, target_slug')
+        .single()
+
+      if (error) throw error
+      await writeAudit(adminClient, user.id, action, 'inquiry', id, {
+        actor_email: actorEmail,
+        target: data,
+      })
+      return jsonResponse(200, { ok: true })
+    }
+
+    if (action === 'assign_inquiry') {
+      const id = assertUuid(payload.id, 'Inquiry id')
+      const profileIdValue = String(payload.profileId || '').trim()
+
+      if (!profileIdValue) {
+        const { data, error } = await adminClient
+          .from('inquiries')
+          .update({
+            assigned_profile_id: null,
+            assigned_partner_id: null,
+            assigned_at: null,
+            assigned_by: null,
+          })
+          .eq('id', id)
+          .select('*')
+          .single()
+
+        if (error) throw error
+        await writeAudit(adminClient, user.id, 'unassign_inquiry', 'inquiry', id, {
+          actor_email: actorEmail,
+        })
+        return jsonResponse(200, { ok: true, row: data, profile: null })
+      }
+
+      const profileId = assertUuid(profileIdValue, 'Profile id')
+      const { data: profile, error: profileError } = await adminClient
+        .from('profiles')
+        .select('id, user_id, slug, name, tag, city, layer_slug, is_published')
+        .eq('id', profileId)
+        .single()
+
+      if (profileError) throw profileError
+      if (!profile.user_id) throw new Error('Partner profile has no linked account.')
+      if (!profile.is_published) throw new Error('Partner profile is not published.')
+
+      const { data: partnerAccount, error: partnerError } = await adminClient
+        .from('accounts')
+        .select('id, role, specialist_status, account_status')
+        .eq('id', profile.user_id)
+        .single()
+
+      if (partnerError) throw partnerError
+      if (partnerAccount.role !== 'specialist' || partnerAccount.specialist_status !== 'approved' || partnerAccount.account_status !== 'active') {
+        throw new Error('Partner account is not active and approved.')
+      }
+
+      const assignedAt = new Date().toISOString()
+      const { data, error } = await adminClient
+        .from('inquiries')
+        .update({
+          assigned_profile_id: profile.id,
+          assigned_partner_id: profile.user_id,
+          assigned_at: assignedAt,
+          assigned_by: user.id,
+        })
+        .eq('id', id)
+        .select('*')
+        .single()
+
+      if (error) throw error
+      await writeAudit(adminClient, user.id, action, 'inquiry', id, {
+        actor_email: actorEmail,
+        profile_id: profile.id,
+        partner_id: profile.user_id,
+        profile_slug: profile.slug,
+      })
+      return jsonResponse(200, { ok: true, row: data, profile })
     }
 
     if (action === 'approve_specialist') {
@@ -395,29 +528,125 @@ Deno.serve(async (req) => {
     if (action === 'approve_partner_service') {
       const serviceId = assertUuid(payload.serviceId, 'Service id')
       const moderationNote = String(payload.moderationNote || '').trim() || null
+      const { data: previous, error: previousError } = await adminClient
+        .from('partner_services')
+        .select('moderation_attachments')
+        .eq('id', serviceId)
+        .single()
+      if (previousError) throw previousError
       const { data, error } = await adminClient
         .from('partner_services')
-        .update({ moderation_status: 'approved', is_published: true, moderation_note: moderationNote })
+        .update({
+          moderation_status: 'approved',
+          is_published: true,
+          moderation_note: moderationNote,
+          moderation_attachments: [],
+        })
         .eq('id', serviceId)
         .select('*')
         .single()
       if (error) throw error
+      if (data.profile_id) {
+        const { error: profileError } = await adminClient
+          .from('profiles')
+          .update({ is_published: true })
+          .eq('id', data.profile_id)
+        if (profileError) throw profileError
+      }
+      await removeModerationAttachments(adminClient, previous.moderation_attachments)
       await writeAudit(adminClient, user.id, action, 'partner_service', serviceId, { moderation_note: moderationNote, actor_email: actorEmail })
       return jsonResponse(200, { ok: true, row: data })
     }
 
     if (action === 'reject_partner_service') {
       const serviceId = assertUuid(payload.serviceId, 'Service id')
-      const moderationNote = String(payload.moderationNote || '').trim() || 'Върната за корекция.'
+      const moderationNote = cleanLimitedText(payload.moderationNote, 2000)
+      if (!moderationNote) throw new Error('Moderation note is required.')
+      const moderationAttachments = normalizeModerationAttachments(payload.attachments, serviceId)
+      const { data: previous, error: previousError } = await adminClient
+        .from('partner_services')
+        .select('moderation_attachments')
+        .eq('id', serviceId)
+        .single()
+      if (previousError) throw previousError
       const { data, error } = await adminClient
         .from('partner_services')
-        .update({ moderation_status: 'rejected', is_published: false, moderation_note: moderationNote })
+        .update({
+          moderation_status: 'rejected',
+          is_published: false,
+          moderation_note: moderationNote,
+          moderation_attachments: moderationAttachments,
+        })
         .eq('id', serviceId)
         .select('*')
         .single()
       if (error) throw error
-      await writeAudit(adminClient, user.id, action, 'partner_service', serviceId, { moderation_note: moderationNote, actor_email: actorEmail })
+      await removeModerationAttachments(adminClient, previous.moderation_attachments)
+      await writeAudit(adminClient, user.id, action, 'partner_service', serviceId, {
+        moderation_note: moderationNote,
+        attachments: moderationAttachments,
+        actor_email: actorEmail,
+      })
       return jsonResponse(200, { ok: true, row: data })
+    }
+
+    if (action === 'edit_and_approve_partner_service') {
+      const serviceId = assertUuid(payload.serviceId, 'Service id')
+      const requestedUpdates = payload.updates && typeof payload.updates === 'object'
+        ? payload.updates as Record<string, unknown>
+        : {}
+      const { data: current, error: currentError } = await adminClient
+        .from('partner_services')
+        .select('id, profile_id, title, subtitle, description_md, tags, moderation_status, is_published, moderation_attachments')
+        .eq('id', serviceId)
+        .single()
+      if (currentError) throw currentError
+
+      const updates: Record<string, unknown> = {}
+      Object.entries(requestedUpdates).forEach(([field, value]) => {
+        if (!SERVICE_EDITOR_FIELDS.has(field)) return
+        if (field === 'title') updates.title = cleanLimitedText(value, 140)
+        if (field === 'subtitle') updates.subtitle = cleanLimitedText(value, 280) || null
+        if (field === 'description_md') updates.description_md = cleanLimitedText(value, 12000) || null
+        if (field === 'tags') updates.tags = normalizeServiceTags(value)
+      })
+      if ('title' in updates && !updates.title) throw new Error('Service title is required.')
+
+      const changedFields = Object.keys(updates).filter((field) => (
+        JSON.stringify(current[field as keyof typeof current] ?? null) !== JSON.stringify(updates[field] ?? null)
+      ))
+      const moderationNote = cleanLimitedText(payload.moderationNote, 2000)
+        || 'Редакторска корекция и одобрение от Totsan.'
+      const { data, error } = await adminClient
+        .from('partner_services')
+        .update({
+          ...updates,
+          moderation_status: 'approved',
+          is_published: true,
+          moderation_note: moderationNote,
+          moderation_attachments: [],
+        })
+        .eq('id', serviceId)
+        .select('*')
+        .single()
+      if (error) throw error
+      if (data.profile_id) {
+        const { error: profileError } = await adminClient
+          .from('profiles')
+          .update({ is_published: true })
+          .eq('id', data.profile_id)
+        if (profileError) throw profileError
+      }
+      await removeModerationAttachments(adminClient, current.moderation_attachments)
+
+      await writeAudit(adminClient, user.id, action, 'partner_service', serviceId, {
+        actor_email: actorEmail,
+        moderation_note: moderationNote,
+        changed_fields: changedFields,
+        before: Object.fromEntries(changedFields.map((field) => [field, current[field as keyof typeof current]])),
+        after: Object.fromEntries(changedFields.map((field) => [field, updates[field]])),
+      })
+      return jsonResponse(200, { ok: true, row: data, changedFields })
     }
 
     if (action === 'update_material_capability_moderation') {

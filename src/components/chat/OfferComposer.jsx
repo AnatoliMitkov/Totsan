@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Plus, Trash2, X } from 'lucide-react'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
@@ -14,6 +15,12 @@ export default function OfferComposer({ open, onClose, onSubmit, status }) {
     deliverables: '',
     priceAmount: '',
     deliveryDays: '',
+    excluded: '',
+    paymentTerms: '',
+    cancellationTerms: '',
+    invoiceIssuer: '',
+    vatStatus: '',
+    acceptedLegal: false,
     executionMode: 'single',
     stages: [createStage(1)],
   })
@@ -63,8 +70,18 @@ export default function OfferComposer({ open, onClose, onSubmit, status }) {
 
   async function submit(event) {
     event.preventDefault()
+    const descriptionSections = [
+      draft.description.trim(),
+      draft.excluded.trim() ? `Не е включено:\n${draft.excluded.trim()}` : '',
+      `Условия за плащане:\n${draft.paymentTerms.trim()}`,
+      `Отказ и възстановяване:\n${draft.cancellationTerms.trim()}`,
+      `Фактура:\n${draft.invoiceIssuer.trim()}`,
+      `ЗДДС статус:\n${draft.vatStatus}`,
+    ].filter(Boolean)
+
     await onSubmit({
       ...draft,
+      description: descriptionSections.join('\n\n'),
       currency: 'EUR',
       executionMode: draft.executionMode,
       stages: draft.executionMode === 'staged'
@@ -114,7 +131,7 @@ export default function OfferComposer({ open, onClose, onSubmit, status }) {
               <ExecutionModeOption
                 active={draft.executionMode === 'staged'}
                 title="Поетапно изпълнение"
-                description="Описваш етапите, но плащането остава общо."
+                description="Описваш етапите и условията за директно плащане към партньора."
                 onClick={() => setExecutionMode('staged')}
               />
             </div>
@@ -125,7 +142,7 @@ export default function OfferComposer({ open, onClose, onSubmit, status }) {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-medium text-ink">Етапи</div>
-                  <p className="mt-1 text-sm text-muted">Добави основните етапи на работа. Плащането е за цялата оферта.</p>
+                  <p className="mt-1 text-sm text-muted">Добави основните етапи на работа и уточни директното плащане в условията на офертата.</p>
                 </div>
                 <button type="button" onClick={addStage} className="btn btn-ghost w-full justify-center !py-2 text-sm sm:w-auto">
                   <Plus size={16} /> Добави етап
@@ -195,14 +212,87 @@ export default function OfferComposer({ open, onClose, onSubmit, status }) {
             </Field>
           </div>
 
+          <section className="rounded-3xl border border-line bg-soft/60 p-4 sm:p-5">
+            <div className="text-sm font-semibold text-ink">Условия на офертата</div>
+            <p className="mt-1 text-sm leading-6 text-muted">Тези данни се добавят към описанието и остават видими за клиента преди плащане.</p>
+            <div className="mt-4 grid gap-4">
+              <Field label="Какво не е включено">
+                <textarea
+                  rows={3}
+                  value={draft.excluded}
+                  onChange={(event) => set('excluded', event.target.value)}
+                  className={INPUT}
+                  placeholder="Например: материали, транспорт, къртене или извозване"
+                />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Условия за плащане">
+                  <textarea
+                    rows={3}
+                    value={draft.paymentTerms}
+                    onChange={(event) => set('paymentTerms', event.target.value)}
+                    className={INPUT}
+                    placeholder="Например: цялата сума при приемане или аванс и остатък"
+                    required
+                  />
+                </Field>
+                <Field label="Отказ и възстановяване">
+                  <textarea
+                    rows={3}
+                    value={draft.cancellationTerms}
+                    onChange={(event) => set('cancellationTerms', event.target.value)}
+                    className={INPUT}
+                    placeholder="Опиши какво се случва при отказ и започнало изпълнение"
+                    required
+                  />
+                </Field>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Партньорът, който издава фактурата">
+                  <input
+                    value={draft.invoiceIssuer}
+                    onChange={(event) => set('invoiceIssuer', event.target.value)}
+                    className={INPUT}
+                    placeholder="Име/фирма и ЕИК при приложимост"
+                    required
+                  />
+                </Field>
+                <Field label="ЗДДС статус">
+                  <select value={draft.vatStatus} onChange={(event) => set('vatStatus', event.target.value)} className={INPUT} required>
+                    <option value="">Избери...</option>
+                    <option value="Цената е без начислен ДДС">Цената е без начислен ДДС</option>
+                    <option value="Цената включва ДДС">Цената включва ДДС</option>
+                    <option value="ЗДДС статусът се уточнява във фактурата">Уточнява се във фактурата</option>
+                  </select>
+                </Field>
+              </div>
+            </div>
+          </section>
+
           <div className="rounded-2xl border border-line bg-soft px-4 py-3 text-sm text-muted">
-            Плащането е за цялата оферта.
+            Клиентът плаща директно на партньора по посочените в офертата условия. Totsan не приема и не прехвърля сумата.
           </div>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-line bg-paper px-4 py-3 text-sm leading-6 text-ink">
+            <input
+              type="checkbox"
+              checked={draft.acceptedLegal}
+              onChange={(event) => set('acceptedLegal', event.target.checked)}
+              className="mt-1 h-4 w-4 shrink-0 accent-black"
+              required
+            />
+            <span>
+              Съгласен съм с{' '}
+              <Link to="/obshti-usloviya" className="font-semibold text-accent hover:underline">Общите условия</Link>
+              {' '}и{' '}
+              <Link to="/politika-za-poveritelnost" className="font-semibold text-accent hover:underline">Политиката за поверителност</Link>.
+            </span>
+          </label>
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
           <p className="text-sm text-muted">Контакти и външни линкове ще бъдат скрити автоматично.</p>
-          <button disabled={status === 'sending'} className="btn btn-primary disabled:opacity-50">
+          <button disabled={status === 'sending' || !draft.acceptedLegal} className="btn btn-primary disabled:opacity-50">
             {status === 'sending' ? 'Изпраща се…' : 'Изпрати оферта'}
           </button>
         </div>

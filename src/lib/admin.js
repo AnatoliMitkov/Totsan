@@ -84,8 +84,37 @@ export async function loadAdminDashboard() {
 }
 
 export async function loadInquiries() {
-  const result = await supabase.from('inquiries').select('*').order('created_at', { ascending: false })
+  const result = await supabase
+    .from('inquiries')
+    .select('*, assigned_profile:profiles!inquiries_assigned_profile_id_fkey(id, user_id, slug, name, tag, city, layer_slug, is_published)')
+    .order('created_at', { ascending: false })
   return requireData(result, [])
+}
+
+export async function loadAssignablePartners() {
+  const profileResult = await supabase
+    .from('profiles')
+    .select('id, user_id, slug, name, tag, city, layer_slug, is_published')
+    .eq('is_published', true)
+    .not('user_id', 'is', null)
+    .order('name')
+
+  const profiles = requireData(profileResult, [])
+  if (profiles.length === 0) return []
+
+  const accountResult = await supabase
+    .from('accounts')
+    .select('id, role, specialist_status, account_status')
+    .in('id', profiles.map((profile) => profile.user_id))
+
+  const accounts = requireData(accountResult, [])
+  const activePartnerIds = new Set(
+    accounts
+      .filter((account) => account.role === 'specialist' && account.specialist_status === 'approved' && account.account_status === 'active')
+      .map((account) => account.id),
+  )
+
+  return profiles.filter((profile) => activePartnerIds.has(profile.user_id))
 }
 
 export async function loadPartnerApplications() {
@@ -154,6 +183,14 @@ export function updateInquiryStatus(id, status) {
   return invokeAdminAction('update_inquiry_status', { id, status })
 }
 
+export function deleteInquiry(id) {
+  return invokeAdminAction('delete_inquiry', { id })
+}
+
+export function assignInquiry(id, profileId = '') {
+  return invokeAdminAction('assign_inquiry', { id, profileId })
+}
+
 export function approveSpecialist(applicationId, decisionNote = '') {
   return invokeAdminAction('approve_specialist', { applicationId, decisionNote })
 }
@@ -182,8 +219,12 @@ export function approvePartnerService(serviceId, moderationNote = '') {
   return invokeAdminAction('approve_partner_service', { serviceId, moderationNote })
 }
 
-export function rejectPartnerService(serviceId, moderationNote = '') {
-  return invokeAdminAction('reject_partner_service', { serviceId, moderationNote })
+export function rejectPartnerService(serviceId, moderationNote = '', attachments = []) {
+  return invokeAdminAction('reject_partner_service', { serviceId, moderationNote, attachments })
+}
+
+export function editAndApprovePartnerService(serviceId, updates, moderationNote = '') {
+  return invokeAdminAction('edit_and_approve_partner_service', { serviceId, updates, moderationNote })
 }
 
 export async function loadAdminMaterialCapabilities() {

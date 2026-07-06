@@ -21,7 +21,7 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
     async function load() {
       if (!profileSlug) return
       try {
-        const rows = await loadPartnerInquiries(profileSlug)
+        const rows = await loadPartnerInquiries(profileSlug, partnerId)
         
         // Fetch client projects for inquiries that have a client_id
         const clientIds = rows.map(r => r.client_id).filter(Boolean)
@@ -45,7 +45,7 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
     }
     load()
     return () => { active = false }
-  }, [profileSlug])
+  }, [partnerId, profileSlug])
 
   async function markAsSeen(id) {
     try {
@@ -58,8 +58,8 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
 
   async function markAsDone(id) {
     try {
-      await updatePartnerInquiryStatus(id, 'completed')
-      setInquiries(current => current.map(item => item.id === id ? { ...item, status: 'completed' } : item))
+      await updatePartnerInquiryStatus(id, 'closed')
+      setInquiries(current => current.map(item => item.id === id ? { ...item, status: 'closed' } : item))
     } catch (err) {
       console.error(err)
     }
@@ -98,8 +98,8 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
     return <div className="rounded-3xl border border-red-200 bg-red-50 p-5 md:p-7 text-red-700">{error}</div>
   }
 
-  const activeInquiries = inquiries.filter(i => i.status === 'new' || i.status === 'seen')
-  const pastInquiries = inquiries.filter(i => i.status === 'completed' || i.status === 'spam' || i.status === 'rejected')
+  const activeInquiries = inquiries.filter(i => i.status === 'new' || i.status === 'seen' || i.status === 'replied')
+  const pastInquiries = inquiries.filter(i => i.status === 'closed')
 
   return (
     <div className="space-y-5">

@@ -210,16 +210,25 @@ function buildAuditView(row, accountById) {
     }
   }
 
-  if (row.action === 'approve_partner_service' || row.action === 'reject_partner_service') {
+  if (row.action === 'approve_partner_service' || row.action === 'reject_partner_service' || row.action === 'edit_and_approve_partner_service') {
     const approved = row.action === 'approve_partner_service'
+    const edited = row.action === 'edit_and_approve_partner_service'
     const targetLabel = row.entity_id ? `Услуга ${shortId(row.entity_id)}` : 'Услуга'
     return {
-      title: approved ? 'Одобрена услуга' : 'Върната услуга за корекция',
-      summary: `${actorLabel} ${approved ? 'одобри' : 'върна'} ${targetLabel}.`,
+      title: edited ? 'Редактирана и одобрена услуга' : approved ? 'Одобрена услуга' : 'Върната услуга за корекция',
+      summary: `${actorLabel} ${edited ? 'редактира и одобри' : approved ? 'одобри' : 'върна'} ${targetLabel}.`,
       actorLabel,
       targetLabel,
       entityLabel,
-      chips: compact([payload.moderation_note && `Бележка: ${payload.moderation_note}`]),
+      chips: compact([
+        payload.moderation_note && `Бележка: ${payload.moderation_note}`,
+        Array.isArray(payload.changed_fields) && payload.changed_fields.length
+          ? `Промени: ${payload.changed_fields.join(', ')}`
+          : '',
+        Array.isArray(payload.attachments) && payload.attachments.length
+          ? `Снимки: ${payload.attachments.length}`
+          : '',
+      ]),
     }
   }
 

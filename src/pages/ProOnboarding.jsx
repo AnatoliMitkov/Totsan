@@ -548,7 +548,7 @@ export default function ProOnboarding() {
     return <Navigate to="/admin" replace />
   }
 
-  if (account?.role !== 'specialist') {
+  if (account?.role !== 'specialist' && account?.role !== 'user') {
     return <WizardShell><StatusCard title="Това не е партньорски акаунт" text="Партньорската кандидатура се попълва от акаунт, създаден през Totsan Pro." primaryTo="/pro/start" primaryLabel="Към Totsan Pro" /></WizardShell>
   }
 
@@ -666,7 +666,7 @@ export default function ProOnboarding() {
 
 function WizardShell({ children }) {
   return (
-    <section className="section !py-8 md:!py-10 relative min-h-[calc(100vh-var(--header-h,0px))] overflow-hidden bg-soft">
+    <section className="section !py-8 md:!py-10 relative min-h-[calc(100vh-var(--header-h,0px))] bg-soft">
       <style>{`
         @keyframes proWizardPulse {
           0%, 100% { transform: translateX(0); }
@@ -678,7 +678,7 @@ function WizardShell({ children }) {
           animation: proWizardPulse 0.42s ease-in-out;
         }
       `}</style>
-      <div className="pointer-events-none absolute inset-0">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute left-[-8rem] top-[-6rem] h-[24rem] w-[24rem] rounded-full bg-accentSoft/80 blur-3xl" />
         <div className="absolute bottom-[-8rem] right-[-7rem] h-[24rem] w-[24rem] rounded-full bg-cloud/90 blur-3xl" />
       </div>
@@ -711,7 +711,7 @@ function BasicStep({ draft, update, touchedFields, attempted, markTouched, photo
       <SelfPhotoField draft={draft} attempted={attempted} uploadState={photoUploadState} onPhotoFile={onPhotoFile} />
       <SocialProfilesField draft={draft} update={update} attempted={attempted} />
       <div className="grid gap-4 md:grid-cols-2">
-        <TextField label="Телефон" value={draft.phone} onChange={event => update('phone', normalizePhone(event.target.value))} onBlur={() => markTouched('phone')} type="tel" inputMode="numeric" pattern="[0-9]*" required valid={isValidPhone} touched={touchedFields.phone} attempted={attempted} helper="Въведете само цифри. Телефонът е нужен за проверка от Totsan." errorText="Добавете валиден телефонен номер." />
+        <TextField label="Телефон" value={draft.phone} onChange={event => update('phone', normalizePhone(event.target.value))} onBlur={() => markTouched('phone')} type="tel" inputMode="numeric" pattern="[0-9]*" required valid={isValidPhone} touched={touchedFields.phone} attempted={attempted} errorText="Добавете валиден телефонен номер." />
         <LocationCombobox label="Град" value={draft.city} onChange={(value) => { update('city', value); markTouched('city') }} required />
       </div>
     </div>
@@ -987,6 +987,18 @@ function ReviewStep({ draft, selectedCategory, stepCompletion }) {
   ]
   return (
     <div className="space-y-3">
+      <div className="rounded-3xl border border-blue-100 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
+        <div className="font-semibold">Данни преди платени оферти</div>
+        <p className="mt-1">
+          Преди изпращане на платени оферти партньорът трябва да поддържа актуални име/фирма, ЕИК/Булстат или приложим идентификатор, адрес, лице за контакт, имейл, телефон и ЗДДС статус. Плащането за проекта е директно от клиента към партньора; Totsan не събира банковите данни за това плащане и не ги показва публично.
+        </p>
+        <p className="mt-2">
+          С кандидатстването потвърждавате, че данните са верни и сте запознати с{' '}
+          <Link to="/obshti-usloviya" className="font-semibold underline">Общите условия</Link>
+          {' '}и{' '}
+          <Link to="/politika-za-poveritelnost" className="font-semibold underline">Политиката за поверителност</Link>.
+        </p>
+      </div>
       {missingSteps.length > 0 ? (
         <div className="rounded-3xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
           <div className="font-semibold">Остава още малко</div>

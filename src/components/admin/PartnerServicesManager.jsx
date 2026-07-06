@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { CheckCircle2, Clock, Eye, LayoutGrid, List, RefreshCw, Search, XCircle, Trash2 } from 'lucide-react'
-import { ADMIN_INPUT_CLASS, formatAdminDate } from '../../lib/admin.js'
-import { SERVICE_STATUS_LABELS, loadAdminPartnerServices, packagePriceLabel, updateAdminPartnerServiceStatus, deletePartnerService } from '../../lib/partner-services.js'
+import { CheckCircle2, Clock, Eye, ImagePlus, LayoutGrid, List, Pencil, RefreshCw, Search, X, XCircle, Trash2 } from 'lucide-react'
+import { ADMIN_INPUT_CLASS, approvePartnerService, editAndApprovePartnerService, formatAdminDate, rejectPartnerService } from '../../lib/admin.js'
+import {
+  SERVICE_STATUS_LABELS,
+  deletePartnerService,
+  deleteServiceModerationAttachments,
+  loadAdminPartnerServices,
+  packagePriceLabel,
+  uploadServiceModerationAttachment,
+} from '../../lib/partner-services.js'
 import { getPartnerServiceCoverCandidates } from '../../lib/service-media.js'
 import { supabase } from '../../lib/supabase.js'
 import FallbackImage from '../FallbackImage.jsx'
@@ -12,7 +20,6 @@ const STATUS_FILTERS = [
   ['pending', 'Чакащи'],
   ['approved', 'Одобрени'],
   ['rejected', 'Върнати'],
-  ['draft', 'Чернови'],
 ]
 
 export default function PartnerServicesManager({ globalQuery }) {
@@ -24,6 +31,7 @@ export default function PartnerServicesManager({ globalQuery }) {
   const [viewMode, setViewMode] = useState('details')
   const [actionState, setActionState] = useState({ id: '', status: 'idle' })
   const [serviceToDelete, setServiceToDelete] = useState(null)
+  const [moderationDialog, setModerationDialog] = useState(null)
 
   useEffect(() => { load() }, [])
 
@@ -50,17 +58,58 @@ export default function PartnerServicesManager({ globalQuery }) {
   }, [filter, globalQuery, localQuery, rows])
 
   async function updateServiceStatus(service, nextStatus) {
+    if (nextStatus === 'rejected') {
+      setModerationDialog({ mode: 'reject', service })
+      return
+    }
     setActionState({ id: service.id, status: nextStatus })
     setError('')
     try {
-      const updated = await updateAdminPartnerServiceStatus(
-        service.id,
-        nextStatus,
-        nextStatus === 'approved' ? 'Одобрено от Totsan.' : 'Върнато за редакция от Totsan.',
-      )
-      setRows(current => current.map(item => item.id === updated.id ? updated : item))
+      await approvePartnerService(service.id, 'Одобрено от Totsan.')
+      await load()
     } catch (actionError) {
       setError(actionError.message || 'Статусът не се обнови.')
+    } finally {
+      setActionState({ id: '', status: 'idle' })
+    }
+  }
+
+  async function submitRejection({ note, files }) {
+    const service = moderationDialog?.service
+    if (!service) return
+    setActionState({ id: service.id, status: 'rejected' })
+    setError('')
+    const uploaded = []
+    try {
+      for (const file of files) {
+        uploaded.push(await uploadServiceModerationAttachment({ serviceId: service.id, file }))
+      }
+      await rejectPartnerService(service.id, note, uploaded)
+      setModerationDialog(null)
+      await load()
+    } catch (actionError) {
+      if (uploaded.length) {
+        deleteServiceModerationAttachments(uploaded).catch(() => {})
+      }
+      setError(actionError.message || 'Услугата не беше върната.')
+      throw actionError
+    } finally {
+      setActionState({ id: '', status: 'idle' })
+    }
+  }
+
+  async function submitEditorialApproval({ updates, note }) {
+    const service = moderationDialog?.service
+    if (!service) return
+    setActionState({ id: service.id, status: 'approved' })
+    setError('')
+    try {
+      await editAndApprovePartnerService(service.id, updates, note)
+      setModerationDialog(null)
+      await load()
+    } catch (actionError) {
+      setError(actionError.message || 'Редакцията не беше запазена.')
+      throw actionError
     } finally {
       setActionState({ id: '', status: 'idle' })
     }
@@ -120,10 +169,10 @@ export default function PartnerServicesManager({ globalQuery }) {
       <div className={viewMode === 'grid' ? 'grid gap-4 sm:grid-cols-2 2xl:grid-cols-3' : 'grid gap-4'}>
         {filtered.map(service => (
           viewMode === 'grid'
-            ? <ServiceGridCard key={service.id} service={service} actionState={actionState} updateServiceStatus={updateServiceStatus} deleteService={deleteService} />
-            : <ServiceDetailsCard key={service.id} service={service} actionState={actionState} updateServiceStatus={updateServiceStatus} deleteService={deleteService} />
+            ? <ServiceGridCard key={service.id} service={service} actionState={actionState} updateServiceStatus={updateServiceStatus} editService={(item) => setModerationDialog({ mode: 'edit', service: item })} deleteService={deleteService} />
+            : <ServiceDetailsCard key={service.id} service={service} actionState={actionState} updateServiceStatus={updateServiceStatus} editService={(item) => setModerationDialog({ mode: 'edit', service: item })} deleteService={deleteService} />
         ))}
-        {filtered.length === 0 && <div className="rounded-3xl border border-dashed border-line bg-paper p-8 text-center text-sm text-muted">Няма услуги в този филтър.</div>}
+        {filtered.length === 0 && <div className="rounded-3xl border border-dashed border-line bg-paper p-8 text-center text-sm text-muted">Няма изпратени услуги в този филтър.</div>}
       </div>
 
       {serviceToDelete && (
@@ -155,6 +204,259 @@ export default function PartnerServicesManager({ globalQuery }) {
           </div>
         </div>
       )}
+
+      {moderationDialog?.mode === 'reject' && createPortal(
+        <ReturnServiceDialog
+          service={moderationDialog.service}
+          saving={actionState.id === moderationDialog.service.id}
+          onClose={() => setModerationDialog(null)}
+          onSubmit={submitRejection}
+        />,
+        document.body,
+      )}
+
+      {moderationDialog?.mode === 'edit' && createPortal(
+        <EditorialServiceDialog
+          service={moderationDialog.service}
+          saving={actionState.id === moderationDialog.service.id}
+          onClose={() => setModerationDialog(null)}
+          onSubmit={submitEditorialApproval}
+        />,
+        document.body,
+      )}
+    </div>
+  )
+}
+
+function ReturnServiceDialog({ service, saving, onClose, onSubmit }) {
+  const [note, setNote] = useState('')
+  const [files, setFiles] = useState([])
+  const [localError, setLocalError] = useState('')
+
+  function close() {
+    files.forEach(item => URL.revokeObjectURL(item.preview))
+    onClose()
+  }
+
+  function queueFiles(selected) {
+    setLocalError('')
+    const next = []
+    for (const file of selected) {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        setLocalError('Разрешени са JPG, PNG и WebP изображения.')
+        continue
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setLocalError('Всяка снимка трябва да бъде до 5 MB.')
+        continue
+      }
+      next.push({ file, preview: URL.createObjectURL(file) })
+    }
+    setFiles(current => {
+      const availableSlots = Math.max(0, 3 - current.length)
+      next.slice(availableSlots).forEach(item => URL.revokeObjectURL(item.preview))
+      return [...current, ...next.slice(0, availableSlots)]
+    })
+  }
+
+  function addFiles(event) {
+    queueFiles(Array.from(event.target.files || []))
+    event.target.value = ''
+  }
+
+  function pasteFiles(event) {
+    const pastedImages = Array.from(event.clipboardData?.items || [])
+      .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+      .map(item => item.getAsFile())
+      .filter(Boolean)
+    if (!pastedImages.length) return
+    event.preventDefault()
+    queueFiles(pastedImages)
+  }
+
+  function removeFile(index) {
+    setFiles(current => current.filter((item, itemIndex) => {
+      if (itemIndex === index) URL.revokeObjectURL(item.preview)
+      return itemIndex !== index
+    }))
+  }
+
+  async function submit(event) {
+    event.preventDefault()
+    if (!note.trim()) {
+      setLocalError('Напиши конкретна причина и какво трябва да се коригира.')
+      return
+    }
+    setLocalError('')
+    try {
+      await onSubmit({ note: note.trim(), files: files.map(item => item.file) })
+      files.forEach(item => URL.revokeObjectURL(item.preview))
+    } catch (error) {
+      setLocalError(error.message || 'Обратната връзка не беше изпратена.')
+    }
+  }
+
+  return (
+    <ModalShell title="Върни услугата за корекция" subtitle={service.title} onClose={close}>
+      <form onSubmit={submit} onPaste={pasteFiles}>
+        <label className="block text-sm font-medium text-ink">
+          Бележка към партньора
+          <textarea
+            value={note}
+            onChange={event => setNote(event.target.value)}
+            rows={6}
+            maxLength={2000}
+            className={`${ADMIN_INPUT_CLASS} resize-none`}
+            placeholder="Опиши какво не е наред и как партньорът може да го поправи."
+            autoFocus
+          />
+        </label>
+        <div className="mt-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium text-ink">Снимки към бележката</div>
+              <div className="mt-1 text-xs text-muted">Постави screenshot с Ctrl+V или прикачи до 3 изображения, максимум 5 MB всяко.</div>
+            </div>
+            {files.length < 3 && (
+              <label className="btn btn-ghost cursor-pointer !px-4 !py-2 text-sm">
+                <ImagePlus size={17} /> Прикачи
+                <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={addFiles} />
+              </label>
+            )}
+          </div>
+          {files.length > 0 && (
+            <div className="mt-3 grid grid-cols-3 gap-3">
+              {files.map((item, index) => (
+                <div key={item.preview} className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-line bg-soft">
+                  <img src={item.preview} alt="" className="h-full w-full object-cover" />
+                  <button type="button" onClick={() => removeFile(index)} className="absolute right-2 top-2 rounded-full bg-ink/75 p-1.5 text-paper backdrop-blur" aria-label="Премахни снимката">
+                    <X size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {localError && <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{localError}</div>}
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button type="button" onClick={close} disabled={saving} className="btn btn-ghost justify-center">Отказ</button>
+          <button type="submit" disabled={saving} className="btn justify-center border border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-200">
+            <XCircle size={18} /> {saving ? 'Изпращаме…' : 'Върни с бележка'}
+          </button>
+        </div>
+      </form>
+    </ModalShell>
+  )
+}
+
+function EditorialServiceDialog({ service, saving, onClose, onSubmit }) {
+  const [draft, setDraft] = useState({
+    title: service.title || '',
+    subtitle: service.subtitle || '',
+    descriptionMd: service.descriptionMd || '',
+    tagsText: (service.tags || []).join(', '),
+  })
+  const [note, setNote] = useState('Коригирано редакторски и одобрено от Totsan.')
+  const [localError, setLocalError] = useState('')
+  const original = {
+    title: service.title || '',
+    subtitle: service.subtitle || '',
+    descriptionMd: service.descriptionMd || '',
+    tagsText: (service.tags || []).join(', '),
+  }
+  const changedFields = Object.keys(original).filter(key => draft[key] !== original[key])
+
+  function update(field, value) {
+    setDraft(current => ({ ...current, [field]: value }))
+  }
+
+  async function submit(event) {
+    event.preventDefault()
+    if (!draft.title.trim()) {
+      setLocalError('Заглавието е задължително.')
+      return
+    }
+    setLocalError('')
+    try {
+      await onSubmit({
+        updates: {
+          title: draft.title,
+          subtitle: draft.subtitle,
+          description_md: draft.descriptionMd,
+          tags: draft.tagsText.split(',').map(item => item.trim()).filter(Boolean),
+        },
+        note: note.trim(),
+      })
+    } catch (error) {
+      setLocalError(error.message || 'Редакцията не беше запазена.')
+    }
+  }
+
+  return (
+    <ModalShell title="Редактирай и одобри" subtitle={service.title} onClose={onClose} wide>
+      <form onSubmit={submit} className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="space-y-4">
+          <AdminEditField label="Заглавие" value={draft.title} original={original.title} onChange={value => update('title', value)} maxLength={140} />
+          <AdminEditField label="Кратко подзаглавие" value={draft.subtitle} original={original.subtitle} onChange={value => update('subtitle', value)} maxLength={280} />
+          <AdminEditField label="Тагове" value={draft.tagsText} original={original.tagsText} onChange={value => update('tagsText', value)} />
+          <label className="block text-sm font-medium text-ink">
+            Описание
+            <textarea value={draft.descriptionMd} onChange={event => update('descriptionMd', event.target.value)} rows={10} maxLength={12000} className={`${ADMIN_INPUT_CLASS} resize-y`} />
+            {draft.descriptionMd !== original.descriptionMd && <ChangePreview before={original.descriptionMd} />}
+          </label>
+        </div>
+        <aside className="space-y-4">
+          <div className="rounded-3xl border border-line bg-soft p-4">
+            <div className="text-sm font-medium text-ink">Редакторска следа</div>
+            <p className="mt-2 text-xs leading-5 text-muted">Промените ще бъдат записани в audit log с предишната и новата стойност.</p>
+            <div className="mt-3 rounded-2xl bg-paper px-3 py-2 text-sm text-ink">
+              Променени полета: <strong>{changedFields.length}</strong>
+            </div>
+          </div>
+          <label className="block text-sm font-medium text-ink">
+            Бележка
+            <textarea value={note} onChange={event => setNote(event.target.value)} rows={5} maxLength={2000} className={`${ADMIN_INPUT_CLASS} resize-none`} />
+          </label>
+          {localError && <div className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{localError}</div>}
+          <button type="submit" disabled={saving} className="btn btn-primary w-full justify-center">
+            <CheckCircle2 size={18} /> {saving ? 'Публикуваме…' : 'Запази и одобри'}
+          </button>
+          <button type="button" onClick={onClose} disabled={saving} className="btn btn-ghost w-full justify-center">Отказ</button>
+        </aside>
+      </form>
+    </ModalShell>
+  )
+}
+
+function AdminEditField({ label, value, original, onChange, maxLength }) {
+  return (
+    <label className="block text-sm font-medium text-ink">
+      {label}
+      <input value={value} onChange={event => onChange(event.target.value)} maxLength={maxLength} className={ADMIN_INPUT_CLASS} />
+      {value !== original && <ChangePreview before={original} />}
+    </label>
+  )
+}
+
+function ChangePreview({ before }) {
+  return <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">Преди: {before || '—'}</div>
+}
+
+function ModalShell({ title, subtitle, onClose, wide = false, children }) {
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-ink/65 p-4 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
+      <div role="dialog" aria-modal="true" aria-label={title} className={`my-auto w-full overflow-hidden rounded-[2rem] border border-line bg-paper shadow-2xl ${wide ? 'max-w-5xl' : 'max-w-2xl'}`}>
+        <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4 sm:px-6">
+          <div>
+            <h3 className="font-display text-3xl text-ink">{title}</h3>
+            <p className="mt-1 text-sm text-muted">{subtitle}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-full p-2 text-muted transition hover:bg-soft hover:text-ink" aria-label="Затвори">
+            <X size={21} />
+          </button>
+        </div>
+        <div className="max-h-[calc(100dvh-8rem)] overflow-y-auto p-5 sm:p-6">{children}</div>
+      </div>
     </div>
   )
 }
@@ -173,7 +475,7 @@ function ViewModeButton({ icon: Icon, active, label, onClick }) {
   )
 }
 
-function ServiceDetailsCard({ service, actionState, updateServiceStatus, deleteService }) {
+function ServiceDetailsCard({ service, actionState, updateServiceStatus, editService, deleteService }) {
   return (
     <article className="rounded-3xl border border-line bg-paper p-5 md:p-6">
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_16rem]">
@@ -192,13 +494,13 @@ function ServiceDetailsCard({ service, actionState, updateServiceStatus, deleteS
           </div>
           {service.moderationNote && <p className="mt-4 rounded-2xl bg-amber-50 p-3 text-sm text-amber-800">Последна бележка: {service.moderationNote}</p>}
         </div>
-        <ServiceActions service={service} actionState={actionState} updateServiceStatus={updateServiceStatus} deleteService={deleteService} />
+        <ServiceActions service={service} actionState={actionState} updateServiceStatus={updateServiceStatus} editService={editService} deleteService={deleteService} />
       </div>
     </article>
   )
 }
 
-function ServiceGridCard({ service, actionState, updateServiceStatus, deleteService }) {
+function ServiceGridCard({ service, actionState, updateServiceStatus, editService, deleteService }) {
   const coverCandidates = getPartnerServiceCoverCandidates(service, service.profile)
 
   return (
@@ -225,19 +527,20 @@ function ServiceGridCard({ service, actionState, updateServiceStatus, deleteServ
           </div>
         </div>
         <div className="mt-auto pt-5">
-          <ServiceActions service={service} actionState={actionState} updateServiceStatus={updateServiceStatus} deleteService={deleteService} compact />
+          <ServiceActions service={service} actionState={actionState} updateServiceStatus={updateServiceStatus} editService={editService} deleteService={deleteService} compact />
         </div>
       </div>
     </article>
   )
 }
 
-function ServiceActions({ service, actionState, updateServiceStatus, deleteService, compact = false }) {
+function ServiceActions({ service, actionState, updateServiceStatus, editService, deleteService, compact = false }) {
   return (
     <div className={compact ? 'space-y-2' : 'space-y-3'}>
       {service.moderationStatus === 'pending' && (
         <>
           <button type="button" onClick={() => updateServiceStatus(service, 'approved')} disabled={actionState.id === service.id} className="btn btn-primary w-full justify-center whitespace-nowrap !py-2 text-sm"><CheckCircle2 size={16} /> Одобри</button>
+          <button type="button" onClick={() => editService(service)} disabled={actionState.id === service.id} className="btn btn-ghost w-full justify-center whitespace-nowrap !py-2 text-sm"><Pencil size={16} /> Редактирай и одобри</button>
           <button type="button" onClick={() => updateServiceStatus(service, 'rejected')} disabled={actionState.id === service.id} className="btn btn-ghost w-full justify-center whitespace-nowrap !py-2 text-sm"><XCircle size={16} /> Върни</button>
         </>
       )}
