@@ -30,7 +30,7 @@ const KIND_COPY = {
 }
 
 const SECTION_LIMITS = {
-  pro: 4,
+  pro: 3,
   service: 3,
   material: 6,
 }
@@ -455,7 +455,7 @@ function MarketplaceSections({ professionals, services, materials, onSelectKind,
           actionLabel="Виж всички специалисти"
           onAction={() => onSelectKind('pro')}
         >
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {professionals.slice(0, SECTION_LIMITS.pro).map((item) => (
               <CatalogCard key={`featured-${item.kind}-${item.slug || item.name}`} it={item} />
             ))}

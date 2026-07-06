@@ -208,7 +208,7 @@ export function resolveProfileUploadTarget({ userId = '', slug = '', name = '' }
   return userId.trim() || slugify(slug.trim() || name.trim())
 }
 
-export async function uploadMediaViaEdge({ file, target = '', purpose = 'profile', projectId = '', kind = 'photo' }) {
+export async function uploadMediaViaEdge({ file, target = '', purpose = 'profile', projectId = '', kind = 'photo', variant = '' }) {
   validateUploadFile(file, purpose)
 
   const { data } = await supabase.auth.getSession()
@@ -237,6 +237,9 @@ export async function uploadMediaViaEdge({ file, target = '', purpose = 'profile
   }
   if (target.trim()) {
     formData.append('target', target.trim())
+  }
+  if (variant.trim()) {
+    formData.append('variant', variant.trim())
   }
 
   const headers = {
@@ -272,17 +275,45 @@ export async function uploadMediaViaEdge({ file, target = '', purpose = 'profile
   }
 }
 
-export async function uploadProfileMedia({ file, target = '' }) {
-  const { data } = await supabase.auth.getSession()
-  const userId = data.session?.user?.id
-  const result = await uploadMediaViaEdge({ file, target: target || userId, purpose: 'profile' })
-  if (result.bucket !== 'profile-images') {
-    throw new Error('Profile media upload endpoint is not up to date. Redeploy profile-media-upload.')
-  }
-  return {
-    publicUrl: result.publicUrl,
-    path: result.path,
-    bucket: result.bucket,
+export async function uploadProfileMedia({ file, target = '', variant = '' }) {
+  const { data: sessionData } = await supabase.auth.getSession()
+  const userId = sessionData.session?.user?.id
+  const folder = target || userId
+  
+  const extension = file.type === 'image/webp' ? 'webp' : (file.type === 'image/png' ? 'png' : 'jpg')
+  const filename = variant ? `main-${variant}.${extension}` : `main.${extension}`
+  const path = `${folder}/profile/${filename}`
+
+  try {
+    const { data, error } = await supabase.storage
+      .from('profile-images')
+      .upload(path, file, {
+        cacheControl: '3600',
+        upsert: true
+      })
+
+    if (error) throw error
+
+    const { data: publicData } = supabase.storage
+      .from('profile-images')
+      .getPublicUrl(path)
+
+    return {
+      bucket: 'profile-images',
+      path: path,
+      publicUrl: publicData?.publicUrl || '',
+    }
+  } catch (error) {
+    console.error('[storage-upload] Direct upload failed, falling back to edge function:', error)
+    const result = await uploadMediaViaEdge({ file, target: folder, purpose: 'profile', variant })
+    if (result.bucket !== 'profile-images') {
+      throw new Error('Profile media upload endpoint is not up to date. Redeploy profile-media-upload.')
+    }
+    return {
+      publicUrl: result.publicUrl,
+      path: result.path,
+      bucket: result.bucket,
+    }
   }
 }
 
@@ -328,5 +359,30 @@ export async function uploadServiceMedia({ file, target = '', kind = 'service' }
     publicUrl: uploaded.publicUrl,
     path: uploaded.path,
     bucket: 'profile-images'
+  }
+}
+
+export async function resizeImageToSize(file, dimension, quality = 0.90) {
+  const source = await loadRasterSource(file)
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = dimension
+    canvas.height = dimension
+    const context = canvas.getContext('2d', { alpha: false })
+    if (!context) throw new Error('Could not create canvas context')
+    context.imageSmoothingEnabled = true
+    context.imageSmoothingQuality = 'high'
+    source.draw(context, dimension, dimension)
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Resize failed'))
+          return
+        }
+        resolve(new File([blob], file.name.replace(/\.[^.]+$/, '') + `-${dimension}.webp`, { type: 'image/webp' }))
+      }, 'image/webp', quality)
+    })
+  } finally {
+    source.cleanup()
   }
 }

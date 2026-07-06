@@ -5,6 +5,7 @@ import { Menu, MessageCircle, X } from 'lucide-react'
 import { getAccountDisplayName, getAccountAvatar, useAccount, signOutAndRedirect } from '../lib/account.js'
 import { loadUnreadConversationCount, subscribeToConversationList } from '../lib/chat.js'
 import Avatar from './Avatar.jsx'
+import { getProfileAvatarVariant } from '../lib/profiles.js'
 import { openCookieSettings } from './CookieConsent.jsx'
 
 const BLOCKED_ACCOUNT_STATUSES = new Set(['banned', 'blocked'])
@@ -459,7 +460,7 @@ function UserMenu({ session, account, isAdmin }) {
         aria-controls="user-menu"
         className="flex items-center gap-2 rounded-full border border-line bg-paper px-2 py-1.5 text-sm hover:border-ink/40 transition"
       >
-        <Avatar src={avatarUrl} name={displayName} size={28} />
+        <Avatar src={getProfileAvatarVariant(avatarUrl, 'tiny')} name={displayName} size={28} />
         <span className="hidden max-w-[10rem] truncate text-muted xl:inline">{displayName}</span>
       </Link>
       {open && (
@@ -488,7 +489,6 @@ function Footer({ isAuthPage = false }) {
         <div>
           <div className="font-display text-2xl">Totsan</div>
           <p className="text-muted mt-2 text-sm max-w-xs">Пространството ти — от идея до последния щрих, на едно място.</p>
-          <p className="mt-3 max-w-xs text-xs leading-5 text-muted">Плащанията по проекти се извършват директно между клиента и партньора. Totsan не приема или прехвърля тези суми.</p>
         </div>
         <div>
           <div className="eyebrow mb-3">Слоеве</div>

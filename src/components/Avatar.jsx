@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
+import { getProfileAvatarVariant } from '../lib/profiles.js'
 
-export default function Avatar({ src, srcCandidates = [], name, size = 36, className = '', imgStyle = {} }) {
+export default function Avatar({ src, srcCandidates = [], name, size = 36, className = '', imgStyle = {}, variant = '' }) {
   const initial = getInitials(name)
+  const resolvedVariant = variant || (size <= 44 ? 'tiny' : (size <= 150 ? 'card' : 'profile'))
+  const resolvedSrc = getProfileAvatarVariant(src, resolvedVariant)
+
   const candidates = useMemo(() => {
     const list = Array.isArray(srcCandidates) ? srcCandidates : []
-    return [...new Set([src, ...list].filter(Boolean))]
-  }, [src, srcCandidates])
+    const mappedList = list.map(c => getProfileAvatarVariant(c, resolvedVariant))
+    return [...new Set([resolvedSrc, ...mappedList].filter(Boolean))]
+  }, [resolvedSrc, srcCandidates, resolvedVariant])
   const [currentIndex, setCurrentIndex] = useState(0)
   const currentSrc = candidates[currentIndex] || ''
 

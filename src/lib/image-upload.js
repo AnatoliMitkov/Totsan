@@ -17,6 +17,14 @@ export const IMAGE_SETTINGS = {
     folder: (userId) => `${userId}/avatar`,
     description: 'Partner profile image'
   },
+  'profileAvatar': {
+    maxSize: 5 * 1024 * 1024, // 5MB
+    maxDimension: 512,
+    formats: ['image/jpeg', 'image/png', 'image/webp'],
+    quality: 0.88,
+    folder: (userId) => `${userId}/avatar`,
+    description: 'Partner profile avatar (cropped and optimized)'
+  },
   'project-media': {
     maxSize: 10 * 1024 * 1024, // 10MB
     maxDimension: 4000,

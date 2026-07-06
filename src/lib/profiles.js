@@ -112,15 +112,8 @@ function compareProfiles(left, right) {
 
 function buildFallbackBio(profile, layer) {
   if (!profile.name) return ''
-  const role = (profile.tag || 'специалист').toLowerCase()
-  const location = profile.city || 'България'
-  const year = profile.since || new Date().getFullYear()
-  const projects = profile.projects || 0
-  if (!layer) {
-    return `${profile.name} работи в ${location} от ${year} г. като ${role}. Има ${projects} реализирани проекта и поема нови запитвания през Totsan.`
-  }
-
-  return `${profile.name} работи в ${location} от ${year} г. като ${role}. Има ${projects} реализирани проекта в Слой ${layer.number} - ${layer.title.toLowerCase()} и отговаря директно през Totsan.`
+  const role = layer ? layer.title : (profile.tag || 'Идея и визия')
+  return `${profile.name} е партньор в Totsan в направление „${role}“. Партньорът все още не е добавил подробно описание.`
 }
 
 function toTextArray(value, fallback = []) {
@@ -192,9 +185,12 @@ export function normalizeProfile(input = {}, fallback = null) {
     || String(input.headline ?? base.headline ?? '').trim()
     || String(input.descriptionLong ?? input.description_long ?? base.descriptionLong ?? base.description_long ?? '').trim()
   )
-  const bio = String(input.bio ?? base.bio ?? buildFallbackBio({ name, tag, city, since, projects }, layer)).trim()
+  const rawBio = String(input.bio ?? base.bio ?? '').trim()
+  const rawDescriptionLong = String(input.descriptionLong ?? input.description_long ?? base.descriptionLong ?? base.description_long ?? '').trim()
+  const displayBio = rawBio || rawDescriptionLong || buildFallbackBio({ name, tag, city, since, projects }, layer)
+  const bio = rawBio
   const headline = String(input.headline ?? base.headline ?? tag).trim()
-  const descriptionLong = String(input.descriptionLong ?? input.description_long ?? base.descriptionLong ?? base.description_long ?? bio).trim()
+  const descriptionLong = rawDescriptionLong
   const phone = String(input.phone ?? base.phone ?? '').trim()
   const emailPublic = String(input.emailPublic ?? input.email_public ?? base.emailPublic ?? base.email_public ?? '').trim()
   const website = String(input.website ?? base.website ?? '').trim()
@@ -235,6 +231,7 @@ export function normalizeProfile(input = {}, fallback = null) {
     rating: rating === null ? null : Number(rating.toFixed(1)),
     projects: Math.round(projects),
     bio,
+    displayBio,
     headline,
     descriptionLong,
     hasProfileDescription,
@@ -396,12 +393,28 @@ export function buildCatalogWithProfiles(profiles) {
   return items
 }
 
-export function getProfileImage(profile) {
-  return profile?.imageUrl || profile?.image_url || ''
+export function getProfileAvatarVariant(url, type) {
+  if (!url || typeof url !== 'string') return url || ''
+  const [base, query] = url.split('?')
+  if (!base.includes('/profile/main.')) return url
+
+  let resolvedBase = base
+  if (type === 'tiny') {
+    resolvedBase = base.replace(/\/main\.(webp|jpg|jpeg)$/i, '/main-tiny.$1')
+  } else if (type === 'card') {
+    resolvedBase = base.replace(/\/main\.(webp|jpg|jpeg)$/i, '/main-card.$1')
+  }
+  return query ? `${resolvedBase}?${query}` : resolvedBase
 }
 
-export function getProfileImageCandidates(profile) {
-  return [profile?.imageUrl, profile?.image_url].filter(Boolean)
+export function getProfileImage(profile, type) {
+  const url = profile?.imageUrl || profile?.image_url || ''
+  return getProfileAvatarVariant(url, type)
+}
+
+export function getProfileImageCandidates(profile, type) {
+  const url = profile?.imageUrl || profile?.image_url || ''
+  return [getProfileAvatarVariant(url, type)].filter(Boolean)
 }
 
 export function getProfileImageStyle(profile) {

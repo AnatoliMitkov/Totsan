@@ -24,7 +24,7 @@ export default function ProfessionalCard({ person, to, state, layerLabel, cta = 
   const priceGuide = normalizePricingNoteDisplay(person?.priceGuide || person?.pricingNote || person?.pricing_note || '')
   const serviceTitles = normalizeList(person?.serviceTitles)
   const description = person?.hasProfileDescription
-    ? compactText(person?.descriptionLong || person?.description_long || person?.bio)
+    ? compactText(person?.descriptionLong || person?.description_long || person?.displayBio)
     : ''
 
   return (
@@ -49,7 +49,7 @@ export default function ProfessionalCard({ person, to, state, layerLabel, cta = 
       <div className="flex flex-1 flex-col p-6 pt-0">
         <div className={`${PROFILE_AVATAR_OVERLAP_CLASS} flex items-end justify-between gap-4`}>
           <div className={`${PROFILE_AVATAR_SIZE_CLASS} shrink-0 overflow-hidden rounded-full border-4 border-paper bg-soft shadow-sm`}>
-            <FallbackImage sources={getProfileImageCandidates(person)} alt={person.name} loading="lazy" decoding="async" className="img-cover" style={getProfileImageStyle(person)} />
+            <FallbackImage sources={getProfileImageCandidates(person, 'card')} alt={person.name} loading="lazy" decoding="async" className="img-cover" style={getProfileImageStyle(person)} />
           </div>
           {person.city && (
             <span className="mb-1 max-w-[60%] truncate rounded-full border border-line bg-paper px-3 py-1 text-xs text-muted">

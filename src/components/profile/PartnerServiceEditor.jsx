@@ -40,6 +40,7 @@ import {
   savePartnerService,
   uploadPartnerServiceImage,
 } from '../../lib/partner-services.js'
+import { getBgnEquivalentText } from '../../lib/money.js'
 import FallbackImage from '../FallbackImage.jsx'
 import TotsanSelect from '../ui/TotsanSelect.jsx'
 import { LocationMultiCombobox } from '../ui/LocationCombobox.jsx'
@@ -1012,12 +1013,19 @@ function PriceSection({ item, onChange, onFeatureChange, onAddFeature, onRemoveF
         <Field label="Име на офертата" hint="Например “Стартова оферта” или “Оглед и планиране”.">
           <input value={item.title} onChange={event => onChange('title', event.target.value)} className={INPUT} placeholder="Стартова оферта" />
         </Field>
-        <Field label="Стартова цена" hint="По-добре ориентир, отколкото празно поле.">
-          <div className="relative">
-            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted">€</span>
-            <input type="number" min="0" value={item.priceAmount} onChange={event => onChange('priceAmount', event.target.value)} className={`${INPUT} pl-14`} placeholder="250" />
-          </div>
-        </Field>
+        <div className="flex flex-col">
+          <Field label="Стартова цена" hint="По-добре ориентир, отколкото празно поле.">
+            <div className="relative">
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted">€</span>
+              <input type="number" min="0" value={item.priceAmount} onChange={event => onChange('priceAmount', event.target.value)} className={`${INPUT} pl-14`} placeholder="250" />
+            </div>
+          </Field>
+          {Number(item.priceAmount) > 0 && (
+            <div className="mt-2 text-xs text-muted">
+              Ще се показва като {item.priceAmount} € / {getBgnEquivalentText(item.priceAmount).replace('≈ ', '')}
+            </div>
+          )}
+        </div>
       </div>
       <Field label="Кратко описание на цената" hint="Кажи от какво зависи финалната оферта.">
         <textarea rows={4} value={item.description} onChange={event => onChange('description', event.target.value)} className={INPUT} placeholder="Цената е стартова и се уточнява според квадратурата, състоянието на основата и избраните материали." />
