@@ -123,7 +123,7 @@ export default function Layout() {
     <div className={isInboxPage ? `app-shell--inbox ${isInboxThreadPage ? 'app-shell--inbox-thread' : ''} flex h-[100dvh] min-h-0 flex-col overflow-hidden` : 'min-h-screen flex flex-col'}>
       <Header />
       <main
-        className={isInboxPage ? `app-main--inbox h-[100dvh] min-h-0 flex-none overflow-hidden ${isInboxThreadPage ? 'mobile-inbox-thread-main' : ''}` : `flex-1 min-h-0 ${isHeroPage ? 'homepage-main' : ''}`}
+        className={isInboxPage ? `app-main--inbox h-[100dvh] min-h-0 flex-none overflow-hidden ${isInboxThreadPage ? 'mobile-inbox-thread-main' : ''}` : `relative z-10 flex-1 min-h-0 ${isHeroPage ? 'homepage-main' : ''}`}
         style={{ paddingTop: isHeroPage ? '0px' : 'var(--header-h, 64px)' }}>
         <Outlet />
       </main>
@@ -198,10 +198,10 @@ function Header() {
 
   return (
     <>
-      <header className={`site-header fixed inset-x-0 top-0 z-40 border-b ${headerSurfaceClass} ${isInboxPage ? 'site-header--inbox' : ''} ${isInboxThreadPage ? 'site-header--inbox-thread' : ''} ${open ? 'site-header--menu-open' : ''} ${isScrolled && !open ? 'site-header--announcement-hidden' : ''}`}>
+      <header className={`site-header fixed inset-x-0 top-0 z-20 border-b ${headerSurfaceClass} ${isInboxPage ? 'site-header--inbox' : ''} ${isInboxThreadPage ? 'site-header--inbox-thread' : ''} ${open ? 'site-header--menu-open' : ''} ${isScrolled && !open ? 'site-header--announcement-hidden' : ''}`}>
         <AnnouncementBar />
         <div className="container-header grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 py-4 px-4 sm:px-6 lg:px-8 xl:gap-4 2xl:gap-12">
-          <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 [text-shadow:0_10px_28px_rgba(0,0,0,0.48)] ${isTopOverlayMode ? 'text-paper' : 'text-ink'}`} onClick={close}>Totsan</Link>
+          <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 ${isTopOverlayMode ? 'text-paper' : 'text-ink'}`} onClick={close}>Totsan</Link>
 
           <div className="min-w-0 flex justify-center">
             <nav aria-label="Основна навигация" className="hidden min-w-0 xl:flex xl:flex-nowrap xl:items-center xl:gap-1.5 2xl:gap-3">
@@ -488,6 +488,7 @@ function Footer({ isAuthPage = false }) {
         <div>
           <div className="font-display text-2xl">Totsan</div>
           <p className="text-muted mt-2 text-sm max-w-xs">Пространството ти — от идея до последния щрих, на едно място.</p>
+          <p className="mt-3 max-w-xs text-xs leading-5 text-muted">Плащанията по проекти се извършват директно между клиента и партньора. Totsan не приема или прехвърля тези суми.</p>
         </div>
         <div>
           <div className="eyebrow mb-3">Слоеве</div>
@@ -519,6 +520,9 @@ function Footer({ isAuthPage = false }) {
           <ul className="space-y-1.5 text-sm text-muted">
             <li><Link to="/obshti-usloviya" className="hover:text-ink">Общи условия</Link></li>
             <li><Link to="/politika-za-poveritelnost" className="hover:text-ink">Политика за поверителност</Link></li>
+            <li><Link to="/kontakt" className="hover:text-ink">Контакт</Link></li>
+            <li><Link to="/pro" className="hover:text-ink">Партньори</Link></li>
+            <li><Link to="/kontakt" state={{ routeKey: 'content_report' }} className="hover:text-ink">Сигнал за съдържание</Link></li>
             <li>
               <button type="button" className="text-left hover:text-ink" onClick={openCookieSettings}>
                 Настройки за бисквитки
@@ -527,9 +531,8 @@ function Footer({ isAuthPage = false }) {
           </ul>
         </div>
       </div>
-      <div className="container-page px-[var(--pad-x)] py-6 text-xs text-muted border-t border-line flex flex-col md:flex-row justify-between gap-2">
-        <span>© {new Date().getFullYear()} Totsan. Всички права запазени.</span>
-        <span>Демо версия</span>
+      <div className="container-page px-[var(--pad-x)] py-6 text-xs text-muted border-t border-line">
+        <span>© {new Date().getFullYear()} Totsan.</span>
       </div>
     </footer>
   )

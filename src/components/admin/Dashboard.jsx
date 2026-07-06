@@ -27,7 +27,7 @@ import { loadAdminReviewReports, loadAdminReviews } from '../../lib/reviews.js'
 import { INQUIRY_STATUS_META, StatusBadge } from './AdminStatus.jsx'
 
 const ORDER_STATUS_LABELS = {
-  pending_payment: 'Очаква плащане',
+  pending_payment: 'Очаква директно плащане',
   paid: 'Платена',
   in_progress: 'В работа',
   delivered: 'Доставена',
@@ -106,7 +106,7 @@ export default function Dashboard({ onOpenSection }) {
           <div>
             <div className="eyebrow">Днес в Totsan</div>
             <h2 className="mt-2 font-display text-3xl text-ink">Какво изисква внимание</h2>
-            <p className="mt-2 max-w-3xl text-sm text-muted">Обзорът показва решенията, които движат платформата: нови хора, модерация, trust, плащания и admin промени.</p>
+            <p className="mt-2 max-w-3xl text-sm text-muted">Обзорът показва решенията, които движат платформата: нови хора, модерация, trust, партньорски абонаменти и admin промени.</p>
           </div>
           <button type="button" onClick={load} className="btn btn-ghost self-start"><RefreshCcw size={17} /> Обнови</button>
         </div>
@@ -212,7 +212,7 @@ function buildDashboardView(data) {
   const risks = [
     riskItem('admins', adminAccounts.length, 'Admin акаунти', adminAccounts.map(formatAccountName).join(', ') || 'Няма admin акаунти', 'users', ShieldCheck),
     riskItem('admin-role-changes', adminRoleChanges.length, 'Дадени admin права', 'Следи всяка промяна на роли. Това е security зоната.', 'audit', AlertTriangle),
-    riskItem('payment-attention', paymentAttention.length, 'Плащания в очакване', 'Провери дали има поръчки, които стоят без финал.', 'orders', CreditCard),
+    riskItem('payment-attention', paymentAttention.length, 'Директни плащания без потвърждение', 'Провери дали има поръчки, за които страните още не са добавили потвърждение.', 'orders', CreditCard),
     riskItem('draft-services', draftServices.length, 'Услуги в чернова', 'Партньорите може да имат нужда от помощ да ги завършат.', 'partner-services', PackageCheck),
   ]
 

@@ -58,7 +58,7 @@ function PartnerOrderCard({ order }) {
             <span className="text-xs text-muted">{formatOrderDate(order.createdAt)}</span>
           </div>
           <h3 className="mt-3 font-display text-3xl text-ink">{order.title}</h3>
-          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-soft px-3 py-1 text-sm text-muted"><CreditCard size={15} /> {formatOrderMoney(order.partnerPayout, order.currency)} към партньора</div>
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-soft px-3 py-1 text-sm text-muted"><CreditCard size={15} /> Договорена сума: {formatOrderMoney(order.amountTotal, order.currency)}</div>
         </div>
         <Link to={`/order/${order.id}`} className="btn btn-primary shrink-0 justify-center">Управлявай</Link>
       </div>

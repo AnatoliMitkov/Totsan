@@ -12,7 +12,11 @@
     "prebuild": "npm run check:encoding",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "remote:dev": "powershell -ExecutionPolicy Bypass -File ./scripts/start-remote-dev.ps1",
+    "remote:dev:stop": "powershell -ExecutionPolicy Bypass -File ./scripts/stop-remote-dev.ps1",
+    "remote:start": "powershell -ExecutionPolicy Bypass -File ./scripts/start-remote-preview.ps1",
+    "remote:stop": "powershell -ExecutionPolicy Bypass -File ./scripts/stop-remote-preview.ps1"
   },
   "dependencies": {
     "@marsidev/react-turnstile": "^1.5.3",

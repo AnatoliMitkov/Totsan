@@ -1,4 +1,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.8'
+import {
+  sendActivationEmailIfNeeded,
+  upsertPartnerSubscription as sharedUpsertPartnerSubscription,
+} from '../_shared/partner-subscriptions.ts'
 
 const encoder = new TextEncoder()
 
@@ -62,129 +66,6 @@ async function verifyStripeSignature(req: Request, rawBody: string) {
 
   const expected = await hmacHex(webhookSecret, `${timestamp}.${rawBody}`)
   if (!safeEqual(expected, signature)) throw new Error('Stripe signature verification failed.')
-}
-
-async function markPaid(session: Record<string, unknown>) {
-  const orderId = String((session.metadata as Record<string, unknown> | undefined)?.order_id || '')
-  if (!orderId) return { skipped: true, reason: 'missing_order_id' }
-  const admin = adminClient()
-  const { data: order, error } = await admin.from('orders').select('*').eq('id', orderId).maybeSingle()
-  if (error) throw error
-  if (!order) return { skipped: true, reason: 'order_not_found' }
-  if (order.status !== 'pending_payment') return { ok: true, order }
-
-  const paymentIntent = typeof session.payment_intent === 'string'
-    ? session.payment_intent
-    : (session.payment_intent as Record<string, unknown> | null)?.id || null
-
-  const { data: updatedRows, error: updateError } = await admin.from('orders').update({
-    status: 'paid',
-    stripe_checkout_session_id: session.id,
-    stripe_payment_intent_id: paymentIntent,
-  }).eq('id', order.id).eq('status', 'pending_payment').select('*')
-  if (updateError) throw updateError
-  const updatedOrder = updatedRows?.[0]
-  if (!updatedOrder) return { ok: true, order }
-
-  await admin.from('payment_transactions').insert({
-    order_id: order.id,
-    type: 'charge',
-    provider: 'stripe',
-    amount: order.amount_total,
-    currency: order.currency,
-    status: 'succeeded',
-    raw: session,
-  })
-  await admin.from('order_events').insert({
-    order_id: order.id,
-    actor_id: order.client_id,
-    type: 'payment_succeeded_webhook',
-    from_status: 'pending_payment',
-    to_status: 'paid',
-    message: 'Stripe webhook потвърди плащането.',
-    payload: session,
-  })
-
-  if (order.offer_id) {
-    await admin.from('offers').update({ status: 'accepted', accepted_at: new Date().toISOString() }).eq('id', order.offer_id)
-  }
-
-  return { ok: true, order: updatedOrder }
-}
-
-async function markPaidFromPaymentIntent(paymentIntent: Record<string, unknown>) {
-  const metadata = paymentIntent.metadata as Record<string, unknown> | undefined
-  const orderId = String(metadata?.order_id || '')
-  if (!orderId) return { skipped: true, reason: 'missing_order_id' }
-  const admin = adminClient()
-  const { data: order, error } = await admin.from('orders').select('*').eq('id', orderId).maybeSingle()
-  if (error) throw error
-  if (!order) return { skipped: true, reason: 'order_not_found' }
-  if (order.status !== 'pending_payment') return { ok: true, order }
-
-  const { data: updatedRows, error: updateError } = await admin.from('orders').update({
-    status: 'paid',
-    stripe_payment_intent_id: paymentIntent.id,
-  }).eq('id', order.id).eq('status', 'pending_payment').select('*')
-  if (updateError) throw updateError
-  const updatedOrder = updatedRows?.[0]
-  if (!updatedOrder) return { ok: true, order }
-
-  await admin.from('payment_transactions').insert({
-    order_id: order.id,
-    type: 'charge',
-    provider: 'stripe',
-    amount: order.amount_total,
-    currency: order.currency,
-    status: 'succeeded',
-    raw: paymentIntent,
-  })
-  await admin.from('order_events').insert({
-    order_id: order.id,
-    actor_id: order.client_id,
-    type: 'payment_intent_succeeded_webhook',
-    from_status: 'pending_payment',
-    to_status: 'paid',
-    message: 'Stripe webhook потвърди плащането.',
-    payload: paymentIntent,
-  })
-
-  if (order.offer_id) {
-    await admin.from('offers').update({ status: 'accepted', accepted_at: new Date().toISOString() }).eq('id', order.offer_id)
-  }
-
-  return { ok: true, order: updatedOrder }
-}
-
-async function markRefunded(charge: Record<string, unknown>) {
-  const paymentIntent = String(charge.payment_intent || '')
-  if (!paymentIntent) return { skipped: true, reason: 'missing_payment_intent' }
-  const admin = adminClient()
-  const { data: order, error } = await admin.from('orders').select('*').eq('stripe_payment_intent_id', paymentIntent).maybeSingle()
-  if (error) throw error
-  if (!order) return { skipped: true, reason: 'order_not_found' }
-
-  const { data: updatedOrder, error: updateError } = await admin.from('orders').update({ status: 'refunded' }).eq('id', order.id).select('*').single()
-  if (updateError) throw updateError
-  await admin.from('payment_transactions').insert({
-    order_id: order.id,
-    type: 'refund',
-    provider: 'stripe',
-    amount: Math.round(Number(charge.amount_refunded || 0) / 100),
-    currency: String(charge.currency || order.currency).toUpperCase(),
-    status: 'succeeded',
-    raw: charge,
-  })
-  await admin.from('order_events').insert({
-    order_id: order.id,
-    actor_id: null,
-    type: 'refund_webhook',
-    from_status: order.status,
-    to_status: 'refunded',
-    message: 'Stripe webhook отчете refund.',
-    payload: charge,
-  })
-  return { ok: true, order: updatedOrder }
 }
 
 function toIsoFromUnix(value: unknown) {
@@ -298,56 +179,48 @@ async function upsertPartnerSubscriptionFromStripeSubscription(subscription: Rec
   }
   const subscriptionId = cleanText(subscription.id || fallback.stripe_subscription_id)
   if (!subscriptionId) return { skipped: true, reason: 'missing_subscription_id' }
-
-  const { data: existing, error: existingError } = await admin
-    .from('partner_subscriptions')
-    .select('*')
-    .eq('stripe_subscription_id', subscriptionId)
-    .maybeSingle()
-  if (existingError) throw existingError
-
-  const priceId = stripePriceIdFromSubscription(subscription) || cleanText(fallback.stripe_price_id || existing?.stripe_price_id)
-  const planKey = cleanText(metadata.plan_key || fallback.plan_key || existing?.plan_key || planKeyFromPriceId(priceId), 'active_partner_monthly')
-  const billingInterval = cleanText(metadata.billing_interval || fallback.billing_interval || existing?.billing_interval || billingIntervalFromPlanKey(planKey), 'monthly')
-  const userId = cleanText(metadata.user_id || fallback.user_id || existing?.user_id)
+  const userId = cleanText(metadata.user_id || fallback.user_id)
   if (!userId) return { skipped: true, reason: 'missing_user_id' }
 
-  const patch = {
+  const row = await sharedUpsertPartnerSubscription(admin, subscription, {
+    ...fallback,
     user_id: userId,
-    partner_profile_id: cleanText(metadata.partner_profile_id || fallback.partner_profile_id || existing?.partner_profile_id) || null,
-    plan_key: planKey,
-    billing_interval: billingInterval,
-    status: mapStripeSubscriptionStatus(subscription.status),
-    stripe_customer_id: stripeObjectId(subscription.customer || fallback.stripe_customer_id || existing?.stripe_customer_id) || null,
-    stripe_subscription_id: subscriptionId,
-    stripe_price_id: priceId || null,
-    current_period_start: toIsoFromUnix(subscription.current_period_start),
-    current_period_end: toIsoFromUnix(subscription.current_period_end),
-    trial_start: toIsoFromUnix(subscription.trial_start),
-    trial_end: toIsoFromUnix(subscription.trial_end),
-    cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
-    metadata: {
-      source: 'stripe_subscription_webhook',
-      stripe_status: cleanText(subscription.status),
-    },
+    partner_profile_id: cleanText(metadata.partner_profile_id || fallback.partner_profile_id),
+    plan_key: cleanText(metadata.plan_key || fallback.plan_key),
+    billing_interval: cleanText(metadata.billing_interval || fallback.billing_interval),
+    sync_source: 'stripe_subscription_webhook',
+  })
+  if (!row) return { skipped: true, reason: 'subscription_not_saved' }
+  return { ok: true, subscription: row }
+}
+
+async function attachActivationEmail(
+  result: Record<string, unknown>,
+  fallbackEmail = '',
+) {
+  const subscription = result.subscription as Record<string, unknown> | undefined
+  const userId = cleanText(subscription?.user_id)
+  if (!subscription || !userId) return result
+
+  let recipientEmail = cleanText(fallbackEmail)
+  if (!recipientEmail) {
+    const admin = adminClient()
+    const { data, error } = await admin.auth.admin.getUserById(userId)
+    if (error) console.error('Could not load subscription email recipient', error)
+    recipientEmail = cleanText(data?.user?.email)
   }
 
-  const updated = await updateSubscriptionRows(admin, {
-    subscriptionId,
-    checkoutSessionId: cleanText(fallback.stripe_checkout_session_id),
-  }, patch)
-  if (updated) return { ok: true, subscription: updated }
-
-  const { data: inserted, error: insertError } = await admin
-    .from('partner_subscriptions')
-    .insert({
-      ...patch,
-      stripe_checkout_session_id: cleanText(fallback.stripe_checkout_session_id) || null,
-    })
-    .select('*')
-    .single()
-  if (insertError) throw insertError
-  return { ok: true, subscription: inserted }
+  const admin = adminClient()
+  const emailResult = await sendActivationEmailIfNeeded(admin, subscription, recipientEmail)
+  return {
+    ...result,
+    subscription: emailResult.subscription || subscription,
+    email: {
+      sent: Boolean(emailResult.sent),
+      skipped: Boolean(emailResult.skipped),
+      reason: cleanText(emailResult.reason),
+    },
+  }
 }
 
 async function upsertPartnerSubscriptionFromSession(session: Record<string, unknown>) {
@@ -404,12 +277,22 @@ async function updatePartnerSubscriptionFromInvoice(invoice: Record<string, unkn
   const subscriptionId = stripeObjectId(invoice.subscription)
   if (!subscriptionId) return { skipped: true, reason: 'missing_subscription_id' }
 
+  const admin = adminClient()
+  const { data: existing, error: existingError } = await admin
+    .from('partner_subscriptions')
+    .select('*')
+    .eq('stripe_subscription_id', subscriptionId)
+    .maybeSingle()
+  if (existingError) throw existingError
+  if (!existing) return { skipped: true, reason: 'subscription_not_found' }
+
   const period = stripeInvoicePeriod(invoice)
   const priceId = stripePriceIdFromInvoice(invoice)
   const patch: Record<string, unknown> = {
     status: nextStatus,
     stripe_customer_id: stripeObjectId(invoice.customer) || null,
     metadata: {
+      ...((existing.metadata as Record<string, unknown> | undefined) || {}),
       source: 'stripe_invoice_webhook',
       invoice_id: cleanText(invoice.id),
       stripe_status: cleanText(invoice.status),
@@ -419,11 +302,10 @@ async function updatePartnerSubscriptionFromInvoice(invoice: Record<string, unkn
   if (period.end) patch.current_period_end = period.end
   if (priceId) patch.stripe_price_id = priceId
 
-  const admin = adminClient()
   const { data, error } = await admin
     .from('partner_subscriptions')
     .update(patch)
-    .eq('stripe_subscription_id', subscriptionId)
+    .eq('id', existing.id)
     .select('*')
   if (error) throw error
   if (!data?.length) return { skipped: true, reason: 'subscription_not_found' }
@@ -442,31 +324,29 @@ Deno.serve(async (req) => {
     const object = event?.data?.object || {}
 
     if (type === 'checkout.session.completed' && object.mode === 'subscription' && object.metadata?.source === 'partner_subscription') {
-      const result = await upsertPartnerSubscriptionFromSession(object)
+      const customerDetails = object.customer_details as Record<string, unknown> | undefined
+      const result = await attachActivationEmail(
+        await upsertPartnerSubscriptionFromSession(object),
+        cleanText(customerDetails?.email),
+      )
       return jsonResponse(200, { received: true, handled: type, result })
     }
     if (type === 'customer.subscription.created' || type === 'customer.subscription.updated' || type === 'customer.subscription.deleted') {
-      const result = await upsertPartnerSubscriptionFromStripeSubscription(object)
+      const result = await attachActivationEmail(
+        await upsertPartnerSubscriptionFromStripeSubscription(object),
+      )
       return jsonResponse(200, { received: true, handled: type, result })
     }
     if (type === 'invoice.payment_succeeded' && object.subscription) {
-      const result = await updatePartnerSubscriptionFromInvoice(object, 'active')
+      const customerEmail = cleanText(object.customer_email)
+      const result = await attachActivationEmail(
+        await updatePartnerSubscriptionFromInvoice(object, 'active'),
+        customerEmail,
+      )
       return jsonResponse(200, { received: true, handled: type, result })
     }
     if (type === 'invoice.payment_failed' && object.subscription) {
       const result = await updatePartnerSubscriptionFromInvoice(object, 'past_due')
-      return jsonResponse(200, { received: true, handled: type, result })
-    }
-    if (type === 'checkout.session.completed' && object.payment_status === 'paid') {
-      const result = await markPaid(object)
-      return jsonResponse(200, { received: true, handled: type, result })
-    }
-    if (type === 'payment_intent.succeeded') {
-      const result = await markPaidFromPaymentIntent(object)
-      return jsonResponse(200, { received: true, handled: type, result })
-    }
-    if (type === 'charge.refunded') {
-      const result = await markRefunded(object)
       return jsonResponse(200, { received: true, handled: type, result })
     }
     return jsonResponse(200, { received: true, ignored: type })

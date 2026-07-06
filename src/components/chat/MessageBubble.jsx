@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CornerUpLeft, Download, FileText, ImageOff, SmilePlus, X } from 'lucide-react'
 import OfferCard from './OfferCard.jsx'
+import ServiceRequestCard from './ServiceRequestCard.jsx'
 import Avatar from '../Avatar.jsx'
 import { compactSystemText, getParticipantDisplayName, getOtherParticipant } from '../../lib/chat.js'
 import { createChatAttachmentSignedUrl, formatAttachmentSize, isDeletedAttachment, isImageAttachment } from '../../lib/chat-attachments.js'
@@ -12,6 +13,7 @@ export default function MessageBubble({
   userId,
   conversation,
   onOfferAction,
+  onServiceRequestAction,
   onReplyToMessage,
   onToggleReaction,
   showAvatar = true,
@@ -27,6 +29,7 @@ export default function MessageBubble({
   const own = message.sender_id === userId
   const system = message.kind === 'system'
   const offer = message.kind === 'offer' && message.offer
+  const serviceRequest = message.kind === 'service_request' && message.service_request
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
   const reactions = Array.isArray(message.reactions) ? message.reactions : []
   const attachments = Array.isArray(message.attachments) ? message.attachments : []
@@ -45,7 +48,7 @@ export default function MessageBubble({
   const bubbleSurfaceClass = own
     ? 'border-accentDeep bg-accentDeep text-paper shadow-[0_14px_34px_-24px_rgba(22,62,162,0.62)]'
     : 'border-line/90 bg-soft/95 text-ink shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] backdrop-blur-sm'
-  const bubbleSizeClass = offer
+  const bubbleSizeClass = offer || serviceRequest
     ? 'w-full max-w-[min(92vw,42rem)] sm:max-w-[min(78%,44rem)] lg:max-w-[min(72%,46rem)]'
     : 'w-fit max-w-[min(82vw,34rem)] sm:max-w-[min(74%,38rem)] lg:max-w-[min(62%,42rem)]'
   const wrapperSpacingClass = groupedWithPrevious ? 'mt-1.5' : 'mt-4 first:mt-0'
@@ -74,7 +77,9 @@ export default function MessageBubble({
               <div className="mt-1 break-words whitespace-normal opacity-80">{replyPreview.body}</div>
             </div>
           )}
-          {offer ? (
+          {serviceRequest ? (
+            <ServiceRequestCard request={serviceRequest} conversation={conversation} userId={userId} onAction={onServiceRequestAction} compact={own} />
+          ) : offer ? (
             <OfferCard offer={message.offer} conversation={conversation} userId={userId} onAction={onOfferAction} compact={own} messageCreatedAt={message.created_at} />
           ) : message.body ? (
             <p className="break-words whitespace-pre-wrap text-sm leading-relaxed [overflow-wrap:anywhere]">{message.body}</p>

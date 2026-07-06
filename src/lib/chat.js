@@ -26,9 +26,11 @@ const LEGACY_MESSAGE_SELECT = `
   body,
   attachments,
   offer_id,
+  service_request_id,
   was_masked,
   created_at,
-  offer:offers(*)
+  offer:offers(*),
+  service_request:service_requests(*)
 `
 
 export const MESSAGE_SELECT = `
@@ -39,10 +41,12 @@ export const MESSAGE_SELECT = `
   body,
   attachments,
   offer_id,
+  service_request_id,
   reply_to_message_id,
   was_masked,
   created_at,
-  offer:offers(*)
+  offer:offers(*),
+  service_request:service_requests(*)
 `
 
 const PROFILE_SELECT = 'user_id, name, slug, city, image_url'
@@ -384,6 +388,7 @@ function mergeMessageRecords(existing, incoming) {
     ...existing,
     ...incoming,
     offer: incoming.offer ?? existing.offer ?? null,
+    service_request: incoming.service_request ?? existing.service_request ?? null,
     reply_to_message: incoming.reply_to_message ?? existing.reply_to_message ?? null,
     reactions: incoming.reactions ?? existing.reactions ?? [],
   }
@@ -860,6 +865,15 @@ export async function sendOffer({ conversationId, offer }) {
   return result
 }
 
+export async function createServiceRequest({ serviceId, servicePackageId }) {
+  const result = await invokeChatAction('create_service_request', { serviceId, servicePackageId })
+  return result
+}
+
+export async function updateServiceRequestStatus({ requestId, status }) {
+  return invokeChatAction('update_service_request_status', { requestId, status })
+}
+
 export async function updateOfferStatus({ offerId, status }) {
   const result = await invokeChatAction('update_offer_status', { offerId, status })
   return result
@@ -885,6 +899,7 @@ export function subscribeToConversation(conversationId, onChange) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `id=eq.${conversationId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'offers', filter: `conversation_id=eq.${conversationId}` }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'service_requests', filter: `conversation_id=eq.${conversationId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, onChange)
     .subscribe()
 

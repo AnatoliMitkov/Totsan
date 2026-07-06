@@ -1,9 +1,9 @@
 import { supabase } from './supabase.js'
-import { formatMoney } from './money.js'
+import { formatEurWithBgn, formatMoney } from './money.js'
 
 export const ORDER_STATUS_LABELS = {
-  pending_payment: 'Очаква плащане',
-  paid: 'Платена',
+  pending_payment: 'Очаква директно плащане',
+  paid: 'Платено директно',
   in_progress: 'В работа',
   delivered: 'Предадена',
   completed: 'Завършена',
@@ -13,6 +13,7 @@ export const ORDER_STATUS_LABELS = {
 }
 
 export const ORDER_ACTION_LABELS = {
+  confirm_direct_payment: 'Потвърди получено плащане',
   start_work: 'Започни работа',
   mark_delivered: 'Маркирай като предадена',
   confirm_completed: 'Потвърди завършване',
@@ -21,7 +22,9 @@ export const ORDER_ACTION_LABELS = {
 }
 
 export function formatOrderMoney(amount, currency = 'EUR') {
-  return formatMoney(amount, currency)
+  return String(currency).toUpperCase() === 'EUR'
+    ? formatEurWithBgn(amount)
+    : formatMoney(amount, currency)
 }
 
 export function formatOrderDate(value) {
@@ -77,17 +80,11 @@ export function normalizeOrder(row = {}) {
     description: row.description || '',
     deliverables: jsonArray(row.deliverables),
     amountTotal: row.amount_total || 0,
-    platformFee: row.platform_fee || 0,
-    partnerPayout: row.partner_payout || 0,
     currency: row.currency || 'EUR',
-    paymentProvider: row.payment_provider || 'stripe',
     status: row.status || 'pending_payment',
     deliveryDueAt: row.delivery_due_at || '',
     deliveredAt: row.delivered_at || '',
     completedAt: row.completed_at || '',
-    stripeCheckoutSessionId: row.stripe_checkout_session_id || '',
-    stripePaymentIntentId: row.stripe_payment_intent_id || '',
-    stripeTransferId: row.stripe_transfer_id || '',
     clientAccount: normalizeAccountParty(row.client_account || {}),
     partnerAccount: normalizeAccountParty(row.partner_account || {}),
   }
@@ -112,62 +109,12 @@ export function normalizePayment(row = {}) {
     id: row.id || '',
     orderId: row.order_id || '',
     type: row.type || '',
-    provider: row.provider || 'stripe',
     amount: row.amount || 0,
     currency: row.currency || 'EUR',
     status: row.status || 'pending',
     raw: row.raw || {},
     createdAt: row.created_at || '',
   }
-}
-
-export async function loadCheckoutPreview(type, id) {
-  if (type === 'service') {
-    const { data, error } = await supabase
-      .from('partner_service_packages')
-      .select('*, service:partner_services(id, slug, title, subtitle, description_md, partner_id, moderation_status, is_published, profile:profiles(id, name, slug, image_url, image_zoom, image_x, image_y))')
-      .eq('id', id)
-      .maybeSingle()
-    if (error) throw error
-    if (!data || !data.service) return null
-    return {
-      type,
-      id: data.id,
-      title: `${data.service.title} · ${data.title}`,
-      subtitle: data.description || data.service.subtitle || '',
-      description: data.service.description_md || '',
-      deliverables: jsonArray(data.features),
-      amountTotal: data.price_amount || 0,
-      currency: data.currency || 'EUR',
-      deliveryDays: data.delivery_days || '',
-      revisions: data.revisions ?? '',
-      service: data.service,
-      partner: data.service.profile,
-      isAvailable: data.service.is_published && data.service.moderation_status === 'approved' && data.is_active !== false,
-    }
-  }
-
-  if (type === 'offer') {
-    const { data, error } = await supabase.from('offers').select('*').eq('id', id).maybeSingle()
-    if (error) throw error
-    if (!data) return null
-    return {
-      type,
-      id: data.id,
-      title: data.title,
-      subtitle: data.description || '',
-      description: data.description || '',
-      deliverables: jsonArray(data.deliverables),
-      amountTotal: data.price_amount || 0,
-      currency: data.currency || 'EUR',
-      deliveryDays: data.delivery_days || '',
-      revisions: data.revisions ?? '',
-      offer: data,
-      isAvailable: ['sent', 'accepted'].includes(data.status),
-    }
-  }
-
-  return null
 }
 
 async function loadOrdersBy(column, value) {

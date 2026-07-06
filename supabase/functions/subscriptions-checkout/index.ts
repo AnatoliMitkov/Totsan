@@ -1,4 +1,9 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.8'
+import {
+  hasActiveDatabaseAccess,
+  reconcilePartnerSubscription,
+  sendActivationEmailIfNeeded,
+} from '../_shared/partner-subscriptions.ts'
 
 const CAMPAIGN_END_MS = Date.parse('2026-07-31T20:59:59.999Z')
 const POST_CAMPAIGN_TRIAL_DAYS = 14
@@ -86,22 +91,66 @@ function stripeSecret() {
   return secret
 }
 
-async function stripeRequest(path: string, body: URLSearchParams) {
+async function stripeRequest(path: string, body?: URLSearchParams, method = 'POST') {
   const secret = stripeSecret()
-  const response = await fetch(`https://api.stripe.com/v1/${path}`, {
-    method: 'POST',
+  const options: RequestInit = {
+    method,
     headers: {
       Authorization: `Bearer ${secret}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
     },
-    body,
-  })
+  }
+  if (method === 'POST' && body) {
+    options.headers = {
+      ...options.headers,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    }
+    options.body = body
+  }
+  const response = await fetch(`https://api.stripe.com/v1/${path}`, options)
   const data = await response.json()
   if (!response.ok) {
     const message = cleanText((data as { error?: { message?: string } })?.error?.message, 'Stripe заявката не беше успешна.')
     throw new Error(message)
   }
   return data as Record<string, unknown>
+}
+
+function toIsoFromUnix(value: unknown) {
+  const seconds = Number(value || 0)
+  if (!Number.isFinite(seconds) || seconds <= 0) return null
+  return new Date(seconds * 1000).toISOString()
+}
+
+function stripePriceIdFromSubscription(subscription: Record<string, unknown>) {
+  const items = subscription.items as { data?: Array<Record<string, unknown>> } | undefined
+  const price = items?.data?.[0]?.price as Record<string, unknown> | undefined
+  return cleanText(price?.id)
+}
+
+function planKeyFromPriceId(priceId: string) {
+  const pairs: Array<[string, string]> = [
+    ['active_partner_monthly', Deno.env.get('STRIPE_PRICE_PARTNER_ACTIVE_MONTHLY') || ''],
+    ['active_partner_yearly', Deno.env.get('STRIPE_PRICE_PARTNER_ACTIVE_YEARLY') || ''],
+    ['company_team_monthly', Deno.env.get('STRIPE_PRICE_PARTNER_COMPANY_MONTHLY') || ''],
+    ['company_team_yearly', Deno.env.get('STRIPE_PRICE_PARTNER_COMPANY_YEARLY') || ''],
+  ]
+  return pairs.find(([, configuredPriceId]) => configuredPriceId && configuredPriceId === priceId)?.[0] || ''
+}
+
+function billingIntervalFromPlanKey(planKey: string) {
+  if (planKey.endsWith('_yearly')) return 'yearly'
+  if (planKey.endsWith('_monthly')) return 'monthly'
+  return ''
+}
+
+function mapStripeSubscriptionStatus(value: unknown) {
+  const status = cleanText(value).toLowerCase()
+  if (status === 'active') return 'active'
+  if (status === 'trialing') return 'trialing'
+  if (status === 'canceled') return 'canceled'
+  if (status === 'incomplete_expired') return 'expired'
+  if (status === 'past_due' || status === 'unpaid' || status === 'incomplete') return 'past_due'
+  return 'inactive'
 }
 
 function assertConsents(value: unknown) {
@@ -120,6 +169,71 @@ Deno.serve(async (req) => {
     const user = await getUser(req, authorization)
     const payload = await req.json().catch(() => ({})) as Record<string, unknown>
     const admin = adminClient()
+
+    if (payload.action === 'notify') {
+      const { data: subscriptionRows, error: subscriptionError } = await admin
+        .from('partner_subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(20)
+      if (subscriptionError) throw subscriptionError
+
+      const subscription = (subscriptionRows || []).find((row: Record<string, unknown>) => (
+        hasActiveDatabaseAccess(row)
+      ))
+      if (!subscription) {
+        return jsonResponse(404, {
+          error: 'Няма активен партньорски план, за който да изпратим потвърждение.',
+          code: 'active_subscription_not_found',
+        })
+      }
+
+      const emailResult = await sendActivationEmailIfNeeded(
+        admin,
+        subscription,
+        cleanText(user.email),
+        { force: payload.force === true },
+      )
+      return jsonResponse(200, {
+        ok: Boolean(emailResult.sent),
+        subscription: emailResult.subscription || subscription,
+        email: {
+          sent: Boolean(emailResult.sent),
+          skipped: Boolean(emailResult.skipped),
+          reason: cleanText(emailResult.reason),
+          channel: cleanText(emailResult.channel),
+        },
+      })
+    }
+
+    if (payload.action === 'sync' || payload.action === 'reconcile') {
+      const sessionId = cleanText(payload.sessionId)
+      if (payload.action === 'sync' && !sessionId) {
+        throw new Error('Липсва номер на сесия (session ID).')
+      }
+
+      const result = await reconcilePartnerSubscription(admin, user, {
+        sessionId,
+        syncSource: sessionId ? 'checkout_return' : 'profile_reconciliation',
+      })
+      const emailResult = result.subscription
+        ? await sendActivationEmailIfNeeded(admin, result.subscription, cleanText(user.email))
+        : { sent: false, skipped: true, reason: 'subscription_not_found' }
+      const subscription = emailResult.subscription || result.subscription
+
+      return jsonResponse(200, {
+        ok: Boolean(subscription),
+        synchronized: Boolean(subscription),
+        repaired: result.repaired,
+        subscription,
+        email: {
+          sent: Boolean(emailResult.sent),
+          skipped: Boolean(emailResult.skipped),
+          reason: cleanText(emailResult.reason),
+        },
+      })
+    }
 
     const planKey = cleanText(payload.planKey)
     const plan = PLAN_CONFIG[planKey]
@@ -154,6 +268,60 @@ Deno.serve(async (req) => {
       .maybeSingle()
     if (profileError) throw profileError
     if (!profile?.id) throw new Error('Първо трябва да имаш партньорски профил, за да активираш абонамент.')
+
+    const reconciliation = await reconcilePartnerSubscription(admin, user, {
+      syncSource: 'checkout_duplicate_guard',
+    })
+    if (hasActiveDatabaseAccess(reconciliation.subscription)) {
+      const emailResult = await sendActivationEmailIfNeeded(
+        admin,
+        reconciliation.subscription,
+        cleanText(user.email || account?.email),
+      )
+      return jsonResponse(409, {
+        error: 'Вече имате активен партньорски план. Управлявайте текущия абонамент от профила си.',
+        code: 'active_subscription',
+        subscription: emailResult.subscription || reconciliation.subscription,
+      })
+    }
+
+    const { data: pendingCheckout, error: pendingCheckoutError } = await admin
+      .from('partner_subscriptions')
+      .select('stripe_checkout_session_id, created_at')
+      .eq('user_id', user.id)
+      .eq('plan_key', planKey)
+      .eq('billing_interval', billingInterval)
+      .eq('status', 'inactive')
+      .not('stripe_checkout_session_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (pendingCheckoutError) throw pendingCheckoutError
+
+    const pendingSessionId = cleanText(pendingCheckout?.stripe_checkout_session_id)
+    const pendingCreatedAt = new Date(cleanText(pendingCheckout?.created_at)).getTime()
+    if (pendingSessionId && Number.isFinite(pendingCreatedAt) && Date.now() - pendingCreatedAt < 23 * 60 * 60 * 1000) {
+      try {
+        const pendingSession = await stripeRequest(
+          `checkout/sessions/${encodeURIComponent(pendingSessionId)}`,
+          undefined,
+          'GET',
+        )
+        const pendingUrl = cleanText(pendingSession.url)
+        if (cleanText(pendingSession.status) === 'open' && pendingUrl) {
+          return jsonResponse(200, {
+            ok: true,
+            checkoutUrl: pendingUrl,
+            sessionId: pendingSessionId,
+            planKey,
+            billingInterval,
+            reused: true,
+          })
+        }
+      } catch (error) {
+        console.warn('Could not reuse pending Stripe Checkout session', error)
+      }
+    }
 
     const { data: existingSubscription, error: existingSubscriptionError } = await admin
       .from('partner_subscriptions')
@@ -199,7 +367,7 @@ Deno.serve(async (req) => {
     const checkoutUrl = cleanText(session.url)
     if (!sessionId || !checkoutUrl) throw new Error('Stripe не върна валидна Checkout сесия.')
 
-    await admin.from('partner_subscriptions').insert({
+    const { error: checkoutRecordError } = await admin.from('partner_subscriptions').insert({
       user_id: user.id,
       partner_profile_id: profile.id,
       plan_key: planKey,
@@ -214,6 +382,7 @@ Deno.serve(async (req) => {
         trial_days: trialDays,
       },
     })
+    if (checkoutRecordError) throw checkoutRecordError
 
     return jsonResponse(200, {
       ok: true,

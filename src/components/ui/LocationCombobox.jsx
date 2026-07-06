@@ -129,33 +129,31 @@ export function LocationCombobox({
         </div>
         <div className="min-w-0 sm:col-span-3">
           <label htmlFor={id} className="block text-sm font-medium text-ink">{label}</label>
-          <div className="flex flex-wrap items-start gap-3">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search size={16} className="pointer-events-none absolute left-4 top-1/2 mt-1 -translate-y-1/2 text-muted" />
-              <input
-                ref={inputRef}
-                id={id}
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value)
-                  setOpen(true)
-                }}
-                onFocus={() => setOpen(true)}
-                onBlur={normalizeTypedValue}
-                required={required}
-                className={`${INPUT_CLASS} pl-11 ${error ? 'border-red-300 bg-red-50/70' : ''}`}
-                placeholder={placeholder}
-                autoComplete="off"
-                role="combobox"
-                aria-expanded={open}
-                aria-invalid={Boolean(error)}
-                aria-controls={`${id}-listbox`}
-              />
-            </div>
-            {topRightSlot && <div className="mt-2 shrink-0">{topRightSlot}</div>}
+          <div className="relative">
+            <Search size={16} className="pointer-events-none absolute left-4 top-1/2 mt-1 -translate-y-1/2 text-muted" />
+            <input
+              ref={inputRef}
+              id={id}
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value)
+                setOpen(true)
+              }}
+              onFocus={() => setOpen(true)}
+              onBlur={normalizeTypedValue}
+              required={required}
+              className={`${INPUT_CLASS} pl-11 ${error ? 'border-red-300 bg-red-50/70' : ''}`}
+              placeholder={placeholder}
+              autoComplete="off"
+              role="combobox"
+              aria-expanded={open}
+              aria-invalid={Boolean(error)}
+              aria-controls={`${id}-listbox`}
+            />
           </div>
           {(helper || error) && <p className={`mt-1.5 text-xs ${error ? 'text-red-700' : 'text-muted'}`}>{error || helper}</p>}
         </div>
+        {topRightSlot && <div className="-mt-1 sm:col-span-5">{topRightSlot}</div>}
       </div>
 
       {open && (
@@ -243,10 +241,12 @@ export function LocationMultiCombobox({
         }
       />
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="sm:col-span-1">
-          {bottomLeftSlot}
-        </div>
-        <div className="sm:col-span-2">
+        {bottomLeftSlot && (
+          <div className="sm:col-span-1">
+            {bottomLeftSlot}
+          </div>
+        )}
+        <div className={bottomLeftSlot ? 'sm:col-span-2' : 'sm:col-span-3'}>
           {list.length > 0 && (
             <div className="rounded-2xl bg-gradient-to-r from-accentDeep to-purple-500 p-[1.5px]">
               <div className="flex h-full flex-col gap-3 rounded-[14px] bg-paper p-4">

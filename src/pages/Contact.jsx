@@ -43,12 +43,20 @@ const CONTACT_ROUTES = {
     extraFields: ['city', 'businessType', 'portfolioUrl'],
   },
   payment: {
-    label: 'Плащане или фактура',
+    label: 'Абонамент или фактура',
     target: 'payment@totsan.com',
-    subject: '[PAYMENT] Плащане или фактура',
-    helper: 'За плащания, фактури, абонаменти и въпроси към конкретна поръчка.',
-    placeholder: 'Опиши въпроса и добави номер на профил, проект, поръчка или плащане, ако имаш такъв.',
+    subject: '[PAYMENT] Абонамент или фактура',
+    helper: 'За партньорски абонаменти и фактури от Totsan. За плащане по проект се свържи директно с партньора.',
+    placeholder: 'Опиши въпроса за абонамента или фактурата от Totsan и добави номер, ако имаш такъв.',
     extraFields: ['referenceId'],
+  },
+  content_report: {
+    label: 'Сигнал за съдържание',
+    target: 'support@totsan.com',
+    subject: '[CONTENT NOTICE] Сигнал за съдържание',
+    helper: 'За незаконно, подвеждащо или нарушаващо чужди права съдържание, както и за оспорване на действие по модерация.',
+    placeholder: 'Добави точен линк, описание на съдържанието, причината за сигнала и данни, с които можем да проверим случая.',
+    extraFields: ['problemUrl'],
   },
   active_project: {
     label: 'Помощ по активен проект',
@@ -94,7 +102,7 @@ export default function Contact() {
   const [form, setForm] = useState({
     name: '',
     contact: '',
-    routeKey: '',
+    routeKey: state?.routeKey || '',
     layer: '',
     message: subject ? `${subject}\n\n` : '',
     problemUrl: '',
@@ -345,7 +353,9 @@ export default function Contact() {
                 </button>
                 <div className="mt-3 text-xs text-muted">
                   С изпращане се съгласяваш с нашите{' '}
-                  <Link to="/obshti-usloviya" className="font-medium text-accent hover:underline">условия</Link>.
+                  <Link to="/obshti-usloviya" className="font-medium text-accent hover:underline">Общи условия</Link>
+                  {' '}и потвърждаваш, че си запознат с{' '}
+                  <Link to="/politika-za-poveritelnost" className="font-medium text-accent hover:underline">Политиката за поверителност</Link>.
                 </div>
               </>
             )}
@@ -357,7 +367,7 @@ export default function Contact() {
               <div className="mt-5 space-y-4 text-sm">
                 <ContactRoute label="Общи клиентски въпроси" email="sales@totsan.com" />
                 <ContactRoute label="Проблем със сайта" email="support@totsan.com" />
-                <ContactRoute label="Плащания и фактури" email="payment@totsan.com" />
+                <ContactRoute label="Партньорски абонаменти и фактури от Totsan" email="payment@totsan.com" />
                 <ContactRoute label="Партньори" email="manager@totsan.com" />
               </div>
             </div>

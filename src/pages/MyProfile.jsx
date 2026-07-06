@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { Activity, AlertTriangle, CalendarDays, ClipboardList, FolderKanban, Home, Lock, LogOut, Mail, MessageCircle, ShieldCheck, Settings2, UserRound, Users, X } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
@@ -40,7 +40,6 @@ import {
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const MAX_BANNER_BYTES = 12 * 1024 * 1024
 const SUPPORTED_PROFILE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
-const BANNER_RATIO_TEXT = 'Препоръчителен размер: 1600 x 520 px'
 const BANNER_DESCRIPTION = 'Широк банер работи най-добре около 3:1. Препоръчваме 1600 x 520 px за най-чист резултат.'
 
 function CustomSpaceIcon({ size = 18, className = '' }) {
@@ -291,7 +290,6 @@ function InfoPill({ label, value }) {
 
 function CustomerProfile({ session, account, refreshAccount }) {
   const [searchParams] = useSearchParams()
-  const [mode, setMode] = useState('profile')
   const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') === 'project' ? 'project' : 'overview')
   const [localAccount, setLocalAccount] = useState(account)
   const [project, setProject] = useState(null)
@@ -300,6 +298,8 @@ function CustomerProfile({ session, account, refreshAccount }) {
   const [loadState, setLoadState] = useState({ status: 'loading', message: '' })
   const [bannerEditor, setBannerEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'banner.jpg' })
   const [avatarEditor, setAvatarEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'avatar.jpg' })
+  const [bannerHintVisible, setBannerHintVisible] = useState(false)
+  const workspaceContentRef = useRef(null)
   const email = session.user.email || account?.email || ''
   const userId = session.user.id
   const displayName = getAccountDisplayName(localAccount, session, 'приятел')
@@ -310,7 +310,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
   }, [account])
 
   useEffect(() => {
-    if (searchParams.get('tab') === 'project') setActiveTab('project')
+    if (searchParams.get('tab') === 'project') handleTabChange('project', { scroll: false })
   }, [searchParams])
 
   useEffect(() => {
@@ -493,42 +493,61 @@ function CustomerProfile({ session, account, refreshAccount }) {
     setMedia(current => current.filter(item => item.id !== mediaId))
   }
 
-  if (mode === 'application') {
-    return (
-      <CenteredCard title="Стани партньор">
-        <p className="text-muted mt-3">Попълни кратка заявка и ще я прегледаме от админ панела.</p>
-        <ApplicationForm userId={userId} email={email} initialName={displayName} onCreated={() => setMode('sent')} />
-      </CenteredCard>
-    )
+  function scrollToWorkspaceStart() {
+    window.setTimeout(() => {
+      try {
+        const element = workspaceContentRef.current
+        if (!element) return
+
+        const headerOffset = window.innerWidth >= 1024 ? 96 : 80
+        const top = Math.max(window.scrollY + element.getBoundingClientRect().top - headerOffset, 0)
+        window.scrollTo({ top, behavior: 'smooth' })
+      } catch (error) {
+        console.warn('[CustomerProfile] Workspace scroll skipped:', error)
+      }
+    }, 0)
   }
 
-  if (mode === 'sent') {
-    return (
-      <CenteredCard title="Заявката е изпратена">
-        <p className="text-muted mt-3">Ще я прегледаме и след одобрение тук ще се появи редакторът на професионалния ти профил.</p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button className="btn btn-primary" onClick={() => setMode('overview')}>Към профила</button>
-          <button className="btn btn-ghost" onClick={() => supabase.auth.signOut()}>Изход</button>
-        </div>
-      </CenteredCard>
-    )
+  function handleTabChange(nextTab, options = {}) {
+    setActiveTab(nextTab)
+    if (options.scroll === false) return
+    scrollToWorkspaceStart()
   }
+
+
 
   return (
     <>
       <PublicProfileBanner
         imageSrc={localAccount?.cover_url || ''}
         imageAlt={displayName}
-        heightClass="h-[clamp(12.5rem,52vw,15rem)] md:aspect-[1600/520] md:h-auto md:min-h-0"
+        heightClass="h-[clamp(15rem,68vw,19rem)] md:aspect-[1600/520] md:h-auto md:min-h-0"
         className="group cursor-pointer focus-within:ring-2 focus-within:ring-ink"
         onClick={openBannerEditor}
+        onMouseEnter={() => setBannerHintVisible(true)}
+        onMouseLeave={() => setBannerHintVisible(false)}
+        onFocus={() => setBannerHintVisible(true)}
+        onBlur={() => setBannerHintVisible(false)}
         placeholderLabel="Добавете банер"
         placeholderClassName="hidden md:grid"
       >
       </PublicProfileBanner>
       <div className="relative z-10 flex flex-col bg-soft pb-16 md:pb-24">
-        <div className="container-page -mt-8 w-full space-y-5 px-4 sm:-mt-12 md:-mt-24 md:px-6">
-          <CustomerHeader account={localAccount} displayName={displayName} completeness={completeness} onEditAvatar={openAvatarEditor} onSignOut={() => signOutAndRedirect(session?.user?.id)} />
+        <div className="container-page -mt-4 w-full space-y-5 px-4 sm:-mt-8 md:-mt-24 md:px-6">
+          <div className="relative">
+            <div
+              aria-hidden={!bannerHintVisible}
+              className={`pointer-events-none absolute right-5 -top-36 z-30 hidden w-[min(21rem,calc(100vw-3rem))] origin-bottom-right rounded-2xl border border-white/20 bg-ink/94 p-4 text-left text-paper shadow-[0_24px_70px_-22px_rgba(5,12,22,0.78)] backdrop-blur-md transition-all duration-300 ease-out md:block lg:right-6 ${
+                bannerHintVisible
+                  ? 'translate-y-0 scale-100 opacity-100'
+                  : 'translate-y-5 scale-[0.98] opacity-0'
+              }`}
+            >
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-paper">Размер на банера</div>
+              <p className="mt-1 text-sm leading-6 text-paper/90">{BANNER_DESCRIPTION}</p>
+            </div>
+            <CustomerHeader account={localAccount} displayName={displayName} completeness={completeness} onEditAvatar={openAvatarEditor} onSignOut={() => signOutAndRedirect(session?.user?.id)} />
+          </div>
 
           <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
             <aside className="min-w-0 max-w-full overflow-hidden rounded-3xl border border-line bg-paper p-3 shadow-[0_8px_30px_rgb(0,0,0,0.02)] lg:sticky lg:top-24 lg:overflow-visible">
@@ -540,7 +559,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => setActiveTab(tab.id)}
+                      onClick={() => handleTabChange(tab.id)}
                       className={`inline-flex min-h-11 shrink-0 snap-start items-center gap-3 rounded-2xl px-4 py-2.5 text-left text-sm font-medium transition lg:w-full ${isActive ? 'bg-ink text-paper shadow-sm' : 'text-muted hover:bg-soft hover:text-ink'}`}
                     >
                       {/* Размерът на иконата се контролира тук (за "Моето пространство" е 22, за останалите е 18) */}
@@ -550,9 +569,9 @@ function CustomerProfile({ session, account, refreshAccount }) {
                     </button>
                   )
                 })}
-                <button type="button" onClick={() => setMode('application')} className="mt-2 inline-flex min-h-11 shrink-0 snap-start items-center justify-center rounded-2xl border border-line px-4 py-2.5 text-sm font-medium text-ink transition hover:border-ink lg:w-full">
+                <Link to="/pro/onboarding" className="mt-2 inline-flex min-h-11 shrink-0 snap-start items-center justify-center rounded-2xl border border-line px-4 py-2.5 text-sm font-medium text-ink transition hover:border-ink lg:w-full">
                   Стани партньор
-                </button>
+                </Link>
               </nav>
               <div className="mt-3 hidden border-t border-line pt-4 lg:block">
                 <div className="px-2">
@@ -567,7 +586,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
               </div>
             </aside>
 
-            <main className="min-w-0 space-y-5">
+            <main ref={workspaceContentRef} className="min-w-0 space-y-5">
               {loadState.status === 'error' && (
                 <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{loadState.message}</div>
               )}
@@ -583,7 +602,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
                   media={media}
                   completeness={completeness}
                   isAdmin={isAdmin}
-                  onSelectTab={setActiveTab}
+                  onSelectTab={handleTabChange}
                   onToggleShare={async (isShareable) => {
                     if (!project?.id) return
                     try {
@@ -887,44 +906,6 @@ function CenteredCard({ title, children }) {
         </div>
       </div>
     </section>
-  )
-}
-
-function ApplicationForm({ userId, email, initialName = '', onCreated }) {
-  const [name, setName] = useState(initialName)
-  const [phone, setPhone] = useState('')
-  const [layerSlug, setLayerSlug] = useState(LAYERS[0]?.slug || '')
-  const [about, setAbout] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-
-  async function submit(e) {
-    e.preventDefault()
-    setBusy(true); setErr('')
-    const { error } = await supabase.from('partner_applications').insert({
-      name: name.trim(),
-      email,
-      phone: phone.trim() || null,
-      layer_slug: layerSlug,
-      about: about.trim() || null,
-      user_id: userId,
-      role: 'pro',
-      status: 'pending',
-    })
-    setBusy(false)
-    if (error) { setErr(error.message); return }
-    onCreated?.()
-  }
-
-  return (
-    <form onSubmit={submit} className="mt-6 space-y-4">
-      <label className="block text-sm font-medium text-ink">Име / фирма<input value={name} onChange={e => setName(e.target.value)} required className={INPUT} /></label>
-      <label className="block text-sm font-medium text-ink">Телефон<input value={phone} onChange={e => setPhone(e.target.value)} type="tel" className={INPUT} /></label>
-      <TotsanSelect label="В кой слой работиш" value={layerSlug} onChange={setLayerSlug} options={LAYERS.map(l => ({ value: l.slug, label: `Слой ${l.number} · ${l.title}` }))} />
-      <label className="block text-sm font-medium text-ink">Кратко представяне<textarea value={about} onChange={e => setAbout(e.target.value)} rows={4} className={INPUT} /></label>
-      {err && <div className="text-sm text-red-700">{err}</div>}
-      <button disabled={busy} className="btn btn-primary w-full justify-center">{busy ? 'Изпращане…' : 'Изпрати заявка'}</button>
-    </form>
   )
 }
 

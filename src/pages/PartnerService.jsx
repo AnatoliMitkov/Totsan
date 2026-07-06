@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, MessageSquare, ShieldCheck, Star, Layers3, MapPin, CalendarDays, RefreshCcw, WalletCards, Package, Image as ImageIcon, LayoutList, CheckCircle2, MessageCircle } from 'lucide-react'
 import FallbackImage from '../components/FallbackImage.jsx'
-import { createConversationFromProfile } from '../lib/chat.js'
+import { createConversationFromProfile, createServiceRequest } from '../lib/chat.js'
 import { getProfileImageCandidates, getProfileImageStyle, normalizeProfile } from '../lib/profiles.js'
 import { formatServicePrice, loadPartnerServiceBySlug, packagePriceLabel } from '../lib/partner-services.js'
 import { getPartnerServiceCoverCandidates } from '../lib/service-media.js'
@@ -213,15 +213,27 @@ export default function PartnerService() {
     }
   }
 
-  function handleBeginCheckout() {
-    if (!service) return
-
+  async function startServiceRequest() {
+    if (!service || !profile || !activePackage) return
+    trackEvent('request_service', {
+      source: 'service_page',
+      service_slug: service.slug || undefined,
+      layer: service.layerSlug || undefined,
+    })
     if (!session) {
       navigate('/login')
       return
     }
-
-    if (activePackage?.id) navigate(`/checkout/service/${activePackage.id}`)
+    setChatState({ status: 'opening', message: 'Създаваме заявката…' })
+    try {
+      const result = await createServiceRequest({
+        serviceId: service.id,
+        servicePackageId: activePackage.id,
+      })
+      navigate(`/inbox/${result.conversation.id}`)
+    } catch (error) {
+      setChatState({ status: 'error', message: error.message || 'Заявката не беше създадена.' })
+    }
   }
 
   if (status === 'loading') {
@@ -380,8 +392,8 @@ export default function PartnerService() {
                   <p className="mt-2 text-sm text-muted">{activePackage.description}</p>
                   <div className="mt-5 font-display text-4xl text-ink">{activePackage.priceAmount ? formatServicePrice(activePackage.priceAmount) : packagePriceLabel(service)}</div>
                   <div className="mt-4 grid gap-2 text-sm text-muted">
-                    <span className="inline-flex items-center gap-2 text-base font-medium text-emerald-600"><ShieldCheck size={18} /> Защитено плащане през Totsan</span>
-                    <span>Поръчай, когато обхватът е ясен. Парите се освобождават към партньора след потвърждение на завършването.</span>
+                    <span className="inline-flex items-center gap-2 text-base font-medium text-emerald-600"><ShieldCheck size={18} /> Директно плащане към партньора</span>
+                    <span>Totsan пази офертата и комуникацията, но не приема или гарантира плащането.</span>
                   </div>
                   {activePackage.features.length > 0 && (
                     <ul className="mt-5 space-y-2 text-sm text-ink/80">
@@ -392,8 +404,10 @@ export default function PartnerService() {
               ) : <p className="mt-5 text-sm text-muted">Няма активна оферта.</p>}
 
               <div className="mt-6 grid gap-3">
-                <button type="button" className="btn btn-primary w-full justify-center" disabled={!activePackage} onClick={handleBeginCheckout}>Поръчай пакета</button>
-                <p className="text-xs text-muted">Директно към checkout, ако условията и цената са ясни.</p>
+                <button type="button" className="btn btn-primary w-full justify-center" disabled={!activePackage || chatState.status === 'opening'} onClick={startServiceRequest}>
+                  {chatState.status === 'opening' ? 'Създаваме заявката…' : 'Заяви услугата'}
+                </button>
+                <p className="text-xs text-muted">Не плащаш сега. Партньорът първо потвърждава възможност и изпраща финална оферта.</p>
                 <button type="button" className="btn btn-ghost w-full justify-center" onClick={startChat} disabled={chatState.status === 'opening'}><MessageSquare size={18} /> {chatState.status === 'opening' ? 'Отваряме…' : 'Питай първо'}</button>
                 <p className="text-xs text-muted">Използвай чат, ако искаш уточнение преди поръчка.</p>
                 {chatState.message && <div className={`rounded-2xl p-3 text-sm ${chatState.status === 'error' ? 'bg-red-50 text-red-700' : 'bg-soft text-muted'}`}>{chatState.message}</div>}

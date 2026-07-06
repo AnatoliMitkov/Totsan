@@ -1,7 +1,7 @@
 import { uploadServiceMedia } from './profile-media-upload-client.js'
 import { slugify } from './profiles.js'
 import { supabase } from './supabase.js'
-import { formatMoney } from './money.js'
+import { formatEurWithBgn, formatMoney } from './money.js'
 import { normalizeLocationList } from './locations.js'
 import { refreshProfileAiSummary } from './profile-ai-summary.js'
 import { deleteStorageRefs, diffStorageRefs, mediaAndCoverStorageRefs } from './storage-media-cleanup.js'
@@ -12,6 +12,8 @@ export const SERVICE_STATUS_LABELS = {
   approved: 'Публикувана',
   rejected: 'Върната',
 }
+
+export const SERVICE_MODERATION_FEEDBACK_BUCKET = 'service-moderation-feedback'
 
 export const SERVICE_TIER_DEFINITIONS = [
   { tier: 'basic', label: 'Официална оферта', fallbackTitle: 'Официална оферта' },
@@ -34,7 +36,8 @@ export const PARTNER_SERVICE_COLUMNS = `
   delivery_areas,
   is_published,
   moderation_status,
-  moderation_note
+  moderation_note,
+  moderation_attachments
 `
 
 const PROFILE_PUBLIC_COLUMNS = `
@@ -136,6 +139,7 @@ export function normalizePartnerService(row = {}, related = {}) {
     isPublished: row.isPublished ?? row.is_published ?? false,
     moderationStatus: row.moderationStatus || row.moderation_status || 'draft',
     moderationNote: row.moderationNote || row.moderation_note || '',
+    moderationAttachments: jsonArray(row.moderationAttachments || row.moderation_attachments),
     packages,
     faq,
     profile,
@@ -183,6 +187,7 @@ export function makePartnerServiceDraft(profile, service = null) {
     deliveryAreasText: (service?.deliveryAreas?.length ? service.deliveryAreas : profile?.serviceAreas || []).join(', '),
     moderationStatus: service?.moderationStatus || 'draft',
     moderationNote: service?.moderationNote || '',
+    moderationAttachments: service?.moderationAttachments || [],
     isPublished: service?.isPublished || false,
     packages: [{ ...makeEmptyPackage('basic'), ...(primaryPackage || {}), tier: 'basic', currency: 'EUR', deliveryDays: '', revisions: '', isActive: true }],
     faq: service?.faq?.length ? service.faq : [
@@ -200,6 +205,7 @@ export function serviceSlugFor(title, profile) {
 function servicePayload(profile, draft, status, slugOverride = '') {
   const nextStatus = status || draft.moderationStatus || 'draft'
   const isPublished = nextStatus === 'approved'
+  const keepModerationFeedback = !isPublished
   return {
     slug: cleanText(slugOverride) || cleanText(draft.slug) || serviceSlugFor(draft.title, profile),
     profile_id: profile.id,
@@ -214,7 +220,8 @@ function servicePayload(profile, draft, status, slugOverride = '') {
     delivery_areas: normalizeLocationList(draft.deliveryAreasText),
     is_published: isPublished,
     moderation_status: nextStatus,
-    moderation_note: null,
+    moderation_note: keepModerationFeedback ? cleanText(draft.moderationNote) : null,
+    moderation_attachments: keepModerationFeedback ? jsonArray(draft.moderationAttachments) : [],
   }
 }
 
@@ -363,6 +370,7 @@ export async function loadAdminPartnerServices() {
   const { data, error } = await supabase
     .from('partner_services')
     .select(`${PARTNER_SERVICE_COLUMNS}, profile:profiles(${PROFILE_PUBLIC_COLUMNS})`)
+    .neq('moderation_status', 'draft')
     .order('created_at', { ascending: false })
 
   if (error) throw error
@@ -498,6 +506,49 @@ export async function uploadPartnerServiceImage({ file, target, kind = 'cover' }
   }
 }
 
+export async function uploadServiceModerationAttachment({ serviceId, file }) {
+  if (!serviceId || !file) throw new Error('Липсва снимка за обратната връзка.')
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    throw new Error('Разрешени са JPG, PNG и WebP изображения.')
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('Снимката трябва да бъде до 5 MB.')
+  }
+
+  const extension = file.name.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg'
+  const id = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const path = `${serviceId}/${id}.${extension}`
+  const { error } = await supabase.storage
+    .from(SERVICE_MODERATION_FEEDBACK_BUCKET)
+    .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type })
+
+  if (error) throw error
+  return {
+    bucket: SERVICE_MODERATION_FEEDBACK_BUCKET,
+    path,
+    name: file.name,
+    type: file.type,
+    size: file.size,
+  }
+}
+
+export async function resolveServiceModerationAttachments(attachments = []) {
+  return Promise.all(jsonArray(attachments).map(async (attachment) => {
+    if (!attachment?.path) return { ...attachment, url: '' }
+    const bucket = attachment.bucket || SERVICE_MODERATION_FEEDBACK_BUCKET
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(attachment.path, 3600)
+    if (error) return { ...attachment, url: '' }
+    return { ...attachment, bucket, url: data?.signedUrl || '' }
+  }))
+}
+
+export async function deleteServiceModerationAttachments(attachments = []) {
+  const paths = jsonArray(attachments).map(item => item?.path).filter(Boolean)
+  if (!paths.length) return
+  const { error } = await supabase.storage.from(SERVICE_MODERATION_FEEDBACK_BUCKET).remove(paths)
+  if (error) throw error
+}
+
 export function appendPartnerServiceMedia(draft, upload, caption = '') {
   const media = Array.isArray(draft.media) ? draft.media : []
   const nextMedia = [
@@ -517,11 +568,13 @@ export function appendPartnerServiceMedia(draft, upload, caption = '') {
 
 export function packagePriceLabel(service) {
   if (!service?.lowestPrice) return 'Цена по оферта'
-  return formatMoney(service.lowestPrice, service.lowestCurrency || 'EUR')
+  return (service.lowestCurrency || 'EUR') === 'EUR'
+    ? formatEurWithBgn(service.lowestPrice)
+    : formatMoney(service.lowestPrice, service.lowestCurrency)
 }
 
 export function formatServicePrice(amount) {
   const value = Number(amount || 0)
   if (!Number.isFinite(value) || value <= 0) return 'Цена по оферта'
-  return formatMoney(value, 'EUR')
+  return formatEurWithBgn(value)
 }

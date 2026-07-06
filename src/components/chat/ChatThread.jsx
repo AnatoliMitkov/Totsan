@@ -23,7 +23,7 @@ function compactOrderStatusLine(orderStatus) {
   if (ACTIVE_ORDER_STATUSES.has(orderStatus.status)) return 'Офертата е платена · Поръчката е активна'
   if (orderStatus.status === 'delivered') return 'Офертата е платена · Поръчката е предадена'
   if (orderStatus.status === 'completed') return 'Офертата е платена · Поръчката е завършена'
-  if (orderStatus.status === 'pending_payment') return 'Офертата чака плащане'
+  if (orderStatus.status === 'pending_payment') return 'Офертата чака потвърждение за директно плащане'
   if (orderStatus.status === 'cancelled') return 'Поръчката е отменена'
   if (orderStatus.status === 'refunded') return 'Поръчката е възстановена'
   if (orderStatus.status === 'disputed') return 'Поръчката е в спор'
@@ -65,6 +65,7 @@ export default function ChatThread({
   userId,
   orderStatus,
   onOfferAction,
+  onServiceRequestAction,
   onReplyToMessage,
   onToggleReaction,
   onBack,
@@ -391,7 +392,7 @@ export default function ChatThread({
           <div className="hidden min-w-0 flex-col gap-2 md:flex">
             <div className="flex min-w-0 items-start gap-2 rounded-2xl border border-line bg-soft/90 px-3 py-2 text-sm text-muted backdrop-blur-sm">
               <ShieldCheck size={17} className="mt-0.5 shrink-0 text-accentDeep" />
-              <p className="min-w-0 break-words whitespace-normal">Сигурност: разговорите и плащанията в Totsan са защитени. Не споделяй външни контакти.</p>
+              <p className="min-w-0 break-words whitespace-normal">Сигурност: пази комуникацията в Totsan и провери условията на офертата преди плащане. Не споделяй чувствителни платежни данни в чата.</p>
             </div>
           </div>
         </div>
@@ -427,6 +428,7 @@ export default function ChatThread({
                 userId={userId}
                 conversation={conversation}
                 onOfferAction={onOfferAction}
+                onServiceRequestAction={onServiceRequestAction}
                 onReplyToMessage={onReplyToMessage}
                 onToggleReaction={onToggleReaction}
                 showAvatar={item.showAvatar}

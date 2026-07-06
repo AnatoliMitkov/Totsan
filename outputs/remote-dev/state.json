@@ -1,0 +1,10 @@
+{
+    "vitePid":  5456,
+    "tunnelLog":  "C:\\Totsan V2\\outputs\\remote-dev\\localtunnel.log",
+    "publicUrl":  "https://twenty-waves-worry.loca.lt",
+    "startedAt":  "2026-06-23T16:41:39.8881488+03:00",
+    "tunnelPid":  27116,
+    "port":  5173,
+    "publicHost":  "twenty-waves-worry.loca.lt",
+    "viteLog":  "C:\\Totsan V2\\outputs\\remote-dev\\vite-dev.log"
+}

@@ -1,0 +1,9 @@
+=clean-crabs-hang.loca.lt : The term '=clean-crabs-hang.loca.lt' is not recognized as the name of a cmdlet, function, 
+script file, or operable program. Check the spelling of the name, or if a path was included, verify that the path is 
+correct and try again.
+At line:1 char:1
++ ='clean-crabs-hang.loca.lt'; npx vite --host 0.0.0.0 --port 5173
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (=clean-crabs-hang.loca.lt:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+ 

@@ -9,6 +9,48 @@ const TERMS_REQUIRED_MESSAGE = 'Първо потвърди, че се съгл�
 const PRODUCTION_APP_ORIGIN = 'https://totsan.com'
 const CHECK_EMAIL_BACKGROUND = '/Images/images-for-pro-page/01-totsan-pro-hero-visual.png'
 const EMAIL_CODE_LENGTH = 8
+const EMPTY_AUTH_ERROR_MESSAGES = new Set(['', '{}', '[]', '[object Object]', 'null', 'undefined'])
+
+function authErrorMessage(error, fallback = 'Заявката към системата за достъп не беше успешна.') {
+  const code = String(error?.code || '').trim()
+  const status = Number(error?.status) || 0
+  const rawMessage = typeof error?.message === 'string' ? error.message.trim() : ''
+  const normalizedMessage = rawMessage.toLowerCase()
+
+  if (code === 'user_already_exists' || code === 'email_exists' || normalizedMessage.includes('already registered')) {
+    return 'Вече има акаунт с този имейл. Влезте в него или използвайте „Забравена парола“.'
+  }
+  if (code === 'email_address_invalid' || normalizedMessage.includes('invalid email')) {
+    return 'Имейл адресът не е валиден. Проверете го и опитайте отново.'
+  }
+  if (code === 'over_email_send_rate_limit' || status === 429 || normalizedMessage.includes('rate limit')) {
+    return 'Направени са твърде много опити за кратко време. Изчакайте няколко минути и опитайте отново.'
+  }
+  if (code === 'signup_disabled') {
+    return 'Създаването на нови акаунти временно е изключено.'
+  }
+  if (code === 'weak_password') {
+    return 'Паролата не отговаря на изискванията за сигурност.'
+  }
+
+  if (rawMessage && !EMPTY_AUTH_ERROR_MESSAGES.has(rawMessage)) return rawMessage
+
+  const reference = code || (status ? `HTTP ${status}` : 'AUTH_UNKNOWN')
+  if (status >= 500 || code === 'unexpected_failure') {
+    return `Supabase Auth върна вътрешна грешка при създаването на акаунта. Проверете настройките за confirmation email/SMTP и опитайте отново. Код: ${reference}.`
+  }
+
+  return `${fallback} Код: ${reference}.`
+}
+
+function logAuthError(context, error) {
+  console.error(context, {
+    name: error?.name || 'AuthError',
+    code: error?.code || '',
+    status: error?.status || 0,
+    message: typeof error?.message === 'string' ? error.message : '',
+  })
+}
 
 const welcomeCards = [
   {
@@ -378,22 +420,30 @@ export function ProStartPage() {
     setStatus('sending')
     setMessage('')
 
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        emailRedirectTo: new URL('/pro/onboarding', getAuthRedirectOrigin()).toString(),
-        data: {
-          full_name: name.trim(),
-          display_name: name.trim(),
-          role: 'specialist',
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          emailRedirectTo: new URL('/pro/onboarding', getAuthRedirectOrigin()).toString(),
+          data: {
+            full_name: name.trim(),
+            display_name: name.trim(),
+            role: 'specialist',
+          },
         },
-      },
-    })
+      })
 
-    if (error) {
+      if (error) {
+        logAuthError('[pro-signup] Supabase Auth signup failed', error)
+        setStatus('error')
+        setMessage(authErrorMessage(error, 'Партньорският акаунт не можа да бъде създаден.'))
+        return
+      }
+    } catch (error) {
+      logAuthError('[pro-signup] Unexpected signup failure', error)
       setStatus('error')
-      setMessage(error.message)
+      setMessage(authErrorMessage(error, 'Не успяхме да се свържем със системата за регистрация.'))
       return
     }
 
@@ -663,8 +713,8 @@ function RuleItem({ isValid, text }) {
 
 function OnboardingShell({ eyebrow, icon: Icon, children, compact = false }) {
   return (
-    <section className={`section relative min-h-[calc(100vh-var(--header-h,0px))] overflow-hidden bg-soft ${compact ? '!py-8 md:!py-10' : ''}`}>
-      <div className="pointer-events-none absolute inset-0">
+    <section className={`section relative min-h-[calc(100vh-var(--header-h,0px))] bg-soft ${compact ? '!py-8 md:!py-10' : ''}`}>
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute left-[-8rem] top-[-6rem] h-[24rem] w-[24rem] rounded-full bg-accentSoft/80 blur-3xl" />
         <div className="absolute bottom-[-8rem] right-[-7rem] h-[24rem] w-[24rem] rounded-full bg-cloud/90 blur-3xl" />
       </div>

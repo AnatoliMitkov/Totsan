@@ -18,7 +18,7 @@ const STATIC_ROUTE_SEO = {
   },
   '/uslugi': {
     title: 'Услуги и пакети от партньори | Totsan',
-    description: 'Разгледай публикувани партньорски услуги с ясен обхват, цена и директен път към чат или checkout през Totsan.',
+    description: 'Разгледай публикувани партньорски услуги с ясен обхват, цена и директен път към разговор с партньора.',
   },
   '/katalog': {
     title: 'Каталог със специалисти, услуги и материали | Totsan',
@@ -118,7 +118,7 @@ export function getDefaultSeo(pathname = '/') {
   if (/^\/uslugi\/[^/]+$/u.test(canonicalPath)) {
     return {
       title: 'Партньорска услуга | Totsan',
-      description: 'Виж детайли за одобрена партньорска услуга в Totsan, с ясен обхват, FAQ и възможност за чат или checkout.',
+      description: 'Виж детайли за одобрена партньорска услуга в Totsan, с ясен обхват, FAQ и възможност за директен разговор с партньора.',
       canonicalPath,
     }
   }
