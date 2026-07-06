@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, PlayCircle, Video, X } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
+import { portfolioProjectPath } from '../../lib/portfolio.js'
 
 function layerLabel(slug) {
   const layer = LAYERS.find(item => item.slug === slug)
@@ -70,8 +72,9 @@ function getProjectCover(item = {}) {
   return firstPreview || item.coverUrl || ''
 }
 
-export default function PortfolioGallery({ items = [], emptyText = 'Още няма публикувано портфолио.' }) {
+export default function PortfolioGallery({ items = [], emptyText = 'Още няма публикувано портфолио.', profileSlug = '' }) {
   const visibleItems = useMemo(() => items.filter(Boolean), [items])
+  const linkMode = Boolean(String(profileSlug || '').trim())
   const [activeIndex, setActiveIndex] = useState(-1)
   const activeItem = activeIndex >= 0 ? visibleItems[activeIndex] : null
   const activeMedia = activeItem ? getPortfolioMedia(activeItem) : []
@@ -103,13 +106,18 @@ export default function PortfolioGallery({ items = [], emptyText = 'Още ня�
           const hasVideo = getPortfolioMedia(item).some(isVideoMedia)
           const role = item.role || item.partnerRole || item.partner_role || ''
           const projectType = layerLabel(item.layerSlug).replace(/^Слой\s+\d+\s+·\s+/, '')
+          const projectPath = portfolioProjectPath(profileSlug, item.id)
+
+          const CardTag = linkMode ? Link : 'button'
+          const cardProps = linkMode
+            ? { to: projectPath }
+            : { type: 'button', onClick: () => setActiveIndex(index) }
 
           return (
-            <button
+            <CardTag
               key={item.id || item.title}
-              type="button"
-              onClick={() => setActiveIndex(index)}
-              className="group w-full overflow-hidden rounded-2xl border border-line/60 bg-paper text-left transition-all duration-300 hover:-translate-y-1 hover:border-ink/35 hover:shadow-[0_12px_30px_rgba(13,35,64,0.08)]"
+              {...cardProps}
+              className="group block w-full overflow-hidden rounded-2xl border border-line/60 bg-paper text-left transition-all duration-300 hover:-translate-y-1 hover:border-ink/35 hover:shadow-[0_12px_30px_rgba(13,35,64,0.08)]"
             >
               <div className="relative aspect-[4/3] overflow-hidden bg-soft">
                 {cover ? (
@@ -140,15 +148,15 @@ export default function PortfolioGallery({ items = [], emptyText = 'Още ня�
                   {role && <span>· Роля: {role}</span>}
                 </div>
                 <div className="mt-4 text-sm font-semibold text-ink group-hover:text-accentDeep">
-                  Виж проекта
+                  {linkMode ? 'Отвори проекта' : 'Виж проекта'}
                 </div>
               </div>
-            </button>
+            </CardTag>
           )
         })}
       </div>
 
-      {activeItem && (
+      {!linkMode && activeItem && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/80 p-4 backdrop-blur-sm"
           role="dialog"

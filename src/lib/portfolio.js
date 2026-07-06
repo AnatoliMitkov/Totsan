@@ -20,6 +20,29 @@ export const PORTFOLIO_SELECT_COLUMNS = `
   updated_at
 `
 
+export const PORTFOLIO_PROFILE_PUBLIC_COLUMNS = `
+  id,
+  slug,
+  layer_slug,
+  name,
+  tag,
+  city,
+  rating,
+  projects,
+  bio,
+  image_url,
+  image_zoom,
+  image_x,
+  image_y,
+  is_published,
+  user_id,
+  headline,
+  description_long,
+  service_areas,
+  response_time_hours,
+  pricing_note
+`
+
 export const DEFAULT_PORTFOLIO_ITEM = {
   id: '',
   profileId: '',
@@ -63,7 +86,15 @@ export function normalizePortfolioItem(row) {
     isPublished: row.isPublished ?? row.is_published ?? true,
     createdAt: row.createdAt || row.created_at || '',
     updatedAt: row.updatedAt || row.updated_at || '',
+    profile: row.profile || null,
   }
+}
+
+export function portfolioProjectPath(profileSlug = '', projectId = '') {
+  const slug = String(profileSlug || '').trim()
+  const id = String(projectId || '').trim()
+  if (!slug || !id) return '/portfolio'
+  return `/portfolio/${encodeURIComponent(slug)}/${encodeURIComponent(id)}`
 }
 
 function toDbPayload(item, profileId) {
@@ -176,6 +207,19 @@ export async function loadPublicPortfolioCounts() {
     acc[profileId] = (acc[profileId] || 0) + 1
     return acc
   }, {})
+}
+
+export async function loadPublicPortfolioItem(projectId) {
+  if (!projectId) return null
+  const { data, error } = await supabase
+    .from('profile_portfolio')
+    .select(`${PORTFOLIO_SELECT_COLUMNS}, profile:profiles(${PORTFOLIO_PROFILE_PUBLIC_COLUMNS})`)
+    .eq('id', projectId)
+    .eq('is_published', true)
+    .maybeSingle()
+
+  if (error) throw error
+  return data ? normalizePortfolioItem(data) : null
 }
 
 export async function uploadPortfolioImage({ file, target, kind = 'photo' }) {

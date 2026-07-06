@@ -1,5 +1,30 @@
 import { supabase } from './supabase.js'
 
+const PROJECT_CONTEXT_SOURCES = new Set(['start_brief', 'guided_project_brief'])
+
+export function inquirySupportsProjectContext(inquiry) {
+  return PROJECT_CONTEXT_SOURCES.has(String(inquiry?.source || '').trim())
+}
+
+export function getInquiryStatusLabel(status = '') {
+  const value = String(status || '').trim()
+  if (value === 'new') return 'Нова'
+  if (value === 'seen') return 'Видяна'
+  if (value === 'replied') return 'Отговорено'
+  if (value === 'closed') return 'Приключена'
+  return value || 'Получена'
+}
+
+export function getInquirySourceLabel(source = '') {
+  const value = String(source || '').trim()
+  if (value === 'pro_inquiry') return 'Директно запитване'
+  if (value === 'start_brief') return 'Проектен бриф'
+  if (value === 'guided_project_brief') return 'Guided brief'
+  if (value === 'contact_form') return 'Контактна форма'
+  if (value === 'product_inquiry') return 'Запитване за услуга'
+  return value || 'Запитване'
+}
+
 export async function loadPartnerInquiries(targetSlug, partnerId) {
   if (!targetSlug && !partnerId) return []
 

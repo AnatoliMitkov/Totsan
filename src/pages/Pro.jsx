@@ -560,7 +560,7 @@ export default function Pro() {
                 <div className="eyebrow mb-2">Портфолио</div>
                 <h2 className="font-display text-3xl font-semibold text-ink mb-6">Реални реализирани проекти</h2>
                 <div>
-                  <PortfolioGallery items={portfolio} emptyText="Портфолиото ще се появи тук, когато партньорът добави реализирани проекти." />
+                  <PortfolioGallery items={portfolio} profileSlug={item.slug} emptyText="Портфолиото ще се появи тук, когато партньорът добави реализирани проекти." />
                 </div>
               </div>
 

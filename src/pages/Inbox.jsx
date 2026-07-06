@@ -20,6 +20,7 @@ import {
   MESSAGE_PAGE_SIZE,
   sendOffer,
   sendAttachmentMessage,
+  sendCatalogReference,
   sendTextMessage,
   subscribeToConversation,
   subscribeToConversationList,
@@ -28,6 +29,8 @@ import {
   updateServiceRequestStatus,
 } from '../lib/chat.js'
 import { normalizeAttachmentFiles, uploadChatAttachments } from '../lib/chat-attachments.js'
+import { loadPublicPartnerServicesForProfile } from '../lib/partner-services.js'
+import { loadProfilePortfolio } from '../lib/portfolio.js'
 
 const EMPTY_PAGINATION = {
   hasOlder: false,
@@ -62,6 +65,7 @@ export default function Inbox() {
   const [scrollToLatestToken, setScrollToLatestToken] = useState(0)
   const [replyTarget, setReplyTarget] = useState(null)
   const [offerOpen, setOfferOpen] = useState(false)
+  const [referenceLibrary, setReferenceLibrary] = useState({ status: 'idle', profileId: '', services: [], portfolio: [] })
   const initialLoadRef = useRef(false)
   const threadTokenRef = useRef(0)
   const metaRefreshTimerRef = useRef(null)
@@ -78,6 +82,7 @@ export default function Inbox() {
     [conversations, activeConversationId],
   )
   const role = conversationRole(activeConversation, userId)
+  const partnerProfileId = activeConversation?.partner?.profile_id || ''
 
   const writeThreadCache = useCallback((conversationId, payload) => {
     if (!conversationId || !userId) return
@@ -403,6 +408,52 @@ export default function Inbox() {
   }, [activeConversationId])
 
   useEffect(() => {
+    let active = true
+
+    async function loadReferenceLibrary() {
+      if (!partnerProfileId || !activeConversation) {
+        if (!active) return
+        setReferenceLibrary({ status: 'idle', profileId: '', services: [], portfolio: [] })
+        return
+      }
+
+      setReferenceLibrary((current) => ({
+        status: 'loading',
+        profileId: partnerProfileId,
+        services: current.profileId === partnerProfileId ? current.services : [],
+        portfolio: current.profileId === partnerProfileId ? current.portfolio : [],
+      }))
+
+      try {
+        const [services, portfolio] = await Promise.all([
+          loadPublicPartnerServicesForProfile(partnerProfileId),
+          loadProfilePortfolio(partnerProfileId),
+        ])
+        if (!active) return
+        setReferenceLibrary({
+          status: 'ready',
+          profileId: partnerProfileId,
+          services,
+          portfolio,
+        })
+      } catch {
+        if (!active) return
+        setReferenceLibrary({
+          status: 'error',
+          profileId: partnerProfileId,
+          services: [],
+          portfolio: [],
+        })
+      }
+    }
+
+    void loadReferenceLibrary()
+    return () => {
+      active = false
+    }
+  }, [activeConversation, partnerProfileId])
+
+  useEffect(() => {
     const handlePopState = () => {
       setSelectedConversationId(parseInboxConversationId(window.location.pathname))
     }
@@ -505,6 +556,31 @@ export default function Inbox() {
     } catch (sendError) {
       setError(sendError.message || 'Съобщението не се изпрати.')
       setMessageStatus('idle')
+    }
+  }
+
+  async function handleSendReference({ referenceType, referenceId }) {
+    if (!activeConversationId || !referenceType || !referenceId) return
+    setMessageStatus('sending')
+    setError('')
+
+    try {
+      const result = await sendCatalogReference({
+        conversationId: activeConversationId,
+        referenceType,
+        referenceId,
+      })
+      if (result?.message?.id) {
+        const nextMessage = await loadFreshMessage(result.message.id, result.message)
+        if (nextMessage) mergeIncomingMessages(activeConversationId, [nextMessage])
+      }
+      setScrollToLatestToken((value) => value + 1)
+      setMessageStatus('idle')
+      scheduleConversationRefresh()
+    } catch (referenceError) {
+      setError(referenceError.message || 'Препратката не се изпрати.')
+      setMessageStatus('idle')
+      throw referenceError
     }
   }
 
@@ -692,6 +768,8 @@ export default function Inbox() {
                 files={draftFiles}
                 onFilesChange={handleDraftFilesChange}
                 onRemoveFile={handleRemoveDraftFile}
+                referenceLibrary={referenceLibrary}
+                onSendReference={handleSendReference}
               />
             )}
           </div>

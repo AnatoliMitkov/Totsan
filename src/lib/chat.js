@@ -49,7 +49,7 @@ export const MESSAGE_SELECT = `
   service_request:service_requests(*)
 `
 
-const PROFILE_SELECT = 'user_id, name, slug, city, image_url'
+const PROFILE_SELECT = 'id, user_id, name, slug, city, image_url'
 const ACCOUNT_AVATAR_SELECT = 'id, full_name, display_name, avatar_url, email'
 const LEGACY_MESSAGE_PREVIEW_SELECT = 'id, conversation_id, sender_id, kind, body, offer_id, created_at'
 const MESSAGE_PREVIEW_SELECT = 'id, conversation_id, sender_id, kind, body, offer_id, reply_to_message_id, created_at'
@@ -57,9 +57,95 @@ const REACTION_SELECT = 'id, message_id, user_id, emoji, created_at'
 export const MESSAGE_PAGE_SIZE = 30
 const SHARED_PROJECT_CONTEXT_KEY = 'totsan.chatSharedProjectContext.v1'
 const SHARED_PROJECT_CONTEXT_LIMIT = 50
+const CHAT_REFERENCE_PREFIX = '__totsan_ref__:'
 const chatFeatureSupport = {
   replies: null,
   reactions: null,
+}
+
+function normalizeChatReferencePayload(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null
+
+  const type = String(payload.type || '').trim()
+  if (type !== 'service' && type !== 'portfolio') return null
+
+  const title = String(payload.title || '').trim()
+  const entityId = String(payload.entityId || payload.id || '').trim()
+  if (!title || !entityId) return null
+
+  const profileSlug = String(payload.profileSlug || '').trim()
+  const slug = String(payload.slug || '').trim()
+  const projectId = String(payload.projectId || entityId).trim()
+
+  return {
+    type,
+    entityId,
+    title,
+    subtitle: String(payload.subtitle || '').trim(),
+    description: String(payload.description || '').trim(),
+    coverUrl: String(payload.coverUrl || '').trim(),
+    layerLabel: String(payload.layerLabel || '').trim(),
+    city: String(payload.city || '').trim(),
+    year: String(payload.year || '').trim(),
+    priceLabel: String(payload.priceLabel || '').trim(),
+    deliveryLabel: String(payload.deliveryLabel || '').trim(),
+    badge: String(payload.badge || '').trim(),
+    slug,
+    profileSlug,
+    projectId,
+  }
+}
+
+export function encodeChatReferenceBody(payload) {
+  const normalized = normalizeChatReferencePayload(payload)
+  if (!normalized) return ''
+  return `${CHAT_REFERENCE_PREFIX}${JSON.stringify(normalized)}`
+}
+
+export function decodeChatReferenceBody(value = '') {
+  const text = String(value || '')
+  if (!text.startsWith(CHAT_REFERENCE_PREFIX)) return null
+  try {
+    return normalizeChatReferencePayload(JSON.parse(text.slice(CHAT_REFERENCE_PREFIX.length)))
+  } catch {
+    return null
+  }
+}
+
+export function getChatReferenceLabel(reference) {
+  if (!reference) return ''
+  return reference.type === 'service' ? 'Споделена услуга' : 'Споделено портфолио'
+}
+
+export function getChatReferenceHref(reference) {
+  if (!reference) return ''
+  if (reference.type === 'service' && reference.slug) {
+    return `/uslugi/${encodeURIComponent(reference.slug)}`
+  }
+  if (reference.type === 'portfolio' && reference.profileSlug && reference.projectId) {
+    return `/portfolio/${encodeURIComponent(reference.profileSlug)}/${encodeURIComponent(reference.projectId)}`
+  }
+  return ''
+}
+
+export function getMessageSnippet(message, { maxLength = 160, missing = 'Съобщението не е налично' } = {}) {
+  if (!message) return missing
+  if (message.kind === 'offer') return 'Оферта'
+  if (message.kind === 'service_request') return 'Заявка за услуга'
+  if (message.kind === 'system') return compactSystemText(message.body || '')
+
+  const reference = decodeChatReferenceBody(message.body)
+  if (reference) {
+    return `${getChatReferenceLabel(reference)}: ${reference.title}`
+  }
+
+  if (Array.isArray(message.attachments) && message.attachments.length) {
+    return message.attachments.length === 1 ? 'Прикачен файл' : `${message.attachments.length} прикачени файла`
+  }
+
+  const text = String(message.body || '').trim()
+  if (!text) return missing
+  return text.length > maxLength ? `${text.slice(0, Math.max(0, maxLength - 3))}...` : text
 }
 
 function supabaseErrorText(error) {
@@ -522,6 +608,7 @@ async function loadProfilesByUserIds(ids = []) {
     const accountAvatarUrl = account.avatar_url || ''
     const avatarCandidates = [row.image_url, accountAvatarUrl, avatarFor(row.name || '')].filter(Boolean)
     return [row.user_id, {
+      profile_id: row.id || '',
       slug: row.slug || '',
       display_name: row.name || account.display_name || account.full_name || '',
       full_name: row.name || account.full_name || '',
@@ -826,6 +913,15 @@ export async function sendAttachmentMessage({ conversationId, body = '', attachm
     kind: 'attachment',
     attachments,
     replyToMessageId,
+  })
+  return result
+}
+
+export async function sendCatalogReference({ conversationId, referenceType, referenceId }) {
+  const result = await invokeChatAction('send_reference', {
+    conversationId,
+    referenceType,
+    referenceId,
   })
   return result
 }
