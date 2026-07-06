@@ -176,7 +176,12 @@ export default function PartnerServicesManager({ globalQuery }) {
       </div>
 
       {serviceToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Изтриване на услуга"
+        >
           <div className="w-full max-w-md rounded-[2rem] border border-line bg-paper p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600">
               <Trash2 size={24} />

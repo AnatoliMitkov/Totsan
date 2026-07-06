@@ -380,6 +380,9 @@ function EditUserModal({ entity, canManageAdmins, currentAccount, actionState, o
   return (
     <div
       className="fixed inset-0 z-[100] flex items-end justify-center bg-ink/60 px-3 py-4 backdrop-blur-sm sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Редакция на потребител"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose()
       }}

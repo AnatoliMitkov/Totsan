@@ -186,6 +186,9 @@ function ApplicationDetailsModal({ row, onClose }) {
   return (
     <div
       className="fixed inset-0 z-[100] overflow-y-auto bg-ink/60 px-4 py-6 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Преглед на кандидатура"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose()
       }}
