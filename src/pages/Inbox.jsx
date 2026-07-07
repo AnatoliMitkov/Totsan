@@ -71,16 +71,28 @@ export default function Inbox() {
   const metaRefreshTimerRef = useRef(null)
   const threadCacheRef = useRef(new Map())
   const conversationsRef = useRef([])
+  const selectedConversationIdRef = useRef(initialConversationId)
 
   useEffect(() => {
     conversationsRef.current = conversations
   }, [conversations])
+
+  useEffect(() => {
+    selectedConversationIdRef.current = selectedConversationId
+  }, [selectedConversationId])
 
   const activeConversationId = selectedConversationId
   const activeConversation = useMemo(
     () => conversations.find((conversation) => conversation.id === activeConversationId) || null,
     [conversations, activeConversationId],
   )
+  const activeServiceRequest = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const request = messages[index]?.service_request
+      if (request && ['requested', 'negotiating'].includes(request.status)) return request
+    }
+    return null
+  }, [messages])
   const role = conversationRole(activeConversation, userId)
   const partnerProfileId = activeConversation?.partner?.profile_id || ''
 
@@ -214,10 +226,11 @@ export default function Inbox() {
     }
   }, [replaceMessageReactions])
 
-  const loadConversationCollection = useCallback(async () => {
+  const loadConversationCollection = useCallback(async (preferredConversationId = '') => {
+    const targetConversationId = preferredConversationId || selectedConversationIdRef.current
     let nextConversations = await loadConversations()
-    if (selectedConversationId && !nextConversations.some((conversation) => conversation.id === selectedConversationId)) {
-      const directConversation = await loadConversation(selectedConversationId)
+    if (targetConversationId && !nextConversations.some((conversation) => conversation.id === targetConversationId)) {
+      const directConversation = await loadConversation(targetConversationId)
       if (directConversation) nextConversations = [directConversation, ...nextConversations]
     }
 
@@ -225,7 +238,7 @@ export default function Inbox() {
     setConversations(nextConversations)
     setConversationStatuses(nextStatuses)
     return nextConversations
-  }, [selectedConversationId])
+  }, [])
 
   const refreshLatestThreadPage = useCallback(async (conversationId, token, nextConversations) => {
     const page = await loadMessagePage(conversationId, { limit: MESSAGE_PAGE_SIZE })
@@ -298,18 +311,19 @@ export default function Inbox() {
     }
   }, [applyThreadSnapshot, refreshLatestThreadPage, userId])
 
-  const loadAll = useCallback(async ({ keepStatus = false } = {}) => {
+  const loadAll = useCallback(async ({ keepStatus = false, conversationId = '' } = {}) => {
     if (!userId) return
     if (!keepStatus) setStatus('loading')
     setError('')
 
     try {
-      const nextConversations = await loadConversationCollection()
-      const nextSelectedId = selectedConversationId && nextConversations.some((conversation) => conversation.id === selectedConversationId)
-        ? selectedConversationId
+      const requestedConversationId = conversationId || selectedConversationIdRef.current
+      const nextConversations = await loadConversationCollection(requestedConversationId)
+      const nextSelectedId = requestedConversationId && nextConversations.some((conversation) => conversation.id === requestedConversationId)
+        ? requestedConversationId
         : ''
       setStatus('ready')
-      if (nextSelectedId !== selectedConversationId) {
+      if (nextSelectedId !== selectedConversationIdRef.current) {
         setSelectedConversationId(nextSelectedId)
         if (!nextSelectedId) navigate('/inbox', { replace: true })
       }
@@ -319,7 +333,7 @@ export default function Inbox() {
       setStatus('error')
       setThreadStatus('error')
     }
-  }, [loadConversationCollection, loadThread, navigate, selectedConversationId, userId])
+  }, [loadConversationCollection, loadThread, navigate, userId])
 
   const refreshConversationCollection = useCallback(async () => {
     if (!userId) return
@@ -383,7 +397,8 @@ export default function Inbox() {
 
   useEffect(() => {
     if (loading || !userId) return
-    loadAll({ keepStatus: initialLoadRef.current })
+    if (initialLoadRef.current) return
+    loadAll({ keepStatus: false, conversationId: selectedConversationIdRef.current })
     initialLoadRef.current = true
   }, [loading, userId, loadAll])
 
@@ -605,6 +620,11 @@ export default function Inbox() {
   }
 
   async function handleOfferAction(offer, nextStatus) {
+    if (nextStatus === 'question') {
+      setDraft(`Въпрос по офертата "${offer.title || 'оферта'}": `)
+      return
+    }
+
     setMessageStatus('sending')
 
     try {
@@ -635,11 +655,21 @@ export default function Inbox() {
     setMessageStatus('sending')
     setError('')
     try {
+      if (nextStatus === 'prepare_offer') {
+        if (request.status === 'requested') {
+          await updateServiceRequestStatus({ requestId: request.id, status: 'negotiating' })
+          await loadThread(activeConversationId, { showLoading: false })
+          scheduleConversationRefresh()
+        }
+        setOfferOpen(true)
+        setMessageStatus('idle')
+        return
+      }
+
       await updateServiceRequestStatus({ requestId: request.id, status: nextStatus })
       await loadThread(activeConversationId, { showLoading: false })
       setMessageStatus('idle')
       scheduleConversationRefresh()
-      if (nextStatus === 'negotiating') setOfferOpen(true)
     } catch (requestError) {
       setError(requestError.message || 'Заявката не беше обновена.')
       setMessageStatus('idle')
@@ -775,7 +805,7 @@ export default function Inbox() {
           </div>
         </div>
       )}
-      <OfferComposer open={offerOpen} onClose={() => setOfferOpen(false)} onSubmit={submitOffer} status={messageStatus} />
+      <OfferComposer open={offerOpen} onClose={() => setOfferOpen(false)} onSubmit={submitOffer} status={messageStatus} serviceRequest={activeServiceRequest} />
       {account?.account_status === 'banned' && <div className="shrink-0 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Акаунтът е блокиран. Някои действия може да бъдат ограничени.</div>}
     </InboxShell>
   )

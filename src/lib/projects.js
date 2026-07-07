@@ -659,6 +659,38 @@ function hasQuizAnswers(project) {
   return Object.keys(answers).length > 0
 }
 
+function countTruthy(values = []) {
+  return values.reduce((total, value) => total + (value ? 1 : 0), 0)
+}
+
+export function isClientProjectReadyForPartner(project, media = []) {
+  if (!project) return false
+
+  const title = cleanText(project.title)
+  const idea = cleanText(project.ideaDescription)
+  const quizReady = hasQuizAnswers(project)
+  const mediaReady = Array.isArray(media) && media.length > 0
+
+  const scopeReady = Boolean(
+    (title && !title.startsWith('Проект: Слой'))
+    || idea.length >= 24
+    || quizReady
+    || mediaReady,
+  )
+
+  const contextSignals = countTruthy([
+    hasText(project.propertyType) || Number(project.areaSqm) > 0 || Number(project.roomsCount) > 0,
+    hasText(project.currentLayerSlug),
+    Number(project.budgetMin) > 0 || Number(project.budgetMax) > 0,
+    hasText(project.addressCity) || hasText(project.addressRegion) || hasProjectLocationAccess(project),
+    hasText(project.desiredStartDate) || hasText(project.desiredEndDate),
+    quizReady,
+    mediaReady,
+  ])
+
+  return scopeReady && contextSignals >= 1
+}
+
 export function getProjectPropertyTypeLabel(project) {
   return labelFromMap(project?.propertyType, PROPERTY_TYPE_LABELS)
 }
@@ -720,21 +752,20 @@ export function getProjectProfileItems(project, layers = []) {
 
 export function calculateClientProfileCompleteness({ account, session, project, media = [] }) {
   const name = account?.full_name || account?.display_name || session?.user?.user_metadata?.name || ''
+  const projectReady = isClientProjectReadyForPartner(project, media)
   const checks = [
-    { key: 'avatar', label: 'Аватар', weight: 5, complete: hasText(account?.avatar_url) },
-    { key: 'name', label: 'Име', weight: 5, complete: hasText(name) },
+    { key: 'name', label: 'Име', weight: 10, complete: hasText(name) },
     { key: 'phone', label: 'Телефон', weight: 10, complete: hasText(account?.phone) },
-    { key: 'city', label: 'Град', weight: 5, complete: hasText(account?.city) },
-    { key: 'bio', label: 'Кратко био', weight: 5, complete: hasText(account?.bio) },
-    { key: 'project-title', label: 'Заглавие на проекта', weight: 5, complete: hasText(project?.title) },
-    { key: 'property-type', label: 'Тип обект', weight: 5, complete: hasText(project?.propertyType) },
-    { key: 'area', label: 'Квадратура', weight: 5, complete: Number(project?.areaSqm) > 0 },
-    { key: 'budget', label: 'Бюджет', weight: 5, complete: Number(project?.budgetMin) > 0 || Number(project?.budgetMax) > 0 },
-    { key: 'idea', label: 'Идея над 80 знака', weight: 10, complete: String(project?.ideaDescription || '').trim().length >= 80 },
-    { key: 'layer', label: 'Текущ слой', weight: 5, complete: hasText(project?.currentLayerSlug) },
-    { key: 'media', label: 'Поне 3 снимки/плана', weight: 15, complete: media.length >= 3 },
-    { key: 'quiz', label: 'Попълнен quiz', weight: 15, complete: hasQuizAnswers(project) },
-    { key: 'address', label: 'Локация на проекта', weight: 5, complete: hasText(project?.addressCity) || hasText(project?.addressRegion) },
+    { key: 'city', label: 'Град', weight: 5, complete: hasText(account?.city), optional: true },
+    { key: 'avatar', label: 'Аватар', weight: 5, complete: hasText(account?.avatar_url), optional: true },
+    { key: 'bio', label: 'Кратко био', weight: 5, complete: hasText(account?.bio), optional: true },
+    { key: 'project-ready', label: 'Проектно задание', weight: 30, complete: projectReady },
+    { key: 'property-type', label: 'Тип обект', weight: 5, complete: hasText(project?.propertyType), optional: true },
+    { key: 'area', label: 'Квадратура', weight: 5, complete: Number(project?.areaSqm) > 0, optional: true },
+    { key: 'budget', label: 'Бюджет', weight: 5, complete: Number(project?.budgetMin) > 0 || Number(project?.budgetMax) > 0, optional: true },
+    { key: 'location', label: 'Локация или достъп', weight: 5, complete: hasText(project?.addressCity) || hasText(project?.addressRegion) || hasProjectLocationAccess(project), optional: true },
+    { key: 'media', label: 'Снимки/планове', weight: 10, complete: media.length > 0, optional: true },
+    { key: 'quiz', label: 'Допълнителни отговори', weight: 5, complete: hasQuizAnswers(project), optional: true },
   ]
 
   const earned = checks.reduce((total, check) => total + (check.complete ? check.weight : 0), 0)
@@ -745,9 +776,10 @@ export function calculateClientProfileCompleteness({ account, session, project, 
     percent,
     earned,
     total,
+    isReady: projectReady && hasText(name) && hasText(account?.phone),
     checks,
     completedChecks: checks.filter(check => check.complete),
-    nextChecks: checks.filter(check => !check.complete).slice(0, 4),
+    nextChecks: checks.filter(check => !check.complete && !check.optional).slice(0, 4),
 
   }
 }

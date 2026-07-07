@@ -29,7 +29,7 @@ const HERO_VIDEO_SOURCES = [
 const HOME_FAQ_ITEMS = [
   {
     question: 'Колко струва да използвам Totsan?',
-    answer: 'За теб като клиент Totsan не начислява комисиона върху проекта. Плащането за ремонт, материали или друга партньорска услуга се уговаря и извършва директно към партньора.',
+    answer: 'За теб като клиент започването в Totsan е безплатно. При приета оферта плащането минава през защитено плащане в платформата и сумата се освобождава към партньора след потвърждение.',
   },
   {
     question: 'Как избирате кои хора влизат?',
@@ -365,7 +365,7 @@ function Hero() {
             <span className="home-hero__title-line home-hero__title-line--bottom text-accent italic hero-animate-title-line">строителството.</span>
           </h1>
           <p className="home-hero__lead mt-5 max-w-xl hero-animate-lead" style={{ fontSize: 'var(--step-md)' }}>
-            От идея до завършен дом — на едно място. Отговаряш на няколко въпроса, а ние те насочваме към правилните проверени специалисти, материали и услуги. Без комисиона върху проекта, с директно плащане към партньора.
+            От идея до завършен дом — на едно място. Отговаряш на няколко въпроса, а ние те насочваме към правилните проверени специалисти, материали и услуги. При приета оферта плащането минава сигурно през Totsan.
           </p>
           <div className="mt-7 flex flex-wrap gap-3">
             <Link to="/start" onClick={() => trackEvent('start_project', { source: 'home_hero' })} className="btn btn-primary !bg-accent !text-paper hover:!bg-accentDeep hero-animate-cta">
@@ -376,7 +376,7 @@ function Hero() {
             </a>
           </div>
           <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-paper/80 hero-animate-cta">
-            <span className="inline-flex items-center gap-2"><ShieldCheck size={16} className="text-accent" /> Директно плащане към партньора</span>
+            <span className="inline-flex items-center gap-2"><ShieldCheck size={16} className="text-accent" /> Защитено плащане през Totsan</span>
             <span className="inline-flex items-center gap-2"><UserCheck size={16} className="text-accent" /> Проверени партньори</span>
             <span className="inline-flex items-center gap-2"><CheckCircle2 size={16} className="text-accent" /> Безплатно за клиенти</span>
           </div>
@@ -482,7 +482,7 @@ function TrustPromise() {
     { value: '5', label: 'Слоя на процеса' },
     { value: '0 лв.', label: 'Такса за клиента' },
     { value: 'Проверени', label: 'Партньори и услуги' },
-    { value: 'Директно', label: 'Плащане към партньора' }
+    { value: 'Сигурно', label: 'Плащане през Totsan' }
   ]
   const statVisuals = [
     { badge: 'Път', icon: <Compass size={18} className="text-accentDeep" /> },
@@ -494,7 +494,7 @@ function TrustPromise() {
     'Ясен път от идея до реализация.',
     'Платформата не взима такса от клиента.',
     'Видими след преглед и активиране.',
-    'Totsan не приема или прехвърля сумата по проекта.'
+    'Сумата по приета оферта се държи през защитен процес и се освобождава към партньора след потвърждение.'
   ]
   const items = [
     { k: 'Проверка преди видимост', v: 'Партньорите минават през преглед, преди да бъдат показани като активни в платформата.', icon: <UserCheck className="text-accent" size={24} /> },
@@ -1031,7 +1031,7 @@ function DreamBuilderQuiz() {
               </Link>
             </div>
             <p className="mt-4 text-center text-xs text-muted">
-              Без комисиона върху проекта · плащането е директно от клиента към партньора.
+              Започването е безплатно · плащането по оферта минава през защитен процес.
             </p>
           </div>
         )}

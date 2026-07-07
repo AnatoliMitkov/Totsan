@@ -27,7 +27,7 @@ import { loadAdminReviewReports, loadAdminReviews } from '../../lib/reviews.js'
 import { INQUIRY_STATUS_META, StatusBadge } from './AdminStatus.jsx'
 
 const ORDER_STATUS_LABELS = {
-  pending_payment: 'Очаква директно плащане',
+  pending_payment: 'Очаква плащане',
   paid: 'Платена',
   in_progress: 'В работа',
   delivered: 'Доставена',
@@ -212,7 +212,7 @@ function buildDashboardView(data) {
   const risks = [
     riskItem('admins', adminAccounts.length, 'Admin акаунти', adminAccounts.map(formatAccountName).join(', ') || 'Няма admin акаунти', 'users', ShieldCheck),
     riskItem('admin-role-changes', adminRoleChanges.length, 'Дадени admin права', 'Следи всяка промяна на роли. Това е security зоната.', 'audit', AlertTriangle),
-    riskItem('payment-attention', paymentAttention.length, 'Директни плащания без потвърждение', 'Провери дали има поръчки, за които страните още не са добавили потвърждение.', 'orders', CreditCard),
+    riskItem('payment-attention', paymentAttention.length, 'Плащания без потвърждение', 'Провери поръчките, които още чакат плащане или потвърждение.', 'orders', CreditCard),
     riskItem('draft-services', draftServices.length, 'Услуги в чернова', 'Партньорите може да имат нужда от помощ да ги завършат.', 'partner-services', PackageCheck),
   ]
 

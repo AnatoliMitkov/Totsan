@@ -38,6 +38,9 @@ export function LocationCombobox({
   placeholder = 'Избери населено място',
   helper = '',
   className = '',
+  gridClassName = 'sm:grid-cols-5',
+  regionClassName = 'sm:col-span-2',
+  settlementClassName = 'sm:col-span-3',
   topRightSlot = null,
 }) {
   const id = useId()
@@ -113,8 +116,8 @@ export function LocationCombobox({
 
   return (
     <div ref={rootRef} className={`relative min-w-0 ${className || ''}`.trim()}>
-      <div className="grid min-w-0 gap-4 sm:grid-cols-5">
-        <div className="sm:col-span-2">
+      <div className={`grid min-w-0 gap-4 ${gridClassName}`}>
+        <div className={regionClassName}>
           <TotsanSelect
             label="Област"
             value={region}
@@ -127,7 +130,7 @@ export function LocationCombobox({
             options={BULGARIA_REGIONS.map((item) => ({ value: item, label: item }))}
           />
         </div>
-        <div className="min-w-0 sm:col-span-3">
+        <div className={`min-w-0 ${settlementClassName}`}>
           <label htmlFor={id} className="block text-sm font-medium text-ink">{label}</label>
           <div className="relative">
             <Search size={16} className="pointer-events-none absolute left-4 top-1/2 mt-1 -translate-y-1/2 text-muted" />

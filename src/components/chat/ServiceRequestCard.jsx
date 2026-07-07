@@ -14,7 +14,8 @@ const STATUS_LABELS = {
 export default function ServiceRequestCard({ request, conversation, userId, onAction, compact = false }) {
   const role = conversationRole(conversation, userId)
   const snapshot = request?.snapshot || {}
-  const canPartnerAct = role === 'partner' && request.status === 'requested'
+  const canPartnerPrepare = role === 'partner' && ['requested', 'negotiating'].includes(request.status)
+  const canPartnerDecline = role === 'partner' && ['requested', 'negotiating'].includes(request.status)
   const canClientCancel = role === 'client' && ['requested', 'negotiating'].includes(request.status)
   const features = Array.isArray(snapshot.features) ? snapshot.features : []
   const serviceHref = snapshot.service_slug ? `/uslugi/${encodeURIComponent(snapshot.service_slug)}` : ''
@@ -68,14 +69,14 @@ export default function ServiceRequestCard({ request, conversation, userId, onAc
         </p>
       )}
 
-      {(canPartnerAct || canClientCancel) && (
+      {(canPartnerPrepare || canPartnerDecline || canClientCancel) && (
         <div className="mt-4 flex flex-wrap gap-2">
-          {canPartnerAct && (
-            <button type="button" onClick={() => onAction?.(request, 'negotiating')} className="btn btn-primary !py-2 text-sm">
-              <CheckCircle2 size={17} /> Приеми и подготви оферта
+          {canPartnerPrepare && (
+            <button type="button" onClick={() => onAction?.(request, 'prepare_offer')} className="btn btn-primary !py-2 text-sm">
+              <CheckCircle2 size={17} /> {request.status === 'requested' ? 'Приеми и подготви оферта' : 'Подготви оферта'}
             </button>
           )}
-          {canPartnerAct && (
+          {canPartnerDecline && (
             <button type="button" onClick={() => onAction?.(request, 'declined')} className="btn btn-ghost !py-2 text-sm">
               <XCircle size={17} /> Откажи
             </button>

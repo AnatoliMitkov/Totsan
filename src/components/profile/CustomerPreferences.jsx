@@ -198,8 +198,13 @@ export default function CustomerPreferences({ account, session, onSave }) {
     }
   }
 
+  function cancelChanges() {
+    setDraft(makeDraft(account))
+    setStatus({ type: 'idle', message: '' })
+  }
+
   return (
-    <form onSubmit={submit} className="grid gap-5 pb-28 lg:grid-cols-12">
+    <form onSubmit={submit} className="grid gap-5 pb-0 lg:grid-cols-12">
       <div className="lg:col-span-8 rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-7 space-y-6">
         {/* Header */}
         <div>
@@ -289,6 +294,7 @@ export default function CustomerPreferences({ account, session, onSave }) {
         status={status.type}
         message={status.message}
         idleMessage="Всички полета са по желание."
+        onCancel={cancelChanges}
         disabled={status.type === 'saving'}
       />
     </form>

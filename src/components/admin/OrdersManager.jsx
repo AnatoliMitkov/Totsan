@@ -8,7 +8,7 @@ import { ORDER_STATUS_LABELS, formatOrderMoney, orderStatusTone } from '../../li
 
 const STATUS_FILTERS = [
   ['all', 'Всички'],
-  ['pending_payment', 'Очакват директно плащане'],
+  ['pending_payment', 'Очакват плащане'],
   ['paid', 'Платени'],
   ['in_progress', 'В работа'],
   ['delivered', 'Предадени'],
@@ -98,7 +98,7 @@ export default function OrdersManager({ globalQuery }) {
       <div className="rounded-3xl border border-line bg-paper p-5 md:p-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <div className="eyebrow">Директни плащания и потвърждения</div>
+            <div className="eyebrow">Плащания и потвърждения</div>
             <h2 className="mt-2 font-display text-3xl text-ink">Поръчки и статуси</h2>
             <p className="mt-2 text-sm text-muted">Следи активни поръчки, спорове и refund статуси.</p>
           </div>

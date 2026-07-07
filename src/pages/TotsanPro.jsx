@@ -91,7 +91,7 @@ const foundingCampaign = {
 
 const subscriptionValue = [
   'Професионален профил в Totsan',
-  'Видимост пред клиенти без комисионни',
+  'Видимост пред клиенти без такса на запитване',
   'Запитвания с описание, снимки, бюджет, срокове и локация',
   'По-малко хаотични разговори',
   'Портфолио, ревюта и потвърдени проекти',
@@ -144,7 +144,7 @@ const subscriptionConsentItems = [
 const pricingFaqItems = [
   {
     question: 'Има ли комисионна?',
-    answer: 'Не. Totsan не взима процент от стойността на ремонта или услугата.',
+    answer: 'Абонаментът не добавя такса на запитване. При поръчки, платени през Totsan, от сумата се приспадат Stripe таксите и 2% платформена комисионна преди превода към партньора.',
   },
   {
     question: 'Гарантирате ли клиенти?',
@@ -269,7 +269,7 @@ export default function TotsanPro() {
 
   useSeo({
     canonicalPath: '/pro',
-    title: 'Totsan Pro — партньорски планове без комисионни',
+    title: 'Totsan Pro — партньорски планове и защитени плащания',
     description: 'Активен професионален профил, видимост, структурирани запитвания и инструменти за по-ясна комуникация с клиенти в Totsan.',
     jsonLd: [
       buildBreadcrumbSchema([
@@ -406,7 +406,7 @@ export default function TotsanPro() {
       setCheckoutState({
         status: 'error',
         planKey: price.key,
-        message: 'Потвърди всички условия, преди да продължиш към Stripe.',
+        message: 'Потвърди всички условия, преди да продължиш към плащане.',
       })
       return
     }
@@ -426,7 +426,7 @@ export default function TotsanPro() {
       setCheckoutState({
         status: 'error',
         planKey: price.key,
-        message: 'Stripe checkout не върна валиден адрес. Провери конфигурацията и опитай отново.',
+        message: 'Платежният процес не върна валиден адрес. Провери конфигурацията и опитай отново.',
       })
     } catch (error) {
       const message = error.message || 'Абонаментът не можа да стартира.'
@@ -484,7 +484,7 @@ export default function TotsanPro() {
                 Професионален канал за добрите майстори, студиа и фирми.
               </h1>
               <p className="mt-5 max-w-xl text-base leading-relaxed text-paper/78 sm:text-lg">
-                Активен профил, видимост, структурирани запитвания и инструменти за ясна комуникация. Без комисионни и без такса на запитване.
+                Активен профил, видимост, структурирани запитвания и инструменти за ясна комуникация. Без такса на запитване; при защитено плащане се прилагат Stripe такси и 2% комисионна.
               </p>
               <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Link
@@ -502,7 +502,7 @@ export default function TotsanPro() {
                 </a>
               </div>
               <div className="mt-8 flex flex-wrap justify-start gap-3 text-sm text-paper/82">
-                <TrustPill icon={CheckCircle2} label="Без комисионни" />
+                <TrustPill icon={CheckCircle2} label="Без такса на запитване" />
                 <TrustPill icon={UserCheck} label="6 месеца промо до 31 юли" />
                 <TrustPill icon={ShieldCheck} label="Проверка преди видимост" />
               </div>
@@ -533,7 +533,7 @@ export default function TotsanPro() {
           <SectionIntro
             eyebrow="Цени за партньори"
             title="Партньорски планове за специалисти и фирми."
-            text="Без комисионни. Без такса на запитване. Плащате за активен професионален профил, видимост и инструменти за по-ясна комуникация с клиенти."
+            text="Без такса на запитване. Плащате за активен професионален профил, видимост и инструменти за по-ясна комуникация; при поръчки през Totsan се прилагат Stripe такси и 2% комисионна."
           />
 
           <CampaignBanner campaign={foundingCampaign} onTrack={() => trackPartnerApplicationStart('totsan_pro_campaign')} />
@@ -803,7 +803,7 @@ function SubscriptionConfirmationModal({
           </div>
 
           <div className="mt-6">
-            <div className="text-sm font-semibold text-ink">Потвърди преди Stripe</div>
+            <div className="text-sm font-semibold text-ink">Потвърди преди плащане</div>
             <div className="mt-3 grid gap-3">
               {consentItems.map((item) => (
                 <label key={item.id} className="flex cursor-pointer gap-3 rounded-2xl border border-line bg-soft/70 px-4 py-3 text-sm leading-6 text-ink">
@@ -830,7 +830,7 @@ function SubscriptionConfirmationModal({
               Назад към плановете
             </button>
             <button type="button" onClick={onContinue} disabled={!acceptedConsents || busy} className="btn btn-primary justify-center disabled:cursor-not-allowed disabled:opacity-55">
-              {busy ? 'Отваряме Stripe...' : 'Продължи към Stripe'} <ArrowRight size={16} />
+              {busy ? 'Отваряме плащането...' : 'Продължи към плащане'} <ArrowRight size={16} />
             </button>
           </div>
         </div>
@@ -858,7 +858,7 @@ function SubscriptionValuePanel() {
           </span>
           <div>
             <div className="eyebrow">Какво отключва абонаментът</div>
-            <h3 className="mt-2 font-display text-3xl text-ink">Плащате за активен професионален канал, не за комисионна.</h3>
+            <h3 className="mt-2 font-display text-3xl text-ink">Плащате за активен професионален канал; проектните плащания имат отделни такси.</h3>
           </div>
         </div>
         <div className="mt-6 grid gap-3 sm:grid-cols-2">

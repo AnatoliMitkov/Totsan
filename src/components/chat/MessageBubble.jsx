@@ -47,8 +47,11 @@ export default function MessageBubble({
   const avatarCandidates = participant?.avatar_candidates || []
   const participantName = getParticipantDisplayName(participant)
   const bubbleRadiusClass = bubbleRadius(own, groupPosition)
+  const forceLightBubble = Boolean(serviceRequest)
   const bubbleSurfaceClass = own
-    ? 'border-accentDeep bg-accentDeep text-paper shadow-[0_14px_34px_-24px_rgba(22,62,162,0.62)]'
+    ? forceLightBubble
+      ? 'border-line/90 bg-soft/95 text-ink shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] backdrop-blur-sm'
+      : 'border-accentDeep bg-accentDeep text-paper shadow-[0_14px_34px_-24px_rgba(22,62,162,0.62)]'
     : 'border-line/90 bg-soft/95 text-ink shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] backdrop-blur-sm'
   const bubbleSizeClass = offer || serviceRequest || reference
     ? 'w-full max-w-[min(92vw,42rem)] sm:max-w-[min(78%,44rem)] lg:max-w-[min(72%,46rem)]'
@@ -74,13 +77,13 @@ export default function MessageBubble({
       <div className={`flex min-w-0 max-w-full flex-1 flex-col ${alignmentClass}`}>
         <div className={`min-w-0 overflow-hidden border px-4 py-3 ${bubbleRadiusClass} ${bubbleSurfaceClass} ${bubbleSizeClass}`}>
           {replyPreview && (
-            <div className={`mb-3 rounded-2xl border px-3 py-2 text-xs ${own ? 'border-paper/15 bg-paper/10 text-paper/85' : 'border-line/70 bg-paper/80 text-muted'}`}>
-              <div className={`truncate font-medium ${own ? 'text-paper' : 'text-ink'}`}>{replyPreview.senderLabel}</div>
+            <div className={`mb-3 rounded-2xl border px-3 py-2 text-xs ${own && !forceLightBubble ? 'border-paper/15 bg-paper/10 text-paper/85' : 'border-line/70 bg-paper/80 text-muted'}`}>
+              <div className={`truncate font-medium ${own && !forceLightBubble ? 'text-paper' : 'text-ink'}`}>{replyPreview.senderLabel}</div>
               <div className="mt-1 break-words whitespace-normal opacity-80">{replyPreview.body}</div>
             </div>
           )}
           {serviceRequest ? (
-            <ServiceRequestCard request={serviceRequest} conversation={conversation} userId={userId} onAction={onServiceRequestAction} compact={own} />
+            <ServiceRequestCard request={serviceRequest} conversation={conversation} userId={userId} onAction={onServiceRequestAction} compact={false} />
           ) : offer ? (
             <OfferCard offer={message.offer} conversation={conversation} userId={userId} onAction={onOfferAction} compact={own} messageCreatedAt={message.created_at} />
           ) : reference ? (
@@ -102,12 +105,12 @@ export default function MessageBubble({
             </div>
           )}
           {message.was_masked && (
-            <div className={`mt-3 flex min-w-0 items-start gap-2 text-xs ${own ? 'text-paper/72' : 'text-amber-800'}`}>
+            <div className={`mt-3 flex min-w-0 items-start gap-2 text-xs ${own && !forceLightBubble ? 'text-paper/72' : 'text-amber-800'}`}>
               <AlertTriangle size={14} /> Част от текста е скрита за сигурност.
             </div>
           )}
           {showTimestamp && (
-            <div className={`mt-2 text-right text-[11px] ${own ? 'text-paper/68' : 'text-muted'} ${groupedWithNext ? 'hidden' : 'block'}`}>
+            <div className={`mt-2 text-right text-[11px] ${own && !forceLightBubble ? 'text-paper/68' : 'text-muted'} ${groupedWithNext ? 'hidden' : 'block'}`}>
               {new Date(message.created_at).toLocaleTimeString('bg-BG', { hour: '2-digit', minute: '2-digit' })}
             </div>
           )}

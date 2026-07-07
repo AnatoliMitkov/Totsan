@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
-import { Activity, AlertTriangle, CalendarDays, ClipboardList, FolderKanban, Home, Lock, LogOut, Mail, MessageCircle, ShieldCheck, Settings2, UserRound, Users, X } from 'lucide-react'
+import { Activity, AlertTriangle, CalendarDays, CheckCircle2, ClipboardList, FolderKanban, Home, Lock, LogOut, Mail, MessageCircle, Play, ShieldCheck, Settings2, UserRound, Users, X } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { getAccountDisplayName, useAccount, signOutAndRedirect } from '../lib/account.js'
 import { uploadProfileCover, uploadProfileMedia } from '../lib/profile-media-upload-client.js'
@@ -24,7 +24,9 @@ import {
   calculateClientProfileCompleteness,
   deactivateClientProject,
   deleteClientProjectMedia,
+  isClientProjectReadyForPartner,
   loadActiveClientProject,
+  mergeQuizAnswer,
   saveActiveClientProject,
   saveCustomerAccountProfile,
   updateClientProjectMedia,
@@ -41,6 +43,14 @@ const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 tex
 const MAX_BANNER_BYTES = 12 * 1024 * 1024
 const SUPPORTED_PROFILE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const BANNER_DESCRIPTION = 'Широк банер работи най-добре около 3:1. Препоръчваме 1600 x 520 px за най-чист резултат.'
+const CUSTOMER_QUIZ_CONFIG_LOADERS = {
+  paint: () => import('../components/quiz/paint-config.js').then(module => module.paintConfig),
+  windows: () => import('../components/quiz/windows-config.js').then(module => module.windowsConfig),
+  tiles: () => import('../components/quiz/tiles-config.js').then(module => module.tilesConfig),
+  flooring: () => import('../components/quiz/flooring-config.js').then(module => module.flooringConfig),
+}
+const CUSTOMER_MATERIAL_QUIZZES = (LAYERS.find(layer => layer.slug === 'materiali')?.whatYouFind || [])
+  .filter(item => item.quizSlug && CUSTOMER_QUIZ_CONFIG_LOADERS[item.quizSlug])
 
 function CustomSpaceIcon({ size = 18, className = '' }) {
   return (
@@ -87,8 +97,9 @@ function validateAvatarFile(file) {
 
 function withCacheBust(url) {
   if (!url) return ''
-  const separator = url.includes('?') ? '&' : '?'
-  return `${url}${separator}v=${Date.now()}`
+  const cleanUrl = stripCacheBust(url)
+  const separator = cleanUrl.includes('?') ? '&' : '?'
+  return `${cleanUrl}${separator}v=${Date.now()}`
 }
 
 function stripCacheBust(url) {
@@ -138,8 +149,8 @@ function buildAccountSavePayload(account, values = {}) {
     fullName: values.fullName ?? account?.full_name ?? '',
     displayName: values.displayName ?? account?.display_name ?? '',
     phone: values.phone ?? account?.phone ?? '',
-    avatarUrl: values.avatarUrl ?? stripCacheBust(account?.avatar_url || ''),
-    coverUrl: values.coverUrl ?? stripCacheBust(account?.cover_url || ''),
+    avatarUrl: values.avatarUrl ?? account?.avatar_url ?? '',
+    coverUrl: values.coverUrl ?? account?.cover_url ?? '',
     city: values.city ?? account?.city ?? '',
     country: values.country ?? account?.country ?? 'BG',
     bio: values.bio ?? account?.bio ?? '',
@@ -150,6 +161,21 @@ function buildAccountSavePayload(account, values = {}) {
     preferredContactMethod: values.preferredContactMethod ?? account?.preferred_contact_method ?? '',
     ageGroup: values.ageGroup ?? account?.age_group ?? '',
     gender: values.gender ?? account?.gender ?? '',
+  }
+}
+
+function hasProfileValue(value) {
+  return String(value || '').trim().length > 0
+}
+
+function getCustomerTabAttention(account, project, media = []) {
+  const hasName = hasProfileValue(account?.full_name) || hasProfileValue(account?.display_name)
+  return {
+    personal: !hasName || !hasProfileValue(account?.phone) || !hasProfileValue(account?.city),
+    preferences: !Array.isArray(account?.interests) || account.interests.length === 0
+      || !Array.isArray(account?.style_preferences) || account.style_preferences.length === 0
+      || !hasProfileValue(account?.preferred_contact_method),
+    project: !isClientProjectReadyForPartner(project, media),
   }
 }
 
@@ -354,6 +380,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
     project,
     media,
   }), [localAccount, session, project, media])
+  const tabAttention = useMemo(() => getCustomerTabAttention(localAccount, project, media), [localAccount, project, media])
 
   async function savePersonal(values) {
     const savedAccount = await saveCustomerAccountProfile(buildAccountSavePayload(localAccount, values))
@@ -409,7 +436,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
   async function saveAvatar(croppedFile) {
     setLoadState({ status: 'loading', message: 'Запазваме снимката…' })
     try {
-      const avatarUrl = await uploadAvatar(croppedFile)
+      const avatarUrl = withCacheBust(await uploadAvatar(croppedFile))
       await savePersonal({ avatarUrl })
       setLoadState({ status: 'ready', message: 'Снимката е запазена успешно.' })
     } catch (error) {
@@ -445,7 +472,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
   async function saveBanner(croppedFile) {
     try {
       const result = await uploadProfileCover({ file: croppedFile, target: userId })
-      const coverUrl = result.publicUrl
+      const coverUrl = withCacheBust(result.publicUrl)
       const savedAccount = await saveCustomerAccountProfile(buildAccountSavePayload(localAccount, { coverUrl }))
 
       const nextAccount = {
@@ -532,7 +559,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
         placeholderClassName="hidden md:grid"
       >
       </PublicProfileBanner>
-      <div className="relative z-10 flex flex-col bg-soft pb-16 md:pb-24">
+      <div className="relative z-10 flex flex-col bg-soft pb-10">
         <div className="container-page -mt-4 w-full space-y-5 px-4 sm:-mt-8 md:-mt-24 md:px-6">
           <div className="relative">
             <div
@@ -550,11 +577,12 @@ function CustomerProfile({ session, account, refreshAccount }) {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
-            <aside className="min-w-0 max-w-full overflow-hidden rounded-3xl border border-line bg-paper p-3 shadow-[0_8px_30px_rgb(0,0,0,0.02)] lg:sticky lg:top-24 lg:overflow-visible">
+            <aside className="min-w-0 max-w-full overflow-hidden rounded-3xl border border-line bg-paper p-3 shadow-[0_8px_30px_rgb(0,0,0,0.02)] lg:sticky lg:top-[calc(var(--header-h,64px)+1rem)] lg:max-h-[calc(100dvh-var(--header-h,64px)-2rem)] lg:self-start lg:overflow-y-auto">
               <nav className="flex w-full min-w-0 max-w-full gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-col lg:overflow-visible lg:pb-0">
                 {CUSTOMER_TABS.map((tab) => {
                   const Icon = tab.icon
                   const isActive = activeTab === tab.id
+                  const needsAttention = Boolean(tabAttention[tab.id])
                   return (
                     <button
                       key={tab.id}
@@ -566,6 +594,15 @@ function CustomerProfile({ session, account, refreshAccount }) {
                       <Icon size={tab.id === 'project' ? 22 : 18} />
                       {/* Размерът на текста се контролира от Tailwind класа 'text-sm' в бутона горе или директно тук */}
                       <span className="text-sm">{tab.label}</span>
+                      {needsAttention && (
+                        <span
+                          className={`ml-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-amber-700 transition ${isActive ? 'border-amber-200/60 bg-amber-200 text-ink' : 'border-amber-200 bg-amber-50'}`}
+                          title="Има данни за попълване"
+                          aria-label="Има данни за попълване"
+                        >
+                          <AlertTriangle size={14} strokeWidth={2.2} />
+                        </span>
+                      )}
                     </button>
                   )
                 })}
@@ -646,7 +683,7 @@ function CustomerProfile({ session, account, refreshAccount }) {
                 />
               )}
 
-              {activeTab === 'activity' && <CustomerActivity account={localAccount} completeness={completeness} />}
+              {activeTab === 'activity' && <CustomerActivity account={localAccount} completeness={completeness} project={project} onSaveProject={saveProject} />}
               {activeTab === 'security' && (
                 <div className="space-y-5">
                   <TotpMfaManager session={session} />
@@ -755,22 +792,112 @@ function CustomerProfile({ session, account, refreshAccount }) {
   )
 }
 
-function CustomerActivity({ account, completeness }) {
+function CustomerActivity({ account, completeness, project, onSaveProject }) {
   return (
     <div className="grid gap-5 grid-cols-1 lg:grid-cols-12">
-      <div className="lg:col-span-8 rounded-3xl border border-line bg-paper p-5 md:p-7">
-        <div className="eyebrow">Активност</div>
-        <h2 className="mt-2 font-display text-3xl text-ink">История на профила</h2>
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <ActivityTile label="Регистриран" value={account?.created_at ? new Date(account.created_at).toLocaleDateString('bg-BG') : 'Скоро'} />
-          <ActivityTile label="Запитвания" value="Скоро" />
-          <ActivityTile label="Активни разговори" value="Скоро" />
+      <div className="lg:col-span-8 space-y-5">
+        <div className="rounded-3xl border border-line bg-paper p-5 md:p-7">
+          <div className="eyebrow">Активност</div>
+          <h2 className="mt-2 font-display text-3xl text-ink">История на профила</h2>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <ActivityTile label="Регистриран" value={account?.created_at ? new Date(account.created_at).toLocaleDateString('bg-BG') : 'Скоро'} />
+            <ActivityTile label="Запитвания" value="Скоро" />
+            <ActivityTile label="Активни разговори" value="Скоро" />
+          </div>
         </div>
+        <CustomerConfiguratorPanel project={project} onSaveProject={onSaveProject} />
       </div>
       <aside className="lg:col-span-4">
         <CompletenessBar completeness={completeness} />
       </aside>
     </div>
+  )
+}
+
+function CustomerConfiguratorPanel({ project, onSaveProject }) {
+  const [activeQuizSlug, setActiveQuizSlug] = useState('')
+  const [quizStatus, setQuizStatus] = useState({ type: 'idle', message: '' })
+  const quizRef = useRef(null)
+  const projectRef = useRef(project)
+  const currentLayer = useMemo(
+    () => LAYERS.find(layer => layer.slug === project?.currentLayerSlug) || LAYERS[0],
+    [project?.currentLayerSlug],
+  )
+  const visibleQuizzes = useMemo(() => {
+    const currentLayerQuizzes = (currentLayer?.whatYouFind || []).filter(item => item.quizSlug && CUSTOMER_QUIZ_CONFIG_LOADERS[item.quizSlug])
+    return currentLayerQuizzes.length > 0 ? currentLayerQuizzes : CUSTOMER_MATERIAL_QUIZZES
+  }, [currentLayer])
+  const savedQuizKeys = Object.keys(project?.quizAnswers || {})
+
+  useEffect(() => {
+    projectRef.current = project
+  }, [project])
+
+  useEffect(() => {
+    if (!activeQuizSlug || !quizRef.current) return undefined
+
+    const node = quizRef.current
+    const loader = CUSTOMER_QUIZ_CONFIG_LOADERS[activeQuizSlug]
+    let cancelled = false
+
+    function handleQuizComplete(event) {
+      const quizMeta = visibleQuizzes.find(item => item.quizSlug === activeQuizSlug)
+      const nextProject = mergeQuizAnswer(projectRef.current || {}, activeQuizSlug, {
+        title: quizMeta?.title || activeQuizSlug,
+        answers: event.detail.answers,
+        recommendation: event.detail.recommendation,
+      })
+
+      setQuizStatus({ type: 'saving', message: 'Записваме резултата…' })
+      onSaveProject(nextProject, { silent: true })
+        .then(() => setQuizStatus({ type: 'saved', message: 'Конфигураторът е записан към проекта.' }))
+        .catch((error) => setQuizStatus({ type: 'error', message: error.message || 'Резултатът не се запази.' }))
+    }
+
+    node.addEventListener('quiz-complete', handleQuizComplete)
+    Promise.all([import('../components/quiz/quiz-engine.js'), loader?.()])
+      .then(([, config]) => {
+        if (cancelled || !config || !quizRef.current) return
+        quizRef.current.config = { ...config, consultationUrl: '' }
+      })
+      .catch(() => setQuizStatus({ type: 'error', message: 'Конфигураторът не успя да зареди.' }))
+
+    return () => {
+      cancelled = true
+      node.removeEventListener('quiz-complete', handleQuizComplete)
+    }
+  }, [activeQuizSlug, onSaveProject, visibleQuizzes])
+
+  return (
+    <section className="rounded-3xl border border-line bg-paper p-5 md:p-7">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="eyebrow">Конфигуратор</div>
+          <h2 className="mt-2 font-display text-3xl text-ink">Детайли за активния слой</h2>
+          <p className="mt-2 text-sm text-muted">Слой {currentLayer.number}. Попълнените отговори се добавят към твоето пространство.</p>
+        </div>
+        {savedQuizKeys.length > 0 && <CheckCircle2 size={24} className="text-trustGreen" strokeWidth={1.5} />}
+      </div>
+
+      <div className="mt-5 grid gap-2.5 sm:grid-cols-2">
+        {visibleQuizzes.map(item => (
+          <button key={item.quizSlug} type="button" onClick={() => { setActiveQuizSlug(item.quizSlug); setQuizStatus({ type: 'idle', message: '' }) }} className={`group flex items-center justify-between rounded-2xl border px-4 py-3.5 text-left text-sm transition-all duration-200 ${activeQuizSlug === item.quizSlug ? 'border-accent bg-accentSoft/20 text-accentDeep font-medium' : 'border-line/75 hover:border-ink hover:shadow-sm text-ink'}`}>
+            <span>{item.title}</span>
+            <Play size={16} className={`transition-transform duration-200 ${activeQuizSlug === item.quizSlug ? 'text-accentDeep' : 'text-muted group-hover:text-ink'}`} />
+          </button>
+        ))}
+      </div>
+
+      {activeQuizSlug && (
+        <div className="mt-6 rounded-2xl border border-line/60 bg-soft/30 p-4">
+          <material-decision-quiz ref={quizRef}></material-decision-quiz>
+        </div>
+      )}
+
+      <div className={`mt-4 text-xs font-medium ${quizStatus.type === 'error' ? 'text-red-700' : 'text-muted'}`}>
+        {quizStatus.message || (savedQuizKeys.length ? `${savedQuizKeys.length} завършени теста` : 'Избери конфигуратор, когато искаш да добавиш още детайли.')}
+      </div>
+    </section>
   )
 }
 

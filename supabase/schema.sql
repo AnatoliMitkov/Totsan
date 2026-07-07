@@ -1380,13 +1380,17 @@ create table if not exists public.offers (
   client_id uuid not null references auth.users(id) on delete cascade,
   project_id uuid references public.client_projects(id) on delete set null,
   title text not null,
+  offer_type text not null default 'final' check (offer_type in ('final','estimate','staged')),
+  summary text,
   description text,
   deliverables jsonb not null default '[]'::jsonb,
+  price_type text not null default 'fixed' check (price_type in ('fixed','estimate','hourly','staged')),
+  offer_details jsonb not null default '{}'::jsonb,
   price_amount integer check (price_amount is null or price_amount >= 0),
   currency text not null default 'EUR',
   delivery_days integer check (delivery_days is null or delivery_days >= 0),
   revisions integer check (revisions is null or revisions >= 0),
-  status text not null default 'sent' check (status in ('draft','sent','accepted','declined','withdrawn','expired')),
+  status text not null default 'sent' check (status in ('draft','sent','viewed','question','accepted','declined','withdrawn','expired','change_requested')),
   expires_at timestamptz,
   accepted_at timestamptz,
   created_at timestamptz not null default now(),
@@ -1513,6 +1517,79 @@ create policy "admins can manage offers"
   using (public.is_admin())
   with check (public.is_admin());
 
+create or replace function public.get_chat_participant_profiles(p_user_ids uuid[])
+returns table (
+  user_id uuid,
+  display_name text,
+  full_name text,
+  avatar_url text,
+  city text
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    return;
+  end if;
+
+  return query
+  select
+    a.id as user_id,
+    coalesce(nullif(btrim(a.display_name), ''), nullif(btrim(a.full_name), ''), nullif(split_part(a.email, '@', 1), '')) as display_name,
+    coalesce(nullif(btrim(a.full_name), ''), nullif(btrim(a.display_name), ''), nullif(split_part(a.email, '@', 1), '')) as full_name,
+    a.avatar_url,
+    a.city
+  from public.accounts a
+  where a.id = any(coalesce(p_user_ids, array[]::uuid[]))
+    and exists (
+      select 1
+      from public.conversations c
+      where auth.uid() in (c.client_id, c.partner_id)
+        and a.id in (c.client_id, c.partner_id)
+    );
+end;
+$$;
+
+revoke execute on function public.get_chat_participant_profiles(uuid[]) from public, anon;
+grant execute on function public.get_chat_participant_profiles(uuid[]) to authenticated;
+
+create or replace function public.get_chat_project_context(p_conversation_ids uuid[])
+returns table (
+  conversation_id uuid,
+  project_id uuid,
+  share_id uuid,
+  title text
+)
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    return;
+  end if;
+
+  return query
+  select
+    c.id as conversation_id,
+    cp.id as project_id,
+    cp.public_share_id as share_id,
+    cp.title
+  from public.conversations c
+  join public.client_projects cp on cp.id = c.project_id
+  where c.id = any(coalesce(p_conversation_ids, array[]::uuid[]))
+    and auth.uid() in (c.client_id, c.partner_id)
+    and cp.is_active = true;
+end;
+$$;
+
+revoke execute on function public.get_chat_project_context(uuid[]) from public, anon;
+grant execute on function public.get_chat_project_context(uuid[]) to authenticated;
+
 do $$
 begin
   if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'conversations') then
@@ -1598,7 +1675,23 @@ alter table public.messages
 alter table public.offers
   add column if not exists service_request_id uuid references public.service_requests(id) on delete set null,
   add column if not exists service_id uuid references public.partner_services(id) on delete set null,
-  add column if not exists service_package_id uuid references public.partner_service_packages(id) on delete set null;
+  add column if not exists service_package_id uuid references public.partner_service_packages(id) on delete set null,
+  add column if not exists offer_type text not null default 'final',
+  add column if not exists summary text,
+  add column if not exists price_type text not null default 'fixed',
+  add column if not exists offer_details jsonb not null default '{}'::jsonb;
+
+alter table public.offers
+  drop constraint if exists offers_offer_type_check,
+  add constraint offers_offer_type_check check (offer_type in ('final','estimate','staged'));
+
+alter table public.offers
+  drop constraint if exists offers_price_type_check,
+  add constraint offers_price_type_check check (price_type in ('fixed','estimate','hourly','staged'));
+
+alter table public.offers
+  drop constraint if exists offers_status_check,
+  add constraint offers_status_check check (status in ('draft','sent','viewed','question','accepted','declined','withdrawn','expired','change_requested'));
 
 drop trigger if exists set_partner_services_updated_at on public.partner_services;
 create trigger set_partner_services_updated_at
@@ -2149,10 +2242,18 @@ declare
   v_media json;
 begin
   select * into v_project
-  from public.client_projects
-  where public_share_id = p_share_id
-    and is_shareable = true
-    and is_active = true
+  from public.client_projects cp
+  where cp.public_share_id = p_share_id
+    and cp.is_active = true
+    and (
+      cp.is_shareable = true
+      or exists (
+        select 1
+        from public.conversations c
+        where c.project_id = cp.id
+          and auth.uid() in (c.client_id, c.partner_id)
+      )
+    )
   limit 1;
 
   if v_project.id is null then

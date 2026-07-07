@@ -39,7 +39,8 @@ export default function Order() {
   const order = details.order
   const isAdminView = Boolean(isAdmin)
   const role = order?.clientId === userId ? 'client' : order?.partnerId === userId ? 'partner' : 'guest'
-  const actions = useMemo(() => buildActions(order, role), [order, role])
+  const checkoutPath = useMemo(() => checkoutPathForOrder(order), [order])
+  const actions = useMemo(() => buildActions(order, role, checkoutPath), [order, role, checkoutPath])
   const visibleEvents = useMemo(() => dedupeEvents(details.events), [details.events])
   const visiblePayments = useMemo(() => dedupePayments(details.payments), [details.payments])
   const projectLocation = details.projectLocation
@@ -117,11 +118,14 @@ export default function Order() {
             <div className="rounded-3xl border border-line bg-paper p-5 md:p-6">
               <div className="eyebrow">Действия</div>
               <div className="mt-3 font-display text-4xl text-ink">{formatOrderMoney(order.amountTotal, order.currency)}</div>
-              <p className="mt-2 text-sm text-muted">Договорена сума между клиента и партньора. Плащането се извършва директно към партньора.</p>
+              <p className="mt-2 text-sm text-muted">Клиентът плаща през Totsan. Сумата се превежда към партньора след потвърждение, че поръчката е завършена.</p>
               <p className="mt-3 rounded-2xl border border-line bg-soft p-3 text-xs leading-5 text-muted">
-                Totsan не приема и не прехвърля сумата. Статус или документ тук служи само като доказателствена следа, а партньорът потвърждава получаването.
+                Партньорската сума се освобождава чрез платежния профил след приспадане на приложимите Stripe такси и 2% платформена комисионна.
               </p>
               {message && <div className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">{message}</div>}
+              {role === 'client' && order.status === 'pending_payment' && checkoutPath && (
+                <Link to={checkoutPath} className="btn btn-primary mt-3 w-full justify-center"><CreditCard size={18} /> Плати</Link>
+              )}
               {order.conversationId && <Link to={`/inbox/${order.conversationId}`} className="btn btn-ghost mt-3 w-full justify-center"><MessageSquare size={18} /> Чат</Link>}
               {actions.includes('request_revision') && <textarea rows={3} value={revisionNote} onChange={(event) => setRevisionNote(event.target.value)} className="mt-4 w-full rounded-2xl border border-line bg-soft px-4 py-3 text-sm outline-none transition focus:border-ink" placeholder="Какво трябва да се коригира" />}
               <div className="mt-4 grid gap-2">
@@ -141,7 +145,7 @@ export default function Order() {
 
             <div className="rounded-3xl border border-line bg-paper p-5 md:p-6">
               <div className="eyebrow">Доказателствена следа</div>
-              <p className="mt-2 text-xs leading-5 text-muted">Записите са предоставена информация за директно плащане и не доказват обработка от Totsan.</p>
+              <p className="mt-2 text-xs leading-5 text-muted">Тук се пазят записите за плащането, освобождаването на сумата към партньора и евентуални възстановявания.</p>
               <div className="mt-4 space-y-3">
                 {visiblePayments.map((payment) => <PaymentRow key={payment.id} payment={payment} />)}
                 {visiblePayments.length === 0 && <div className="rounded-2xl border border-dashed border-line p-4 text-center text-sm text-muted">Няма добавено потвърждение или документ.</div>}
@@ -154,10 +158,17 @@ export default function Order() {
   )
 }
 
-function buildActions(order, role) {
+function checkoutPathForOrder(order) {
+  if (!order) return ''
+  if (order.offerId) return `/checkout/offer/${order.offerId}`
+  if (order.servicePackageId) return `/checkout/service/${order.servicePackageId}`
+  return ''
+}
+
+function buildActions(order, role, checkoutPath = '') {
   if (!order || role === 'guest') return []
   const actions = []
-  if (role === 'partner' && order.status === 'pending_payment') actions.push('confirm_direct_payment')
+  if (role === 'partner' && order.status === 'pending_payment' && !checkoutPath) actions.push('confirm_direct_payment')
   if (role === 'partner' && order.status === 'paid') actions.push('start_work')
   if (role === 'partner' && ['paid', 'in_progress'].includes(order.status)) actions.push('mark_delivered')
   if (role === 'client' && order.status === 'delivered') actions.push('confirm_completed', 'request_revision')
@@ -347,9 +358,9 @@ function PaymentRow({ payment }) {
 
 function paymentTypeLabel(value = '') {
   const labels = {
-    charge: 'Отбелязано директно плащане',
-    payout: 'Потвърждение от партньора',
-    refund: 'Отбелязано възстановяване',
+    charge: 'Плащане',
+    payout: 'Превод към партньора',
+    refund: 'Възстановяване',
   }
   return labels[value] || 'Платежен документ или потвърждение'
 }

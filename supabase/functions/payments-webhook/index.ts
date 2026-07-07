@@ -149,6 +149,132 @@ async function stripeGet(path: string) {
   return data as Record<string, unknown>
 }
 
+async function markOrderPaidFromSession(session: Record<string, unknown>) {
+  const orderId = cleanText((session.metadata as Record<string, unknown> | undefined)?.order_id)
+  if (!orderId) return { skipped: true, reason: 'missing_order_id' }
+
+  const admin = adminClient()
+  const { data: order, error } = await admin.from('orders').select('*').eq('id', orderId).maybeSingle()
+  if (error) throw error
+  if (!order) return { skipped: true, reason: 'order_not_found' }
+  if (order.status !== 'pending_payment') return { ok: true, order }
+
+  const paymentIntent = typeof session.payment_intent === 'string'
+    ? session.payment_intent
+    : (session.payment_intent as Record<string, unknown> | null)?.id || null
+
+  const { data: updatedRows, error: updateError } = await admin.from('orders').update({
+    status: 'paid',
+    stripe_checkout_session_id: session.id,
+    stripe_payment_intent_id: paymentIntent,
+  }).eq('id', order.id).eq('status', 'pending_payment').select('*')
+  if (updateError) throw updateError
+  const updatedOrder = updatedRows?.[0]
+  if (!updatedOrder) return { ok: true, order }
+
+  await admin.from('payment_transactions').insert({
+    order_id: order.id,
+    type: 'charge',
+    provider: 'stripe',
+    amount: order.amount_total,
+    currency: order.currency,
+    status: 'succeeded',
+    raw: session,
+  })
+  await admin.from('order_events').insert({
+    order_id: order.id,
+    actor_id: order.client_id,
+    type: 'payment_succeeded_webhook',
+    from_status: 'pending_payment',
+    to_status: 'paid',
+    message: 'Платежният доставчик потвърди плащането.',
+    payload: session,
+  })
+
+  if (order.offer_id) {
+    await admin.from('offers').update({ status: 'accepted', accepted_at: new Date().toISOString() }).eq('id', order.offer_id)
+  }
+
+  return { ok: true, order: updatedOrder }
+}
+
+async function markOrderPaidFromPaymentIntent(paymentIntent: Record<string, unknown>) {
+  const metadata = paymentIntent.metadata as Record<string, unknown> | undefined
+  const orderId = cleanText(metadata?.order_id)
+  if (!orderId) return { skipped: true, reason: 'missing_order_id' }
+
+  const admin = adminClient()
+  const { data: order, error } = await admin.from('orders').select('*').eq('id', orderId).maybeSingle()
+  if (error) throw error
+  if (!order) return { skipped: true, reason: 'order_not_found' }
+  if (order.status !== 'pending_payment') return { ok: true, order }
+
+  const { data: updatedRows, error: updateError } = await admin.from('orders').update({
+    status: 'paid',
+    stripe_payment_intent_id: paymentIntent.id,
+  }).eq('id', order.id).eq('status', 'pending_payment').select('*')
+  if (updateError) throw updateError
+  const updatedOrder = updatedRows?.[0]
+  if (!updatedOrder) return { ok: true, order }
+
+  await admin.from('payment_transactions').insert({
+    order_id: order.id,
+    type: 'charge',
+    provider: 'stripe',
+    amount: order.amount_total,
+    currency: order.currency,
+    status: 'succeeded',
+    raw: paymentIntent,
+  })
+  await admin.from('order_events').insert({
+    order_id: order.id,
+    actor_id: order.client_id,
+    type: 'payment_intent_succeeded_webhook',
+    from_status: 'pending_payment',
+    to_status: 'paid',
+    message: 'Платежният доставчик потвърди плащането.',
+    payload: paymentIntent,
+  })
+
+  if (order.offer_id) {
+    await admin.from('offers').update({ status: 'accepted', accepted_at: new Date().toISOString() }).eq('id', order.offer_id)
+  }
+
+  return { ok: true, order: updatedOrder }
+}
+
+async function markOrderRefunded(charge: Record<string, unknown>) {
+  const paymentIntent = cleanText(charge.payment_intent)
+  if (!paymentIntent) return { skipped: true, reason: 'missing_payment_intent' }
+
+  const admin = adminClient()
+  const { data: order, error } = await admin.from('orders').select('*').eq('stripe_payment_intent_id', paymentIntent).maybeSingle()
+  if (error) throw error
+  if (!order) return { skipped: true, reason: 'order_not_found' }
+
+  const { data: updatedOrder, error: updateError } = await admin.from('orders').update({ status: 'refunded' }).eq('id', order.id).select('*').single()
+  if (updateError) throw updateError
+  await admin.from('payment_transactions').insert({
+    order_id: order.id,
+    type: 'refund',
+    provider: 'stripe',
+    amount: Math.round(Number(charge.amount_refunded || 0) / 100),
+    currency: cleanText(charge.currency, order.currency).toUpperCase(),
+    status: 'succeeded',
+    raw: charge,
+  })
+  await admin.from('order_events').insert({
+    order_id: order.id,
+    actor_id: null,
+    type: 'refund_webhook',
+    from_status: order.status,
+    to_status: 'refunded',
+    message: 'Платежният доставчик отчете възстановяване на сума.',
+    payload: charge,
+  })
+  return { ok: true, order: updatedOrder }
+}
+
 async function updateSubscriptionRows(admin: ReturnType<typeof createClient>, match: { subscriptionId?: string; checkoutSessionId?: string }, patch: Record<string, unknown>) {
   if (match.subscriptionId) {
     const { data, error } = await admin
@@ -354,6 +480,18 @@ Deno.serve(async (req) => {
     }
     if (type === 'invoice.payment_failed' && object.subscription) {
       const result = await updatePartnerSubscriptionFromInvoice(object, 'past_due')
+      return jsonResponse(200, { received: true, handled: type, result })
+    }
+    if (type === 'checkout.session.completed' && object.mode === 'payment' && object.payment_status === 'paid' && object.metadata?.order_id) {
+      const result = await markOrderPaidFromSession(object)
+      return jsonResponse(200, { received: true, handled: type, result })
+    }
+    if (type === 'payment_intent.succeeded' && object.metadata?.order_id) {
+      const result = await markOrderPaidFromPaymentIntent(object)
+      return jsonResponse(200, { received: true, handled: type, result })
+    }
+    if (type === 'charge.refunded') {
+      const result = await markOrderRefunded(object)
       return jsonResponse(200, { received: true, handled: type, result })
     }
     return jsonResponse(200, { received: true, ignored: type })

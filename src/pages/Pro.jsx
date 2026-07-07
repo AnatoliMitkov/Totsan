@@ -424,7 +424,7 @@ export default function Pro() {
         heightClass="h-[clamp(12.5rem,52vw,15rem)] md:aspect-[1600/520] md:h-auto md:min-h-0"
       />
 
-      <div className="relative z-10 bg-soft flex flex-col pb-16 md:pb-24">
+      <div className="relative z-10 bg-soft flex flex-col pb-10">
         <div className="container-page -mt-8 w-full px-4 sm:-mt-12 md:-mt-24 md:px-6">
           <div className="grid lg:grid-cols-12 gap-8 lg:gap-12">
 

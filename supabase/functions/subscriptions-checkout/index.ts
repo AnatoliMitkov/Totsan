@@ -87,7 +87,7 @@ function adminClient() {
 
 function stripeSecret() {
   const secret = cleanText(Deno.env.get('STRIPE_SECRET_KEY'))
-  if (!secret) throw new Error('Липсва STRIPE_SECRET_KEY за Stripe Billing.')
+  if (!secret) throw new Error('Липсва STRIPE_SECRET_KEY за абонаментни плащания.')
   return secret
 }
 
@@ -109,7 +109,7 @@ async function stripeRequest(path: string, body?: URLSearchParams, method = 'POS
   const response = await fetch(`https://api.stripe.com/v1/${path}`, options)
   const data = await response.json()
   if (!response.ok) {
-    const message = cleanText((data as { error?: { message?: string } })?.error?.message, 'Stripe заявката не беше успешна.')
+    const message = cleanText((data as { error?: { message?: string } })?.error?.message, 'Заявката към платежния доставчик не беше успешна.')
     throw new Error(message)
   }
   return data as Record<string, unknown>
@@ -244,7 +244,7 @@ Deno.serve(async (req) => {
 
     const consents = assertConsents(payload.consents)
     const priceId = cleanText(Deno.env.get(plan.envName))
-    if (!priceId) throw new Error(`Липсва ${plan.envName}. Добави Stripe Price ID в Supabase Edge Function env.`)
+    if (!priceId) throw new Error(`Липсва ${plan.envName}. Добави ценови идентификатор за плана в Supabase Edge Function env.`)
 
     const { data: account, error: accountError } = await admin
       .from('accounts')
@@ -365,7 +365,7 @@ Deno.serve(async (req) => {
     const session = await stripeRequest('checkout/sessions', params)
     const sessionId = cleanText(session.id)
     const checkoutUrl = cleanText(session.url)
-    if (!sessionId || !checkoutUrl) throw new Error('Stripe не върна валидна Checkout сесия.')
+    if (!sessionId || !checkoutUrl) throw new Error('Платежната сесия не беше създадена коректно.')
 
     const { error: checkoutRecordError } = await admin.from('partner_subscriptions').insert({
       user_id: user.id,
