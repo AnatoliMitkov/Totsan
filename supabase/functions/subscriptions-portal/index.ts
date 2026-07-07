@@ -64,7 +64,7 @@ function adminClient() {
 
 async function createPortalSession(customerId: string, returnUrl: string) {
   const secret = cleanText(Deno.env.get('STRIPE_SECRET_KEY'))
-  if (!secret) throw new Error('Липсва STRIPE_SECRET_KEY за Stripe Billing Portal.')
+  if (!secret) throw new Error('Липсва STRIPE_SECRET_KEY за портала за плащания.')
 
   const params = new URLSearchParams()
   params.set('customer', customerId)
@@ -80,7 +80,7 @@ async function createPortalSession(customerId: string, returnUrl: string) {
   })
   const data = await response.json()
   if (!response.ok) {
-    const message = cleanText((data as { error?: { message?: string } })?.error?.message, 'Stripe Billing Portal не беше отворен.')
+    const message = cleanText((data as { error?: { message?: string } })?.error?.message, 'Порталът за плащания не беше отворен.')
     throw new Error(message)
   }
   return data as Record<string, unknown>
@@ -121,12 +121,12 @@ Deno.serve(async (req) => {
       && (row.status === 'active' || row.status === 'trialing')
     )) || rows[0]
     const customerId = cleanText(subscription?.stripe_customer_id)
-    if (!customerId) throw new Error('Няма Stripe клиент за този партньорски абонамент.')
+    if (!customerId) throw new Error('Няма платежен профил за този партньорски абонамент.')
 
     const action = cleanText(payload.action, 'portal')
     if (action === 'cancel_at_period_end' || action === 'resume') {
       const subscriptionId = cleanText(subscription?.stripe_subscription_id)
-      if (!subscriptionId) throw new Error('Няма активен Stripe абонамент за управление.')
+      if (!subscriptionId) throw new Error('Няма активен абонамент за управление.')
 
       const currentStripeSubscription = await stripeRequest(
         `subscriptions/${encodeURIComponent(subscriptionId)}`,
@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
           : (currentStripeSubscription.customer as Record<string, unknown> | undefined)?.id,
       )
       if (stripeCustomerId !== customerId) {
-        throw new Error('Stripe абонаментът не съвпада с вашия профил.')
+        throw new Error('Абонаментът не съвпада с вашия профил.')
       }
 
       const nextCancelAtPeriodEnd = action === 'cancel_at_period_end'
@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
     const origin = siteOrigin(req, payload)
     const session = await createPortalSession(customerId, `${origin}/moy-profil?subscription=portal_return`)
     const portalUrl = cleanText(session.url)
-    if (!portalUrl) throw new Error('Stripe не върна валиден Billing Portal адрес.')
+    if (!portalUrl) throw new Error('Порталът за плащания не върна валиден адрес.')
 
     return jsonResponse(200, { ok: true, portalUrl })
   } catch (error) {

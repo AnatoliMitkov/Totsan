@@ -109,7 +109,7 @@ export async function syncPartnerProfileSubscriptionAccess(
 
 export function stripeSecret() {
   const secret = cleanText(Deno.env.get('STRIPE_SECRET_KEY'))
-  if (!secret) throw new Error('Липсва STRIPE_SECRET_KEY за Stripe Billing.')
+  if (!secret) throw new Error('Липсва STRIPE_SECRET_KEY за абонаментни плащания.')
   return secret
 }
 
@@ -130,7 +130,7 @@ export async function stripeRequest(path: string, options: { method?: 'GET' | 'P
   if (!response.ok) {
     const message = cleanText(
       (data as { error?: { message?: string } })?.error?.message,
-      'Stripe заявката не беше успешна.',
+      'Заявката към платежния доставчик не беше успешна.',
     )
     throw new Error(message)
   }

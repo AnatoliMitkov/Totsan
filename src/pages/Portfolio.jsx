@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import TotsanSelect from '../components/ui/TotsanSelect.jsx'
 import './Portfolio.css'
 
 const PROJECTS = [
@@ -54,8 +55,8 @@ const PROJECTS = [
     subtitle: 'AuraSpa Premium E-Commerce',
     role: 'Creative Director & Web Developer',
     duration: '2 Months',
-    focus: 'React, Next.js, Stripe, Tailwind CSS',
-    description: 'A luxurious digital spa storefront. Integrates Stripe Checkout, custom-curated dynamic audio streams, and smooth page transitions with CSS clip-paths.',
+    focus: 'React, Next.js, Payments, Tailwind CSS',
+    description: 'A luxurious digital spa storefront. Integrates checkout payments, custom-curated dynamic audio streams, and smooth page transitions with CSS clip-paths.',
     image: 'https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=80',
     liveLink: '#'
   }
@@ -539,15 +540,18 @@ export default function Portfolio() {
 
                   <div>
                     <label className="block text-xs uppercase text-[#212E02]/60 font-semibold mb-2">Budget Target (€)</label>
-                    <select 
+                    <TotsanSelect
                       value={formState.budget}
-                      onChange={e => setFormState({...formState, budget: e.target.value})}
-                      className="w-full bg-[#212E02]/5 border border-[#212E02]/15 rounded-full px-5 py-3 text-sm focus:outline-none focus:border-[#212E02] transition"
-                    >
-                      <option value="1500-3000">€1,500 − €3,000</option>
-                      <option value="3000-6000">€3,000 − €6,000</option>
-                      <option value="6000+">€6,000+</option>
-                    </select>
+                      onChange={(value) => setFormState({...formState, budget: value})}
+                      ariaLabel="Budget Target"
+                      options={[
+                        { value: '1500-3000', label: '€1,500 − €3,000' },
+                        { value: '3000-6000', label: '€3,000 − €6,000' },
+                        { value: '6000+', label: '€6,000+' },
+                      ]}
+                      buttonClassName="rounded-full border-[#212E02]/15 bg-[#212E02]/5 px-5 py-3 text-[#212E02] shadow-none focus:border-[#212E02]"
+                      menuClassName="border-[#212E02]/15"
+                    />
                   </div>
 
                   <div>

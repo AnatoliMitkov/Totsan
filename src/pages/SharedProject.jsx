@@ -391,7 +391,11 @@ export default function SharedProject() {
               </div>
 
               <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <ProjectCta cta={cta} className="w-full justify-center sm:w-auto" />
+                <ProjectCta
+                  cta={cta}
+                  className="w-full justify-center sm:w-auto"
+                  onAction={isAuthenticated && isSpecialist && !viewerIsOwner ? startChatWithClient : undefined}
+                />
                 <span className="text-xs leading-relaxed text-muted">
                   Видимо само чрез споделен линк или контекст от Totsan.
                 </span>

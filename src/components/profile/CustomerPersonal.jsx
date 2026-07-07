@@ -10,7 +10,7 @@ function makeDraft(account, session) {
   const fallbackName = metadata.full_name || metadata.name || session?.user?.email?.split('@')[0] || ''
   return {
     fullName: account?.full_name || fallbackName,
-    displayName: account?.display_name || account?.full_name || fallbackName,
+    displayName: account?.full_name || account?.display_name || fallbackName,
     phone: account?.phone || '',
     avatarUrl: account?.avatar_url || '',
     city: account?.city || '',
@@ -18,21 +18,6 @@ function makeDraft(account, session) {
     bio: account?.bio || '',
     locale: account?.locale || 'bg',
     marketingOptIn: Boolean(account?.marketing_opt_in),
-  }
-}
-
-function stripAvatarCacheBust(url) {
-  if (!url) return ''
-
-  try {
-    const parsed = new URL(url)
-    parsed.searchParams.delete('v')
-    return parsed.toString()
-  } catch {
-    return url.replace(/([?&])v=\d+(&?)/, (_, prefix, suffix) => {
-      if (prefix === '?' && suffix) return '?'
-      return suffix ? prefix : ''
-    }).replace(/[?&]$/, '')
   }
 }
 
@@ -61,7 +46,8 @@ export default function CustomerPersonal({ account, session, onSave }) {
     try {
       const payload = {
         ...draftRef.current,
-        avatarUrl: stripAvatarCacheBust(draftRef.current.avatarUrl),
+        displayName: draftRef.current.fullName,
+        avatarUrl: draftRef.current.avatarUrl,
         city: normalizeLocationValue(draftRef.current.city),
       }
       const savedAccount = await onSave(payload)
@@ -74,23 +60,26 @@ export default function CustomerPersonal({ account, session, onSave }) {
     }
   }
 
+  function cancelChanges() {
+    const nextDraft = makeDraft(account, session)
+    setDraft(nextDraft)
+    draftRef.current = nextDraft
+    setStatus({ type: 'idle', message: '' })
+  }
+
   return (
-    <form onSubmit={submit} className="max-w-4xl pb-28">
+    <form onSubmit={submit} className="max-w-4xl pb-0">
       <div className="rounded-3xl border border-line bg-paper p-5 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-7 space-y-5">
         <div>
           <div className="eyebrow">Лични данни</div>
           <h2 className="mt-2 font-display text-3xl text-ink">Твоят клиентски профил</h2>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="block text-sm font-medium text-ink">Име<input value={draft.fullName} onChange={event => update('fullName', event.target.value)} className={INPUT} /></label>
-          <label className="block text-sm font-medium text-ink">Показвано име<input value={draft.displayName} onChange={event => update('displayName', event.target.value)} className={INPUT} /></label>
-        </div>
+        <label className="block text-sm font-medium text-ink">Имена<input value={draft.fullName} onChange={event => update('fullName', event.target.value)} className={INPUT} /></label>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-[minmax(12rem,0.85fr)_minmax(0,2.15fr)]">
           <label className="block text-sm font-medium text-ink">Телефон<input value={draft.phone} onChange={event => update('phone', event.target.value)} type="tel" className={INPUT} /></label>
           <LocationCombobox label="Град" value={draft.city} onChange={(value) => update('city', value)} />
-          <label className="block text-sm font-medium text-ink">Държава<input value={draft.country} onChange={event => update('country', event.target.value)} className={INPUT} /></label>
         </div>
 
         <label className="block text-sm font-medium text-ink">Имейл<input value={session?.user?.email || account?.email || ''} readOnly className={`${INPUT} bg-soft text-muted`} /></label>
@@ -106,6 +95,7 @@ export default function CustomerPersonal({ account, session, onSave }) {
         status={status.type}
         message={status.message}
         idleMessage="Промените се пазят само след запазване."
+        onCancel={cancelChanges}
         disabled={status.type === 'saving' || status.type === 'uploading'}
       />
     </form>

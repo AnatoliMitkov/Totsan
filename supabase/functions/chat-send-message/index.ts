@@ -2,7 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.49.8'
 
 const MASK = '[скрито от Totsan - общувайте в платформата]'
 const MESSAGE_KINDS = new Set(['text', 'attachment'])
-const OFFER_STATUSES = new Set(['accepted', 'declined', 'withdrawn'])
+const OFFER_STATUSES = new Set(['accepted', 'declined', 'withdrawn', 'change_requested'])
 const SERVICE_REQUEST_STATUSES = new Set(['negotiating', 'declined', 'cancelled'])
 const REFERENCE_TYPES = new Set(['service', 'portfolio'])
 const MAX_MESSAGES_PER_MINUTE = 30
@@ -79,6 +79,61 @@ function normalizeExecutionMode(value: unknown) {
   return value === 'staged' ? 'staged' : 'single'
 }
 
+function normalizeOfferType(value: unknown) {
+  const text = String(value || '').trim()
+  return ['final', 'estimate', 'staged'].includes(text) ? text : 'final'
+}
+
+function normalizePriceType(value: unknown) {
+  const text = String(value || '').trim()
+  return ['fixed', 'estimate', 'hourly', 'staged'].includes(text) ? text : 'fixed'
+}
+
+function cleanNumber(value: unknown) {
+  const parsed = Number(value || 0)
+  return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : 0
+}
+
+function maskJsonValue(value: unknown): { value: unknown; wasMasked: boolean } {
+  if (typeof value === 'string') {
+    const result = maskText(value)
+    return { value: result.masked, wasMasked: result.wasMasked }
+  }
+
+  if (Array.isArray(value)) {
+    let wasMasked = false
+    const next = value.map((item) => {
+      const result = maskJsonValue(item)
+      wasMasked = wasMasked || result.wasMasked
+      return result.value
+    })
+    return { value: next, wasMasked }
+  }
+
+  if (value && typeof value === 'object') {
+    let wasMasked = false
+    const entries = Object.entries(value as Record<string, unknown>).map(([key, item]) => {
+      const result = maskJsonValue(item)
+      wasMasked = wasMasked || result.wasMasked
+      return [key, result.value]
+    })
+    return { value: Object.fromEntries(entries), wasMasked }
+  }
+
+  return { value, wasMasked: false }
+}
+
+function normalizeOfferDetails(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return { details: {}, wasMasked: false }
+  const result = maskJsonValue(value)
+  return {
+    details: result.value && typeof result.value === 'object' && !Array.isArray(result.value)
+      ? result.value as Record<string, unknown>
+      : {},
+    wasMasked: result.wasMasked,
+  }
+}
+
 function normalizeOfferStages(value: unknown) {
   if (!Array.isArray(value)) return []
 
@@ -91,10 +146,14 @@ function normalizeOfferStages(value: unknown) {
       const description = maskText(record.description).masked.trim()
       const parsedOrder = Number(record.order)
       const order = Number.isFinite(parsedOrder) ? Math.max(0, Math.round(parsedOrder)) : index + 1
+      const payment = maskText(record.payment).masked.trim()
+      const startCondition = maskText(record.startCondition).masked.trim()
+      const durationDays = cleanNumber(record.durationDays)
+      const priceAmount = cleanNumber(record.priceAmount)
 
-      if (!title && !description) return null
+      if (!title && !description && priceAmount <= 0) return null
 
-      return { title, description, order }
+      return { title, description, order, durationDays, priceAmount, payment, startCondition }
     })
     .filter(Boolean)
 }
@@ -292,16 +351,29 @@ Deno.serve(async (req) => {
       if (!partnerId) throw new Error('Профилът още няма свързан партньорски акаунт.')
       if (partnerId === user.id) throw new Error('Не можеш да започнеш разговор със собствения си профил.')
 
-      let query = adminClient
+      const { data: openConversations, error: existingError } = await adminClient
         .from('conversations')
         .select('*')
         .eq('client_id', user.id)
         .eq('partner_id', partnerId)
         .eq('status', 'open')
+        .order('updated_at', { ascending: false })
 
-      query = projectId ? query.eq('project_id', projectId) : query.is('project_id', null)
-      const { data: existing, error: existingError } = await query.maybeSingle()
       if (existingError) throw existingError
+      const existingRows = openConversations || []
+      let existing = projectId
+        ? existingRows.find((row) => row.project_id === projectId) || existingRows.find((row) => !row.project_id) || existingRows[0]
+        : existingRows.find((row) => !row.project_id) || existingRows[0]
+      if (existing && projectId && !existing.project_id) {
+        const { data: updatedConversation, error: updateExistingError } = await adminClient
+          .from('conversations')
+          .update({ project_id: projectId, subject })
+          .eq('id', existing.id)
+          .select('*')
+          .single()
+        if (updateExistingError) throw updateExistingError
+        existing = updatedConversation
+      }
       if (existing) return jsonResponse(200, { ok: true, conversation: existing, reused: true })
 
       const partnerCanReceiveNewChats = await hasActivePartnerAccess(adminClient, partnerId, partnerProfileId)
@@ -349,15 +421,15 @@ Deno.serve(async (req) => {
         throw new Error('Партньорът в момента не приема нови заявки.')
       }
 
-      let { data: conversation, error: conversationError } = await adminClient
+      const { data: openConversations, error: conversationError } = await adminClient
         .from('conversations')
         .select('*')
         .eq('client_id', user.id)
         .eq('partner_id', service.partner_id)
         .eq('status', 'open')
-        .is('project_id', null)
-        .maybeSingle()
+        .order('updated_at', { ascending: false })
       if (conversationError) throw conversationError
+      let conversation = (openConversations || []).find((row) => !row.project_id) || (openConversations || [])[0] || null
 
       if (!conversation) {
         const created = await adminClient.from('conversations').insert({
@@ -392,6 +464,8 @@ Deno.serve(async (req) => {
         features: Array.isArray(servicePackage.features) ? servicePackage.features : [],
         starting_price: servicePackage.price_amount,
         currency: servicePackage.currency || 'EUR',
+        delivery_days: servicePackage.delivery_days,
+        revisions: servicePackage.revisions,
       }
       const { data: serviceRequest, error: requestError } = await adminClient.from('service_requests').insert({
         conversation_id: conversation.id,
@@ -675,15 +749,26 @@ Deno.serve(async (req) => {
       if (conversation.status !== 'open') throw new Error('Conversation is not open.')
 
       const title = maskText(payload.title)
+      const summary = maskText(payload.summary || '')
       const description = maskText(payload.description)
       const deliverables = maskList(payload.deliverables)
-      const executionMode = normalizeExecutionMode(payload.executionMode)
+      const detailsResult = normalizeOfferDetails(payload.offerDetails)
+      const offerType = normalizeOfferType(payload.offerType || detailsResult.details.offerType)
+      const priceType = normalizePriceType(payload.priceType || detailsResult.details.priceType || (offerType === 'staged' ? 'staged' : 'fixed'))
+      const executionMode = offerType === 'staged' ? 'staged' : normalizeExecutionMode(payload.executionMode)
       const stages = normalizeOfferStages(payload.stages)
       if (!title.masked.trim()) throw new Error('Офертата има нужда от заглавие.')
 
       const priceAmount = Number(payload.priceAmount || 0)
       const deliveryDays = Number(payload.deliveryDays || 0)
       const revisions = Number(payload.revisions || 0)
+      const offerDetails = {
+        ...detailsResult.details,
+        offerType,
+        priceType,
+        summary: summary.masked.trim(),
+        stages,
+      }
       const { data: activeServiceRequest, error: activeRequestError } = await adminClient
         .from('service_requests')
         .select('*')
@@ -698,8 +783,12 @@ Deno.serve(async (req) => {
         client_id: conversation.client_id,
         project_id: conversation.project_id,
         title: title.masked.trim(),
+        offer_type: offerType,
+        summary: summary.masked.trim(),
         description: description.masked.trim(),
         deliverables: deliverables.items,
+        price_type: priceType,
+        offer_details: offerDetails,
         price_amount: Number.isFinite(priceAmount) ? Math.max(0, Math.round(priceAmount)) : null,
         currency: String(payload.currency || 'EUR').trim().toUpperCase().slice(0, 3) || 'EUR',
         delivery_days: Number.isFinite(deliveryDays) ? Math.max(0, Math.round(deliveryDays)) : null,
@@ -728,7 +817,7 @@ Deno.serve(async (req) => {
         kind: 'offer',
         body: messageBody,
         offer_id: offer.id,
-        was_masked: title.wasMasked || description.wasMasked || deliverables.wasMasked,
+        was_masked: title.wasMasked || summary.wasMasked || description.wasMasked || deliverables.wasMasked || detailsResult.wasMasked,
       }).select('*').single()
       if (messageError) throw messageError
 
@@ -741,6 +830,7 @@ Deno.serve(async (req) => {
       if (message.was_masked) {
         await auditMasked(adminClient, user.id, message.id, {
           original_title: title.original,
+          original_summary: summary.original,
           original_description: description.original,
           conversation_id: conversationId,
           offer_id: offer.id,
@@ -759,7 +849,7 @@ Deno.serve(async (req) => {
       if (offerLoadError) throw offerLoadError
       if (offer.status !== 'sent') throw new Error('Офертата вече е обработена.')
       if (status === 'withdrawn' && offer.partner_id !== user.id) throw new Error('Само партньорът може да изтегли оферта.')
-      if (status !== 'withdrawn' && offer.client_id !== user.id) throw new Error('Само клиентът може да приеме или откаже оферта.')
+      if (status !== 'withdrawn' && offer.client_id !== user.id) throw new Error('Само клиентът може да обработи офертата.')
 
       const { data: conversation, error: conversationError } = await adminClient.from('conversations').select('*').eq('id', offer.conversation_id).single()
       if (conversationError) throw conversationError
@@ -790,10 +880,11 @@ Deno.serve(async (req) => {
 
       const labels: Record<string, string> = {
         accepted: order
-          ? 'Финалната оферта е приета. Създадена е поръчка, която очаква директно плащане към партньора.'
-          : 'Офертата е приета. Плащането се уговаря и извършва директно между клиента и партньора.',
+          ? 'Финалната оферта е приета. Създадена е поръчка, която очаква защитено плащане през Totsan.'
+          : 'Офертата е приета. Следва защитено плащане през Totsan според условията на офертата.',
         declined: 'Офертата е отказана.',
         withdrawn: 'Офертата е изтеглена от партньора.',
+        change_requested: 'Клиентът поиска промяна по офертата.',
       }
       const { data: message, error: messageError } = await adminClient.from('messages').insert({
         conversation_id: offer.conversation_id,

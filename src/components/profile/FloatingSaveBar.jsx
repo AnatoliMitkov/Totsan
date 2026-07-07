@@ -1,4 +1,4 @@
-import { Save } from 'lucide-react'
+import { Save, X } from 'lucide-react'
 
 export default function FloatingSaveBar({
   state,
@@ -7,6 +7,8 @@ export default function FloatingSaveBar({
   idleMessage = 'Промените се пазят след запазване.',
   savingLabel = 'Запазва се...',
   saveLabel = 'Запази',
+  cancelLabel = 'Отказ',
+  onCancel,
   disabled = false,
 }) {
   const stateType = state?.status || state?.type || status || 'idle'
@@ -27,14 +29,27 @@ export default function FloatingSaveBar({
           {stateMessage}
         </div>
       )}
-      <button
-        type="submit"
-        className="pointer-events-auto btn btn-primary px-8 py-3.5 shadow-xl shadow-primary/20 transition-transform hover:scale-105"
-        disabled={disabled || isSaving}
-      >
-        <Save size={20} />
-        <span>{isSaving ? savingLabel : saveLabel}</span>
-      </button>
+      <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-2 rounded-full border border-line bg-paper/95 p-1.5 shadow-xl shadow-primary/15 backdrop-blur">
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="btn btn-ghost px-5 py-3 text-muted hover:text-ink"
+            disabled={disabled || isSaving}
+          >
+            <X size={18} />
+            <span>{cancelLabel}</span>
+          </button>
+        )}
+        <button
+          type="submit"
+          className="btn btn-primary px-8 py-3.5 transition-transform hover:scale-105"
+          disabled={disabled || isSaving}
+        >
+          <Save size={20} />
+          <span>{isSaving ? savingLabel : saveLabel}</span>
+        </button>
+      </div>
     </div>
   )
 }

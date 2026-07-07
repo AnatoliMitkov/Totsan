@@ -13,6 +13,7 @@ import { formatMoney, formatMoneyText, normalizeMoneyValue } from '../lib/money.
 import { getPartnerServiceCoverCandidates } from '../lib/service-media.js'
 import { trackEvent } from '../lib/analytics.js'
 import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
+import TotsanSelect from '../components/ui/TotsanSelect.jsx'
 
 const VALID_KINDS = new Set(['all', 'pro', 'service', 'material'])
 const KIND_TABS = [
@@ -316,14 +317,22 @@ export default function Catalog() {
                   className="w-full rounded-full border border-line bg-soft py-3 pl-11 pr-4 text-sm outline-none transition focus:border-ink focus:bg-paper"
                 />
               </label>
-              <select value={layer} onChange={event => setLayer(event.target.value)} className="rounded-full border border-line bg-soft px-4 py-3 text-sm outline-none transition focus:border-ink focus:bg-paper">
-                <option value="all">Всички слоеве</option>
-                {layers.map(item => <option key={item.slug} value={item.slug}>{item.number} · {item.title}</option>)}
-              </select>
-              <select value={city} onChange={event => setCity(event.target.value)} className="rounded-full border border-line bg-soft px-4 py-3 text-sm outline-none transition focus:border-ink focus:bg-paper">
-                <option value="all">Всички градове</option>
-                {availableCities.map(item => <option key={item} value={item}>{item}</option>)}
-              </select>
+              <TotsanSelect
+                value={layer}
+                onChange={setLayer}
+                ariaLabel="Слой"
+                options={[{ value: 'all', label: 'Всички слоеве' }, ...layers.map(item => ({ value: item.slug, label: `${item.number} · ${item.title}` }))]}
+                className="min-w-[12rem]"
+                buttonClassName="rounded-full bg-soft py-3 shadow-none"
+              />
+              <TotsanSelect
+                value={city}
+                onChange={setCity}
+                ariaLabel="Град"
+                options={[{ value: 'all', label: 'Всички градове' }, ...availableCities.map(item => ({ value: item, label: item }))]}
+                className="min-w-[12rem]"
+                buttonClassName="rounded-full bg-soft py-3 shadow-none"
+              />
             </div>
           </div>
 

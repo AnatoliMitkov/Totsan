@@ -6,9 +6,12 @@ export const LEGAL_OPERATOR_ADDRESS = 'с. Липник 7242, ул. Никола
 export const LEGAL_OPERATOR_EMAIL = 'ivaylo.nikolov@simotionbg.com'
 export const LEGAL_OPERATOR_PHONE = '+359895645164'
 export const LEGAL_OPERATOR_IBAN = 'TODO: добавете IBAN само в защитен административен/фактурен контекст'
-export const LEGAL_LAST_UPDATED = '05.07.2026'
+export const LEGAL_LAST_UPDATED = '08.07.2026'
 export const SUBSCRIPTION_PAYMENT_PROVIDER_NAME = 'Stripe'
 export const DUAL_PRICE_DISPLAY_END = '08.08.2026'
+export const PLATFORM_COMMISSION_RATE_LABEL = '2%'
+export const STRIPE_PRICING_URL = 'https://stripe.com/en-bg/pricing'
+export const STRIPE_CONNECT_PRICING_URL = 'https://stripe.com/en-bg/connect/pricing'
 
 // TODO(legal/accounting): Confirm the VAT status immediately before publication.
 export const VAT_STATUS_NOTE = 'Към момента операторът не е регистриран по ЗДДС.'
@@ -20,5 +23,6 @@ export const LEGAL_REVIEW_TODOS = [
   'Потвърждение на ЗДДС статуса от счетоводител.',
   'Потвърждение на юридически имейл и телефон за контакт.',
   'Потвърждение на фактурирането за партньорските абонаменти и другите собствени услуги на оператора.',
+  'Потвърждение на избрания Stripe Connect pricing модел и счетоводното третиране на Stripe такси, payouts и disputes.',
   'Финална редакция на Общите условия и Политиката за поверителност от адвокат.',
 ]

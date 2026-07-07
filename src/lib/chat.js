@@ -180,6 +180,26 @@ function isMissingReactionsTableError(error) {
   )
 }
 
+function isMissingChatParticipantProfilesFunction(error) {
+  const text = supabaseErrorText(error)
+  return text.includes('get_chat_participant_profiles') && (
+    text.includes('schema cache')
+    || text.includes('does not exist')
+    || text.includes('not found')
+    || text.includes('function')
+  )
+}
+
+function isMissingChatProjectContextFunction(error) {
+  const text = supabaseErrorText(error)
+  return text.includes('get_chat_project_context') && (
+    text.includes('schema cache')
+    || text.includes('does not exist')
+    || text.includes('not found')
+    || text.includes('function')
+  )
+}
+
 function normalizeMessageRecord(row) {
   if (!row) return row
   return {
@@ -278,10 +298,6 @@ export function getConversationTitle(conversation, userId, fallback = 'Потр�
   const participant = getOtherParticipant(conversation, userId)
   const participantName = getParticipantDisplayName(participant, '')
   if (participantName) return participantName
-  
-  if (isPartner(conversation, userId)) {
-    return fallback
-  }
 
   const subjectName = conversationSubjectName(conversation?.subject)
   return subjectName || fallback
@@ -588,7 +604,7 @@ async function loadProfilesByUserIds(ids = []) {
   const uniqueIds = [...new Set(ids.filter(Boolean))]
   if (uniqueIds.length === 0) return new Map()
 
-  const [profilesResult, accountsResult] = await Promise.all([
+  const [profilesResult, accountsResult, chatParticipantsByUserId] = await Promise.all([
     supabase
       .from('profiles')
       .select(PROFILE_SELECT)
@@ -597,12 +613,16 @@ async function loadProfilesByUserIds(ids = []) {
       .from('accounts')
       .select(ACCOUNT_AVATAR_SELECT)
       .in('id', uniqueIds),
+    loadChatParticipantProfilesByUserIds(uniqueIds),
   ])
 
   if (profilesResult.error) throw profilesResult.error
   if (accountsResult.error) throw accountsResult.error
 
   const accountsByUserId = new Map((accountsResult.data || []).map((row) => [row.id, row]))
+  chatParticipantsByUserId.forEach((row, userId) => {
+    if (!accountsByUserId.has(userId)) accountsByUserId.set(userId, row)
+  })
   const profileEntries = (profilesResult.data || []).map((row) => {
     const account = accountsByUserId.get(row.user_id) || {}
     const accountAvatarUrl = account.avatar_url || ''
@@ -638,10 +658,62 @@ async function loadProfilesByUserIds(ids = []) {
   return profilesByUserId
 }
 
-function normalizeConversation(conversation, profilesByUserId) {
+async function loadChatParticipantProfilesByUserIds(ids = []) {
+  const uniqueIds = [...new Set(ids.filter(Boolean))]
+  if (uniqueIds.length === 0) return new Map()
+
+  const { data, error } = await supabase.rpc('get_chat_participant_profiles', { p_user_ids: uniqueIds })
+  if (error) {
+    if (isMissingChatParticipantProfilesFunction(error)) return new Map()
+    throw error
+  }
+
+  const participantsByUserId = new Map()
+  ;(data || []).forEach((row) => {
+    const userId = row.user_id || row.id
+    if (!userId) return
+    participantsByUserId.set(userId, {
+      id: userId,
+      display_name: row.display_name || row.full_name || '',
+      full_name: row.full_name || row.display_name || '',
+      avatar_url: row.avatar_url || '',
+      city: row.city || '',
+    })
+  })
+  return participantsByUserId
+}
+
+async function loadSharedProjectContextsByConversationIds(ids = []) {
+  const uniqueIds = [...new Set(ids.filter(Boolean))]
+  if (uniqueIds.length === 0) return new Map()
+
+  const { data, error } = await supabase.rpc('get_chat_project_context', { p_conversation_ids: uniqueIds })
+  if (error) {
+    if (isMissingChatProjectContextFunction(error)) return new Map()
+    throw error
+  }
+
+  const contextsByConversationId = new Map()
+  ;(data || []).forEach((row) => {
+    const conversationId = row.conversation_id || row.id
+    const shareId = row.share_id || row.public_share_id || ''
+    const projectId = row.project_id || ''
+    if (!conversationId || !shareId || !projectId) return
+    contextsByConversationId.set(conversationId, {
+      conversationId,
+      projectId,
+      shareId,
+      projectTitle: row.title || row.project_title || '',
+    })
+  })
+  return contextsByConversationId
+}
+
+function normalizeConversation(conversation, profilesByUserId, sharedProjectsByConversationId = new Map()) {
   if (!conversation) return null
-  const sharedProject = findSharedProjectContext(conversation)
-  const clientFallback = sharedProject?.clientId === conversation.client_id ? sharedProject.client : null
+  const localSharedProject = findSharedProjectContext(conversation)
+  const sharedProject = sharedProjectsByConversationId.get(conversation.id) || localSharedProject
+  const clientFallback = localSharedProject?.clientId === conversation.client_id ? localSharedProject.client : null
   return {
     ...conversation,
     sharedProject: sharedProject
@@ -657,8 +729,11 @@ function normalizeConversation(conversation, profilesByUserId) {
 }
 
 async function enrichConversations(rows = []) {
-  const profilesByUserId = await loadProfilesByUserIds(rows.flatMap((row) => [row.client_id, row.partner_id]))
-  return rows.map((row) => normalizeConversation(row, profilesByUserId))
+  const [profilesByUserId, sharedProjectsByConversationId] = await Promise.all([
+    loadProfilesByUserIds(rows.flatMap((row) => [row.client_id, row.partner_id])),
+    loadSharedProjectContextsByConversationIds(rows.map((row) => row.id)),
+  ])
+  return rows.map((row) => normalizeConversation(row, profilesByUserId, sharedProjectsByConversationId))
 }
 
 async function enrichConversation(row) {
@@ -845,22 +920,57 @@ export async function createConversationFromProfile({ profileId, partnerId, proj
 async function findOpenConversation({ clientId, partnerId, projectId = '' }) {
   if (!clientId || !partnerId) return null
 
-  let query = supabase
+  const wantedProjectId = String(projectId || '').trim()
+  const { data, error } = await supabase
     .from('conversations')
     .select(CONVERSATION_SELECT)
     .eq('client_id', clientId)
     .eq('partner_id', partnerId)
     .eq('status', 'open')
-
-  query = projectId ? query.eq('project_id', projectId) : query.is('project_id', null)
-
-  const { data, error } = await query
     .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
 
   if (error) throw error
-  return data || null
+  const rows = data || []
+  if (rows.length === 0) return null
+
+  if (wantedProjectId) {
+    return rows.find((row) => row.project_id === wantedProjectId)
+      || rows.find((row) => !row.project_id)
+      || rows[0]
+  }
+
+  return rows.find((row) => !row.project_id) || rows[0]
+}
+
+async function attachProjectToConversation(conversation, { projectId = '', subject = '' } = {}) {
+  const wantedProjectId = String(projectId || '').trim()
+  if (!conversation?.id || !wantedProjectId || conversation.project_id) return conversation
+
+  const patch = { project_id: wantedProjectId }
+  if (subject && (!conversation.subject || conversation.subject === 'Връзка по ваше запитване')) {
+    patch.subject = subject
+  }
+
+  const { data, error } = await supabase
+    .from('conversations')
+    .update(patch)
+    .eq('id', conversation.id)
+    .select(CONVERSATION_SELECT)
+    .single()
+
+  if (error) {
+    if (error.code === '23505' || String(error.message || '').includes('idx_conversations_active_unique')) {
+      const existing = await findOpenConversation({
+        clientId: conversation.client_id,
+        partnerId: conversation.partner_id,
+        projectId: wantedProjectId,
+      })
+      if (existing) return existing
+    }
+    throw error
+  }
+
+  return data || conversation
 }
 
 export async function createConversationWithClient({ clientId, partnerId, projectId = '', subject = '', sharedProjectContext = null }) {
@@ -870,8 +980,9 @@ export async function createConversationWithClient({ clientId, partnerId, projec
 
   const existing = await findOpenConversation({ clientId, partnerId, projectId })
   if (existing) {
-    cacheSharedProjectConversationContext(existing, sharedProjectContext || {})
-    return existing
+    const conversation = await attachProjectToConversation(existing, { projectId, subject })
+    cacheSharedProjectConversationContext(conversation, sharedProjectContext || {})
+    return conversation
   }
 
   const insertPayload = {
@@ -890,7 +1001,11 @@ export async function createConversationWithClient({ clientId, partnerId, projec
   if (error) {
     if (error.code === '23505' || String(error.message || '').includes('idx_conversations_active_unique')) {
       const conversation = await findOpenConversation({ clientId, partnerId, projectId })
-      if (conversation) return conversation
+      if (conversation) {
+        const updatedConversation = await attachProjectToConversation(conversation, { projectId, subject })
+        cacheSharedProjectConversationContext(updatedConversation, sharedProjectContext || {})
+        return updatedConversation
+      }
     }
 
     console.error('Failed to create conversation with client:', error)

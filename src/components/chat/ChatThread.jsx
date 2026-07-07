@@ -23,7 +23,7 @@ function compactOrderStatusLine(orderStatus) {
   if (ACTIVE_ORDER_STATUSES.has(orderStatus.status)) return 'Офертата е платена · Поръчката е активна'
   if (orderStatus.status === 'delivered') return 'Офертата е платена · Поръчката е предадена'
   if (orderStatus.status === 'completed') return 'Офертата е платена · Поръчката е завършена'
-  if (orderStatus.status === 'pending_payment') return 'Офертата чака потвърждение за директно плащане'
+  if (orderStatus.status === 'pending_payment') return 'Офертата чака защитено плащане'
   if (orderStatus.status === 'cancelled') return 'Поръчката е отменена'
   if (orderStatus.status === 'refunded') return 'Поръчката е възстановена'
   if (orderStatus.status === 'disputed') return 'Поръчката е в спор'
@@ -356,7 +356,8 @@ export default function ChatThread({
   const avatarUrl = otherParticipant?.avatar_url || ''
   const avatarCandidates = otherParticipant?.avatar_candidates || []
   const displayName = getConversationTitle(conversation, userId)
-  const roleLabel = getRoleLabel(getOtherParticipantRole(conversation, userId))
+  const participantRole = getOtherParticipantRole(conversation, userId)
+  const roleLabel = getRoleLabel(participantRole)
   const statusLine = compactOrderStatusLine(orderStatus)
   const participantHref = getParticipantPublicHref(conversation, userId)
   const IdentityTag = participantHref ? Link : 'div'
@@ -384,6 +385,9 @@ export default function ChatThread({
               <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted md:gap-2">
                 <span className="shrink-0 rounded-full border border-line bg-soft px-2.5 py-1">{roleLabel}</span>
                 <span className="shrink-0 rounded-full border border-line bg-soft px-2.5 py-1">{conversationStateLabel(conversation.status)}</span>
+                {participantHref && participantRole === 'client' && (
+                  <span className="shrink-0 rounded-full border border-accent/20 bg-accentSoft px-2.5 py-1 font-semibold text-accentDeep">Моето пространство</span>
+                )}
               </div>
               {statusLine && <div className="mt-1.5 hidden break-words text-sm text-muted sm:block">{statusLine}</div>}
             </div>

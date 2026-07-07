@@ -52,6 +52,10 @@ import {
   uploadPortfolioImage,
 } from '../../lib/portfolio.js'
 import {
+  createConnectOnboarding,
+  getConnectStatus,
+} from '../../lib/payments.js'
+import {
   cancelPartnerSubscriptionAtPeriodEnd,
   createPartnerSubscriptionPortal,
   ensurePartnerSubscriptionActivationEmail,
@@ -217,6 +221,21 @@ function makePortfolioDraft(item = null, profile) {
   }
 }
 
+function paymentMessageFromStripe(result) {
+  switch (result?.status) {
+    case 'active':
+      return 'Платежният профил е активен. Оттук можеш да управляваш плащанията и преводите.'
+    case 'pending_review':
+      return 'Данните са изпратени за проверка. Платежният профил чака преглед и може да отнеме малко време.'
+    case 'needs_information':
+      return 'Нужни са още данни, преди плащанията да бъдат активирани.'
+    case 'not_started':
+      return 'Плащанията още не са настроени.'
+    default:
+      return 'Проверихме платежния профил.'
+  }
+}
+
 export default function PartnerProfileWorkspace({ profile, userId, account, session, refreshAccount, onSaved }) {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('overview')
@@ -228,6 +247,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
   const [portfolioDraft, setPortfolioDraft] = useState(() => makePortfolioDraft(null, profile))
   const [saveState, setSaveState] = useState({ status: 'idle', message: '' })
   const [portfolioState, setPortfolioState] = useState({ status: 'idle', message: '' })
+  const [paymentState, setPaymentState] = useState({ status: 'idle', message: '' })
   const [subscriptionState, setSubscriptionState] = useState({ status: 'loading', subscription: null, message: '', checkoutSuccess: false, confirmingExpired: false })
   const [subscriptionRefreshKey, setSubscriptionRefreshKey] = useState(0)
   const [avatarEditor, setAvatarEditor] = useState({ open: false, file: null, imageUrl: '', fileName: 'avatar.jpg' })
@@ -402,6 +422,62 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
   }, [profile?.id])
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const paymentsState = params.get('payments')
+    if (!paymentsState) return undefined
+
+    let active = true
+    setPaymentState({ status: 'saving', message: 'Проверяваме платежния профил...' })
+
+    async function loadStripeStatus() {
+      try {
+        const result = await getConnectStatus()
+        if (!active) return
+        setPaymentState({ status: result.status === 'needs_information' || result.status === 'not_started' ? 'idle' : 'saved', message: paymentMessageFromStripe(result) })
+        if (result?.stripeAccountId) await refreshAccount?.()
+      } catch (error) {
+        if (!active) return
+        setPaymentState({ status: 'error', message: error.message || 'Не успяхме да проверим платежния профил.' })
+      } finally {
+        params.delete('payments')
+        const query = params.toString()
+        const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash || ''}`
+        window.history.replaceState({}, '', nextUrl)
+      }
+    }
+
+    loadStripeStatus()
+    return () => { active = false }
+  }, [refreshAccount])
+
+  useEffect(() => {
+    if (!account?.stripe_account_id) return undefined
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('payments')) return undefined
+
+    let active = true
+
+    async function loadStripeStatusQuietly() {
+      try {
+        const result = await getConnectStatus()
+        if (!active || !result?.status || result.status === 'not_started') return
+        setPaymentState(current => {
+          if (current.status === 'opening' || current.status === 'saving') return current
+          return {
+            status: result.status === 'needs_information' ? 'idle' : 'saved',
+            message: paymentMessageFromStripe(result),
+          }
+        })
+      } catch {
+        // Keep the workspace usable even if Stripe status cannot be loaded in the background.
+      }
+    }
+
+    loadStripeStatusQuietly()
+    return () => { active = false }
+  }, [account?.stripe_account_id])
+
+  useEffect(() => {
     if (!profile?.id) return undefined
 
     let active = true
@@ -515,7 +591,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
         } else if (hasActiveAccess && (subscriptionParam === 'success' || pollAttempts > 0)) {
           message = 'Абонаментът е активиран успешно!'
         } else if (hasActiveAccess && repairedFromStripe) {
-          message = 'Абонаментът беше синхронизиран успешно със Stripe.'
+          message = 'Абонаментът беше синхронизиран успешно.'
         } else if (subscriptionParam === 'portal_return') {
           message = 'Върнахте се от управлението на абонамента.'
         }
@@ -591,6 +667,11 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
 
   function updateProfile(key, value) {
     setProfileDraft(current => ({ ...current, [key]: value }))
+  }
+
+  function cancelProfileChanges() {
+    setProfileDraft(makeProfileDraft(currentProfile))
+    setSaveState({ status: 'idle', message: '' })
   }
 
   function scrollToWorkspaceStart() {
@@ -872,15 +953,38 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
     }
   }
 
+  async function startPaymentOnboarding() {
+    setPaymentState({ status: 'opening', message: 'Отваряме настройките за плащания...' })
+    try {
+      const result = await createConnectOnboarding()
+      if (result.dashboardUrl) {
+        window.location.href = result.dashboardUrl
+        return
+      }
+      if (result.status && result.status !== 'active' && !result.onboardingUrl) {
+        setPaymentState({ status: result.status === 'needs_information' ? 'idle' : 'saved', message: paymentMessageFromStripe(result) })
+        return
+      }
+      if (result.onboardingUrl) {
+        window.location.href = result.onboardingUrl
+        return
+      }
+      setPaymentState({ status: 'saved', message: 'Платежният профил е проверен.' })
+      await refreshAccount?.()
+    } catch (error) {
+      setPaymentState({ status: 'error', message: error.message || 'Настройката на плащанията не можа да стартира.' })
+    }
+  }
+
   async function openSubscriptionPortal() {
-    setSubscriptionState(current => ({ ...current, status: 'opening', message: 'Отваряме Stripe Billing Portal...' }))
+    setSubscriptionState(current => ({ ...current, status: 'opening', message: 'Отваряме управлението на абонамента...' }))
     try {
       const result = await createPartnerSubscriptionPortal()
       if (result.portalUrl) {
         window.location.href = result.portalUrl
         return
       }
-      setSubscriptionState(current => ({ ...current, status: 'error', message: 'Stripe не върна адрес за управление на абонамента.' }))
+      setSubscriptionState(current => ({ ...current, status: 'error', message: 'Не получихме адрес за управление на абонамента.' }))
     } catch (error) {
       setSubscriptionState(current => ({ ...current, status: 'error', message: error.message || 'Абонаментът не може да бъде управляван в момента.' }))
     }
@@ -943,7 +1047,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
       const message = result?.email?.sent
         ? 'Потвърждението за абонамента е изпратено.'
         : reason === 'stripe_test_mode_receipts_disabled'
-          ? 'Stripe не изпраща разписки за тестови плащания. За тестови имейли е нужен конфигуриран доставчик за транзакционна поща.'
+          ? 'Тестовите плащания не изпращат реални разписки. За тестови имейли е нужен конфигуриран доставчик за транзакционна поща.'
           : 'Потвърждението не беше изпратено. Проверете конфигурацията на доставчика за транзакционна поща.'
       setSubscriptionState(current => ({
         ...current,
@@ -995,7 +1099,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
         className="hidden"
         onChange={handleCoverFileChange}
       />
-      <div className="relative z-10 flex flex-col bg-soft pb-16 md:pb-24">
+      <div className="relative z-10 flex flex-col bg-soft pb-10">
         <div className="container-page -mt-4 w-full space-y-5 px-4 sm:-mt-8 md:-mt-24 md:px-6">
         {subscriptionState.message && (
           <div
@@ -1055,9 +1159,33 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
             </div>
             <div className="flex w-full flex-col gap-3 pb-1 sm:flex-row sm:flex-wrap lg:w-auto lg:justify-end">
               {preview.isPublished && <Link to={`/profil/${preview.slug}`} className="btn btn-primary w-full justify-center sm:w-auto"><Eye size={18} /> Виж публично</Link>}
+              <button
+                type="button"
+                onClick={startPaymentOnboarding}
+                disabled={paymentState.status === 'opening' || paymentState.status === 'saving'}
+                className="btn btn-ghost w-full justify-center sm:w-auto"
+                title="Плащания"
+              >
+                {paymentState.status === 'opening' || paymentState.status === 'saving' ? <Loader2 size={18} className="animate-spin" /> : <CreditCard size={18} />}
+                {account?.stripe_account_id ? 'Плащания' : 'Настрой плащания'}
+              </button>
               <button className="btn btn-ghost w-full justify-center sm:w-auto" onClick={() => supabase.auth.signOut()}><LogOut size={18} /> Изход</button>
             </div>
           </div>
+          {paymentState.message && (
+            <div
+              role={paymentState.status === 'error' ? 'alert' : 'status'}
+              className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-medium ${
+                paymentState.status === 'error'
+                  ? 'border-red-200 bg-red-50 text-red-800'
+                  : paymentState.status === 'saved'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-blue-200 bg-blue-50 text-blue-800'
+              }`}
+            >
+              {paymentState.message}
+            </div>
+          )}
         </PublicProfilePanel>
 
         <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
@@ -1099,17 +1227,19 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
                 onUpdateSocialLink={updateSocialLink}
                 onRemoveSocialLink={removeSocialLink}
                 onSubmit={saveProfile}
+                onCancel={cancelProfileChanges}
               />
             )}
 
             {activeTab === 'layer01' && profileDraft.layerSlug === 'ideya' && (
-              <form onSubmit={saveProfile} className="space-y-5">
+              <form onSubmit={saveProfile} className="space-y-5 pb-28">
                 <Layer01SpecEditor draft={profileDraft.layer01Meta} onChange={updateLayer01} profileDraft={profileDraft} onProfileChange={updateProfile} />
                 <SavePanel
                   state={saveState}
                   idleMessage="Промените в Слой 01 се пазят след запис на профила."
                   savingLabel="Запазва се…"
                   saveLabel="Запази профила"
+                  onCancel={cancelProfileChanges}
                 />
               </form>
             )}
@@ -2054,17 +2184,16 @@ function MiniFact({ label, value }) {
   )
 }
 
-function SavePanel({ state, idleMessage, savingLabel = 'Запазва се…', saveLabel = 'Запази' }) {
+function SavePanel({ state, idleMessage, savingLabel = 'Запазва се…', saveLabel = 'Запази', onCancel }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-line bg-paper p-5 md:p-6">
-      <div className={`text-sm ${state.status === 'error' ? 'text-red-700' : 'text-muted'}`}>
-        {state.message || idleMessage}
-      </div>
-      <button className="btn btn-primary" disabled={state.status === 'saving'}>
-        <Save size={18} />
-        {state.status === 'saving' ? savingLabel : saveLabel}
-      </button>
-    </div>
+    <FloatingSaveBar
+      state={state}
+      idleMessage={idleMessage}
+      savingLabel={savingLabel}
+      saveLabel={saveLabel}
+      onCancel={onCancel}
+      disabled={state.status === 'saving' || state.status === 'uploading'}
+    />
   )
 }
 
@@ -2078,6 +2207,7 @@ function ProfileForm({
   onUpdateSocialLink,
   onRemoveSocialLink,
   onSubmit,
+  onCancel,
 }) {
   const bioLength = String(draft.bio || '').length
   const descriptionLength = String(draft.descriptionLong || '').length
@@ -2194,6 +2324,8 @@ function ProfileForm({
         state={saveState}
         idleMessage="Промените се пазят след запазване."
         saveLabel="Запази профила"
+        onCancel={onCancel}
+        disabled={saveState.status === 'saving' || saveState.status === 'uploading'}
       />
     </form>
   )

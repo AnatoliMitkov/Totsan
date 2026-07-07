@@ -62,7 +62,7 @@ const ADMIN_SECTIONS = [
   { id: 'inquiries', label: 'Запитвания', hint: 'Форми, източници и статуси', icon: ClipboardList, Component: InquiriesManagerSection },
   { id: 'applications', label: 'Кандидатури', hint: 'Одобрение на специалисти', icon: UserCog, Component: ApplicationsManagerSection },
   { id: 'partner-services', label: 'Услуги', hint: 'Модерация на партньорски услуги', icon: PackageCheck, Component: PartnerServicesManagerSection },
-  { id: 'orders', label: 'Поръчки', hint: 'Директни плащания, потвърждения и спорове', icon: CreditCard, Component: OrdersManagerSection },
+  { id: 'orders', label: 'Поръчки', hint: 'Плащания, потвърждения и спорове', icon: CreditCard, Component: OrdersManagerSection },
   { id: 'reviews', label: 'Отзиви', hint: 'Verified отзиви и сигнали', icon: Star, Component: ReviewsManagerSection },
   { id: 'materials', label: 'Материали', hint: 'Модерация на материали и марки', icon: Tags, Component: MaterialsManagerSection },
   { id: 'audit', label: 'Audit log', hint: 'Админ действия', icon: ScrollText, Component: AuditLogSection },

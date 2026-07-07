@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Camera, CheckCircle2, FileSpreadsheet, FileText, FileType, ImagePlus, Play, Save, Trash2, UploadCloud,
+  Camera, CheckCircle2, FileSpreadsheet, FileText, FileType, ImagePlus, Play, Trash2, UploadCloud,
   Edit3, MapPin, Home, Banknote, Calendar, AlignLeft, Layers, ShieldCheck
 } from 'lucide-react'
 import { LAYERS } from '../../data/layers.js'
@@ -18,6 +18,7 @@ import {
 } from '../../lib/projects.js'
 import TotsanSelect from '../ui/TotsanSelect.jsx'
 import { LocationCombobox } from '../ui/LocationCombobox.jsx'
+import FloatingSaveBar from './FloatingSaveBar.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line/75 bg-soft/30 px-4 py-3.5 text-sm outline-none transition-all duration-200 focus:bg-paper focus:border-accentDeep focus:shadow-sm'
 const TEXTAREA = 'mt-2 w-full rounded-2xl border border-line/75 bg-soft/30 px-4 py-3.5 text-sm outline-none transition-all duration-200 focus:bg-paper focus:border-accentDeep focus:shadow-sm resize-none'
@@ -417,6 +418,16 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
     }
   }
 
+  function cancelChanges() {
+    setDraft(makeDraft(project))
+    setExactLocationOpen(hasExactLocationDetails(getProjectLocationAccess(project)))
+    setSaveStatus({ type: 'idle', message: '' })
+    setUploadStatus({ type: 'idle', message: '' })
+    setQuizStatus({ type: 'idle', message: '' })
+    setActiveQuizSlug('')
+    if (hasMeaningfulContent) setIsEditing(false)
+  }
+
   async function handleUploadFiles(fileList) {
     const allFiles = Array.from(fileList || [])
     const files = allFiles
@@ -481,7 +492,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
       )}
 
       {/* Main Project Passport Area */}
-      <div className="lg:col-span-8 space-y-6">
+      <div className="lg:col-span-12 space-y-6">
         <div className="rounded-3xl border border-line bg-paper p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)] md:p-8">
 
           <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
@@ -543,7 +554,15 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
                   </div>
                 </div>
                 <div className="grid gap-4 md:grid-cols-12 mt-4">
-                  <LocationCombobox className="md:col-span-8" label="Населено място" value={draft.addressCity} onChange={(value) => update('addressCity', value)} />
+                  <LocationCombobox
+                    className="md:col-span-8"
+                    gridClassName="sm:grid-cols-7"
+                    regionClassName="sm:col-span-3"
+                    settlementClassName="sm:col-span-4"
+                    label="Населено място"
+                    value={draft.addressCity}
+                    onChange={(value) => update('addressCity', value)}
+                  />
                   <div className="md:col-span-4">
                     <label className="block text-sm font-medium text-ink">Район / квартал</label>
                     <input value={draft.addressRegion} onChange={e => update('addressRegion', e.target.value)} className={INPUT} placeholder="централна част, квартал или ориентир" />
@@ -709,15 +728,13 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
                 </div>
               </div>
 
-              <div className="sticky bottom-0 z-30 -mx-5 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-paper/92 px-5 py-4 shadow-[0_-18px_45px_-32px_rgba(13,35,64,0.55)] backdrop-blur md:-mx-7 md:px-7">
-                <button type="button" onClick={() => hasMeaningfulContent && setIsEditing(false)} className="btn btn-ghost justify-center text-muted hover:text-ink">
-                  Отказ
-                </button>
-                <button type="submit" className="btn btn-primary justify-center px-8 py-3.5" disabled={saveStatus.type === 'saving'}>
-                  <Save size={18} />
-                  {saveStatus.type === 'saving' ? 'Запазва се…' : 'Запази'}
-                </button>
-              </div>
+              <FloatingSaveBar
+                status={saveStatus.type}
+                message={saveStatus.message}
+                idleMessage="Промените се пазят само след запазване."
+                onCancel={cancelChanges}
+                disabled={saveStatus.type === 'saving'}
+              />
 
             </form>
           ) : (
@@ -837,7 +854,7 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
       </div>
 
       {/* Sidebar Areas */}
-      <aside className="lg:col-span-4 space-y-6">
+      <aside className="hidden">
 
         {/* Media Block */}
         <div className="rounded-3xl border border-line bg-paper p-6 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
@@ -934,9 +951,24 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
             <div className="eyebrow flex items-center gap-2"><Camera size={14} /> Галерия</div>
             <h2 className="mt-2 font-display text-3xl font-semibold text-ink">Снимки</h2>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-line bg-soft px-3 py-1.5 text-xs font-semibold text-ink">
-            Общо {imageMedia.length}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-line bg-soft px-3 py-1.5 text-xs font-semibold text-ink">
+              Общо {imageMedia.length}
+            </div>
+            <label className="btn btn-primary cursor-pointer !py-2 text-sm">
+              <UploadCloud size={16} />
+              Добави снимки
+              <input type="file" accept={PROJECT_UPLOAD_ACCEPT} multiple className="sr-only" onChange={event => { handleUploadFiles(event.target.files); event.target.value = '' }} />
+            </label>
           </div>
+        </div>
+        <div
+          onDragOver={(event) => { event.preventDefault(); setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(event) => { event.preventDefault(); setDragOver(false); handleUploadFiles(event.dataTransfer.files) }}
+          className={`mb-5 rounded-2xl border border-dashed px-4 py-3 text-sm transition ${dragOver ? 'border-accent bg-accentSoft/30 text-accentDeep' : 'border-line/70 bg-soft/35 text-muted'}`}
+        >
+          {uploadStatus.message || 'Качи снимки, планове или документи директно тук.'}
         </div>
 
         {imageMedia.length === 0 ? (
@@ -945,7 +977,12 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
               <ImagePlus size={32} strokeWidth={1.5} />
             </div>
             <h3 className="font-display text-xl font-semibold text-ink mb-2">Тук е малко празно</h3>
-            <p className="text-sm text-muted max-w-md">Добави снимки, скици, PDF планове или вдъхновения в панела горе, за да придобие проектът ти ясен облик.</p>
+            <p className="text-sm text-muted max-w-md">Добави снимки, скици, PDF планове или вдъхновения, за да придобие проектът ти ясен облик.</p>
+            <label className="btn btn-primary mt-5 cursor-pointer">
+              <UploadCloud size={18} />
+              Добави снимки
+              <input type="file" accept={PROJECT_UPLOAD_ACCEPT} multiple className="sr-only" onChange={event => { handleUploadFiles(event.target.files); event.target.value = '' }} />
+            </label>
           </div>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -1007,6 +1044,49 @@ export default function CustomerProject({ project, pendingBrief, media, onSave, 
                 </article>
               )
             })}
+          </div>
+        )}
+
+        {documentMedia.length > 0 && (
+          <div className="mt-8 border-t border-line/60 pt-6">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-muted">Документи</div>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              {documentMedia.map(item => {
+                const mediaUrl = getMediaUrl(item)
+                const fileName = getDisplayFileName(item) || 'Документ'
+                const fileType = getDocumentTypeLabel(item)
+                const fileSize = formatFileSize(item?.size)
+                const DocumentIcon = getDocumentIcon(item)
+
+                return (
+                  <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-line/75 bg-soft/35 px-3 py-3 shadow-[0_8px_20px_rgb(0,0,0,0.02)]">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line bg-paper text-accentDeep">
+                      <DocumentIcon size={20} strokeWidth={1.7} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-ink" title={fileName}>{fileName}</div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-muted">
+                        <span>{fileType}</span>
+                        {fileSize ? <span>{fileSize}</span> : null}
+                      </div>
+                    </div>
+                    {mediaUrl ? (
+                      <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-full border border-line bg-paper px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:border-accentDeep hover:text-accentDeep">
+                        Отвори
+                      </a>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => onDeleteMedia(item.id)}
+                      className="shrink-0 rounded-full border border-line bg-paper p-2 text-muted transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                      aria-label="Изтрий документ"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
       </div>
