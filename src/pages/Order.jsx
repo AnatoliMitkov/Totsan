@@ -77,12 +77,12 @@ export default function Order() {
               <h1 className="mt-2 font-display text-4xl leading-tight text-ink md:text-5xl">{order.title}</h1>
               {order.description && <p className="mt-3 max-w-3xl whitespace-pre-wrap text-muted">{order.description}</p>}
             </div>
-            <span className={`rounded-full px-3 py-1 text-xs ${orderStatusTone(order.status)}`}>{ORDER_STATUS_LABELS[order.status] || order.status}</span>
+            <span className={`rounded-full px-3 py-1 text-sm ${orderStatusTone(order.status)}`}>{ORDER_STATUS_LABELS[order.status] || order.status}</span>
           </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             <Info icon={CreditCard} label="Сума" value={formatOrderMoney(order.amountTotal, order.currency)} />
-            <Info icon={PackageCheck} label="Партньор ID" value={shortId(order.partnerId)} />
+            <Info icon={PackageCheck} label="Партньор" value={getPartyDisplayName(order.partnerAccount, order.partnerId)} />
             <Info icon={Clock} label="Срок" value={order.deliveryDueAt ? formatOrderDate(order.deliveryDueAt) : 'По уговорка'} />
           </div>
 
@@ -117,11 +117,7 @@ export default function Order() {
           <div className="space-y-5 lg:sticky lg:top-24">
             <div className="rounded-3xl border border-line bg-paper p-5 md:p-6">
               <div className="eyebrow">Действия</div>
-              <div className="mt-3 font-display text-4xl text-ink">{formatOrderMoney(order.amountTotal, order.currency)}</div>
-              <p className="mt-2 text-sm text-muted">Клиентът плаща през Totsan. Сумата се превежда към партньора след потвърждение, че поръчката е завършена.</p>
-              <p className="mt-3 rounded-2xl border border-line bg-soft p-3 text-xs leading-5 text-muted">
-                Партньорската сума се освобождава чрез платежния профил след приспадане на приложимите Stripe такси и 2% платформена комисионна.
-              </p>
+              <div className="mt-3 mb-3 font-display text-4xl text-ink">{formatOrderMoney(order.amountTotal, order.currency)}</div>
               {message && <div className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">{message}</div>}
               {role === 'client' && order.status === 'pending_payment' && checkoutPath && (
                 <Link to={checkoutPath} className="btn btn-primary mt-3 w-full justify-center"><CreditCard size={18} /> Плати</Link>
@@ -145,7 +141,6 @@ export default function Order() {
 
             <div className="rounded-3xl border border-line bg-paper p-5 md:p-6">
               <div className="eyebrow">Доказателствена следа</div>
-              <p className="mt-2 text-xs leading-5 text-muted">Тук се пазят записите за плащането, освобождаването на сумата към партньора и евентуални възстановявания.</p>
               <div className="mt-4 space-y-3">
                 {visiblePayments.map((payment) => <PaymentRow key={payment.id} payment={payment} />)}
                 {visiblePayments.length === 0 && <div className="rounded-2xl border border-dashed border-line p-4 text-center text-sm text-muted">Няма добавено потвърждение или документ.</div>}
@@ -176,6 +171,12 @@ function buildActions(order, role, checkoutPath = '') {
   return actions
 }
 
+function getPartyDisplayName(party, fallbackId) {
+  if (!party) return shortId(fallbackId)
+  const name = party.name || party.display_name || party.displayName || party.company_name || party.companyName || party.full_name || party.fullName || party.email
+  return name || shortId(fallbackId)
+}
+
 function shortId(value = '') {
   return value ? value.slice(0, 8) : '—'
 }
@@ -189,7 +190,20 @@ function Panel({ title, children }) {
 }
 
 function Info({ icon: Icon, label, value }) {
-  return <div className="rounded-2xl border border-line bg-soft p-4"><Icon size={17} className="text-accentDeep" /><div className="mt-2 text-xs uppercase tracking-[0.14em] text-muted">{label}</div><div className="mt-1 text-sm font-medium text-ink">{value}</div></div>
+  return (
+    <div className="rounded-2xl border border-line bg-soft p-4">
+      <div className="flex items-center gap-2">
+        <Icon size={17} className="text-accentDeep" />
+        <div className="text-xs uppercase tracking-[0.14em] text-muted leading-none">
+          {label}
+        </div>
+      </div>
+
+      <div className="mt-2 text-md font-medium text-ink">
+        {value}
+      </div>
+    </div>
+  )
 }
 
 function PartyCard({ label, party, fallbackId, showEmail = false }) {
@@ -200,7 +214,7 @@ function PartyCard({ label, party, fallbackId, showEmail = false }) {
   return (
     <div className="rounded-2xl border border-line bg-soft p-4">
       <div className="text-xs uppercase tracking-[0.14em] text-muted">{label}</div>
-      <div className="mt-1 text-sm font-medium text-ink break-all">{displayName}</div>
+      <div className="mt-1 text-md font-medium text-ink break-all">{displayName}</div>
       {showEmail && <div className="mt-1 text-xs text-muted break-all">{email || 'Без имейл'}</div>}
       {!showEmail && <div className="mt-1 text-xs text-muted break-all">ID: {shortId(fallbackId)}</div>}
     </div>

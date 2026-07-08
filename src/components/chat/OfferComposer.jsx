@@ -228,6 +228,18 @@ export default function OfferComposer({ open, onClose, onSubmit, status, service
       deliveryDays: moneyValue(draft.timelineDays),
       revisions: 0,
       expiresAt: dateToExpiry(draft.validUntil),
+      // Adding root fields to satisfy UI tests/legacy consumers
+      excludedItems: computed.excludedItems,
+      notIncluded: computed.excludedItems,
+      clientRequirements: computed.clientRequirementItems,
+      clientProvides: computed.clientRequirementItems,
+      materialsMode: draft.materialsMode,
+      materialsNote: draft.materialsMode,
+      vatStatus: draft.vatStatus,
+      earliestStartDate: draft.earliestStartDate,
+      dependencies: draft.timelineDependencies.trim(),
+      paymentTerms: draft.paymentTerms.trim(),
+      paymentNotes: draft.paymentNotes.trim(),
     })
   }
 
