@@ -9,6 +9,8 @@ import {
   archiveConversation,
   conversationRole,
   getMessageCursor,
+  isClient,
+  isPartner,
   loadConversation,
   loadConversations,
   loadConversationStatuses,
@@ -60,6 +62,7 @@ export default function Inbox() {
   const [messageStatus, setMessageStatus] = useState('idle')
   const [conversationStatuses, setConversationStatuses] = useState(new Map())
   const [error, setError] = useState('')
+  const [accessDenied, setAccessDenied] = useState(false)
   const [draft, setDraft] = useState('')
   const [draftFiles, setDraftFiles] = useState([])
   const [scrollToLatestToken, setScrollToLatestToken] = useState(0)
@@ -82,9 +85,13 @@ export default function Inbox() {
   }, [selectedConversationId])
 
   const activeConversationId = selectedConversationId
+  const visibleConversations = useMemo(
+    () => conversations.filter((c) => isClient(c, userId) || isPartner(c, userId)),
+    [conversations, userId]
+  )
   const activeConversation = useMemo(
-    () => conversations.find((conversation) => conversation.id === activeConversationId) || null,
-    [conversations, activeConversationId],
+    () => visibleConversations.find((conversation) => conversation.id === activeConversationId) || null,
+    [visibleConversations, activeConversationId],
   )
   const activeServiceRequest = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -94,7 +101,14 @@ export default function Inbox() {
     return null
   }, [messages])
   const role = conversationRole(activeConversation, userId)
-  const partnerProfileId = activeConversation?.partner?.profile_id || ''
+  const isGuest = !activeConversationId ? false : (!activeConversation ? true : role === 'guest')
+  const isVerifying = Boolean(activeConversationId && !activeConversation && !accessDenied)
+  
+  // Safe derived values for the hard render gate
+  const safeActiveConversation = (!accessDenied && !isGuest) ? activeConversation : null
+  const safeMessages = (!accessDenied && !isGuest) ? messages : []
+
+  const partnerProfileId = safeActiveConversation?.partner?.profile_id || ''
 
   const writeThreadCache = useCallback((conversationId, payload) => {
     if (!conversationId || !userId) return
@@ -229,16 +243,25 @@ export default function Inbox() {
   const loadConversationCollection = useCallback(async (preferredConversationId = '') => {
     const targetConversationId = preferredConversationId || selectedConversationIdRef.current
     let nextConversations = await loadConversations()
+    
+    // Filter to participant-only
+    nextConversations = nextConversations.filter(
+      (c) => isClient(c, userId) || isPartner(c, userId)
+    )
+
     if (targetConversationId && !nextConversations.some((conversation) => conversation.id === targetConversationId)) {
       const directConversation = await loadConversation(targetConversationId)
-      if (directConversation) nextConversations = [directConversation, ...nextConversations]
+      // Only add the conversation if the current user is a participant
+      if (directConversation && (isClient(directConversation, userId) || isPartner(directConversation, userId))) {
+        nextConversations = [directConversation, ...nextConversations]
+      }
     }
 
     const nextStatuses = await loadConversationStatuses(nextConversations.map((conversation) => conversation.id))
     setConversations(nextConversations)
     setConversationStatuses(nextStatuses)
     return nextConversations
-  }, [])
+  }, [userId])
 
   const refreshLatestThreadPage = useCallback(async (conversationId, token, nextConversations) => {
     const page = await loadMessagePage(conversationId, { limit: MESSAGE_PAGE_SIZE })
@@ -315,13 +338,33 @@ export default function Inbox() {
     if (!userId) return
     if (!keepStatus) setStatus('loading')
     setError('')
+    setAccessDenied(false)
 
     try {
       const requestedConversationId = conversationId || selectedConversationIdRef.current
       const nextConversations = await loadConversationCollection(requestedConversationId)
-      const nextSelectedId = requestedConversationId && nextConversations.some((conversation) => conversation.id === requestedConversationId)
-        ? requestedConversationId
-        : ''
+      const found = requestedConversationId && nextConversations.some((conversation) => conversation.id === requestedConversationId)
+      const nextSelectedId = found ? requestedConversationId : ''
+
+      // If the URL requested a specific conversation but it's not in the filtered list,
+      // the user is not a participant — deny access and clear all thread state.
+      if (requestedConversationId && !found) {
+        setAccessDenied(true)
+        setSelectedConversationId('')
+        setMessages([])
+        setThreadStatus('idle')
+        setPagination(EMPTY_PAGINATION)
+        setDraft('')
+        setDraftFiles([])
+        setReplyTarget(null)
+        setOfferOpen(false)
+        setMessageStatus('idle')
+        const cacheKey = `${userId}:${requestedConversationId}`
+        threadCacheRef.current.delete(cacheKey)
+        setStatus('ready')
+        return
+      }
+
       setStatus('ready')
       if (nextSelectedId !== selectedConversationIdRef.current) {
         setSelectedConversationId(nextSelectedId)
@@ -404,23 +447,100 @@ export default function Inbox() {
 
   useEffect(() => {
     setSelectedConversationId(initialConversationId || '')
+    // Clear access denied when the URL changes — it will be re-evaluated on load
+    setAccessDenied(false)
   }, [initialConversationId])
 
   useEffect(() => {
+    if (!initialLoadRef.current || !initialConversationId || !userId) return
+
+    const hasConversation = conversations.some((c) => c.id === initialConversationId)
+    if (hasConversation) return
+
+    let active = true
+    async function verifyAndAddConversation() {
+      try {
+        const directConversation = await loadConversation(initialConversationId)
+        if (!active) return
+        if (directConversation && (isClient(directConversation, userId) || isPartner(directConversation, userId))) {
+          setConversations((current) => {
+            if (current.some((c) => c.id === directConversation.id)) return current
+            return [directConversation, ...current]
+          })
+          setAccessDenied(false)
+        } else {
+          setAccessDenied(true)
+          setSelectedConversationId('')
+          setMessages([])
+          setThreadStatus('idle')
+          setPagination(EMPTY_PAGINATION)
+          setDraft('')
+          setDraftFiles([])
+          setReplyTarget(null)
+          setOfferOpen(false)
+          setMessageStatus('idle')
+          const cacheKey = `${userId}:${initialConversationId}`
+          threadCacheRef.current.delete(cacheKey)
+        }
+      } catch (err) {
+        if (!active) return
+        setAccessDenied(true)
+        setSelectedConversationId('')
+        setMessages([])
+        setThreadStatus('idle')
+        setPagination(EMPTY_PAGINATION)
+        setDraft('')
+        setDraftFiles([])
+        setReplyTarget(null)
+        setOfferOpen(false)
+        setMessageStatus('idle')
+        const cacheKey = `${userId}:${initialConversationId}`
+        threadCacheRef.current.delete(cacheKey)
+      }
+    }
+
+    void verifyAndAddConversation()
+    return () => {
+      active = false
+    }
+  }, [initialConversationId, conversations, userId])
+
+  useEffect(() => {
     if (!initialLoadRef.current) return
-    if (!activeConversationId) {
+    if (!activeConversationId || accessDenied || isGuest) {
       setMessages([])
       setThreadStatus('idle')
       setPagination(EMPTY_PAGINATION)
       return
     }
     loadThread(activeConversationId, { showLoading: !threadCacheRef.current.get(`${userId}:${activeConversationId}`)?.messages?.length })
-  }, [activeConversationId, loadThread, userId])
+  }, [activeConversationId, accessDenied, isGuest, loadThread, userId])
 
   useEffect(() => {
     setReplyTarget(null)
     setDraftFiles([])
   }, [activeConversationId])
+
+  useEffect(() => {
+    if (!activeConversation || !userId || accessDenied || isGuest) return
+    const unread = activeConversation.client_id === userId
+      ? !activeConversation.is_read_by_client
+      : activeConversation.partner_id === userId
+        ? !activeConversation.is_read_by_partner
+        : false
+
+    if (unread) {
+      void markConversationRead(activeConversation, userId).catch(() => {})
+      setConversations((current) => current.map((c) => {
+        if (c.id !== activeConversation.id) return c
+        return {
+          ...c,
+          is_read_by_client: activeConversation.client_id === userId ? true : c.is_read_by_client,
+          is_read_by_partner: activeConversation.partner_id === userId ? true : c.is_read_by_partner,
+        }
+      }))
+    }
+  }, [activeConversation, accessDenied, isGuest, userId])
 
   useEffect(() => {
     let active = true
@@ -483,7 +603,7 @@ export default function Inbox() {
   }, [userId, scheduleConversationRefresh])
 
   useEffect(() => {
-    if (!activeConversationId) return undefined
+    if (!activeConversationId || accessDenied || isGuest) return undefined
 
     return subscribeToConversation(activeConversationId, async (payload) => {
       if (!payload?.table) {
@@ -527,7 +647,7 @@ export default function Inbox() {
 
       scheduleConversationRefresh()
     })
-  }, [activeConversationId, loadFreshMessage, mergeIncomingMessages, patchOfferMessage, refreshMessageReactions, scheduleConversationRefresh])
+  }, [accessDenied, isGuest, activeConversationId, loadFreshMessage, mergeIncomingMessages, patchOfferMessage, refreshMessageReactions, scheduleConversationRefresh])
 
   useEffect(() => {
     return () => {
@@ -758,7 +878,7 @@ export default function Inbox() {
         <div className="grid min-h-0 min-w-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)] lg:gap-3 xl:grid-cols-[minmax(20rem,23rem)_minmax(0,1fr)]">
           <div className={`${hasSelectedConversation ? 'hidden lg:flex' : 'flex'} min-h-0 min-w-0`}>
             <ConversationList
-              conversations={conversations}
+              conversations={visibleConversations}
               activeId={activeConversationId}
               userId={userId}
               statusByConversation={conversationStatuses}
@@ -767,45 +887,58 @@ export default function Inbox() {
             />
           </div>
           <div className={`${hasSelectedConversation ? 'flex' : 'hidden lg:flex'} min-h-0 min-w-0 flex-col overflow-hidden lg:gap-3`}>
-            <ChatThread
-              conversation={activeConversation}
-              messages={messages}
-              userId={userId}
-              orderStatus={conversationStatuses.get(activeConversationId) || null}
-              onBack={handleBackToList}
-              onOfferAction={handleOfferAction}
-              onServiceRequestAction={handleServiceRequestAction}
-              onReplyToMessage={handleReplyToMessage}
-              onToggleReaction={handleToggleReaction}
-              onLoadOlder={loadOlderMessages}
-              hasOlder={pagination.hasOlder}
-              isLoadingOlder={pagination.isLoadingOlder}
-              status={threadStatus}
-              forceScrollToken={scrollToLatestToken}
-              layoutVersion={`${draft.length}:${draftFiles.length}:${replyTarget?.id || ''}:${messageStatus}`}
-            />
-            {activeConversation && activeConversation.status === 'open' && threadStatus === 'ready' && (
-              <ComposeBar
-                value={draft}
-                onChange={setDraft}
-                onSubmit={submitMessage}
-                canSendOffer={role === 'partner'}
-                onOpenOffer={() => setOfferOpen(true)}
-                replyTarget={replyTarget}
-                onClearReply={() => setReplyTarget(null)}
-                conversation={activeConversation}
-                status={messageStatus}
-                files={draftFiles}
-                onFilesChange={handleDraftFilesChange}
-                onRemoveFile={handleRemoveDraftFile}
-                referenceLibrary={referenceLibrary}
-                onSendReference={handleSendReference}
-              />
+            {isVerifying ? (
+              <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center rounded-3xl border border-dashed border-line bg-paper p-8 text-center text-sm text-muted">
+                Зареждаме...
+              </div>
+            ) : accessDenied || isGuest ? (
+              <div className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col items-center justify-center rounded-3xl border border-line bg-paper p-8 text-center text-sm text-muted">
+                <h2 className="font-display text-2xl text-ink">Нямате достъп до този разговор.</h2>
+                <p className="mt-2 text-sm text-muted">Разговорите са достъпни само за участниците.</p>
+              </div>
+            ) : (
+              <>
+                <ChatThread
+                  conversation={safeActiveConversation}
+                  messages={safeMessages}
+                  userId={userId}
+                  orderStatus={conversationStatuses.get(activeConversationId) || null}
+                  onBack={handleBackToList}
+                  onOfferAction={handleOfferAction}
+                  onServiceRequestAction={handleServiceRequestAction}
+                  onReplyToMessage={handleReplyToMessage}
+                  onToggleReaction={handleToggleReaction}
+                  onLoadOlder={loadOlderMessages}
+                  hasOlder={pagination.hasOlder}
+                  isLoadingOlder={pagination.isLoadingOlder}
+                  status={threadStatus}
+                  forceScrollToken={scrollToLatestToken}
+                  layoutVersion={`${draft.length}:${draftFiles.length}:${replyTarget?.id || ''}:${messageStatus}`}
+                />
+                {safeActiveConversation && safeActiveConversation.status === 'open' && threadStatus === 'ready' && (
+                  <ComposeBar
+                    value={draft}
+                    onChange={setDraft}
+                    onSubmit={submitMessage}
+                    canSendOffer={role === 'partner'}
+                    onOpenOffer={() => setOfferOpen(true)}
+                    replyTarget={replyTarget}
+                    onClearReply={() => setReplyTarget(null)}
+                    conversation={safeActiveConversation}
+                    status={messageStatus}
+                    files={draftFiles}
+                    onFilesChange={handleDraftFilesChange}
+                    onRemoveFile={handleRemoveDraftFile}
+                    referenceLibrary={referenceLibrary}
+                    onSendReference={handleSendReference}
+                  />
+                )}
+              </>
             )}
           </div>
         </div>
       )}
-      <OfferComposer open={offerOpen} onClose={() => setOfferOpen(false)} onSubmit={submitOffer} status={messageStatus} serviceRequest={activeServiceRequest} />
+      {!accessDenied && !isGuest && <OfferComposer open={offerOpen} onClose={() => setOfferOpen(false)} onSubmit={submitOffer} status={messageStatus} serviceRequest={activeServiceRequest} />}
       {account?.account_status === 'banned' && <div className="shrink-0 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Акаунтът е блокиран. Някои действия може да бъдат ограничени.</div>}
     </InboxShell>
   )

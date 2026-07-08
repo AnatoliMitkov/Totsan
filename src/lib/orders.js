@@ -214,10 +214,30 @@ export async function loadOrderDetails(orderId) {
 
       if (Array.isArray(accounts)) {
         const accountMap = new Map(accounts.map((row) => [row.id, row]))
+
+        // Enrich partner_account with the public profile name (e.g. "Totsan Design").
+        // Partner profile names live in profiles.name, linked via profiles.user_id.
+        let partnerProfileName = ''
+        if (orderWithParties.partner_id) {
+          const { data: partnerProfile } = await supabase
+            .from('profiles')
+            .select('name')
+            .eq('user_id', orderWithParties.partner_id)
+            .maybeSingle()
+          partnerProfileName = partnerProfile?.name || ''
+        }
+
+        const rawPartnerAccount = accountMap.get(orderWithParties.partner_id) || null
+        const enrichedPartnerAccount = rawPartnerAccount
+          ? { ...rawPartnerAccount, full_name: partnerProfileName || rawPartnerAccount.full_name || rawPartnerAccount.display_name || '' }
+          : partnerProfileName
+            ? { id: orderWithParties.partner_id, full_name: partnerProfileName, display_name: '', email: '' }
+            : null
+
         orderWithParties = {
           ...orderWithParties,
           client_account: accountMap.get(orderWithParties.client_id) || null,
-          partner_account: accountMap.get(orderWithParties.partner_id) || null,
+          partner_account: enrichedPartnerAccount,
         }
       }
     }

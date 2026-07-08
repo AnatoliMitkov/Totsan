@@ -259,10 +259,11 @@ function MfaAppGate({ children }) {
 
 function AppRoutes() {
   const location = useLocation()
+  const rootPath = location.pathname.split('/')[1] || ''
 
   return (
     <MfaAppGate>
-      <ErrorBoundary key={location.pathname}>
+      <ErrorBoundary key={rootPath}>
         <Routes>
           <Route path="/portfolio" element={<Portfolio />} />
           <Route element={<Layout />}>

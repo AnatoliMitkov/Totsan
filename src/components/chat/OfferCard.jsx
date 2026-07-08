@@ -42,8 +42,10 @@ export default function OfferCard({ offer, conversation, userId, onAction, compa
   const payment = details.payment || {}
   const conditions = details.conditions || {}
   const includedItems = getStringArray(details.includedItems, offer.deliverables)
-  const excludedItems = getStringArray(details.excludedItems)
-  const clientRequirements = getStringArray(details.clientRequirements)
+  const excludedItems = getStringArray(details.excludedItems, details.notIncluded)
+  const clientRequirements = getStringArray(details.clientRequirements, details.clientProvides)
+  const materialsMode = details.materialsMode || details.materialsNote || ''
+  const vatStatus = details.vatStatus || ''
   const stages = normalizeStages(details.stages || offer.stages)
   const createdLabel = formatOfferTimestamp(offer.created_at || messageCreatedAt)
   const validUntil = details.validUntil || offer.expires_at || ''
@@ -94,7 +96,7 @@ export default function OfferCard({ offer, conversation, userId, onAction, compa
         </div>
       )}
 
-      {offerType === 'staged' && stages.length > 0 && (
+      {stages.length > 0 && (
         <OfferSection title="Етапи" icon={Layers3} compact={compact}>
           <ol className="space-y-3">
             {stages.map((stage) => (
@@ -103,11 +105,11 @@ export default function OfferCard({ offer, conversation, userId, onAction, compa
                 <div className="min-w-0">
                   <div className="break-words text-sm font-semibold">{stage.title || `Етап ${stage.order}`}</div>
                   {stage.description && <p className="mt-1 break-words whitespace-pre-wrap text-sm opacity-75">{stage.description}</p>}
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs opacity-75">
-                    {stage.durationDays > 0 && <span>{stage.durationDays} дни</span>}
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs opacity-75">
+                    {stage.durationDays > 0 && <span>Срок: {stage.durationDays} работни дни</span>}
                     {stage.priceAmount > 0 && <span>{formatEurWithBgn(stage.priceAmount)}</span>}
+                    {stage.startCondition && <span>Условие за старт: {stage.startCondition}</span>}
                     {stage.payment && <span>{stage.payment}</span>}
-                    {stage.startCondition && <span>{stage.startCondition}</span>}
                   </div>
                 </div>
               </li>
@@ -137,15 +139,22 @@ export default function OfferCard({ offer, conversation, userId, onAction, compa
         </div>
       )}
 
-      {(payment.terms || payment.notes || details.materialsMode || details.vatStatus) && (
-        <OfferSection title="Плащане" icon={CreditCard} compact={compact}>
+      {(materialsMode || vatStatus) && (
+        <div className="mt-4 flex flex-wrap gap-2 text-xs">
+          {materialsMode && (
+            <InlineBadge compact={compact}>{MATERIAL_MODE_LABELS[materialsMode] || materialsMode}</InlineBadge>
+          )}
+          {vatStatus && (
+            <InlineBadge compact={compact}>{VAT_LABELS[vatStatus] || vatStatus}</InlineBadge>
+          )}
+        </div>
+      )}
+
+      {(payment.terms || payment.notes) && (
+        <OfferSection title="Условия за плащане" icon={CreditCard} compact={compact}>
           <div className="space-y-2 text-sm">
             {payment.terms && <p className="break-words whitespace-pre-wrap opacity-80">{payment.terms}</p>}
             {payment.notes && <p className="break-words whitespace-pre-wrap opacity-75">{payment.notes}</p>}
-            <div className="flex flex-wrap gap-2 text-xs">
-              {details.materialsMode && <InlineBadge compact={compact}>{MATERIAL_MODE_LABELS[details.materialsMode] || details.materialsMode}</InlineBadge>}
-              {details.vatStatus && <InlineBadge compact={compact}>{VAT_LABELS[details.vatStatus] || details.vatStatus}</InlineBadge>}
-            </div>
           </div>
         </OfferSection>
       )}
@@ -192,9 +201,13 @@ function getOfferDetails(offer) {
   return typeof details === 'object' && !Array.isArray(details) ? details : {}
 }
 
-function getStringArray(primary, fallback = []) {
-  const source = Array.isArray(primary) && primary.length ? primary : fallback
-  return Array.isArray(source) ? source.map((item) => String(item || '').trim()).filter(Boolean) : []
+function getStringArray(...sources) {
+  for (const source of sources) {
+    if (Array.isArray(source) && source.length > 0) {
+      return source.map((item) => String(item || '').trim()).filter(Boolean)
+    }
+  }
+  return []
 }
 
 function normalizeStages(value) {
@@ -204,8 +217,8 @@ function normalizeStages(value) {
     .map((stage, index) => ({
       title: String(stage.title || '').trim(),
       description: String(stage.description || '').trim(),
-      durationDays: Number(stage.durationDays || stage.duration_days || 0),
-      priceAmount: Number(stage.priceAmount || stage.price_amount || 0),
+      durationDays: Number(stage.durationDays || stage.duration_days || stage.days || 0),
+      priceAmount: Number(stage.priceAmount || stage.price_amount || stage.price || 0),
       payment: String(stage.payment || '').trim(),
       startCondition: String(stage.startCondition || stage.start_condition || '').trim(),
       order: Number.isFinite(Number(stage.order)) ? Number(stage.order) : index + 1,

@@ -7,20 +7,19 @@ import { ORDER_STATUS_LABELS, formatOrderDate, formatOrderMoney, loadClientOrder
 export default function MyOrders() {
   const { session, account, loading } = useAccount()
   const userId = session?.user?.id || ''
-  const [clientOrders, setClientOrders] = useState([])
-  const [partnerOrders, setPartnerOrders] = useState([])
-  const [activeTab, setActiveTab] = useState('client')
+  const [orders, setOrders] = useState([])
   const [status, setStatus] = useState('loading')
   const [error, setError] = useState('')
+
+  const isPartnerUser = account?.role === 'specialist'
 
   async function load() {
     if (!userId) return
     setStatus('loading')
     setError('')
     try {
-      const [clientRows, partnerRows] = await Promise.all([loadClientOrders(userId), loadPartnerOrders(userId)])
-      setClientOrders(clientRows)
-      setPartnerOrders(partnerRows)
+      const rows = isPartnerUser ? await loadPartnerOrders(userId) : await loadClientOrders(userId)
+      setOrders(rows)
       setStatus('ready')
     } catch (loadError) {
       setStatus('error')
@@ -28,11 +27,11 @@ export default function MyOrders() {
     }
   }
 
-  useEffect(() => { if (!loading && userId) load() }, [loading, userId]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const isPartner = account?.role === 'specialist' || partnerOrders.length > 0
-  const rows = activeTab === 'partner' ? partnerOrders : clientOrders
-  const totals = useMemo(() => ({ client: clientOrders.length, partner: partnerOrders.length }), [clientOrders.length, partnerOrders.length])
+  useEffect(() => {
+    if (!loading && userId) {
+      load()
+    }
+  }, [loading, userId, account?.role]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <OrdersShell><Panel title="Зареждаме поръчките…" /></OrdersShell>
   if (!session) return <OrdersShell><Panel title="Влез, за да видиш поръчките"><Link to="/login" className="btn btn-primary mt-5">Вход</Link></Panel></OrdersShell>
@@ -49,17 +48,11 @@ export default function MyOrders() {
           </div>
           <button type="button" onClick={load} className="btn btn-ghost"><RefreshCw size={18} /> Обнови</button>
         </div>
-        {isPartner && (
-          <div className="mt-5 flex flex-wrap gap-2 rounded-2xl bg-soft p-1">
-            <TabButton active={activeTab === 'client'} onClick={() => setActiveTab('client')} label={`Като клиент · ${totals.client}`} />
-            <TabButton active={activeTab === 'partner'} onClick={() => setActiveTab('partner')} label={`Като партньор · ${totals.partner}`} />
-          </div>
-        )}
       </div>
 
       <div className="mt-5 grid gap-4">
-        {rows.map(order => <OrderCard key={order.id} order={order} />)}
-        {rows.length === 0 && <div className="rounded-3xl border border-dashed border-line bg-paper p-8 text-center text-sm text-muted">Още няма поръчки в този списък.</div>}
+        {orders.map(order => <OrderCard key={order.id} order={order} />)}
+        {orders.length === 0 && <div className="rounded-3xl border border-dashed border-line bg-paper p-8 text-center text-sm text-muted">Още няма поръчки в този списък.</div>}
       </div>
     </OrdersShell>
   )
@@ -71,10 +64,6 @@ function OrdersShell({ children }) {
 
 function Panel({ title, children }) {
   return <div className="rounded-3xl border border-line bg-paper p-6 md:p-8"><h1 className="font-display text-3xl text-ink">{title}</h1>{children}</div>
-}
-
-function TabButton({ active, onClick, label }) {
-  return <button type="button" onClick={onClick} className={`rounded-full px-4 py-2 text-sm transition ${active ? 'bg-ink text-paper' : 'text-muted hover:bg-paper hover:text-ink'}`}>{label}</button>
 }
 
 function OrderCard({ order }) {
