@@ -23,7 +23,7 @@ function compactOrderStatusLine(orderStatus) {
   if (ACTIVE_ORDER_STATUSES.has(orderStatus.status)) return 'Офертата е платена · Поръчката е активна'
   if (orderStatus.status === 'delivered') return 'Офертата е платена · Поръчката е предадена'
   if (orderStatus.status === 'completed') return 'Офертата е платена · Поръчката е завършена'
-  if (orderStatus.status === 'pending_payment') return 'Офертата чака защитено плащане'
+  if (orderStatus.status === 'pending_payment') return 'Офертата очаква плащане'
   if (orderStatus.status === 'cancelled') return 'Поръчката е отменена'
   if (orderStatus.status === 'refunded') return 'Поръчката е възстановена'
   if (orderStatus.status === 'disputed') return 'Поръчката е в спор'

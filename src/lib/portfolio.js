@@ -2,6 +2,7 @@ import { uploadPortfolioMedia } from './profile-media-upload-client.js'
 import { supabase } from './supabase.js'
 import { normalizeLocationValue } from './locations.js'
 import { deleteStorageRefs, diffStorageRefs, mediaAndCoverStorageRefs } from './storage-media-cleanup.js'
+import { normalizeProfile } from './profiles.js'
 
 export const PORTFOLIO_SELECT_COLUMNS = `
   id,
@@ -247,4 +248,76 @@ export function appendPortfolioMedia(item, upload, caption = '') {
       },
     ],
   }
+}
+
+export async function loadPublicPortfolioByLayer(layerSlug) {
+  if (!layerSlug) return []
+  const { data, error } = await supabase
+    .from('profile_portfolio')
+    .select(`${PORTFOLIO_SELECT_COLUMNS}, profile:profiles(${PORTFOLIO_PROFILE_PUBLIC_COLUMNS})`)
+    .eq('is_published', true)
+    .eq('layer_slug', layerSlug)
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+
+  return (data || [])
+    .map(row => {
+      const item = normalizePortfolioItem(row)
+      if (item && row.profile) {
+        item.profile = normalizeProfile(row.profile)
+      }
+      return item
+    })
+    .filter(item => item && item.profile && item.profile.isPublished)
+}
+
+export function getPortfolioMeta(item = {}) {
+  return [item.city, item.year].filter(Boolean).join(' · ')
+}
+
+export function isVideoMedia(item = {}) {
+  return item.type === 'video' || item.provider === 'youtube' || item.kind === 'video'
+}
+
+export function getYoutubeVideoId(url = '') {
+  const value = String(url || '').trim()
+  if (!value) return ''
+
+  try {
+    const parsed = new URL(value)
+    if (parsed.hostname.includes('youtu.be')) return parsed.pathname.replace('/', '').split(/[?&]/)[0]
+    if (parsed.hostname.includes('youtube.com')) {
+      if (parsed.pathname.startsWith('/shorts/')) return parsed.pathname.split('/')[2] || ''
+      if (parsed.pathname.startsWith('/embed/')) return parsed.pathname.split('/')[2] || ''
+      return parsed.searchParams.get('v') || ''
+    }
+  } catch {
+    const match = value.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^?&/\s]+)/)
+    return match?.[1] || ''
+  }
+
+  return ''
+}
+
+export function getYoutubeThumbnail(url = '') {
+  const id = getYoutubeVideoId(url)
+  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : ''
+}
+
+export function getMediaPreviewUrl(item = {}) {
+  if (!item) return ''
+  if (isVideoMedia(item)) return item.thumbnail || getYoutubeThumbnail(item.url) || ''
+  return item.url || ''
+}
+
+export function getPortfolioMedia(item = {}) {
+  const media = Array.isArray(item.media) ? item.media.filter(Boolean) : []
+  if (media.length) return media
+  return item.coverUrl ? [{ type: 'image', url: item.coverUrl }] : []
+}
+
+export function getProjectCover(item = {}) {
+  const firstPreview = getPortfolioMedia(item).map(getMediaPreviewUrl).find(Boolean)
+  return firstPreview || item.coverUrl || ''
 }

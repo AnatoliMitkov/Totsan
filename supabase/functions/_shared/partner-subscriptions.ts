@@ -478,7 +478,7 @@ export async function sendActivationEmailIfNeeded(
     return { sent: false, skipped: true, reason: 'recently_attempted', subscription }
   }
 
-  let result = await sendTotsanEmail({
+  let result: any = await sendTotsanEmail({
     to: recipientEmail,
     subject: 'Абонаментът ви в Totsan е активен',
     html: buildSubscriptionActivatedEmail({

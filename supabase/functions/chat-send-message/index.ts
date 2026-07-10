@@ -275,7 +275,7 @@ function nextReadFlags(conversation: { client_id: string; partner_id: string }, 
   }
 }
 
-async function auditMasked(adminClient: ReturnType<typeof createClient>, actorId: string, messageId: string | null, payload: Record<string, unknown>) {
+async function auditMasked(adminClient: any, actorId: string, messageId: string | null, payload: Record<string, unknown>) {
   const { error } = await adminClient.from('audit_log').insert({
     actor_id: actorId,
     action: 'chat_content_masked',
@@ -286,7 +286,7 @@ async function auditMasked(adminClient: ReturnType<typeof createClient>, actorId
   if (error) console.error('chat-send-message audit error', error)
 }
 
-async function hasActivePartnerAccess(adminClient: ReturnType<typeof createClient>, partnerId: string, profileId: string | null) {
+async function hasActivePartnerAccess(adminClient: any, partnerId: string, profileId: string | null) {
   const { data, error } = await adminClient.rpc('has_active_partner_access', {
     check_user_id: partnerId,
     check_profile_id: profileId,
@@ -408,7 +408,7 @@ Deno.serve(async (req) => {
 
       let packageQuery = adminClient
         .from('partner_service_packages')
-        .select('id, title, description, features, price_amount, currency, is_active')
+        .select('id, title, description, features, price_amount, currency, delivery_days, revisions, is_active')
         .eq('service_id', serviceId)
         .eq('is_active', true)
       packageQuery = requestedPackageId ? packageQuery.eq('id', requestedPackageId) : packageQuery.order('created_at').limit(1)
@@ -599,7 +599,7 @@ Deno.serve(async (req) => {
           priceLabel: meta.priceLabel,
           deliveryLabel: meta.deliveryLabel,
           slug: service.slug,
-          profileSlug: String((service.profile as Record<string, unknown> | null)?.slug || ''),
+          profileSlug: String((service.profile as unknown as Record<string, unknown> | null)?.slug || ''),
         })
         preview = `Споделена услуга: ${service.title}`
       }
@@ -612,7 +612,7 @@ Deno.serve(async (req) => {
           .maybeSingle()
         if (itemError) throw itemError
 
-        const profile = item?.profile as Record<string, unknown> | null
+        const profile = item?.profile as unknown as Record<string, unknown> | null
         if (!item?.id || !profile || String(profile.user_id || '') !== conversation.partner_id) {
           throw new Error('Портфолио проектът не принадлежи на този разговор.')
         }
@@ -857,7 +857,7 @@ Deno.serve(async (req) => {
 
       let updatedOffer = null
       let order = null
-      if (status === 'accepted' && offer.service_request_id) {
+      if (status === 'accepted') {
         const { data: accepted, error: acceptError } = await adminClient.rpc('accept_service_offer', {
           p_offer_id: offerId,
           p_client_id: user.id,
@@ -880,8 +880,8 @@ Deno.serve(async (req) => {
 
       const labels: Record<string, string> = {
         accepted: order
-          ? 'Финалната оферта е приета. Създадена е поръчка, която очаква защитено плащане през Totsan.'
-          : 'Офертата е приета. Следва защитено плащане през Totsan според условията на офертата.',
+          ? 'Финалната оферта е приета. Създадена е поръчка, която очаква плащане.'
+          : 'Офертата е приета. Следва плащане според условията на офертата.',
         declined: 'Офертата е отказана.',
         withdrawn: 'Офертата е изтеглена от партньора.',
         change_requested: 'Клиентът поиска промяна по офертата.',

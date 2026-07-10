@@ -37,6 +37,10 @@ export function runOrderAction(orderId, orderAction, note = '') {
   return invokePaymentAction('order_action', { orderId, orderAction, note })
 }
 
+export function runMilestoneAction(milestoneId, milestoneAction, note = '') {
+  return invokePaymentAction('milestone_action', { milestoneId, milestoneAction, note })
+}
+
 export function createConnectOnboarding(origin = window.location.origin) {
   return invokePaymentAction('connect_onboarding', { origin })
 }

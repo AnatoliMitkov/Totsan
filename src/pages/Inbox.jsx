@@ -31,7 +31,7 @@ import {
   updateServiceRequestStatus,
 } from '../lib/chat.js'
 import { normalizeAttachmentFiles, uploadChatAttachments } from '../lib/chat-attachments.js'
-import { loadPublicPartnerServicesForProfile } from '../lib/partner-services.js'
+import { loadPartnerServicesForProfile, loadPublicPartnerServicesForProfile } from '../lib/partner-services.js'
 import { loadProfilePortfolio } from '../lib/portfolio.js'
 
 const EMPTY_PAGINATION = {
@@ -561,7 +561,7 @@ export default function Inbox() {
 
       try {
         const [services, portfolio] = await Promise.all([
-          loadPublicPartnerServicesForProfile(partnerProfileId),
+          role === 'partner' ? loadPartnerServicesForProfile(partnerProfileId) : loadPublicPartnerServicesForProfile(partnerProfileId),
           loadProfilePortfolio(partnerProfileId),
         ])
         if (!active) return
@@ -586,7 +586,7 @@ export default function Inbox() {
     return () => {
       active = false
     }
-  }, [activeConversation, partnerProfileId])
+  }, [activeConversation, partnerProfileId, role])
 
   useEffect(() => {
     const handlePopState = () => {
@@ -720,7 +720,7 @@ export default function Inbox() {
   }
 
   async function submitOffer(offer) {
-    if (!activeConversationId) return
+    if (!activeConversationId) return false
     setMessageStatus('sending')
 
     try {
@@ -733,9 +733,11 @@ export default function Inbox() {
       setOfferOpen(false)
       setMessageStatus('idle')
       scheduleConversationRefresh()
+      return true
     } catch (offerError) {
       setError(offerError.message || 'Офертата не се изпрати.')
       setMessageStatus('idle')
+      return false
     }
   }
 
@@ -938,7 +940,7 @@ export default function Inbox() {
           </div>
         </div>
       )}
-      {!accessDenied && !isGuest && <OfferComposer open={offerOpen} onClose={() => setOfferOpen(false)} onSubmit={submitOffer} status={messageStatus} serviceRequest={activeServiceRequest} />}
+      {!accessDenied && !isGuest && <OfferComposer open={offerOpen} onClose={() => setOfferOpen(false)} onSubmit={submitOffer} status={messageStatus} serviceRequest={activeServiceRequest} conversationId={activeConversationId} services={referenceLibrary.services} servicesStatus={referenceLibrary.status} />}
       {account?.account_status === 'banned' && <div className="shrink-0 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Акаунтът е блокиран. Някои действия може да бъдат ограничени.</div>}
     </InboxShell>
   )

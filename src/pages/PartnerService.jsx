@@ -394,7 +394,7 @@ export default function PartnerService() {
                   <div className="mt-5 font-display text-4xl text-ink">{activePackage.priceAmount ? formatServicePrice(activePackage.priceAmount) : packagePriceLabel(service)}</div>
                   <div className="mt-4 grid gap-2 text-sm text-muted">
                     <span className="inline-flex items-center gap-2 text-base font-medium text-emerald-600"><ShieldCheck size={18} /> Защитено плащане през Totsan</span>
-                    <span>Totsan пази офертата, комуникацията и статуса на плащането; сумата се освобождава към партньора според условията на поръчката.</span>
+                    <span>Totsan пази офертата, комуникацията и статуса на плащането; преводът към партньора следва условията на поръчката.</span>
                   </div>
                   {activePackage.features.length > 0 && (
                     <ul className="mt-5 space-y-2 text-sm text-ink/80">

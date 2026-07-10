@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js'
 import { formatEurWithBgn, formatMoney } from './money.js'
+import { normalizeAcceptedOffer } from './offers.js'
 
 export const ORDER_STATUS_LABELS = {
   pending_payment: 'Очаква плащане',
@@ -84,6 +85,8 @@ export function normalizeOrder(row = {}) {
     partnerPayout: row.partner_payout || 0,
     currency: row.currency || 'EUR',
     paymentProvider: row.payment_provider || 'stripe',
+    paymentMethod: row.payment_method || 'platform',
+    acceptedOfferSnapshot: row.accepted_offer_snapshot || null,
     status: row.status || 'pending_payment',
     deliveryDueAt: row.delivery_due_at || '',
     deliveredAt: row.delivered_at || '',
@@ -124,7 +127,60 @@ export function normalizePayment(row = {}) {
   }
 }
 
+export function normalizeOrderMilestone(row = {}) {
+  return {
+    id: row.id || '',
+    orderId: row.order_id || '',
+    milestoneId: row.milestone_id || '',
+    offerId: row.offer_id || '',
+    position: Number(row.position || 0),
+    title: row.title || '',
+    description: row.description || '',
+    amount: Number(row.amount || 0),
+    currency: row.currency || 'EUR',
+    durationDays: Number(row.duration_days || 0),
+    startCondition: row.start_condition || '',
+    paymentNote: row.payment_note || '',
+    status: row.status || 'pending',
+    evidence: Array.isArray(row.evidence) ? row.evidence : [],
+    startedAt: row.started_at || '',
+    submittedAt: row.submitted_at || '',
+    acceptedAt: row.accepted_at || '',
+    paidAt: row.paid_at || '',
+    dueAt: row.due_at || '',
+    stripeCheckoutSessionId: row.stripe_checkout_session_id || '',
+    stripePaymentIntentId: row.stripe_payment_intent_id || '',
+    stripeTransferId: row.stripe_transfer_id || '',
+    createdAt: row.created_at || '',
+    updatedAt: row.updated_at || '',
+  }
+}
+
 export async function loadCheckoutPreview(type, id) {
+  if (type === 'milestone') {
+    const { data: milestone, error } = await supabase.from('order_milestones').select('*').eq('id', id).maybeSingle()
+    if (error) throw error
+    if (!milestone) return null
+    const { data: order, error: orderError } = await supabase.from('orders').select('*').eq('id', milestone.order_id).maybeSingle()
+    if (orderError) throw orderError
+    if (!order) return null
+    return {
+      type,
+      id: milestone.id,
+      title: `${order.title} · ${milestone.title}`,
+      subtitle: milestone.description || '',
+      description: milestone.payment_note || '',
+      deliverables: milestone.description ? [milestone.description] : [],
+      amountTotal: milestone.amount || 0,
+      currency: milestone.currency || order.currency || 'EUR',
+      deliveryDays: milestone.duration_days || '',
+      revisions: '',
+      milestone: normalizeOrderMilestone(milestone),
+      order: normalizeOrder(order),
+      isAvailable: ['ready', 'payment_pending'].includes(milestone.status),
+    }
+  }
+
   if (type === 'service') {
     const { data, error } = await supabase
       .from('partner_service_packages')
@@ -154,19 +210,21 @@ export async function loadCheckoutPreview(type, id) {
     const { data, error } = await supabase.from('offers').select('*').eq('id', id).maybeSingle()
     if (error) throw error
     if (!data) return null
+    const normalizedOffer = normalizeAcceptedOffer(data)
     return {
       type,
       id: data.id,
-      title: data.title,
-      subtitle: data.description || '',
-      description: data.description || '',
-      deliverables: jsonArray(data.deliverables),
-      amountTotal: data.price_amount || 0,
-      currency: data.currency || 'EUR',
-      deliveryDays: data.delivery_days || '',
+      title: normalizedOffer.title,
+      subtitle: normalizedOffer.summary,
+      description: normalizedOffer.description,
+      deliverables: normalizedOffer.includedItems,
+      amountTotal: normalizedOffer.priceAmount,
+      currency: normalizedOffer.currency,
+      deliveryDays: normalizedOffer.timeline.days,
       revisions: data.revisions ?? '',
       offer: data,
-      isAvailable: ['sent', 'accepted'].includes(data.status),
+      normalizedOffer,
+      isAvailable: data.status === 'accepted' && Boolean(data.accepted_at),
     }
   }
 
@@ -194,14 +252,16 @@ export async function loadPartnerOrders(userId) {
 }
 
 export async function loadOrderDetails(orderId) {
-  const [{ data: order, error: orderError }, { data: events, error: eventsError }, { data: payments, error: paymentsError }] = await Promise.all([
+  const [{ data: order, error: orderError }, { data: events, error: eventsError }, { data: payments, error: paymentsError }, { data: milestones, error: milestonesError }] = await Promise.all([
     supabase.from('orders').select('*').eq('id', orderId).maybeSingle(),
     supabase.from('order_events').select('*').eq('order_id', orderId).order('created_at', { ascending: false }),
     supabase.from('payment_transactions').select('*').eq('order_id', orderId).order('created_at', { ascending: false }),
+    supabase.from('order_milestones').select('*').eq('order_id', orderId).order('position', { ascending: true }),
   ])
   if (orderError) throw orderError
   if (eventsError) throw eventsError
   if (paymentsError) throw paymentsError
+  if (milestonesError && !isMissingMilestonesTableError(milestonesError)) throw milestonesError
 
   let orderWithParties = order || null
   if (orderWithParties) {
@@ -257,6 +317,17 @@ export async function loadOrderDetails(orderId) {
     order: orderWithParties ? normalizeOrder(orderWithParties) : null,
     events: (events || []).map(normalizeOrderEvent),
     payments: (payments || []).map(normalizePayment),
+    milestones: (milestones || []).map(normalizeOrderMilestone),
     projectLocation,
   }
+}
+
+function isMissingMilestonesTableError(error) {
+  const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return text.includes('order_milestones') && (
+    text.includes('does not exist')
+    || text.includes('schema cache')
+    || text.includes('42p01')
+    || text.includes('pgrst')
+  )
 }

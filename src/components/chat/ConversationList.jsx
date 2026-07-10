@@ -1,10 +1,27 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MoreVertical } from 'lucide-react'
 import { compactSystemText, formatChatTime, getConversationTitle, getOtherParticipant, isUnread } from '../../lib/chat.js'
 import Avatar from '../Avatar.jsx'
 
 export default function ConversationList({ conversations, activeId, userId, statusByConversation, onSelect, onArchive }) {
   const [openMenuId, setOpenMenuId] = useState(null)
+  const openMenuRef = useRef(null)
+
+  useEffect(() => {
+    if (!openMenuId) return undefined
+    function closeOnOutsidePointer(event) {
+      if (!openMenuRef.current?.contains(event.target)) setOpenMenuId(null)
+    }
+    function closeOnEscape(event) {
+      if (event.key === 'Escape') setOpenMenuId(null)
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointer)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [openMenuId])
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-none border-0 bg-paper p-2.5 sm:rounded-3xl sm:border sm:border-line lg:p-3.5">
@@ -67,7 +84,7 @@ export default function ConversationList({ conversations, activeId, userId, stat
               </button>
 
               {/* Three dots actions menu */}
-              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 z-10 flex items-center">
+              <div ref={openMenuId === conversation.id ? openMenuRef : null} className="absolute right-2.5 top-1/2 -translate-y-1/2 z-10 flex items-center">
                 <button
                   type="button"
                   onClick={(e) => {
@@ -76,22 +93,14 @@ export default function ConversationList({ conversations, activeId, userId, stat
                   }}
                   className="flex h-8 w-8 items-center justify-center rounded-xl text-muted hover:bg-line/60 hover:text-ink transition focus-visible:outline-none"
                   aria-label="Опции за разговор"
+                  aria-expanded={openMenuId === conversation.id}
+                  aria-controls={`conversation-menu-${conversation.id}`}
                 >
                   <MoreVertical size={18} />
                 </button>
 
                 {openMenuId === conversation.id && (
-                  <>
-                    {/* Overlay to close menu on click outside */}
-                    <div
-                      className="fixed inset-0 z-20"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setOpenMenuId(null)
-                      }}
-                    />
-                    {/* Dropdown Menu */}
-                    <div className="absolute right-0 top-full mt-1.5 z-30 w-44 origin-top-right rounded-xl border border-line bg-paper py-1 shadow-lg ring-1 ring-black/5 focus:outline-none">
+                    <div id={`conversation-menu-${conversation.id}`} role="menu" className="absolute right-0 top-full mt-1.5 z-30 w-44 origin-top-right rounded-xl border border-line bg-paper py-1 shadow-lg ring-1 ring-black/5 focus:outline-none">
                       <button
                         type="button"
                         onClick={(e) => {
@@ -100,6 +109,7 @@ export default function ConversationList({ conversations, activeId, userId, stat
                           onArchive?.(conversation)
                         }}
                         className="flex w-full items-center px-4 py-2.5 text-left text-sm font-medium text-ink hover:bg-soft transition"
+                        role="menuitem"
                       >
                         Архивирай
                       </button>
@@ -111,11 +121,11 @@ export default function ConversationList({ conversations, activeId, userId, stat
                           onArchive?.(conversation)
                         }}
                         className="flex w-full items-center px-4 py-2.5 text-left text-sm text-muted hover:bg-soft transition"
+                        role="menuitem"
                       >
                         Скрий от списъка
                       </button>
                     </div>
-                  </>
                 )}
               </div>
             </div>

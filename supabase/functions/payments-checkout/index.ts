@@ -1,7 +1,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.8'
 
-const CHECKOUT_TYPES = new Set(['service', 'offer'])
+const CHECKOUT_TYPES = new Set(['service', 'offer', 'milestone'])
 const ORDER_ACTIONS = new Set(['confirm_direct_payment', 'start_work', 'mark_delivered', 'confirm_completed', 'request_revision', 'cancel_pending'])
+const MILESTONE_ACTIONS = new Set(['start', 'submit', 'accept', 'request_revision', 'dispute'])
 const ZERO_DECIMAL_CURRENCIES = new Set(['BIF','CLP','DJF','GNF','JPY','KMF','KRW','MGA','PYG','RWF','UGX','VND','VUV','XAF','XOF','XPF'])
 const PLATFORM_FEE_RATE = 0.02
 
@@ -11,7 +12,9 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-type SupabaseAdmin = ReturnType<typeof createClient>
+// Edge functions use tables added by migrations that are not represented by a
+// generated Database type in this repository.
+type SupabaseAdmin = any
 
 function jsonResponse(status: number, payload: Record<string, unknown>) {
   return new Response(JSON.stringify(payload), {
@@ -40,14 +43,28 @@ function decodeJwtPayload(token: string) {
   }
 }
 
-function cleanText(value: unknown, fallback = '') {
-  return String(value ?? '').trim() || fallback
+function cleanText(value: unknown, fallback: unknown = '') {
+  return String(value ?? '').trim() || String(fallback ?? '').trim()
 }
 
 function asArray(value: unknown) {
   if (Array.isArray(value)) return value.map(item => String(item || '').trim()).filter(Boolean)
   if (typeof value === 'string') return value.split('\n').map(item => item.trim()).filter(Boolean)
   return []
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value) return {}
+  if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>
+  if (typeof value !== 'string') return {}
+  try {
+    const parsed = JSON.parse(value)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {}
+  } catch {
+    return {}
+  }
 }
 
 function moneyAmount(value: unknown) {
@@ -144,6 +161,7 @@ async function loadServiceSource(admin: SupabaseAdmin, packageId: string, userId
     currency,
     deliveryDueAt: dueDate(item.delivery_days),
     ...fees,
+    paymentMethod: 'platform',
   }
 }
 
@@ -152,11 +170,23 @@ async function loadOfferSource(admin: SupabaseAdmin, offerId: string, userId: st
   if (error) throw error
   if (!offer) throw new Error('Офертата не беше намерена.')
   if (offer.client_id !== userId) throw new Error('Само клиентът може да плати тази оферта.')
-  if (!['sent', 'accepted'].includes(offer.status)) throw new Error('Тази оферта вече не е активна за плащане.')
+  if (offer.status !== 'accepted' || !offer.accepted_at) throw new Error('Офертата трябва първо да бъде приета.')
 
-  const amount = moneyAmount(offer.price_amount)
-  const currency = currencyCode(offer.currency)
+  const isAccepted = offer.status === 'accepted' && offer.accepted_at != null
+  const acceptedSnapshot = asRecord(offer.accepted_offer_snapshot)
+  const mutableDetails = asRecord(offer.offer_details)
+  const nestedSnapshotDetails = asRecord(acceptedSnapshot.offerDetails)
+  const snapshot = isAccepted && Object.keys(acceptedSnapshot).length > 0
+    ? { ...nestedSnapshotDetails, ...acceptedSnapshot }
+    : mutableDetails
+  const timeline = asRecord(snapshot.timeline)
+  const payment = asRecord(snapshot.payment)
+  const amount = moneyAmount(snapshot.priceAmount ?? offer.price_amount)
+  const currency = currencyCode(snapshot.currency ?? offer.currency)
   const fees = computeFees(amount)
+  const deliverables = asArray(snapshot.includedItems ?? snapshot.deliverables ?? offer.deliverables)
+  const paymentMethod = cleanText(payment.method, offer.offer_type === 'staged' ? 'staged_platform' : 'platform')
+
   return {
     sourceType: 'offer',
     sourceId: offer.id,
@@ -166,14 +196,31 @@ async function loadOfferSource(admin: SupabaseAdmin, offerId: string, userId: st
     serviceId: null,
     servicePackageId: null,
     offerId: offer.id,
-    title: offer.title,
-    description: cleanText(offer.description),
-    deliverables: asArray(offer.deliverables),
+    title: cleanText(snapshot.title, offer.title),
+    description: cleanText(snapshot.description, cleanText(snapshot.summary, offer.description)),
+    deliverables,
     amount,
     currency,
-    deliveryDueAt: dueDate(offer.delivery_days),
+    deliveryDueAt: dueDate(timeline.days ?? snapshot.deliveryDays ?? offer.delivery_days),
     ...fees,
+    isAccepted,
+    snapshot,
+    paymentMethod,
   }
+}
+
+async function loadMilestoneSource(admin: SupabaseAdmin, milestoneId: string, userId: string) {
+  const { data: milestone, error } = await admin.from('order_milestones').select('*').eq('id', milestoneId).maybeSingle()
+  if (error) throw error
+  if (!milestone) throw new Error('Етапът не беше намерен.')
+
+  const { data: order, error: orderError } = await admin.from('orders').select('*').eq('id', milestone.order_id).maybeSingle()
+  if (orderError) throw orderError
+  if (!order || order.client_id !== userId) throw new Error('Само клиентът може да плати този етап.')
+  if (order.payment_method !== 'staged_platform') throw new Error('Поръчката не използва плащане по етапи.')
+  if (!['ready', 'payment_pending'].includes(milestone.status)) throw new Error('Този етап не е готов за плащане.')
+
+  return { order, milestone }
 }
 
 async function findPendingOrder(admin: SupabaseAdmin, source: Record<string, unknown>) {
@@ -187,7 +234,10 @@ async function findPendingOrder(admin: SupabaseAdmin, source: Record<string, unk
 }
 
 async function createOrUpdateOrder(admin: SupabaseAdmin, source: Record<string, unknown>, provider: 'stripe' | 'mock') {
-  const payload = {
+  const isAccepted = Boolean(source.isAccepted)
+  const snapshot = asRecord(source.snapshot)
+
+  const payload: Record<string, unknown> = {
     client_id: source.clientId,
     partner_id: source.partnerId,
     conversation_id: source.conversationId,
@@ -196,19 +246,36 @@ async function createOrUpdateOrder(admin: SupabaseAdmin, source: Record<string, 
     offer_id: source.offerId,
     title: source.title,
     description: source.description,
-    deliverables: source.deliverables,
+    deliverables: isAccepted && Object.keys(snapshot).length > 0
+      ? asArray(snapshot.deliverables)
+      : source.deliverables,
     amount_total: source.amount,
     platform_fee: source.platformFee,
     partner_payout: source.partnerPayout,
     currency: source.currency,
     payment_provider: provider,
+    payment_method: cleanText(source.paymentMethod, 'platform'),
     status: 'pending_payment',
     delivery_due_at: source.deliveryDueAt,
   }
+
+  // For accepted offers, also persist the canonical snapshot into the order.
+  if (isAccepted && Object.keys(snapshot).length > 0) {
+    payload['accepted_offer_snapshot'] = snapshot
+  }
+
   const existing = await findPendingOrder(admin, source)
-  const request = existing
-    ? admin.from('orders').update(payload).eq('id', existing.id)
-    : admin.from('orders').insert(payload)
+  const request = existing && isAccepted
+    ? admin.from('orders').update({
+        payment_provider: provider,
+        payment_method: cleanText(source.paymentMethod, existing.payment_method || 'platform'),
+        ...(Object.keys(asRecord(existing.accepted_offer_snapshot)).length === 0 && snapshot
+          ? { accepted_offer_snapshot: snapshot }
+          : {}),
+      }).eq('id', existing.id)
+    : existing
+      ? admin.from('orders').update(payload).eq('id', existing.id)
+      : admin.from('orders').insert(payload)
   const { data: order, error } = await request.select('*').single()
   if (error) throw error
 
@@ -321,26 +388,29 @@ async function latestChargeForPaymentIntent(admin: SupabaseAdmin, paymentIntentI
   return cleanText(latestCharge?.id)
 }
 
-async function createStripeCheckout(admin: SupabaseAdmin, order: Record<string, unknown>, origin: string, sourceType: string, sourceId: string) {
+async function createStripeCheckout(admin: SupabaseAdmin, order: Record<string, unknown>, origin: string, sourceType: string, sourceId: string, milestone: Record<string, unknown> | null = null) {
   const currency = String(order.currency || 'EUR').toLowerCase()
-  const amount = toStripeAmount(Number(order.amount_total || 0), currency)
+  const sourceAmount = Number(milestone?.amount || order.amount_total || 0)
+  const amount = toStripeAmount(sourceAmount, currency)
   const transferGroup = orderTransferGroup(order)
   const params = new URLSearchParams()
   params.set('mode', 'payment')
   params.set('client_reference_id', String(order.id))
   params.set('success_url', `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`)
-  params.set('cancel_url', `${origin}/checkout/${sourceType}/${sourceId}?cancelled=1`)
+  params.set('cancel_url', milestone ? `${origin}/order/${order.id}?payment=cancelled` : `${origin}/checkout/${sourceType}/${sourceId}?cancelled=1`)
   params.set('line_items[0][quantity]', '1')
   params.set('line_items[0][price_data][currency]', currency)
   params.set('line_items[0][price_data][unit_amount]', String(amount))
-  params.set('line_items[0][price_data][product_data][name]', String(order.title).slice(0, 240))
+  params.set('line_items[0][price_data][product_data][name]', String(milestone ? `${order.title} · ${milestone.title}` : order.title).slice(0, 240))
   params.set('metadata[order_id]', String(order.id))
   params.set('metadata[source_type]', sourceType)
   params.set('metadata[source_id]', sourceId)
   params.set('metadata[partner_id]', String(order.partner_id))
+  if (milestone?.id) params.set('metadata[milestone_id]', String(milestone.id))
   params.set('payment_intent_data[metadata][order_id]', String(order.id))
   params.set('payment_intent_data[metadata][source_type]', sourceType)
   params.set('payment_intent_data[metadata][partner_id]', String(order.partner_id))
+  if (milestone?.id) params.set('payment_intent_data[metadata][milestone_id]', String(milestone.id))
   params.set('payment_intent_data[description]', `Totsan order ${order.id}`)
   params.set('payment_intent_data[transfer_group]', transferGroup)
 
@@ -350,11 +420,20 @@ async function createStripeCheckout(admin: SupabaseAdmin, order: Record<string, 
   }).eq('id', order.id).select('*').single()
   if (updateError) throw updateError
 
+  if (milestone?.id) {
+    const { error: milestoneError } = await admin.from('order_milestones').update({
+      status: 'payment_pending',
+      stripe_checkout_session_id: session.id,
+    }).eq('id', milestone.id).in('status', ['ready', 'payment_pending'])
+    if (milestoneError) throw milestoneError
+  }
+
   await admin.from('payment_transactions').insert({
     order_id: order.id,
+    milestone_id: milestone?.id || null,
     type: 'charge',
     provider: 'stripe',
-    amount: order.amount_total,
+    amount: sourceAmount,
     currency: order.currency,
     status: 'pending',
     raw: { checkout_session_id: session.id, url: session.url },
@@ -398,8 +477,12 @@ async function insertSystemMessage(admin: SupabaseAdmin, offerId: string, actorI
 }
 
 async function markPaid(admin: SupabaseAdmin, order: Record<string, unknown>, actorId: string, raw: Record<string, unknown>) {
+  const metadata = asRecord(raw.metadata)
+  const paymentIntentRecord = asRecord(raw.payment_intent)
+  const milestoneId = cleanText(metadata.milestone_id, cleanText(asRecord(paymentIntentRecord.metadata).milestone_id))
+  if (milestoneId) return markMilestonePaid(admin, order, actorId, raw, milestoneId)
   if (order.status !== 'pending_payment') return order
-  const paymentIntent = typeof raw.payment_intent === 'string' ? raw.payment_intent : raw.payment_intent?.id || null
+  const paymentIntent = typeof raw.payment_intent === 'string' ? raw.payment_intent : cleanText(asRecord(raw.payment_intent).id) || null
   const provider = raw.provider === 'mock' ? 'mock' : 'stripe'
   const { data: updatedRows, error } = await admin.from('orders').update({
     status: 'paid',
@@ -436,15 +519,53 @@ async function markPaid(admin: SupabaseAdmin, order: Record<string, unknown>, ac
   return updatedOrder
 }
 
+async function markMilestonePaid(admin: SupabaseAdmin, order: Record<string, unknown>, actorId: string, raw: Record<string, unknown>, milestoneId: string) {
+  const { data: milestone, error } = await admin.from('order_milestones').select('*').eq('id', milestoneId).eq('order_id', order.id).maybeSingle()
+  if (error) throw error
+  if (!milestone) throw new Error('Етапът за плащане не беше намерен.')
+  if (milestone.status === 'paid') return order
+  if (!['ready', 'payment_pending'].includes(milestone.status)) throw new Error('Етапът не очаква плащане.')
+
+  const paymentIntent = typeof raw.payment_intent === 'string' ? raw.payment_intent : paymentIntentRecordId(raw.payment_intent)
+  const now = new Date().toISOString()
+  const { error: milestoneError } = await admin.from('order_milestones').update({
+    status: 'paid', paid_at: now, stripe_payment_intent_id: paymentIntent || null,
+  }).eq('id', milestone.id).in('status', ['ready', 'payment_pending'])
+  if (milestoneError) throw milestoneError
+
+  const { data: updatedOrder, error: orderError } = await admin.from('orders').update({ status: 'paid' }).eq('id', order.id).eq('status', 'pending_payment').select('*').maybeSingle()
+  if (orderError) throw orderError
+  const resultOrder = updatedOrder || order
+  const provider = raw.provider === 'mock' ? 'mock' : 'stripe'
+  await admin.from('payment_transactions').insert({ order_id: order.id, milestone_id: milestone.id, type: 'charge', provider, amount: milestone.amount, currency: milestone.currency, status: 'succeeded', raw })
+  await admin.from('order_events').insert({ order_id: order.id, milestone_id: milestone.id, actor_id: actorId, type: 'milestone_payment_succeeded', from_status: milestone.status, to_status: 'paid', message: `Плащането за етап ${milestone.position} е потвърдено.`, payload: raw })
+  return resultOrder
+}
+
+function paymentIntentRecordId(value: unknown) {
+  return cleanText(asRecord(value).id)
+}
+
 async function startCheckout(req: Request, admin: SupabaseAdmin, userId: string, payload: Record<string, unknown>) {
   const type = String(payload.type || '')
   if (!CHECKOUT_TYPES.has(type)) throw new Error('Checkout type is invalid.')
   const id = assertUuid(payload.id, 'Checkout id')
-  const source = type === 'offer'
-    ? await loadOfferSource(admin, id, userId)
-    : await loadServiceSource(admin, id, userId)
   const origin = siteOrigin(req, payload)
   const provider = requestedPaymentProvider(payload.provider)
+  if (type === 'milestone') {
+    const source = await loadMilestoneSource(admin, id, userId)
+    if (provider === 'mock') {
+      const { data: mockOrder, error: mockOrderError } = await admin.from('orders').update({ payment_provider: 'mock' }).eq('id', source.order.id).select('*').single()
+      if (mockOrderError) throw mockOrderError
+      const order = await markPaid(admin, mockOrder, userId, { provider: 'mock', paid: true, metadata: { order_id: source.order.id, milestone_id: source.milestone.id } })
+      return jsonResponse(200, { ok: true, provider, order, checkoutUrl: `${origin}/order/${order.id}?mock=paid` })
+    }
+    const { order, session } = await createStripeCheckout(admin, source.order, origin, type, id, source.milestone)
+    return jsonResponse(200, { ok: true, provider, order, checkoutUrl: session.url, sessionId: session.id })
+  }
+
+  const source = type === 'offer' ? await loadOfferSource(admin, id, userId) : await loadServiceSource(admin, id, userId)
+  if (source.paymentMethod === 'custom') throw new Error('Тази оферта използва договорени условия за плащане, а не Stripe checkout.')
   const order = await createOrUpdateOrder(admin, source, provider)
 
   if (provider === 'mock') {
@@ -478,7 +599,7 @@ function transitionFor(action: string, order: Record<string, unknown>, userId: s
   if (action === 'confirm_direct_payment') {
     if (order.partner_id !== userId) throw new Error('Само партньорът може да потвърди получено плащане.')
     if (status !== 'pending_payment') throw new Error('Поръчката не очаква потвърждение за плащане.')
-    return { status: 'paid', payment_provider: 'mock', message: 'Партньорът потвърди, че плащането е получено.' }
+    return { status: 'paid', payment_provider: 'manual', message: 'Партньорът потвърди, че договореното плащане е получено.' }
   }
   if (action === 'start_work') {
     if (order.partner_id !== userId) throw new Error('Само партньорът може да започне работа.')
@@ -532,17 +653,127 @@ async function orderAction(admin: SupabaseAdmin, userId: string, payload: Record
     payload: { note },
   })
 
-  if (action === 'confirm_completed') {
+  if (action === 'confirm_direct_payment') {
+    await admin.from('payment_transactions').insert({
+      order_id: order.id,
+      type: 'charge',
+      provider: 'manual',
+      amount: order.amount_total,
+      currency: order.currency,
+      status: 'succeeded',
+      raw: { confirmed_by: userId, note },
+    })
+  }
+
+  if (action === 'confirm_completed' && order.payment_method !== 'custom') {
     await releasePayout(admin, order)
   }
 
   return jsonResponse(200, { ok: true, order: updatedOrder })
 }
 
+async function milestoneAction(admin: SupabaseAdmin, userId: string, payload: Record<string, unknown>) {
+  const action = cleanText(payload.milestoneAction || payload.nextAction)
+  if (!MILESTONE_ACTIONS.has(action)) throw new Error('Действието за етапа е невалидно.')
+  const milestoneId = assertUuid(payload.milestoneId, 'Milestone id')
+  const { data: milestone, error } = await admin.from('order_milestones').select('*').eq('id', milestoneId).maybeSingle()
+  if (error) throw error
+  if (!milestone) throw new Error('Етапът не беше намерен.')
+  const { data: order, error: orderError } = await admin.from('orders').select('*').eq('id', milestone.order_id).maybeSingle()
+  if (orderError) throw orderError
+  if (!order || ![order.client_id, order.partner_id].includes(userId)) throw new Error('Нямаш достъп до този етап.')
+
+  const note = cleanText(payload.note)
+  const now = new Date().toISOString()
+  const previousStatus = String(milestone.status)
+  let nextStatus = previousStatus
+  let message = ''
+  const patch: Record<string, unknown> = {}
+
+  if (action === 'start') {
+    if (order.partner_id !== userId || previousStatus !== 'paid') throw new Error('Етапът трябва да е платен, преди да започне.')
+    nextStatus = 'in_progress'; patch.started_at = now; message = `Партньорът започна етап ${milestone.position}.`
+  } else if (action === 'submit') {
+    if (order.partner_id !== userId || !['in_progress', 'revision_requested'].includes(previousStatus)) throw new Error('Етапът не е готов за предаване.')
+    nextStatus = 'submitted'; patch.submitted_at = now; message = note || `Етап ${milestone.position} е предаден за приемане.`
+  } else if (action === 'request_revision') {
+    if (order.client_id !== userId || previousStatus !== 'submitted') throw new Error('Корекция може да се поиска след предаване.')
+    if (!note) throw new Error('Опиши какво трябва да бъде коригирано.')
+    nextStatus = 'revision_requested'; message = note
+  } else if (action === 'dispute') {
+    if (!['paid', 'in_progress', 'submitted', 'revision_requested'].includes(previousStatus)) throw new Error('Този етап не може да бъде оспорен в текущото състояние.')
+    if (!note) throw new Error('Опиши причината за спора.')
+    nextStatus = 'disputed'; message = note
+  } else if (action === 'accept') {
+    if (order.client_id !== userId || previousStatus !== 'submitted') throw new Error('Само клиентът може да приеме предаден етап.')
+    nextStatus = 'accepted'; patch.accepted_at = now; message = `Клиентът прие етап ${milestone.position}.`
+  }
+
+  const evidence = Array.isArray(milestone.evidence) ? [...milestone.evidence] : []
+  if (note) evidence.push({ type: 'note', action, body: note, actorId: userId, createdAt: now })
+  const { data: updatedRows, error: updateError } = await admin.from('order_milestones').update({ ...patch, status: nextStatus, evidence }).eq('id', milestone.id).eq('status', previousStatus).select('*')
+  if (updateError) throw updateError
+  const updatedMilestone = updatedRows?.[0]
+  if (!updatedMilestone) throw new Error('Състоянието на етапа вече е променено. Обнови страницата.')
+
+  if (action === 'start') await admin.from('orders').update({ status: 'in_progress' }).eq('id', order.id)
+  if (action === 'dispute') await admin.from('orders').update({ status: 'disputed' }).eq('id', order.id)
+  if (action === 'accept') {
+    await releaseMilestonePayout(admin, order, updatedMilestone)
+    const { data: nextMilestone } = await admin.from('order_milestones').select('*').eq('order_id', order.id).gt('position', milestone.position).order('position').limit(1).maybeSingle()
+    if (nextMilestone) {
+      await admin.from('order_milestones').update({ status: 'ready' }).eq('id', nextMilestone.id).eq('status', 'pending')
+      await admin.from('orders').update({ status: 'pending_payment' }).eq('id', order.id)
+    } else {
+      await admin.from('orders').update({ status: 'completed', completed_at: now }).eq('id', order.id)
+    }
+  }
+
+  await admin.from('order_events').insert({ order_id: order.id, milestone_id: milestone.id, actor_id: userId, type: `milestone_${action}`, from_status: previousStatus, to_status: nextStatus, message, payload: { note } })
+  const { data: refreshedOrder } = await admin.from('orders').select('*').eq('id', order.id).single()
+  return jsonResponse(200, { ok: true, order: refreshedOrder, milestone: updatedMilestone })
+}
+
+async function releaseMilestonePayout(admin: SupabaseAdmin, order: Record<string, unknown>, milestone: Record<string, unknown>) {
+  const provider = String(order.payment_provider || 'mock')
+  const platformFee = Math.max(0, Math.round(Number(milestone.amount || 0) * PLATFORM_FEE_RATE))
+  const payoutAmount = Math.max(0, Number(milestone.amount || 0) - platformFee)
+  let status = provider === 'mock' ? 'succeeded' : 'pending'
+  let raw: Record<string, unknown> = { provider, milestone_id: milestone.id }
+
+  if (provider === 'stripe') {
+    try {
+      const { data: partnerAccount, error } = await admin.from('accounts').select('stripe_account_id').eq('id', order.partner_id).maybeSingle()
+      if (error) throw error
+      if (!partnerAccount?.stripe_account_id) {
+        raw = { ...raw, requires_connect_payout: true }
+      } else {
+        const currency = String(milestone.currency || order.currency || 'EUR').toLowerCase()
+        const params = new URLSearchParams()
+        const sourceCharge = await latestChargeForPaymentIntent(admin, milestone.stripe_payment_intent_id)
+        params.set('amount', String(toStripeAmount(payoutAmount, currency)))
+        params.set('currency', currency)
+        params.set('destination', partnerAccount.stripe_account_id)
+        params.set('transfer_group', orderTransferGroup(order))
+        params.set('metadata[order_id]', String(order.id))
+        params.set('metadata[milestone_id]', String(milestone.id))
+        if (sourceCharge) params.set('source_transaction', sourceCharge)
+        const transfer = await stripeRequest(admin, 'transfers', { method: 'POST', body: params })
+        status = 'succeeded'; raw = transfer
+        await admin.from('order_milestones').update({ stripe_transfer_id: transfer.id }).eq('id', milestone.id)
+      }
+    } catch (error) {
+      raw = { ...raw, payout_error: error instanceof Error ? error.message : 'Преводът към партньора не беше успешен.' }
+    }
+  }
+
+  await admin.from('payment_transactions').insert({ order_id: order.id, milestone_id: milestone.id, type: 'payout', provider, amount: payoutAmount, currency: milestone.currency || order.currency, status, raw })
+}
+
 async function releasePayout(admin: SupabaseAdmin, order: Record<string, unknown>) {
   const provider = String(order.payment_provider || 'mock')
   let status = provider === 'mock' ? 'succeeded' : 'pending'
-  let raw: Record<string, unknown> = { escrow_released: true, provider }
+  let raw: Record<string, unknown> = { release_requested: true, provider }
 
   if (provider === 'stripe') {
     try {
@@ -553,7 +784,7 @@ async function releasePayout(admin: SupabaseAdmin, order: Record<string, unknown
         .maybeSingle()
       if (error) throw error
       if (!partnerAccount?.stripe_account_id) {
-        raw = { escrow_released: true, requires_connect_payout: true }
+        raw = { release_requested: true, requires_connect_payout: true }
       } else {
         const currency = String(order.currency || 'EUR').toLowerCase()
         const params = new URLSearchParams()
@@ -571,7 +802,7 @@ async function releasePayout(admin: SupabaseAdmin, order: Record<string, unknown
       }
     } catch (error) {
       status = 'pending'
-      raw = { escrow_released: true, payout_error: error instanceof Error ? error.message : 'Преводът към партньора не беше успешен.' }
+      raw = { release_requested: true, payout_error: error instanceof Error ? error.message : 'Преводът към партньора не беше успешен.' }
     }
   }
 
@@ -667,6 +898,7 @@ Deno.serve(async (req) => {
     if (action === 'start_checkout') return await startCheckout(req, admin, user.id, payload)
     if (action === 'sync_stripe_session') return await syncStripeSession(admin, user.id, payload)
     if (action === 'order_action') return await orderAction(admin, user.id, payload)
+    if (action === 'milestone_action') return await milestoneAction(admin, user.id, payload)
     if (action === 'connect_onboarding') return await connectOnboarding(req, admin, user.id, payload)
     if (action === 'connect_status') return await connectStatus(admin, user.id)
     return jsonResponse(400, { error: 'Unsupported payment action.' })

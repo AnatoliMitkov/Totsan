@@ -21,6 +21,7 @@ import About from './pages/About.jsx'
 import Contact from './pages/Contact.jsx'
 import Vizualizacia from './pages/Vizualizacia.jsx'
 import Admin from './pages/Admin.jsx'
+import AdminEvidence from './pages/AdminEvidence.jsx'
 import MyProfile from './pages/MyProfile.jsx'
 import Inbox from './pages/Inbox.jsx'
 import Checkout from './pages/Checkout.jsx'
@@ -303,6 +304,7 @@ function AppRoutes() {
             <Route path="/welcome" element={<WelcomePage />} />
             <Route path="/partner-onboarding" element={<Navigate to="/pro/onboarding" replace />} />
             <Route path="/admin" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
+            <Route path="/admin/evidence/:conversationId" element={<ProtectedRoute requireAdmin><AdminEvidence /></ProtectedRoute>} />
             <Route path="/moy-profil" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
             <Route path="/porachki" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />
             <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />

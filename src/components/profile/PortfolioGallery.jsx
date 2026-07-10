@@ -183,7 +183,22 @@ export default function PortfolioGallery({ items = [], emptyText = 'Още ня�
                   {(activeItem.role || activeItem.partnerRole || activeItem.partner_role) && (
                     <span className="rounded-full border border-line px-3 py-1">Роля: {activeItem.role || activeItem.partnerRole || activeItem.partner_role}</span>
                   )}
-                  {activeItem.budgetBand && <span className="rounded-full border border-line px-3 py-1">{activeItem.budgetBand}</span>}
+                  {activeItem.budgetBand && (() => {
+                    let galleryPills = []
+                    const accentVal = activeItem.budgetBand
+                    if (accentVal.includes(',')) {
+                      galleryPills = accentVal.split(',').map(s => s.trim()).filter(Boolean)
+                    } else if (accentVal.includes('·')) {
+                      galleryPills = accentVal.split('·').map(s => s.trim()).filter(Boolean)
+                    } else {
+                      galleryPills = [accentVal.trim()].filter(Boolean)
+                    }
+                    return galleryPills.slice(0, 5).map((pill, idx) => (
+                      <span key={idx} className="rounded-full border border-line px-3 py-1">
+                        {pill}
+                      </span>
+                    ))
+                  })()}
                 </div>
                 {activeItem.description && <p className="mt-5 whitespace-pre-wrap text-muted">{activeItem.description}</p>}
 

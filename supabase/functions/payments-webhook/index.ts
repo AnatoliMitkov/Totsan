@@ -150,13 +150,16 @@ async function stripeGet(path: string) {
 }
 
 async function markOrderPaidFromSession(session: Record<string, unknown>) {
-  const orderId = cleanText((session.metadata as Record<string, unknown> | undefined)?.order_id)
+  const metadata = (session.metadata as Record<string, unknown> | undefined) || {}
+  const orderId = cleanText(metadata.order_id)
   if (!orderId) return { skipped: true, reason: 'missing_order_id' }
 
   const admin = adminClient()
   const { data: order, error } = await admin.from('orders').select('*').eq('id', orderId).maybeSingle()
   if (error) throw error
   if (!order) return { skipped: true, reason: 'order_not_found' }
+  const milestoneId = cleanText(metadata.milestone_id)
+  if (milestoneId) return markMilestonePaidFromStripe(admin, order, milestoneId, session)
   if (order.status !== 'pending_payment') return { ok: true, order }
 
   const paymentIntent = typeof session.payment_intent === 'string'
@@ -207,6 +210,8 @@ async function markOrderPaidFromPaymentIntent(paymentIntent: Record<string, unkn
   const { data: order, error } = await admin.from('orders').select('*').eq('id', orderId).maybeSingle()
   if (error) throw error
   if (!order) return { skipped: true, reason: 'order_not_found' }
+  const milestoneId = cleanText(metadata?.milestone_id)
+  if (milestoneId) return markMilestonePaidFromStripe(admin, order, milestoneId, paymentIntent)
   if (order.status !== 'pending_payment') return { ok: true, order }
 
   const { data: updatedRows, error: updateError } = await admin.from('orders').update({
@@ -243,11 +248,52 @@ async function markOrderPaidFromPaymentIntent(paymentIntent: Record<string, unkn
   return { ok: true, order: updatedOrder }
 }
 
+async function markMilestonePaidFromStripe(admin: any, order: Record<string, unknown>, milestoneId: string, raw: Record<string, unknown>) {
+  const { data: milestone, error } = await admin.from('order_milestones').select('*').eq('id', milestoneId).eq('order_id', order.id).maybeSingle()
+  if (error) throw error
+  if (!milestone) return { skipped: true, reason: 'milestone_not_found' }
+  if (milestone.status === 'paid') return { ok: true, order, milestone }
+  if (!['ready', 'payment_pending'].includes(milestone.status)) return { skipped: true, reason: 'milestone_not_payable' }
+
+  const paymentIntent = typeof raw.payment_intent === 'string'
+    ? raw.payment_intent
+    : cleanText((raw.payment_intent as Record<string, unknown> | undefined)?.id || raw.id)
+  const checkoutSessionId = cleanText(raw.object === 'checkout.session' ? raw.id : milestone.stripe_checkout_session_id)
+  const { data: updatedRows, error: updateError } = await admin.from('order_milestones').update({
+    status: 'paid',
+    paid_at: new Date().toISOString(),
+    stripe_checkout_session_id: checkoutSessionId || milestone.stripe_checkout_session_id,
+    stripe_payment_intent_id: paymentIntent || milestone.stripe_payment_intent_id,
+  }).eq('id', milestone.id).in('status', ['ready', 'payment_pending']).select('*')
+  if (updateError) throw updateError
+  const updatedMilestone = updatedRows?.[0]
+  if (!updatedMilestone) return { ok: true, order, milestone }
+
+  const { data: updatedOrder } = await admin.from('orders').update({ status: 'paid' }).eq('id', order.id).eq('status', 'pending_payment').select('*').maybeSingle()
+  await admin.from('payment_transactions').insert({ order_id: order.id, milestone_id: milestone.id, type: 'charge', provider: 'stripe', amount: milestone.amount, currency: milestone.currency, status: 'succeeded', raw })
+  await admin.from('order_events').insert({ order_id: order.id, milestone_id: milestone.id, actor_id: order.client_id, type: 'milestone_payment_succeeded_webhook', from_status: milestone.status, to_status: 'paid', message: `Платежният доставчик потвърди плащането за етап ${milestone.position}.`, payload: raw })
+  return { ok: true, order: updatedOrder || order, milestone: updatedMilestone }
+}
+
 async function markOrderRefunded(charge: Record<string, unknown>) {
   const paymentIntent = cleanText(charge.payment_intent)
   if (!paymentIntent) return { skipped: true, reason: 'missing_payment_intent' }
 
   const admin = adminClient()
+  const { data: milestone, error: milestoneError } = await admin.from('order_milestones').select('*').eq('stripe_payment_intent_id', paymentIntent).maybeSingle()
+  if (milestoneError) throw milestoneError
+  if (milestone) {
+    const { data: milestoneOrder, error: milestoneOrderError } = await admin.from('orders').select('*').eq('id', milestone.order_id).maybeSingle()
+    if (milestoneOrderError) throw milestoneOrderError
+    if (!milestoneOrder) return { skipped: true, reason: 'order_not_found' }
+    await admin.from('order_milestones').update({ status: 'disputed' }).eq('id', milestone.id)
+    const { data: updatedOrder, error: milestoneUpdateError } = await admin.from('orders').update({ status: 'disputed' }).eq('id', milestoneOrder.id).select('*').single()
+    if (milestoneUpdateError) throw milestoneUpdateError
+    await admin.from('payment_transactions').insert({ order_id: milestoneOrder.id, milestone_id: milestone.id, type: 'refund', provider: 'stripe', amount: Math.round(Number(charge.amount_refunded || 0) / 100), currency: cleanText(charge.currency, milestone.currency).toUpperCase(), status: 'succeeded', raw: charge })
+    await admin.from('order_events').insert({ order_id: milestoneOrder.id, milestone_id: milestone.id, actor_id: null, type: 'milestone_refund_webhook', from_status: milestone.status, to_status: 'disputed', message: `Платежният доставчик отчете възстановяване за етап ${milestone.position}.`, payload: charge })
+    return { ok: true, order: updatedOrder }
+  }
+
   const { data: order, error } = await admin.from('orders').select('*').eq('stripe_payment_intent_id', paymentIntent).maybeSingle()
   if (error) throw error
   if (!order) return { skipped: true, reason: 'order_not_found' }
@@ -275,7 +321,7 @@ async function markOrderRefunded(charge: Record<string, unknown>) {
   return { ok: true, order: updatedOrder }
 }
 
-async function updateSubscriptionRows(admin: ReturnType<typeof createClient>, match: { subscriptionId?: string; checkoutSessionId?: string }, patch: Record<string, unknown>) {
+async function updateSubscriptionRows(admin: any, match: { subscriptionId?: string; checkoutSessionId?: string }, patch: Record<string, unknown>) {
   if (match.subscriptionId) {
     const { data, error } = await admin
       .from('partner_subscriptions')

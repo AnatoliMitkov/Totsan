@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "test": "node --test src/tests/*.js",
     "check:encoding": "node scripts/check-text-encoding.mjs",
     "email:preview": "node scripts/build-email-previews.mjs",
     "email:validate": "node scripts/validate-email-system.mjs",
