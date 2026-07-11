@@ -1633,7 +1633,6 @@ body:has([aria-modal='true']) .mobile-nav-shell {
   transform: translateY(0);
 }
 
-<<<<<<< HEAD
 /* Partner Portfolio Marquee Carousel */
 @keyframes marquee-ltr {
   0% {
@@ -1666,49 +1665,4 @@ body:has([aria-modal='true']) .mobile-nav-shell {
     mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
     -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
   }
-=======
-/* ─── offer system animations ─────────────────────────────── */
-
-@keyframes popover-in {
-  from { opacity: 0; transform: translateY(-8px) scale(0.96); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-.animate-popover-in {
-  animation: popover-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes card-enter {
-  from { opacity: 0; transform: translateY(16px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-.animate-card-enter {
-  animation: card-enter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes slide-up {
-  from { opacity: 0; transform: translateY(24px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.animate-slide-up {
-  animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-.animate-shimmer {
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%);
-  background-size: 200% 100%;
-  animation: shimmer 3s ease-in-out infinite;
-}
-
-/* Card hover lift */
-.card-lift {
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.card-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 32px -20px rgba(13, 35, 64, 0.2);
->>>>>>> worktree-offer-ui-redesign
 }
