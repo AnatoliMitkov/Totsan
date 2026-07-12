@@ -498,6 +498,35 @@ body:has([aria-modal='true']) .mobile-nav-shell {
 .btn-ghost { border: 1px solid theme('colors.line'); color: theme('colors.ink'); }
 .btn-ghost:hover { border-color: theme('colors.ink'); }
 
+@keyframes offer-stage-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.offer-stage-enter {
+  animation: offer-stage-enter .22s cubic-bezier(.2,.75,.2,1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offer-stage-enter {
+    animation: none;
+  }
+
+  .btn,
+  .btn-primary,
+  .btn-primary::before {
+    transition-duration: .01ms !important;
+  }
+
+  .btn-primary:hover {
+    transform: none;
+  }
+
+  .btn-primary::before {
+    display: none;
+  }
+}
+
 .link-arrow { display:inline-flex; align-items:center; gap:.4rem; color: theme('colors.ink'); border-bottom: 1px solid theme('colors.ink'); padding-bottom:.15rem; }
 .link-arrow:hover { color: theme('colors.accentDeep'); border-color: theme('colors.accentDeep'); }
 

@@ -570,6 +570,22 @@ export async function loadMessageReactions(messageIds = []) {
   return reactionsByMessageId
 }
 
+async function loadOrdersByOfferIds(offerIds = []) {
+  const uniqueIds = [...new Set(offerIds.filter(Boolean))]
+  if (uniqueIds.length === 0) return new Map()
+
+  const { data, error } = await supabase
+    .from('orders')
+    // Keep this lightweight lookup compatible with orders created before the
+    // payment-method migration. The card only needs the order id and status
+    // to provide a reliable route from an accepted offer to its order.
+    .select('id, offer_id, status')
+    .in('offer_id', uniqueIds)
+
+  if (error) return new Map()
+  return new Map((data || []).filter((order) => order?.offer_id && order?.id).map((order) => [order.offer_id, order]))
+}
+
 async function enrichMessages(rows = []) {
   const messages = sortMessages(dedupeMessagesById(rows || []))
   if (messages.length === 0) return []
@@ -578,9 +594,11 @@ async function enrichMessages(rows = []) {
   const messageIdSet = new Set(messageIds)
   const replyIds = [...new Set(messages.map((message) => message.reply_to_message_id).filter((replyId) => replyId && !messageIdSet.has(replyId)))]
 
-  const [replyRows, reactionsByMessageId] = await Promise.all([
+  const offerIds = [...new Set(messages.map((message) => message.offer_id).filter(Boolean))]
+  const [replyRows, reactionsByMessageId, ordersByOfferId] = await Promise.all([
     loadMessagePreviewsByIds(replyIds),
     loadMessageReactions(messageIds),
+    loadOrdersByOfferIds(offerIds),
   ])
 
   const repliesById = new Map()
@@ -595,6 +613,10 @@ async function enrichMessages(rows = []) {
 
   return messages.map((message) => ({
     ...message,
+    offer: message.offer ? (() => {
+      const order = ordersByOfferId.get(message.offer_id)
+      return order ? { ...message.offer, orderId: order.id, orderStatus: order.status } : message.offer
+    })() : null,
     reply_to_message: message.reply_to_message_id ? repliesById.get(message.reply_to_message_id) || null : null,
     reactions: reactionsByMessageId.get(message.id) || [],
   }))

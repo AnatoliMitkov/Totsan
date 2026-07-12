@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, Clock, CreditCard, MapPin, MessageSquare, PackageCheck, ShieldCheck } from 'lucide-react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, CheckCircle2, Clock, CreditCard, MapPin, MessageSquare, ShieldCheck } from 'lucide-react'
 import { useAccount } from '../lib/account.js'
 import { ORDER_ACTION_LABELS, ORDER_STATUS_LABELS, formatOrderDate, formatOrderMoney, loadOrderDetails, orderStatusTone } from '../lib/orders.js'
 import { normalizeAcceptedOffer, OFFER_TYPE_LABELS, PRICE_TYPE_LABELS, MATERIAL_MODE_LABELS, VAT_LABELS, PAYMENT_METHOD_LABELS, MILESTONE_STATUS_LABELS } from '../lib/offers.js'
@@ -14,6 +14,7 @@ import { formatEurWithBgn } from '../lib/money.js'
 
 export default function Order() {
   const { orderId = '' } = useParams()
+  const [searchParams] = useSearchParams()
   const { session, loading, isAdmin } = useAccount()
   const userId = session?.user?.id || ''
   const [details, setDetails] = useState({ order: null, events: [], payments: [], milestones: [] })
@@ -23,10 +24,12 @@ export default function Order() {
   const [message, setMessage] = useState('')
   const [revisionNote, setRevisionNote] = useState('')
 
-  async function load() {
+  async function load({ background = false } = {}) {
     if (!orderId || !userId) return
-    setStatus('loading')
-    setMessage('')
+    if (!background) {
+      setStatus('loading')
+      setMessage('')
+    }
     try {
       const next = await loadOrderDetails(orderId)
       const nextReview = next.order?.status === 'completed' ? await loadOrderReview(orderId) : null
@@ -46,12 +49,18 @@ export default function Order() {
       setOffer(nextOffer)
       setStatus(next.order ? 'ready' : 'not-found')
     } catch (error) {
-      setStatus('error')
-      setMessage(error.message || 'Поръчката не се зареди.')
+      setStatus(background ? 'ready' : 'error')
+      setMessage(error.message || (background ? 'Поръчката не можа да се обнови.' : 'Поръчката не се зареди.'))
     }
   }
 
-  useEffect(() => { if (!loading && userId) load() }, [loading, userId, orderId]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (loading || !userId) return undefined
+    load()
+    const refreshInBackground = () => load({ background: true })
+    window.addEventListener('focus', refreshInBackground)
+    return () => window.removeEventListener('focus', refreshInBackground)
+  }, [loading, userId, orderId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const order = details.order
   const agreedOffer = order && (offer || order.acceptedOfferSnapshot)
@@ -72,7 +81,7 @@ export default function Order() {
     try {
       await runOrderAction(order.id, action, revisionNote)
       setRevisionNote('')
-      await load()
+      await load({ background: true })
     } catch (error) {
       setStatus('ready')
       setMessage(error.message || 'Статусът не се промени.')
@@ -84,7 +93,7 @@ export default function Order() {
     setMessage('')
     try {
       await runMilestoneAction(milestoneId, action, note)
-      await load()
+      await load({ background: true })
     } catch (error) {
       setStatus('ready')
       setMessage(error.message || 'Етапът не се промени.')
@@ -101,27 +110,32 @@ export default function Order() {
   return (
     <OrderShell>
       <Link to="/porachki" className="inline-flex items-center gap-2 text-sm font-medium text-muted transition hover:text-ink"><ArrowLeft size={17} /> Моите поръчки</Link>
+      {searchParams.get('payment') === 'cancelled' && <div role="status" className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Плащането е прекъснато и не е начислена сума. Можеш да опиташ отново, когато си готов.</div>}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-12">
         <section className="lg:col-span-8 rounded-3xl border border-line bg-paper p-5 md:p-7">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0">
               <div className="eyebrow">Поръчка</div>
-              <h1 className="mt-2 font-display text-4xl leading-tight text-ink md:text-5xl">{order.title}</h1>
-              {order.description && <p className="mt-3 max-w-3xl whitespace-pre-wrap text-muted">{order.description}</p>}
+              <h1 className="mt-2 break-words font-display text-4xl leading-[1.05] text-ink md:text-[2.8rem]">{order.title}</h1>
+              {order.description && <p className="mt-3 max-w-3xl whitespace-pre-wrap text-sm leading-6 text-muted md:text-base">{order.description}</p>}
             </div>
             <span className={`rounded-full px-3 py-1 text-sm ${orderStatusTone(order.status)}`}>{ORDER_STATUS_LABELS[order.status] || order.status}</span>
           </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             <Info icon={CreditCard} label="Сума" value={formatOrderMoney(order.amountTotal, order.currency)} />
-            <Info icon={PackageCheck} label="Партньор" value={getPartyDisplayName(order.partnerAccount, order.partnerId)} />
             <Info icon={Clock} label="Срок" value={order.deliveryDueAt ? formatOrderDate(order.deliveryDueAt) : 'По уговорка'} />
+            <Info icon={ShieldCheck} label="Плащане" value={PAYMENT_METHOD_LABELS[order.paymentMethod] || 'По договорка'} />
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <PartyCard label="Клиент" party={order.clientAccount} fallbackId={order.clientId} showEmail={isAdminView} />
             <PartyCard label="Партньор" party={order.partnerAccount} fallbackId={order.partnerId} showEmail={isAdminView} />
+          </div>
+
+          <div className="mt-4 lg:hidden">
+            <OrderActionPanel order={order} role={role} checkoutPath={checkoutPath} actions={actions} revisionNote={revisionNote} setRevisionNote={setRevisionNote} status={status} message={message} onRun={run} compact />
           </div>
 
           {projectLocation && <OrderLocationCard location={projectLocation} />}
@@ -356,7 +370,7 @@ export default function Order() {
           })()}
 
           <div className="mt-8 border-t border-line pt-6">
-            <div className="eyebrow">Timeline</div>
+            <div className="eyebrow">История на поръчката</div>
             <div className="mt-4 space-y-3">
               {visibleEvents.map((event) => <EventRow key={event.id} event={event} />)}
               {visibleEvents.length === 0 && <div className="rounded-2xl border border-dashed border-line p-5 text-center text-sm text-muted">Още няма събития.</div>}
@@ -368,42 +382,80 @@ export default function Order() {
 
         <aside className="lg:col-span-4">
           <div className="space-y-5 lg:sticky lg:top-24">
-            <div className="rounded-3xl border border-line bg-paper p-5 md:p-6">
-              <div className="eyebrow">Действия</div>
-              <div className="mt-3 mb-3 font-display text-4xl text-ink">{formatOrderMoney(order.amountTotal, order.currency)}</div>
-              {message && <div className="mt-4 rounded-2xl bg-red-50 p-3 text-sm text-red-700">{message}</div>}
-              {role === 'client' && order.status === 'pending_payment' && checkoutPath && (
-                <Link to={checkoutPath} className="btn btn-primary mt-3 w-full justify-center"><CreditCard size={18} /> Плати</Link>
-              )}
-              {order.conversationId && <Link to={`/inbox/${order.conversationId}`} className="btn btn-ghost mt-3 w-full justify-center"><MessageSquare size={18} /> Чат</Link>}
-              {actions.includes('request_revision') && <textarea rows={3} value={revisionNote} onChange={(event) => setRevisionNote(event.target.value)} className="mt-4 w-full rounded-2xl border border-line bg-soft px-4 py-3 text-sm outline-none transition focus:border-ink" placeholder="Какво трябва да се коригира" />}
-              <div className="mt-4 grid gap-2">
-                {actions.map((action) => (
-                  <button
-                    key={action}
-                    type="button"
-                    onClick={() => run(action)}
-                    disabled={status === 'saving'}
-                    className={['confirm_direct_payment', 'confirm_completed', 'mark_delivered', 'start_work'].includes(action) ? 'btn btn-primary justify-center' : 'btn btn-ghost justify-center'}
-                  >
-                    {ORDER_ACTION_LABELS[action] || action}
-                  </button>
-                ))}
-              </div>
+            <div className="hidden lg:block">
+              <OrderActionPanel order={order} role={role} checkoutPath={checkoutPath} actions={actions} revisionNote={revisionNote} setRevisionNote={setRevisionNote} status={status} message={message} onRun={run} />
             </div>
 
-            <div className="rounded-3xl border border-line bg-paper p-5 md:p-6">
-              <div className="eyebrow">Доказателствена следа</div>
+            {visiblePayments.length > 0 && <div className="rounded-3xl border border-line bg-paper p-5 md:p-6">
+              <div className="eyebrow">Плащания и потвърждения</div>
               <div className="mt-4 space-y-3">
                 {visiblePayments.map((payment) => <PaymentRow key={payment.id} payment={payment} />)}
-                {visiblePayments.length === 0 && <div className="rounded-2xl border border-dashed border-line p-4 text-center text-sm text-muted">Няма добавено потвърждение или документ.</div>}
               </div>
-            </div>
+            </div>}
           </div>
         </aside>
       </div>
     </OrderShell>
   )
+}
+
+function OrderActionPanel({ order, role, checkoutPath, actions, revisionNote, setRevisionNote, status, message, onRun, compact = false }) {
+  const nextStep = orderNextStep(order, role, checkoutPath)
+  const saving = status === 'saving'
+  return (
+    <section className={`rounded-3xl border border-line bg-paper ${compact ? 'p-4 shadow-[0_20px_55px_-46px_rgba(13,35,64,0.7)]' : 'p-5 md:p-6'}`} aria-label="Следваща стъпка">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="eyebrow">Следваща стъпка</div>
+          {!compact && <div className="mt-3 font-display text-4xl leading-none text-ink">{formatOrderMoney(order.amountTotal, order.currency)}</div>}
+        </div>
+        <span className={`shrink-0 rounded-full px-3 py-1 text-xs ${orderStatusTone(order.status)}`}>{ORDER_STATUS_LABELS[order.status] || order.status}</span>
+      </div>
+      <p className={`${compact ? 'mt-3' : 'mt-4'} text-sm leading-6 text-muted`}>{nextStep}</p>
+      {message && <div role="alert" className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{message}</div>}
+
+      {actions.includes('request_revision') && (
+        <div className="mt-4">
+          <label htmlFor={compact ? 'revision-note-mobile' : 'revision-note-desktop'} className="text-sm font-medium text-ink">Какво трябва да се коригира</label>
+          <textarea id={compact ? 'revision-note-mobile' : 'revision-note-desktop'} rows={3} value={revisionNote} onChange={(event) => setRevisionNote(event.target.value)} className="mt-2 w-full rounded-2xl border border-line bg-soft px-4 py-3 text-sm outline-none transition focus:border-ink focus:ring-4 focus:ring-accent/10" />
+        </div>
+      )}
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+        {role === 'client' && order.status === 'pending_payment' && checkoutPath && (
+          <Link to={checkoutPath} className="btn btn-primary min-h-11 w-full justify-center"><CreditCard size={18} /> Към плащане</Link>
+        )}
+        {actions.map((action) => (
+          <button
+            key={action}
+            type="button"
+            onClick={() => onRun(action)}
+            disabled={saving}
+            className={`${['confirm_direct_payment', 'confirm_completed', 'mark_delivered', 'start_work'].includes(action) ? 'btn btn-primary' : 'btn btn-ghost'} min-h-11 justify-center disabled:opacity-55`}
+          >
+            {saving ? 'Запазваме…' : ORDER_ACTION_LABELS[action] || action}
+          </button>
+        ))}
+        {order.conversationId && <Link to={`/inbox/${order.conversationId}`} className="btn btn-ghost min-h-11 w-full justify-center"><MessageSquare size={18} /> Отвори чата</Link>}
+      </div>
+
+      <div className="mt-4 flex items-start gap-2 border-t border-line pt-4 text-xs leading-5 text-muted"><ShieldCheck size={16} className="mt-0.5 shrink-0 text-accentDeep" /> Плащанията и промените по статуса се записват към поръчката.</div>
+    </section>
+  )
+}
+
+function orderNextStep(order, role, checkoutPath) {
+  if (!order) return ''
+  if (order.status === 'pending_payment' && role === 'client' && checkoutPath) return 'Прегледай договореното и завърши защитеното плащане.'
+  if (order.status === 'pending_payment' && role === 'client' && order.paymentMethod === 'staged_platform') return 'Плати първия готов етап от секцията „Изпълнение и плащане“.'
+  if (order.status === 'pending_payment' && role === 'client') return 'Изчакай партньорът да потвърди договореното плащане или използвай чата при въпрос.'
+  if (order.status === 'pending_payment' && role === 'partner' && order.paymentMethod === 'staged_platform') return 'Клиентът ще плати първия етап. След потвърждението можеш да започнеш работа.'
+  if (order.status === 'pending_payment' && role === 'partner') return 'Потвърди плащането едва след като реално го получиш.'
+  if (order.status === 'paid' && role === 'partner') return 'Плащането е потвърдено. Започни работата, когато си готов.'
+  if (order.status === 'in_progress' && role === 'partner') return 'Работата е в ход. Маркирай я като предадена, когато резултатът е готов.'
+  if (order.status === 'delivered' && role === 'client') return 'Прегледай предаденото и го приеми или поискай конкретна корекция.'
+  if (order.status === 'completed') return 'Поръчката е завършена. Всички договорени детайли остават достъпни тук.'
+  return 'Следи статуса тук и използвай чата, ако трябва да уточните следващото действие.'
 }
 
 function checkoutPathForOrder(order) {
@@ -420,7 +472,7 @@ function buildActions(order, role, checkoutPath = '') {
   const actions = []
   if (role === 'partner' && order.status === 'pending_payment' && !checkoutPath) actions.push('confirm_direct_payment')
   if (role === 'partner' && order.status === 'paid') actions.push('start_work')
-  if (role === 'partner' && ['paid', 'in_progress'].includes(order.status)) actions.push('mark_delivered')
+  if (role === 'partner' && order.status === 'in_progress') actions.push('mark_delivered')
   if (role === 'client' && order.status === 'delivered') actions.push('confirm_completed', 'request_revision')
   if (role === 'client' && order.status === 'pending_payment') actions.push('cancel_pending')
   return actions
@@ -471,12 +523,12 @@ function MilestoneCard({ milestone, role, busy, onAction }) {
       {(canSubmit || canReview) && <textarea rows={2} value={note} onChange={(event) => setNote(event.target.value)} className="mt-3 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none focus:border-ink" placeholder={canReview ? 'Бележка при корекция или спор' : 'Бележка към предаването (по избор)'} />}
       {localError && <p className="mt-2 text-xs text-red-700">{localError}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
-        {canPay && <Link to={`/checkout/milestone/${milestone.id}`} className="btn btn-primary !py-2 text-sm"><CreditCard size={16} /> Плати този етап</Link>}
-        {canStart && <button type="button" disabled={busy} onClick={() => act('start')} className="btn btn-primary !py-2 text-sm">Започни етапа</button>}
-        {canSubmit && <button type="button" disabled={busy} onClick={() => act('submit')} className="btn btn-primary !py-2 text-sm">Предай етапа</button>}
-        {canReview && <button type="button" disabled={busy} onClick={() => act('accept')} className="btn btn-primary !py-2 text-sm">Приеми етапа</button>}
-        {canReview && <button type="button" disabled={busy} onClick={() => act('request_revision', true)} className="btn btn-ghost !py-2 text-sm">Поискай корекция</button>}
-        {canReview && <button type="button" disabled={busy} onClick={() => act('dispute', true)} className="btn btn-ghost !py-2 text-sm text-red-700">Оспори</button>}
+        {canPay && <Link to={`/checkout/milestone/${milestone.id}`} className="btn btn-primary min-h-11 text-sm"><CreditCard size={16} /> Плати този етап</Link>}
+        {canStart && <button type="button" disabled={busy} onClick={() => act('start')} className="btn btn-primary min-h-11 text-sm">Започни етапа</button>}
+        {canSubmit && <button type="button" disabled={busy} onClick={() => act('submit')} className="btn btn-primary min-h-11 text-sm">Предай етапа</button>}
+        {canReview && <button type="button" disabled={busy} onClick={() => act('accept')} className="btn btn-primary min-h-11 text-sm">Приеми етапа</button>}
+        {canReview && <button type="button" disabled={busy} onClick={() => act('request_revision', true)} className="btn btn-ghost min-h-11 text-sm">Поискай корекция</button>}
+        {canReview && <button type="button" disabled={busy} onClick={() => act('dispute', true)} className="btn btn-ghost min-h-11 text-sm text-red-700">Оспори</button>}
       </div>
     </article>
   )
@@ -527,7 +579,7 @@ function PartyCard({ label, party, fallbackId, showEmail = false }) {
       <div className="text-xs uppercase tracking-[0.14em] text-muted">{label}</div>
       <div className="mt-1 text-md font-medium text-ink break-all">{displayName}</div>
       {showEmail && <div className="mt-1 text-xs text-muted break-all">{email || 'Без имейл'}</div>}
-      {!showEmail && <div className="mt-1 text-xs text-muted break-all">ID: {shortId(fallbackId)}</div>}
+      {!showEmail && !hasName && <div className="mt-1 text-xs text-muted break-all">ID: {shortId(fallbackId)}</div>}
     </div>
   )
 }

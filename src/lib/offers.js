@@ -41,6 +41,7 @@ export function normalizeAcceptedOffer(offer = null, snapshot = undefined) {
   const deliverables = stringArray(document.deliverables, document.includedItems, fallback.deliverables)
   const includedItems = stringArray(document.includedItems, document.deliverables, fallback.deliverables)
   const timelineSource = asObject(document.timeline)
+  const scopeSource = asObject(document.scope)
   const paymentSource = asObject(document.payment)
   const conditionSource = asObject(document.conditions)
 
@@ -57,8 +58,23 @@ export function normalizeAcceptedOffer(offer = null, snapshot = undefined) {
     currency,
     deliverables,
     includedItems,
-    excludedItems: stringArray(document.excludedItems, document.notIncluded),
-    clientRequirements: stringArray(document.clientRequirements, document.clientProvides),
+    excludedItems: stringArray(
+      document.excludedItems,
+      document.excluded,
+      document.notIncluded,
+      scopeSource.excludedItems,
+      scopeSource.excluded,
+      fallback.excludedItems,
+      fallback.excluded,
+    ),
+    clientRequirements: stringArray(
+      document.clientRequirements,
+      document.clientRequirementItems,
+      document.clientProvides,
+      scopeSource.clientRequirements,
+      scopeSource.clientProvides,
+      fallback.clientRequirements,
+    ),
     materialsMode: firstText(document.materialsMode, document.materialsNote),
     vatStatus: firstText(document.vatStatus),
     timeline: {
@@ -193,8 +209,11 @@ function positiveNumber(...values) {
 
 function stringArray(...sources) {
   for (const source of sources) {
-    if (!Array.isArray(source)) continue
-    const values = source.map((item) => firstText(item)).filter(Boolean)
+    const values = Array.isArray(source)
+      ? source.map((item) => firstText(item)).filter(Boolean)
+      : typeof source === 'string'
+        ? source.split(/\r?\n/).map((item) => item.trim()).filter(Boolean)
+        : []
     if (values.length > 0) return values
   }
   return []
@@ -255,7 +274,7 @@ export const STATUS_LABELS = {
 
 export const MILESTONE_STATUS_LABELS = {
   pending: 'Предстоящ',
-  ready: 'Готов за започване',
+  ready: 'Готов за плащане',
   in_progress: 'В работа',
   submitted: 'Предаден',
   revision_requested: 'Искана корекция',

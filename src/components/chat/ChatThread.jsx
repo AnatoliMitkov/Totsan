@@ -457,10 +457,10 @@ export default function ChatThread({
         <button
           type="button"
           onClick={() => scrollToBottom('smooth')}
-          className="absolute bottom-4 left-1/2 z-20 grid h-9 w-9 -translate-x-1/2 place-items-center rounded-full border border-paper/15 bg-ink/58 text-paper shadow-[0_16px_34px_-20px_rgba(15,23,42,0.68)] backdrop-blur-xl transition hover:bg-ink/72 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paper/30 md:bottom-5"
+          className="absolute bottom-4 left-1/2 z-20 grid h-10 w-10 -translate-x-1/2 place-items-center rounded-full border-2 border-paper bg-ink text-paper shadow-[0_16px_34px_-16px_rgba(15,23,42,0.58)] transition hover:scale-105 hover:bg-accentDeep focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/25 md:bottom-5"
           aria-label="Към най-новите съобщения"
         >
-          <ChevronDown size={20} strokeWidth={2.5} />
+          <ChevronDown size={21} strokeWidth={2.8} aria-hidden="true" />
         </button>
       )}
       <ChatMediaViewer

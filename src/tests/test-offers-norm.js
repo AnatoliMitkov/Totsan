@@ -150,6 +150,17 @@ describe('normalizeAcceptedOffer', () => {
     assert.equal(norm.summary, 'Parsed summary')
   })
 
+  it('keeps scope boundaries when legacy payloads stored them as text', () => {
+    const norm = normalizeAcceptedOffer({
+      offer_details: {
+        excluded: 'Демонтаж\nМонтаж',
+        clientProvides: 'Достъп до обекта\nЕлектричество',
+      },
+    }, null)
+    assert.deepStrictEqual(norm.excludedItems, ['Демонтаж', 'Монтаж'])
+    assert.deepStrictEqual(norm.clientRequirements, ['Достъп до обекта', 'Електричество'])
+  })
+
   it('reads older snapshots that wrapped the rich fields in offerDetails', () => {
     const norm = normalizeAcceptedOffer({ title: 'Mutable title' }, {
       offerType: 'final',

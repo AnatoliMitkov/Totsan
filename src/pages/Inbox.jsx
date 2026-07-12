@@ -730,7 +730,6 @@ export default function Inbox() {
         if (nextMessage) mergeIncomingMessages(activeConversationId, [nextMessage])
       }
       setScrollToLatestToken((value) => value + 1)
-      setOfferOpen(false)
       setMessageStatus('idle')
       scheduleConversationRefresh()
       return true
@@ -940,7 +939,7 @@ export default function Inbox() {
           </div>
         </div>
       )}
-      {!accessDenied && !isGuest && <OfferComposer open={offerOpen} onClose={() => setOfferOpen(false)} onSubmit={submitOffer} status={messageStatus} serviceRequest={activeServiceRequest} conversationId={activeConversationId} services={referenceLibrary.services} servicesStatus={referenceLibrary.status} />}
+      {!accessDenied && !isGuest && <OfferComposer open={offerOpen} onClose={() => setOfferOpen(false)} onSubmit={submitOffer} status={messageStatus} userId={userId} serviceRequest={activeServiceRequest} conversationId={activeConversationId} services={referenceLibrary.services} servicesStatus={referenceLibrary.status} />}
       {account?.account_status === 'banned' && <div className="shrink-0 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Акаунтът е блокиран. Някои действия може да бъдат ограничени.</div>}
     </InboxShell>
   )

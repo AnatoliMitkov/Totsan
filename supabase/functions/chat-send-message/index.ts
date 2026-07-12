@@ -1,6 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.8'
 
-const MASK = '[скрито от Totsan - общувайте в платформата]'
 const MESSAGE_KINDS = new Set(['text', 'attachment'])
 const OFFER_STATUSES = new Set(['accepted', 'declined', 'withdrawn', 'change_requested'])
 const SERVICE_REQUEST_STATUSES = new Set(['negotiating', 'declined', 'cancelled'])
@@ -51,12 +50,44 @@ function optionalUuid(value: unknown) {
   return assertUuid(value, 'Optional uuid')
 }
 
-function maskText(value: unknown) {
-  const original = String(value || '')
-  const masked = original
+const MASK = '[скрито от Totsan - общувайте в платформата]'
+const ISO_DATE_TIME_PATTERN = /\b\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])(?:[Tt ](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:[.,]\d{1,9})?)?(?:[Zz]|[+-](?:0\d|1[0-3]):[0-5]\d|[+-]14:00)?)?\b/g
+
+function isValidIsoDateTimeFragment(fragment = '') {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(fragment)
+  if (!match) return false
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1] || 0
+  return day >= 1 && day <= daysInMonth
+}
+
+export function maskContactText(original = '') {
+  const maskedDirectContacts = original
     .replace(/https?:\/\/\S+/gi, MASK)
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, MASK)
-    .replace(/\+?\d[\d\s().-]{6,}/g, MASK)
+
+  const preservedFragments = []
+  const protectedText = maskedDirectContacts.replace(ISO_DATE_TIME_PATTERN, (fragment) => {
+    if (!isValidIsoDateTimeFragment(fragment)) return fragment
+    const token = `\uE000${preservedFragments.length}\uE001`
+    preservedFragments.push({ token, fragment })
+    return token
+  })
+
+  let masked = protectedText.replace(/\+?\d[\d\s().-]{6,}/g, MASK)
+  for (const { token, fragment } of preservedFragments) {
+    masked = masked.split(token).join(fragment)
+  }
+  return masked
+}
+
+function maskText(value: unknown) {
+  const original = String(value || '')
+  const masked = maskContactText(original)
   return {
     original,
     masked,
