@@ -12,6 +12,9 @@ const offerCard = read('src/components/chat/OfferCard.jsx')
 const messageBubble = read('src/components/chat/MessageBubble.jsx')
 const chatThread = read('src/components/chat/ChatThread.jsx')
 const conversationList = read('src/components/chat/ConversationList.jsx')
+const orderPage = read('src/pages/Order.jsx')
+const checkoutPage = read('src/pages/Checkout.jsx')
+const orders = read('src/lib/orders.js')
 
 describe('offer lifecycle contract', () => {
   it('persists the immutable agreement on both offer and order', () => {
@@ -113,6 +116,38 @@ describe('offer lifecycle contract', () => {
   it('only sends an offer from the explicit send button', () => {
     assert.match(composer, /type="button" onClick=\{submit\}/)
     assert.doesNotMatch(composer, /onSubmit=\{submit\}/)
+  })
+
+  it('keeps operational order work ahead of the archived agreement', () => {
+    const currentWorkIndex = orderPage.indexOf('<CurrentWorkPanel')
+    const agreementIndex = orderPage.indexOf('<AgreedOfferDisclosure')
+    assert.ok(currentWorkIndex >= 0)
+    assert.ok(agreementIndex > currentWorkIndex)
+    assert.match(orderPage, /function CurrentWorkPanel\([\s\S]*role="progressbar"/)
+    assert.doesNotMatch(orderPage, /agreedOffer && false/)
+  })
+
+  it('keeps order reference sections collapsed by default', () => {
+    assert.match(orderPage, /function OrderLocationDisclosure\([\s\S]*<details className=/)
+    assert.match(orderPage, /function AgreedOfferDisclosure\([\s\S]*<details className=/)
+    assert.match(orderPage, /function RecordDisclosure\([\s\S]*<details className=/)
+    assert.doesNotMatch(orderPage, /<details[^>]*\sopen(?:=|\s|>)/)
+  })
+
+  it('keeps the successful payment state compact without changing pending states', () => {
+    assert.match(checkoutPage, /compact=\{isPaid\}/)
+    assert.match(checkoutPage, /function CheckoutStatePage\([\s\S]*compact = false/)
+    assert.match(checkoutPage, /<CheckoutShell compact=\{compact\}>/)
+    assert.match(checkoutPage, /compact \? '' : 'min-h-\[calc\(100vh-var\(--header-h,0px\)\)\]'/)
+  })
+
+  it('keeps both order parties identifiable and links the available profiles', () => {
+    assert.match(orderPage, /function PartyCard\([\s\S]*ID: \{shortId\(fallbackId\)\}/)
+    assert.match(orderPage, /<Link to=\{profilePath\}[\s\S]*aria-label=/)
+    assert.match(orderPage, /clientProfilePath[\s\S]*\/client-profile/)
+    assert.match(orderPage, /partnerProfilePath[\s\S]*partnerAccount\?\.profilePath/)
+    assert.match(orders, /get_chat_participant_profiles/)
+    assert.match(orders, /profilePath: row\.profile_path \|\| ''/)
   })
 
   it('closes the conversation menu outside and with Escape', () => {

@@ -134,7 +134,6 @@ export default function Layout() {
 
 function Header() {
   const [open, setOpen] = useState(false)
-  const [isScrolled, setIsScrolled] = useState(false)
   const [isMoreOpen, setIsMoreOpen] = useState(false)
   const close = () => setOpen(false)
   const { pathname, search, hash } = useLocation()
@@ -147,23 +146,13 @@ function Header() {
   const isVisualizationActive = pathname === '/vizualizacia'
   const isInboxPage = pathname === '/inbox' || pathname.startsWith('/inbox/')
   const isInboxThreadPage = /^\/inbox\/[^/?#]+/.test(pathname)
-  const isTopOverlayMode = !isScrolled && !open
+  const isTopOverlayMode = !open
   const headerSurfaceClass = isTopOverlayMode ? 'site-header--hero' : 'site-header--solid'
   const loginHref = `/login?next=${encodeURIComponent(`${pathname}${search}${hash}`)}`
 
   useEffect(() => {
     setOpen(false)
     setIsMoreOpen(false)
-  }, [pathname])
-
-  useEffect(() => {
-    const syncScrolledState = () => {
-      setIsScrolled(window.scrollY > 24)
-    }
-
-    syncScrolledState()
-    window.addEventListener('scroll', syncScrolledState, { passive: true })
-    return () => window.removeEventListener('scroll', syncScrolledState)
   }, [pathname])
 
   useEffect(() => {
@@ -198,7 +187,7 @@ function Header() {
 
   return (
     <>
-      <header className={`site-header fixed inset-x-0 top-0 z-20 border-b ${headerSurfaceClass} ${isInboxPage ? 'site-header--inbox' : ''} ${isInboxThreadPage ? 'site-header--inbox-thread' : ''} ${open ? 'site-header--menu-open' : ''} ${isScrolled && !open ? 'site-header--announcement-hidden' : ''}`}>
+      <header className={`site-header fixed inset-x-0 top-0 z-20 border-b ${headerSurfaceClass} ${isInboxPage ? 'site-header--inbox' : ''} ${isInboxThreadPage ? 'site-header--inbox-thread' : ''} ${open ? 'site-header--menu-open' : ''}`}>
         <AnnouncementBar />
         <div className="container-header grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-5 py-4 px-4 sm:px-6 lg:px-8 xl:gap-4 2xl:gap-12">
           <Link to="/" className={`brand-logo shrink-0 transition-colors duration-300 ${isTopOverlayMode ? 'text-paper' : 'text-ink'}`} onClick={close}>Totsan</Link>
@@ -244,6 +233,16 @@ function Header() {
                 <Link to={loginHref} className={`desktop-header-auth ${isTopOverlayMode ? 'desktop-header-auth-on-dark' : ''}`}>Вход</Link>
               </>
             )}
+            {!loading && canShowPrivateHeader ? (
+              <Link
+                to="/inbox"
+                aria-label={unreadCount > 0 ? `Съобщения, ${unreadCount} непрочетени` : 'Съобщения'}
+                className={`mobile-header-messages xl:hidden ${isTopOverlayMode ? 'mobile-header-messages-on-dark' : ''}`}
+              >
+                <MessageCircle size={18} aria-hidden="true" />
+                {unreadCount > 0 && <span aria-hidden="true" className="mobile-header-messages__badge">{unreadCount}</span>}
+              </Link>
+            ) : null}
             <button
               aria-label="Меню"
               onClick={() => setOpen(o => !o)}
@@ -262,6 +261,22 @@ function Header() {
           <div className="mobile-nav-backdrop" aria-hidden="true" />
           <div className="mobile-nav-panel">
             <div className="container-page mobile-nav-scroll px-[var(--pad-x)] pb-8 text-sm">
+
+              {canShowPrivateHeader && !loading ? (
+                <div className="mobile-nav-group">
+                  <div className="mobile-nav-group__label">Профил</div>
+                  <div className="grid gap-3">
+                    <NavLink to="/moy-profil" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Моят профил</span><span className="mobile-nav-arrow">→</span></NavLink>
+                    <NavLink to="/inbox" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Съобщения{unreadCount > 0 ? ` (${unreadCount})` : ''}</span><span className="mobile-nav-arrow">→</span></NavLink>
+                    <NavLink to="/porachki" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Поръчки</span><span className="mobile-nav-arrow">→</span></NavLink>
+                    {isAdmin && (
+                      <NavLink to="/admin" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Админ</span><span className="mobile-nav-arrow">→</span></NavLink>
+                    )}
+                    <button onClick={() => { close(); signOutAndRedirect(session?.user?.id) }} className="mobile-nav-item text-left text-muted hover:text-ink">Изход</button>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="mobile-nav-group">
                 <div className="grid gap-3 mb-3">
                   <NavLink to="/start" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}>
@@ -297,20 +312,6 @@ function Header() {
                 </div>
               </div>
 
-              {canShowPrivateHeader && !loading ? (
-                <div className="mobile-nav-group">
-                  <div className="mobile-nav-group__label">Профил</div>
-                  <div className="grid gap-3">
-                    {isAdmin && (
-                      <NavLink to="/admin" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Админ</span><span className="mobile-nav-arrow">→</span></NavLink>
-                    )}
-                    <NavLink to="/inbox" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Съобщения{unreadCount > 0 ? ` (${unreadCount})` : ''}</span><span className="mobile-nav-arrow">→</span></NavLink>
-                    <NavLink to="/porachki" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Поръчки</span><span className="mobile-nav-arrow">→</span></NavLink>
-                    <NavLink to="/moy-profil" onClick={close} className={({ isActive }) => mobileNavClassName(isActive)}><span>Моят профил</span><span className="mobile-nav-arrow">→</span></NavLink>
-                    <button onClick={() => { close(); signOutAndRedirect(session?.user?.id) }} className="mobile-nav-item text-left text-muted hover:text-ink">Изход</button>
-                  </div>
-                </div>
-              ) : null}
             </div>
           </div>
         </div>

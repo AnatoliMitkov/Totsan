@@ -5,6 +5,7 @@ import ConversationList from '../components/chat/ConversationList.jsx'
 import ChatThread from '../components/chat/ChatThread.jsx'
 import ComposeBar from '../components/chat/ComposeBar.jsx'
 import OfferComposer from '../components/chat/OfferComposer.jsx'
+import CallPlannerDialog from '../components/chat/CallPlannerDialog.jsx'
 import Avatar from '../components/Avatar.jsx'
 import { useAccount } from '../lib/account.js'
 import {
@@ -29,6 +30,8 @@ import {
   sendOffer,
   sendAttachmentMessage,
   sendCatalogReference,
+  sendCallInvite,
+  respondToCallInvite,
   sendTextMessage,
   subscribeToConversation,
   subscribeToConversationList,
@@ -77,6 +80,7 @@ export default function Inbox() {
   const [replyNotFoundId, setReplyNotFoundId] = useState(null)
   const [forwardDraft, setForwardDraft] = useState(null)
   const [offerOpen, setOfferOpen] = useState(false)
+  const [callPlanner, setCallPlanner] = useState(null)
   const [confirmAction, setConfirmAction] = useState(null)
   const [confirmStatus, setConfirmStatus] = useState('idle')
   const [referenceLibrary, setReferenceLibrary] = useState({ status: 'idle', profileId: '', services: [], portfolio: [] })
@@ -1017,31 +1021,48 @@ export default function Inbox() {
     }
   }
 
-  async function handleSendCallInvite() {
+  function handleSendCallInvite() { setCallPlanner({ mode: 'request' }) }
+
+  function handleScheduleCall() { setCallPlanner({ mode: 'scheduled' }) }
+
+  async function submitCallPlanner(payload) {
     if (!activeConversationId) return
     setError('')
     setMessageStatus('sending')
     try {
-      const result = await sendTextMessage({
-        conversationId: activeConversationId,
-        body: 'Предлагам кратък разговор, за да уточним детайлите. Кога ти е удобно?',
-      })
+      const result = await sendCallInvite({ conversationId: activeConversationId, payload })
       if (result?.message?.id) {
         const nextMessage = await loadFreshMessage(result.message.id, result.message)
         if (nextMessage) mergeIncomingMessages(activeConversationId, [nextMessage])
       }
+      setCallPlanner(null)
       setScrollToLatestToken((value) => value + 1)
-      setMessageStatus('idle')
       scheduleConversationRefresh()
     } catch (inviteError) {
       setError(inviteError.message || 'Поканата за разговор не се изпрати.')
+    } finally {
       setMessageStatus('idle')
     }
   }
 
-  function handleScheduleCall() {
-    setDraft('Нека насрочим разговор. Подходящи за мен са: ')
-    window.requestAnimationFrame(() => document.querySelector('.chat-compose-textarea')?.focus())
+  async function handleCallInviteAction(message, action) {
+    if (action === 'reschedule') {
+      setCallPlanner({ mode: 'scheduled' })
+      return
+    }
+    if (!activeConversationId) return
+    setMessageStatus('sending')
+    try {
+      const result = await respondToCallInvite({ messageId: message.id, action })
+      if (result?.invite?.id) mergeIncomingMessages(activeConversationId, [result.invite])
+      if (result?.message?.id) mergeIncomingMessages(activeConversationId, [result.message])
+      setScrollToLatestToken((value) => value + 1)
+      scheduleConversationRefresh()
+    } catch (callError) {
+      setError(callError.message || 'Отговорът за разговора не се изпрати.')
+    } finally {
+      setMessageStatus('idle')
+    }
   }
 
   function handleReportConversation() {
@@ -1134,6 +1155,7 @@ export default function Inbox() {
                   onDeleteConversation={() => setConfirmAction({ type: 'delete', conversation: safeActiveConversation })}
                   onSendCallInvite={handleSendCallInvite}
                   onScheduleCall={handleScheduleCall}
+                  onCallInviteAction={handleCallInviteAction}
                   onReportConversation={handleReportConversation}
                   onLoadOlder={loadOlderMessages}
                   hasOlder={pagination.hasOlder}
@@ -1185,6 +1207,7 @@ export default function Inbox() {
           onConfirm={handleConfirmAction}
         />
       )}
+      {callPlanner && <CallPlannerDialog mode={callPlanner.mode} status={messageStatus} onClose={() => { if (messageStatus !== 'sending') setCallPlanner(null) }} onSubmit={submitCallPlanner} />}
       {!accessDenied && !isGuest && <OfferComposer open={offerOpen} onClose={() => setOfferOpen(false)} onSubmit={submitOffer} status={messageStatus} userId={userId} serviceRequest={activeServiceRequest} conversationId={activeConversationId} services={referenceLibrary.services} servicesStatus={referenceLibrary.status} />}
       {account?.account_status === 'banned' && <div className="shrink-0 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Акаунтът е блокиран. Някои действия може да бъдат ограничени.</div>}
     </InboxShell>

@@ -62,6 +62,7 @@ export const MESSAGE_PAGE_SIZE = 30
 const SHARED_PROJECT_CONTEXT_KEY = 'totsan.chatSharedProjectContext.v1'
 const SHARED_PROJECT_CONTEXT_LIMIT = 50
 const CHAT_REFERENCE_PREFIX = '__totsan_ref__:'
+const CHAT_CALL_PREFIX = '__totsan_call__:'
 const chatFeatureSupport = {
   replies: null,
   reactions: null,
@@ -117,6 +118,34 @@ export function decodeChatReferenceBody(value = '') {
   }
 }
 
+export function encodeChatCallBody(payload = {}) {
+  const mode = payload.mode === 'scheduled' ? 'scheduled' : 'request'
+  const duration = Number(payload.duration)
+  const startsAt = String(payload.startsAt || '')
+  const normalized = {
+    mode,
+    purpose: String(payload.purpose || 'Уточняване на детайли').trim().slice(0, 100),
+    duration: [15, 30, 45, 60].includes(duration) ? duration : 30,
+    startsAt: startsAt && !Number.isNaN(new Date(startsAt).getTime()) ? startsAt : '',
+    channel: ['phone', 'video', 'in_person'].includes(payload.channel) ? payload.channel : 'video',
+    location: String(payload.location || '').trim().slice(0, 300),
+    note: String(payload.note || '').trim().slice(0, 600),
+    status: ['pending', 'accepted', 'declined', 'cancelled'].includes(payload.status) ? payload.status : 'pending',
+  }
+  return `${CHAT_CALL_PREFIX}${JSON.stringify(normalized)}`
+}
+
+export function decodeChatCallBody(value = '') {
+  const text = String(value || '')
+  if (!text.startsWith(CHAT_CALL_PREFIX)) return null
+  try {
+    const payload = JSON.parse(text.slice(CHAT_CALL_PREFIX.length))
+    return JSON.parse(encodeChatCallBody(payload).slice(CHAT_CALL_PREFIX.length))
+  } catch {
+    return null
+  }
+}
+
 export function getChatReferenceLabel(reference) {
   if (!reference) return ''
   return reference.type === 'service' ? 'Споделена услуга' : 'Споделено портфолио'
@@ -138,6 +167,9 @@ export function getMessageSnippet(message, { maxLength = 160, missing = 'Съо�
   if (message.kind === 'offer') return 'Оферта'
   if (message.kind === 'service_request') return 'Заявка за услуга'
   if (message.kind === 'system') return compactSystemText(message.body || '')
+
+  const call = decodeChatCallBody(message.body)
+  if (call) return call.startsAt ? 'Предложен разговор' : 'Покана за разговор'
 
   const reference = decodeChatReferenceBody(message.body)
   if (reference) {
@@ -1140,6 +1172,16 @@ export async function createConversationWithClient({ clientId, partnerId, projec
 export async function sendTextMessage({ conversationId, body, replyToMessageId = '' }) {
   const result = await invokeChatAction('send_message', { conversationId, body, kind: 'text', replyToMessageId })
   return result
+}
+
+export async function sendCallInvite({ conversationId, payload = {} }) {
+  if (!conversationId) throw new Error('Липсва разговор.')
+  return invokeChatAction('send_call_invite', { conversationId, ...payload })
+}
+
+export async function respondToCallInvite({ messageId, action }) {
+  if (!messageId || !['accept', 'decline'].includes(action)) throw new Error('Невалиден отговор за разговора.')
+  return invokeChatAction('respond_call_invite', { messageId, action })
 }
 
 export async function sendAttachmentMessage({ conversationId, body = '', attachments = [], replyToMessageId = '' }) {

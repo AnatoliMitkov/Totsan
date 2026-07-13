@@ -399,6 +399,7 @@ function CheckoutSuccess({ sessionId }) {
       tone={tone}
       role={isError ? 'alert' : 'status'}
       busy={isChecking}
+      compact={isPaid}
       eyebrow="Статус на плащането"
       title={title}
       description={description}
@@ -503,15 +504,15 @@ function CompactList({ title, items }) {
   )
 }
 
-function CheckoutShell({ children, withMobileAction = false }) {
+function CheckoutShell({ children, withMobileAction = false, compact = false }) {
   return (
-    <section className={`section min-h-[calc(100vh-var(--header-h,0px))] bg-soft !py-6 sm:!py-8 lg:!py-10 ${withMobileAction ? '!pb-[calc(10rem+env(safe-area-inset-bottom))] lg:!pb-10' : ''}`}>
+    <section className={`section ${compact ? '' : 'min-h-[calc(100vh-var(--header-h,0px))]'} bg-soft !py-6 sm:!py-8 lg:!py-10 ${withMobileAction ? '!pb-[calc(10rem+env(safe-area-inset-bottom))] lg:!pb-10' : ''}`}>
       <div className="container-page">{children}</div>
     </section>
   )
 }
 
-function CheckoutStatePage({ icon: Icon = Loader2, iconClassName = '', status = '', tone = 'neutral', role = 'status', busy = false, eyebrow = 'Плащане', title, description, children }) {
+function CheckoutStatePage({ icon: Icon = Loader2, iconClassName = '', status = '', tone = 'neutral', role = 'status', busy = false, compact = false, eyebrow = 'Плащане', title, description, children }) {
   const loading = status === 'loading'
   const toneClasses = {
     neutral: 'border-line bg-soft text-accentDeep',
@@ -521,8 +522,8 @@ function CheckoutStatePage({ icon: Icon = Loader2, iconClassName = '', status = 
   }
 
   return (
-    <CheckoutShell>
-      <div className="mx-auto max-w-3xl rounded-3xl border border-line bg-paper p-6 shadow-[0_24px_70px_-54px_rgba(13,35,64,0.4)] sm:p-8">
+    <CheckoutShell compact={compact}>
+      <div className="mx-auto max-w-3xl rounded-3xl border border-line bg-paper p-6 shadow-[0_24px_70px_-54px_rgba(13,35,64,0.4)] sm:p-7">
         <div role={role} aria-live={role === 'alert' ? 'assertive' : 'polite'} aria-busy={loading || busy}>
           <div className={`grid h-12 w-12 place-items-center rounded-2xl border ${toneClasses[tone] || toneClasses.neutral}`}>
             <Icon size={22} className={`${loading ? 'animate-spin motion-reduce:animate-none' : ''} ${iconClassName}`} />

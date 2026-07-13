@@ -5,7 +5,7 @@ import { ArrowLeft, Ban, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, C
 import MessageBubble from './MessageBubble.jsx'
 import Avatar from '../Avatar.jsx'
 import ShieldHandsIcon from './ShieldHandsIcon.jsx'
-import { compactSystemText, getConversationTitle, getOtherParticipant, getParticipantPublicHref } from '../../lib/chat.js'
+import { compactSystemText, decodeChatCallBody, getConversationTitle, getOtherParticipant, getParticipantPublicHref } from '../../lib/chat.js'
 import { createChatAttachmentSignedUrl, isDeletedAttachment, isImageAttachment } from '../../lib/chat-attachments.js'
 
 const BOTTOM_STICK_THRESHOLD = 96
@@ -25,6 +25,9 @@ function isSameDay(left, right) {
 function canGroupMessages(left, right) {
   if (!left || !right) return false
   if (left.kind === 'system' || right.kind === 'system') return false
+  // Conversation invitations are complete interaction cards, not text fragments.
+  // Keeping each card separate preserves its boundaries and reading rhythm.
+  if (decodeChatCallBody(left.body) || decodeChatCallBody(right.body)) return false
   return left.sender_id === right.sender_id && isSameDay(left.created_at, right.created_at)
 }
 
@@ -59,6 +62,7 @@ export default function ChatThread({
   onDeleteConversation,
   onSendCallInvite,
   onScheduleCall,
+  onCallInviteAction,
   onReportConversation,
   onBack,
   onLoadOlder,
@@ -575,7 +579,7 @@ export default function ChatThread({
               <div
                 key={item.id}
                 data-message-id={item.message.id}
-                className={highlightedMessageId === item.message.id ? 'motion-safe:message-highlight' : ''}
+                className={`flow-root ${highlightedMessageId === item.message.id ? 'motion-safe:message-highlight' : ''}`}
               >
                 <MessageBubble
                   message={{ ...item.message, body: item.message.kind === 'system' ? compactSystemText(item.message.body) : item.message.body }}
@@ -588,6 +592,7 @@ export default function ChatThread({
                   onToggleReaction={onToggleReaction}
                   onForwardMessage={onForwardMessage}
                   onSaveMessageFlags={onSaveMessageFlags}
+                  onCallInviteAction={onCallInviteAction}
                   showAvatar={item.showAvatar}
                   showTimestamp={item.showTimestamp}
                   groupPosition={item.groupPosition}

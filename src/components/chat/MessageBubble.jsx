@@ -4,8 +4,9 @@ import { AlertTriangle, Check, Copy, CornerUpLeft, Download, FileText, Forward, 
 import OfferCard from './OfferCard.jsx'
 import ServiceRequestCard from './ServiceRequestCard.jsx'
 import CatalogReferenceCard from './CatalogReferenceCard.jsx'
+import CallInviteCard from './CallInviteCard.jsx'
 import Avatar from '../Avatar.jsx'
-import { compactSystemText, decodeChatReferenceBody, getMessageSnippet, getParticipantDisplayName, getOtherParticipant } from '../../lib/chat.js'
+import { compactSystemText, decodeChatCallBody, decodeChatReferenceBody, getMessageSnippet, getParticipantDisplayName, getOtherParticipant } from '../../lib/chat.js'
 import { createChatAttachmentSignedUrl, formatAttachmentSize, isAudioAttachment, isDeletedAttachment, isImageAttachment } from '../../lib/chat-attachments.js'
 
 const EMOJI_OPTIONS = ['👍', '❤️', '😂', '😮', '🙏']
@@ -28,6 +29,7 @@ export default function MessageBubble({
   onToggleReaction,
   onForwardMessage,
   onSaveMessageFlags,
+  onCallInviteAction,
   showAvatar = true,
   showTimestamp = true,
   groupPosition = 'single',
@@ -46,6 +48,7 @@ export default function MessageBubble({
   const offer = message.kind === 'offer' && message.offer
   const serviceRequest = message.kind === 'service_request' && message.service_request
   const reference = message.kind === 'text' ? decodeChatReferenceBody(message.body) : null
+  const callInvite = message.kind === 'text' ? decodeChatCallBody(message.body) : null
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false)
   const [actionsMenuPosition, setActionsMenuPosition] = useState('up')
@@ -74,19 +77,19 @@ export default function MessageBubble({
   const participantName = getParticipantDisplayName(participant)
   const bubbleRadiusClass = bubbleRadius(own, groupPosition)
   const isOfferDocument = Boolean(offer)
-  const forceLightBubble = Boolean(serviceRequest || isOfferDocument)
+  const forceLightBubble = Boolean(serviceRequest || isOfferDocument || callInvite)
   const bubbleSurfaceClass = isOfferDocument
     ? 'border-transparent bg-transparent text-ink shadow-none'
     : own && !forceLightBubble
       ? 'border-accentDeep bg-accentDeep text-paper shadow-[0_14px_34px_-24px_rgba(22,62,162,0.62)]'
       : 'border-line/90 bg-soft/95 text-ink shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] backdrop-blur-sm'
-  const bubbleSizeClass = offer || serviceRequest || reference
+  const bubbleSizeClass = offer || serviceRequest || reference || callInvite
     ? 'w-full max-w-[min(92vw,42rem)] sm:max-w-[min(78%,44rem)] lg:max-w-[min(72%,46rem)]'
     : audioOnlyMessage
       ? 'w-full max-w-[min(84vw,20.5rem)] sm:max-w-[20.5rem]'
     : 'w-fit max-w-[min(82vw,34rem)] sm:max-w-[min(74%,38rem)] lg:max-w-[min(62%,42rem)]'
   const bubblePaddingClass = isOfferDocument ? 'p-0' : audioOnlyMessage ? 'px-3 py-2.5' : 'px-4 py-3'
-  const wrapperSpacingClass = groupedWithPrevious ? 'mt-1.5' : 'mt-4 first:mt-0'
+  const wrapperSpacingClass = groupedWithPrevious ? 'mt-1.5' : 'mt-4'
   const alignmentClass = own ? 'items-end' : 'items-start'
   const downloadableAttachments = attachments.filter((attachment) => !isDeletedAttachment(attachment))
   const messageActionText = getMessageActionText(message, { reference, offer, serviceRequest })
@@ -278,7 +281,7 @@ export default function MessageBubble({
     <div ref={bubbleRef} className={`group flex w-full min-w-0 gap-3 ${own ? 'justify-end' : 'justify-start'} ${wrapperSpacingClass}`}>
       {!own && (
         showAvatar
-          ? <Avatar src={avatarUrl} srcCandidates={avatarCandidates} name={participantName} size={32} className="self-end" />
+          ? <Avatar src={avatarUrl} srcCandidates={avatarCandidates} name={participantName} size={32} className="self-center" />
           : <div className="w-8 shrink-0" aria-hidden="true" />
       )}
       <div className={`flex min-w-0 max-w-full flex-1 flex-col ${alignmentClass}`}>
@@ -341,6 +344,14 @@ export default function MessageBubble({
             <OfferCard offer={message.offer} conversation={conversation} userId={userId} onAction={onOfferAction} messageCreatedAt={message.created_at} />
           ) : reference ? (
             <CatalogReferenceCard reference={reference} compact={own} />
+          ) : callInvite ? (
+            <CallInviteCard
+              call={callInvite}
+              own={own}
+              onAccept={() => onCallInviteAction?.(message, 'accept')}
+              onDecline={() => onCallInviteAction?.(message, 'decline')}
+              onReschedule={() => onCallInviteAction?.(message, 'reschedule')}
+            />
           ) : message.body ? (
             <p className="break-words whitespace-pre-wrap text-sm leading-relaxed [overflow-wrap:anywhere]">{message.body}</p>
           ) : null}
@@ -362,7 +373,7 @@ export default function MessageBubble({
               ))}
             </div>
           )}
-          {message.was_masked && (
+          {message.was_masked && !callInvite && (
             <div className={`mt-3 flex min-w-0 items-start gap-2 text-xs ${own && !forceLightBubble ? 'text-paper/72' : 'text-amber-800'}`}>
               <AlertTriangle size={14} /> Част от текста е скрита за сигурност.
             </div>

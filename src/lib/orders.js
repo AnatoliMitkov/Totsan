@@ -50,6 +50,7 @@ function normalizeAccountParty(row = {}) {
     id: row.id || '',
     name: row.full_name || row.display_name || '',
     email: row.email || '',
+    profilePath: row.profile_path || '',
   }
 }
 
@@ -81,6 +82,7 @@ export function normalizeOrder(row = {}) {
     description: row.description || '',
     deliverables: jsonArray(row.deliverables),
     amountTotal: row.amount_total || 0,
+    hasAmount: row.amount_total !== null && row.amount_total !== undefined,
     platformFee: row.platform_fee || 0,
     partnerPayout: row.partner_payout || 0,
     currency: row.currency || 'EUR',
@@ -251,6 +253,31 @@ export async function loadPartnerOrders(userId) {
   return loadOrdersBy('partner_id', userId)
 }
 
+export async function loadMyOrdersWorkspace(userId, role = 'client') {
+  const orders = role === 'partner'
+    ? await loadPartnerOrders(userId)
+    : await loadClientOrders(userId)
+  const orderIds = orders.map((order) => order.id).filter(Boolean)
+  if (orderIds.length === 0) return { orders, milestonesByOrder: new Map() }
+
+  const { data, error } = await supabase
+    .from('order_milestones')
+    .select('*')
+    .in('order_id', orderIds)
+    .order('position', { ascending: true })
+
+  if (error && !isMissingMilestonesTableError(error)) throw error
+  const milestonesByOrder = new Map()
+  const normalizedMilestones = (data || []).map(normalizeOrderMilestone)
+  normalizedMilestones.forEach((milestone) => {
+    const current = milestonesByOrder.get(milestone.orderId) || []
+    current.push(milestone)
+    milestonesByOrder.set(milestone.orderId, current)
+  })
+
+  return { orders, milestonesByOrder }
+}
+
 export async function loadOrderDetails(orderId) {
   const [{ data: order, error: orderError }, { data: events, error: eventsError }, { data: payments, error: paymentsError }, { data: milestones, error: milestonesError }] = await Promise.all([
     supabase.from('orders').select('*').eq('id', orderId).maybeSingle(),
@@ -267,38 +294,52 @@ export async function loadOrderDetails(orderId) {
   if (orderWithParties) {
     const partyIds = [...new Set([orderWithParties.client_id, orderWithParties.partner_id].filter(Boolean))]
     if (partyIds.length > 0) {
-      const { data: accounts } = await supabase
-        .from('accounts')
-        .select('id, email, full_name, display_name')
-        .in('id', partyIds)
+      const [{ data: accounts }, { data: participants, error: participantsError }] = await Promise.all([
+        supabase
+          .from('accounts')
+          .select('id, email, full_name, display_name')
+          .in('id', partyIds),
+        supabase.rpc('get_chat_participant_profiles', { p_user_ids: partyIds }),
+      ])
 
-      if (Array.isArray(accounts)) {
-        const accountMap = new Map(accounts.map((row) => [row.id, row]))
+      if (participantsError && !isMissingChatParticipantProfilesFunction(participantsError)) throw participantsError
 
-        // Enrich partner_account with the public profile name (e.g. "Totsan Design").
-        // Partner profile names live in profiles.name, linked via profiles.user_id.
-        let partnerProfileName = ''
-        if (orderWithParties.partner_id) {
-          const { data: partnerProfile } = await supabase
-            .from('profiles')
-            .select('name')
-            .eq('user_id', orderWithParties.partner_id)
-            .maybeSingle()
-          partnerProfileName = partnerProfile?.name || ''
-        }
+      const accountMap = new Map((accounts || []).map((row) => [row.id, row]))
+      const participantMap = new Map((participants || []).map((row) => [row.user_id || row.id, row]))
 
-        const rawPartnerAccount = accountMap.get(orderWithParties.partner_id) || null
-        const enrichedPartnerAccount = rawPartnerAccount
-          ? { ...rawPartnerAccount, full_name: partnerProfileName || rawPartnerAccount.full_name || rawPartnerAccount.display_name || '' }
-          : partnerProfileName
-            ? { id: orderWithParties.partner_id, full_name: partnerProfileName, display_name: '', email: '' }
-            : null
+      // Partner profile details live in profiles, while the protected RPC provides
+      // participant names when account RLS intentionally hides the other party.
+      let partnerProfile = null
+      if (orderWithParties.partner_id) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('name, slug, is_published')
+          .eq('user_id', orderWithParties.partner_id)
+          .maybeSingle()
+        partnerProfile = data || null
+      }
 
-        orderWithParties = {
-          ...orderWithParties,
-          client_account: accountMap.get(orderWithParties.client_id) || null,
-          partner_account: enrichedPartnerAccount,
-        }
+      const rawClientAccount = accountMap.get(orderWithParties.client_id) || null
+      const rawPartnerAccount = accountMap.get(orderWithParties.partner_id) || null
+      const clientParticipant = participantMap.get(orderWithParties.client_id) || null
+      const partnerParticipant = participantMap.get(orderWithParties.partner_id) || null
+      const participantName = (participant) => participant?.full_name || participant?.display_name || ''
+      const clientName = participantName(clientParticipant) || rawClientAccount?.full_name || rawClientAccount?.display_name || ''
+      const partnerName = partnerProfile?.name || participantName(partnerParticipant) || rawPartnerAccount?.full_name || rawPartnerAccount?.display_name || ''
+      const enrichedClientAccount = (rawClientAccount || clientName)
+        ? { ...(rawClientAccount || {}), id: orderWithParties.client_id, full_name: clientName, display_name: rawClientAccount?.display_name || '' }
+        : null
+      const partnerProfilePath = partnerProfile?.is_published && partnerProfile?.slug ? `/profil/${partnerProfile.slug}` : ''
+      const enrichedPartnerAccount = rawPartnerAccount
+        ? { ...rawPartnerAccount, full_name: partnerName, profile_path: partnerProfilePath }
+        : partnerName
+          ? { id: orderWithParties.partner_id, full_name: partnerName, display_name: '', email: '', profile_path: partnerProfilePath }
+          : null
+
+      orderWithParties = {
+        ...orderWithParties,
+        client_account: enrichedClientAccount,
+        partner_account: enrichedPartnerAccount,
       }
     }
   }
@@ -329,5 +370,14 @@ function isMissingMilestonesTableError(error) {
     || text.includes('schema cache')
     || text.includes('42p01')
     || text.includes('pgrst')
+  )
+}
+
+function isMissingChatParticipantProfilesFunction(error) {
+  const text = `${error?.code || ''} ${error?.message || ''} ${error?.details || ''}`.toLowerCase()
+  return text.includes('get_chat_participant_profiles') && (
+    text.includes('does not exist')
+    || text.includes('could not find')
+    || text.includes('schema cache')
   )
 }

@@ -814,6 +814,61 @@ body:has([aria-modal='true']) .mobile-nav-shell {
   transition: border-color .22s ease, background-color .22s ease, color .22s ease, transform .22s ease;
 }
 
+.mobile-header-messages {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.85rem;
+  height: 2.85rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid theme('colors.line');
+  background: rgba(255,255,255,0.92);
+  color: theme('colors.ink');
+  transition: border-color .22s ease, background-color .22s ease, color .22s ease, transform .22s ease;
+}
+
+.mobile-header-messages:hover {
+  border-color: rgba(22,62,162,0.18);
+  background: rgba(229,238,255,0.5);
+}
+
+.mobile-header-messages-on-dark {
+  border-color: rgba(255,255,255,0.11);
+  background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.09) 100%);
+  color: theme('colors.paper');
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.06),
+    0 12px 24px -20px rgba(0,0,0,0.4);
+  backdrop-filter: blur(16px) saturate(145%);
+  -webkit-backdrop-filter: blur(16px) saturate(145%);
+}
+
+.mobile-header-messages-on-dark:hover {
+  border-color: rgba(255,255,255,0.18);
+  background: linear-gradient(180deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.12) 100%);
+}
+
+.mobile-header-messages__badge {
+  position: absolute;
+  top: -0.3rem;
+  right: -0.3rem;
+  display: inline-flex;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 0.2rem;
+  border: 2px solid theme('colors.paper');
+  border-radius: 999px;
+  background: theme('colors.accentDeep');
+  color: theme('colors.paper');
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .mobile-menu-toggle:hover {
   border-color: rgba(22,62,162,0.18);
   background: rgba(229,238,255,0.5);
@@ -1206,6 +1261,7 @@ body:has([aria-modal='true']) .mobile-nav-shell {
 
 @media (min-width: 1280px) {
   .mobile-header-auth,
+  .mobile-header-messages,
   .mobile-menu-toggle,
   .mobile-nav-shell {
     display: none !important;

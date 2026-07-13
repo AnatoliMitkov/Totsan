@@ -1,6 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.8'
 
 const MESSAGE_KINDS = new Set(['text', 'attachment'])
+const CHAT_CALL_PREFIX = '__totsan_call__:'
 const OFFER_STATUSES = new Set(['accepted', 'declined', 'withdrawn', 'change_requested'])
 const SERVICE_REQUEST_STATUSES = new Set(['negotiating', 'declined', 'cancelled'])
 const REFERENCE_TYPES = new Set(['service', 'portfolio'])
@@ -231,6 +232,19 @@ function activePackageMeta(packages: Array<Record<string, unknown>>) {
 function sanitizeAttachmentName(value: unknown) {
   const text = String(value || 'file').trim().replace(/\s+/g, ' ')
   return text.slice(0, 160) || 'file'
+}
+
+function normalizeCallLocation(value: unknown) {
+  const original = String(value || '').trim().slice(0, 300)
+  if (!original) return { value: '', wasMasked: false }
+  try {
+    const url = new URL(original)
+    if (url.protocol === 'http:' || url.protocol === 'https:') return { value: url.href, wasMasked: false }
+  } catch {
+    // A non-URL location continues through the normal privacy filter.
+  }
+  const result = maskText(original)
+  return { value: result.masked.trim().slice(0, 300), wasMasked: result.wasMasked }
 }
 
 function normalizeAttachmentWaveform(value: unknown) {
@@ -788,6 +802,105 @@ Deno.serve(async (req) => {
       }
 
       return jsonResponse(200, { ok: true, message, wasMasked: bodyResult.wasMasked, originalBody: bodyResult.original })
+    }
+
+    if (action === 'send_call_invite') {
+      const conversationId = assertUuid(payload.conversationId, 'Conversation id')
+      const { data: conversation, error: conversationError } = await adminClient.from('conversations').select('*').eq('id', conversationId).single()
+      if (conversationError) throw conversationError
+      if (!isParticipant(conversation, user.id)) throw new Error('Conversation access denied.')
+      if (conversation.deleted_at || conversation.status !== 'open') throw new Error('Conversation is not open.')
+
+      const mode = payload.mode === 'scheduled' ? 'scheduled' : 'request'
+      const duration = Number(payload.duration)
+      if (![15, 30, 45, 60].includes(duration)) throw new Error('Call duration is invalid.')
+      const startsAt = String(payload.startsAt || '')
+      if (mode === 'scheduled' && (!startsAt || Number.isNaN(new Date(startsAt).getTime()))) {
+        throw new Error('Call time is invalid.')
+      }
+
+      const purposeResult = maskText(payload.purpose || 'Уточняване на детайли')
+      const locationResult = normalizeCallLocation(payload.location || '')
+      const noteResult = maskText(payload.note || '')
+      const callPayload = {
+        mode,
+        purpose: purposeResult.masked.trim().slice(0, 100) || 'Уточняване на детайли',
+        duration,
+        startsAt: mode === 'scheduled' ? startsAt : '',
+        channel: ['phone', 'video', 'in_person'].includes(String(payload.channel)) ? String(payload.channel) : 'video',
+        location: locationResult.value,
+        note: noteResult.masked.trim().slice(0, 600),
+        status: 'pending',
+      }
+      const body = `${CHAT_CALL_PREFIX}${JSON.stringify(callPayload)}`
+      const wasMasked = purposeResult.wasMasked || locationResult.wasMasked || noteResult.wasMasked
+
+      const { data: message, error: messageError } = await adminClient.from('messages').insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        kind: 'text',
+        body,
+        attachments: [],
+        was_masked: wasMasked,
+      }).select('*').single()
+      if (messageError) throw messageError
+
+      const preview = mode === 'scheduled' ? 'Предложен разговор' : 'Покана за разговор'
+      await adminClient.from('conversations').update({
+        last_message_at: message.created_at,
+        last_message_preview: preview,
+        ...nextReadFlags(conversation, user.id),
+      }).eq('id', conversationId)
+
+      return jsonResponse(200, { ok: true, message, wasMasked })
+    }
+
+    if (action === 'respond_call_invite') {
+      const messageId = assertUuid(payload.messageId, 'Message id')
+      const responseAction = String(payload.action || '')
+      if (responseAction !== 'accept' && responseAction !== 'decline') throw new Error('Call invite response is invalid.')
+
+      const { data: invite, error: inviteError } = await adminClient.from('messages').select('*').eq('id', messageId).single()
+      if (inviteError) throw inviteError
+      if (!String(invite.body || '').startsWith(CHAT_CALL_PREFIX)) throw new Error('Message is not a call invitation.')
+
+      const { data: conversation, error: conversationError } = await adminClient.from('conversations').select('*').eq('id', invite.conversation_id).single()
+      if (conversationError) throw conversationError
+      if (!isParticipant(conversation, user.id) || invite.sender_id === user.id) throw new Error('Only the recipient can respond to this invitation.')
+
+      let callPayload: Record<string, unknown>
+      try { callPayload = JSON.parse(String(invite.body).slice(CHAT_CALL_PREFIX.length)) } catch { throw new Error('Call invitation is invalid.') }
+      if (callPayload.status && callPayload.status !== 'pending') throw new Error('This invitation has already been answered.')
+      callPayload.status = responseAction === 'accept' ? 'accepted' : 'declined'
+
+      const { data: updatedInvite, error: updateError } = await adminClient
+        .from('messages')
+        .update({ body: `${CHAT_CALL_PREFIX}${JSON.stringify(callPayload)}` })
+        .eq('id', invite.id)
+        .select('*')
+        .single()
+      if (updateError) throw updateError
+
+      const responseBody = responseAction === 'accept'
+        ? 'Поканата за разговор е приета.'
+        : 'Поканата за разговор е отказана.'
+      const { data: responseMessage, error: responseError } = await adminClient.from('messages').insert({
+        conversation_id: conversation.id,
+        sender_id: user.id,
+        kind: 'system',
+        body: responseBody,
+        attachments: [],
+        was_masked: false,
+      }).select('*').single()
+      if (responseError) throw responseError
+
+      await adminClient.from('conversations').update({
+        last_message_at: responseMessage.created_at,
+        last_message_preview: responseBody,
+        ...nextReadFlags(conversation, user.id),
+      }).eq('id', conversation.id)
+
+      return jsonResponse(200, { ok: true, invite: updatedInvite, message: responseMessage })
     }
 
     if (action === 'send_offer') {
