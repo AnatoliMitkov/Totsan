@@ -1,5 +1,6 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Ban, Trash2, XCircle } from 'lucide-react'
 import ConversationList from '../components/chat/ConversationList.jsx'
 import ChatThread from '../components/chat/ChatThread.jsx'
 import ComposeBar from '../components/chat/ComposeBar.jsx'
@@ -7,8 +8,8 @@ import OfferComposer from '../components/chat/OfferComposer.jsx'
 import Avatar from '../components/Avatar.jsx'
 import { useAccount } from '../lib/account.js'
 import {
-  archiveConversation,
   conversationRole,
+  deleteConversationForEveryone,
   getMessageCursor,
   getMessageSnippet,
   getConversationTitle,
@@ -32,6 +33,7 @@ import {
   subscribeToConversation,
   subscribeToConversationList,
   toggleMessageReaction,
+  updateConversationStatus,
   updateOfferStatus,
   updateServiceRequestStatus,
 } from '../lib/chat.js'
@@ -75,6 +77,8 @@ export default function Inbox() {
   const [replyNotFoundId, setReplyNotFoundId] = useState(null)
   const [forwardDraft, setForwardDraft] = useState(null)
   const [offerOpen, setOfferOpen] = useState(false)
+  const [confirmAction, setConfirmAction] = useState(null)
+  const [confirmStatus, setConfirmStatus] = useState('idle')
   const [referenceLibrary, setReferenceLibrary] = useState({ status: 'idle', profileId: '', services: [], portfolio: [] })
   const initialLoadRef = useRef(false)
   const threadTokenRef = useRef(0)
@@ -967,22 +971,82 @@ export default function Inbox() {
     }
   }
 
-  const handleArchiveConversation = useCallback(async (conversation) => {
-    if (!conversation || !userId) return
+  const handleDeleteConversation = useCallback(async (conversation) => {
+    if (!conversation?.id) return
     try {
-      await archiveConversation(conversation, userId)
-      
+      await deleteConversationForEveryone(conversation.id)
+
       const nextConversations = conversationsRef.current.filter((c) => c.id !== conversation.id)
       setConversations(nextConversations)
-      
+
       if (conversation.id === selectedConversationId) {
         setSelectedConversationId('')
         navigate('/inbox', { replace: true })
       }
+      setError('')
     } catch (err) {
-      setError(err.message || 'Грешка при архивиране на разговора.')
+      setError(err.message || 'Грешка при изтриване на разговора.')
     }
-  }, [navigate, userId, selectedConversationId])
+  }, [navigate, selectedConversationId])
+
+  async function handleConversationStatus(statusValue) {
+    if (!safeActiveConversation) return
+    try {
+      const updatedConversation = await updateConversationStatus(safeActiveConversation.id, statusValue)
+      setConversations((current) => current.map((conversation) => (
+        conversation.id === updatedConversation.id ? { ...conversation, ...updatedConversation } : conversation
+      )))
+      setError('')
+    } catch (statusError) {
+      setError(statusError.message || 'Статусът на разговора не се промени.')
+    }
+  }
+
+  async function handleConfirmAction() {
+    if (!confirmAction || confirmStatus === 'working') return
+    setConfirmStatus('working')
+    try {
+      if (confirmAction.type === 'delete') {
+        await handleDeleteConversation(confirmAction.conversation)
+      } else if (confirmAction.type === 'status') {
+        await handleConversationStatus(confirmAction.statusValue)
+      }
+      setConfirmAction(null)
+    } finally {
+      setConfirmStatus('idle')
+    }
+  }
+
+  async function handleSendCallInvite() {
+    if (!activeConversationId) return
+    setError('')
+    setMessageStatus('sending')
+    try {
+      const result = await sendTextMessage({
+        conversationId: activeConversationId,
+        body: 'Предлагам кратък разговор, за да уточним детайлите. Кога ти е удобно?',
+      })
+      if (result?.message?.id) {
+        const nextMessage = await loadFreshMessage(result.message.id, result.message)
+        if (nextMessage) mergeIncomingMessages(activeConversationId, [nextMessage])
+      }
+      setScrollToLatestToken((value) => value + 1)
+      setMessageStatus('idle')
+      scheduleConversationRefresh()
+    } catch (inviteError) {
+      setError(inviteError.message || 'Поканата за разговор не се изпрати.')
+      setMessageStatus('idle')
+    }
+  }
+
+  function handleScheduleCall() {
+    setDraft('Нека насрочим разговор. Подходящи за мен са: ')
+    window.requestAnimationFrame(() => document.querySelector('.chat-compose-textarea')?.focus())
+  }
+
+  function handleReportConversation() {
+    setError('Докладването ще бъде добавено към центъра за поддръжка. Засега можеш да ни изпратиш детайлите през формата за контакт.')
+  }
 
 
   if (loading) return <InboxShell><Panel title="Зареждаме..." /></InboxShell>
@@ -1030,7 +1094,6 @@ export default function Inbox() {
               userId={userId}
               statusByConversation={conversationStatuses}
               onSelect={handleSelectConversation}
-              onArchive={handleArchiveConversation}
             />
           </div>
           <div className={`${hasSelectedConversation ? 'flex' : 'hidden lg:flex'} min-h-0 min-w-0 flex-col overflow-hidden lg:gap-3`}>
@@ -1054,7 +1117,6 @@ export default function Inbox() {
                   conversation={safeActiveConversation}
                   messages={safeMessages}
                   userId={userId}
-                  orderStatus={conversationStatuses.get(activeConversationId) || null}
                   onBack={handleBackToList}
                   onOfferAction={handleOfferAction}
                   onServiceRequestAction={handleServiceRequestAction}
@@ -1063,6 +1125,16 @@ export default function Inbox() {
                   onToggleReaction={handleToggleReaction}
                   onForwardMessage={handleForwardMessage}
                   onSaveMessageFlags={handleSaveMessageFlags}
+                  onOpenContact={() => {
+                    const href = getParticipantPublicHref(safeActiveConversation, userId)
+                    if (href) navigate(href)
+                  }}
+                  onCloseConversation={() => setConfirmAction({ type: 'status', statusValue: 'closed' })}
+                  onBlockConversation={() => setConfirmAction({ type: 'status', statusValue: 'blocked' })}
+                  onDeleteConversation={() => setConfirmAction({ type: 'delete', conversation: safeActiveConversation })}
+                  onSendCallInvite={handleSendCallInvite}
+                  onScheduleCall={handleScheduleCall}
+                  onReportConversation={handleReportConversation}
                   onLoadOlder={loadOlderMessages}
                   hasOlder={pagination.hasOlder}
                   isLoadingOlder={pagination.isLoadingOlder}
@@ -1101,6 +1173,16 @@ export default function Inbox() {
           status={messageStatus}
           onCancel={() => setForwardDraft(null)}
           onSelect={submitForwardMessage}
+        />
+      )}
+      {confirmAction && (
+        <ConfirmActionDialog
+          action={confirmAction}
+          status={confirmStatus}
+          onCancel={() => {
+            if (confirmStatus !== 'working') setConfirmAction(null)
+          }}
+          onConfirm={handleConfirmAction}
         />
       )}
       {!accessDenied && !isGuest && <OfferComposer open={offerOpen} onClose={() => setOfferOpen(false)} onSubmit={submitOffer} status={messageStatus} userId={userId} serviceRequest={activeServiceRequest} conversationId={activeConversationId} services={referenceLibrary.services} servicesStatus={referenceLibrary.status} />}
@@ -1153,6 +1235,71 @@ function ForwardMessageDialog({ conversations, userId, status, onCancel, onSelec
       </div>
     </div>
   )
+}
+
+function ConfirmActionDialog({ action, status, onCancel, onConfirm }) {
+  const working = status === 'working'
+  const config = getConfirmActionCopy(action)
+  const Icon = config.icon
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/35 px-4 py-6 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="flex h-[223px] w-full max-w-[392px] flex-col items-center rounded-[25px] bg-white px-6 pb-5 pt-5 shadow-[0_30px_90px_-38px_rgba(13,35,64,0.65)] animate-in zoom-in-95 slide-in-from-bottom-3 duration-200">
+        <Icon size={60} className={config.iconClassName} strokeWidth={1.2} />
+        <h2 className="mt-5 whitespace-nowrap text-center font-['Inter'] text-[24px] font-normal leading-none text-black">
+          {config.title}
+        </h2>
+        <div className="mt-8 flex items-center justify-center gap-[15px]">
+          <button
+            type="button"
+            disabled={working}
+            onClick={onCancel}
+            className="grid h-[35px] w-[120px] place-items-center rounded-[25px] border border-[rgba(32,72,128,0.5)] bg-white text-[16px] font-normal leading-none text-black transition hover:bg-soft disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Откажи
+          </button>
+          <button
+            type="button"
+            disabled={working}
+            onClick={onConfirm}
+            className={`grid h-[35px] w-[120px] place-items-center rounded-[25px] text-[16px] font-normal leading-none text-white transition disabled:cursor-not-allowed disabled:opacity-70 ${config.confirmClassName}`}
+          >
+            {working ? '...' : config.confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function getConfirmActionCopy(action) {
+  if (action?.type === 'delete') {
+    return {
+      title: 'Изтриване на чат?',
+      confirmLabel: 'Изтрий',
+      icon: Trash2,
+      iconClassName: 'text-red-600',
+      confirmClassName: 'bg-red-600 hover:bg-red-700',
+    }
+  }
+
+  if (action?.statusValue === 'blocked') {
+    return {
+      title: 'Блокиране на разговор?',
+      confirmLabel: 'Блокирай',
+      icon: Ban,
+      iconClassName: 'text-red-600',
+      confirmClassName: 'bg-red-600 hover:bg-red-700',
+    }
+  }
+
+  return {
+    title: 'Затваряне на чат?',
+    confirmLabel: 'Затвори',
+    icon: XCircle,
+    iconClassName: 'text-accentDeep',
+    confirmClassName: 'bg-accentDeep hover:bg-ink',
+  }
 }
 
 function buildForwardMessageBody(message, text = '') {

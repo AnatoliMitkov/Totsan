@@ -23,7 +23,7 @@ function ReferenceRow({ icon: Icon, title, meta, onClick, disabled = false }) {
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex w-full min-w-0 items-center gap-3 rounded-2xl border border-line bg-paper px-3 py-3 text-left transition hover:border-ink/20 hover:bg-soft disabled:cursor-not-allowed disabled:opacity-60"
+      className="chat-compose-reference-row flex w-full min-w-0 items-center gap-3 rounded-2xl border px-3 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60"
     >
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-soft text-accentDeep">
         <Icon size={18} />
@@ -57,17 +57,28 @@ export default function ComposeBar({
   const replyPreview = buildReplyPreview(replyTarget, conversation)
   const textareaRef = useRef(null)
   const fileInputRef = useRef(null)
+  const reopenReferenceMenuAfterPickerRef = useRef(false)
   const referenceMenuRef = useRef(null)
+  const referenceToggleRef = useRef(null)
   const [referenceMenuOpen, setReferenceMenuOpen] = useState(false)
   const [referenceStep, setReferenceStep] = useState('root')
   const [voiceStatus, setVoiceStatus] = useState('idle')
   const [voiceElapsed, setVoiceElapsed] = useState(0)
   const [voiceError, setVoiceError] = useState('')
   const [voiceLevels, setVoiceLevels] = useState(() => Array.from({ length: 34 }, () => 0.08))
+  const [isMobileViewport, setIsMobileViewport] = useState(false)
   const mediaRecorderRef = useRef(null)
   const mediaStreamRef = useRef(null)
   const audioContextRef = useRef(null)
   const analyserRef = useRef(null)
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const updateViewport = () => setIsMobileViewport(mediaQuery.matches)
+    updateViewport()
+    mediaQuery.addEventListener?.('change', updateViewport)
+    return () => mediaQuery.removeEventListener?.('change', updateViewport)
+  }, [])
   const voiceAnimationRef = useRef(0)
   const voiceLastDrawRef = useRef(0)
   const voiceChunksRef = useRef([])
@@ -98,7 +109,11 @@ export default function ComposeBar({
     if (!referenceMenuOpen) return undefined
 
     function handlePointerDown(event) {
-      if (!referenceMenuRef.current?.contains(event.target)) {
+      const target = event.target
+      if (referenceMenuRef.current?.contains(target) || referenceToggleRef.current?.contains(target)) {
+        return
+      }
+      if (!referenceMenuRef.current?.contains(target)) {
         setReferenceMenuOpen(false)
         setReferenceStep('root')
       }
@@ -111,6 +126,21 @@ export default function ComposeBar({
       document.removeEventListener('touchstart', handlePointerDown)
     }
   }, [referenceMenuOpen])
+
+  useEffect(() => {
+    function restoreReferenceMenuAfterFilePicker() {
+      if (!reopenReferenceMenuAfterPickerRef.current) return
+      window.setTimeout(() => {
+        if (!reopenReferenceMenuAfterPickerRef.current) return
+        reopenReferenceMenuAfterPickerRef.current = false
+        setReferenceStep('root')
+        setReferenceMenuOpen(true)
+      }, 160)
+    }
+
+    window.addEventListener('focus', restoreReferenceMenuAfterFilePicker)
+    return () => window.removeEventListener('focus', restoreReferenceMenuAfterFilePicker)
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -145,6 +175,29 @@ export default function ComposeBar({
       if (next) setReferenceStep('root')
       return next
     })
+  }
+
+  function openFilePicker() {
+    if (disabled || files.length >= MAX_CHAT_ATTACHMENTS) return
+    reopenReferenceMenuAfterPickerRef.current = true
+    setReferenceMenuOpen(false)
+    setReferenceStep('root')
+    window.setTimeout(() => fileInputRef.current?.click(), 0)
+  }
+
+  function handleFileInputChange(event) {
+    const selectedFiles = event.target.files
+    reopenReferenceMenuAfterPickerRef.current = false
+    onFilesChange?.(selectedFiles)
+    setReferenceMenuOpen(false)
+    setReferenceStep('root')
+    event.target.value = ''
+  }
+
+  function handleFilePickerCancel() {
+    reopenReferenceMenuAfterPickerRef.current = false
+    setReferenceStep('root')
+    setReferenceMenuOpen(true)
   }
 
   function stopVoiceTimer() {
@@ -386,17 +439,14 @@ export default function ComposeBar({
         )}
 
         {referenceMenuOpen && (
-          <div ref={referenceMenuRef} className="rounded-[1.6rem] border border-line bg-paper/98 p-3 shadow-[0_22px_60px_-36px_rgba(15,23,42,0.45)] backdrop-blur-sm">
+          <div ref={referenceMenuRef} className="chat-compose-reference-menu rounded-[1.6rem] border p-3">
             {referenceStep === 'root' ? (
               <div className="grid gap-2">
                 <ReferenceRow
                   icon={Paperclip}
                   title="Прикачи файлове"
                   meta={files.length >= MAX_CHAT_ATTACHMENTS ? 'Достигнат е лимитът за файлове' : 'Снимки, документи или други файлове'}
-                  onClick={() => {
-                    setReferenceMenuOpen(false)
-                    fileInputRef.current?.click()
-                  }}
+                  onClick={openFilePicker}
                   disabled={disabled || files.length >= MAX_CHAT_ATTACHMENTS}
                 />
                 <ReferenceRow
@@ -476,6 +526,7 @@ export default function ComposeBar({
         <div className="chat-compose-bar">
           <div className="chat-compose-primary">
             <button
+              ref={referenceToggleRef}
               type="button"
               onClick={toggleReferenceMenu}
               disabled={disabled}
@@ -505,7 +556,7 @@ export default function ComposeBar({
               onKeyDown={handleTextareaKeyDown}
               rows={1}
               disabled={disabled}
-              placeholder="Напиши съобщение..."
+              placeholder={isMobileViewport ? 'съобщение...' : 'Напиши съобщение...'}
               className="chat-compose-textarea"
             />
           </div>
@@ -517,10 +568,8 @@ export default function ComposeBar({
               className="sr-only"
               multiple
               accept="image/jpeg,image/png,image/webp,image/gif,audio/aac,audio/m4a,audio/mp4,audio/mpeg,audio/ogg,audio/wav,audio/webm,application/pdf,text/plain,text/csv,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip"
-              onChange={(event) => {
-                onFilesChange?.(event.target.files)
-                event.target.value = ''
-              }}
+              onChange={handleFileInputChange}
+              onCancel={handleFilePickerCancel}
               disabled={disabled || files.length >= MAX_CHAT_ATTACHMENTS}
             />
             <button

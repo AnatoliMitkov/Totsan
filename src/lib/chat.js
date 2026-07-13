@@ -14,6 +14,9 @@ export const CONVERSATION_SELECT = `
   is_read_by_partner,
   hidden_by_client_at,
   hidden_by_partner_at,
+  deleted_at,
+  delete_after,
+  deleted_by,
   created_at,
   updated_at
 `
@@ -325,7 +328,7 @@ export function getParticipantPublicHref(conversation, userId) {
   const role = getOtherParticipantRole(conversation, userId)
   const participant = getOtherParticipant(conversation, userId)
 
-  if (role === 'client' && conversation?.sharedProject?.shareId) {
+  if (role === 'client' && isPartner(conversation, userId) && conversation?.sharedProject?.shareId) {
     return `/proekt/${conversation.sharedProject.shareId}`
   }
 
@@ -918,6 +921,7 @@ export async function loadConversations() {
     rows = rows.filter((conversation) => {
       if (conversation.client_id === userId && conversation.hidden_by_client_at) return false
       if (conversation.partner_id === userId && conversation.hidden_by_partner_at) return false
+      if (conversation.deleted_at) return false
       return true
     })
   }
@@ -933,6 +937,7 @@ export async function loadConversation(conversationId) {
     .eq('id', conversationId)
     .maybeSingle()
   if (error) throw error
+  if (data?.deleted_at) return null
   return enrichConversation(data || null)
 }
 
@@ -1042,6 +1047,7 @@ async function findOpenConversation({ clientId, partnerId, projectId = '' }) {
     .eq('client_id', clientId)
     .eq('partner_id', partnerId)
     .eq('status', 'open')
+    .is('deleted_at', null)
     .order('updated_at', { ascending: false })
 
   if (error) throw error
@@ -1156,34 +1162,38 @@ export async function sendCatalogReference({ conversationId, referenceType, refe
   return result
 }
 
-export async function toggleMessageReaction({ messageId, emoji, userId, active }) {
+export async function toggleMessageReaction({ messageId, emoji, userId }) {
   if (!messageId || !emoji || !userId) throw new Error('Липсва реакция или съобщение.')
 
-  if (active) {
+  // Read ownership from the source of truth so another participant's emoji
+  // can never be mistaken for the current user's reaction in a stale UI.
+  const { data: existingReaction, error: lookupError } = await supabase
+    .from('message_reactions')
+    .select('id')
+    .eq('message_id', messageId)
+    .eq('user_id', userId)
+    .eq('emoji', emoji)
+    .maybeSingle()
+
+  if (lookupError) throw lookupError
+
+  if (existingReaction?.id) {
     const { error } = await supabase
       .from('message_reactions')
       .delete()
-      .eq('message_id', messageId)
-      .eq('user_id', userId)
-      .eq('emoji', emoji)
+      .eq('id', existingReaction.id)
     if (error) throw error
     return
   }
 
   const { error } = await supabase
     .from('message_reactions')
-    .upsert(
-      {
-        message_id: messageId,
-        user_id: userId,
-        emoji,
-      },
-      {
-        onConflict: 'message_id,user_id,emoji',
-        ignoreDuplicates: true,
-      },
-    )
-  if (error) throw error
+    .insert({
+      message_id: messageId,
+      user_id: userId,
+      emoji,
+    })
+  if (error && error.code !== '23505') throw error
 }
 
 export async function sendOffer({ conversationId, offer }) {
@@ -1254,4 +1264,33 @@ export async function archiveConversation(conversation, userId) {
 
   if (error) throw error
   return data
+}
+
+export async function deleteConversationForEveryone(conversationId) {
+  if (!conversationId) throw new Error('Липсва разговор.')
+
+  const { data, error } = await supabase.rpc('delete_conversation_for_everyone', {
+    p_conversation_id: conversationId,
+  })
+
+  if (error) throw error
+  return enrichConversation(data || null)
+}
+
+export async function updateConversationStatus(conversationId, status) {
+  if (!conversationId) throw new Error('Липсва разговор.')
+  if (!['open', 'closed', 'blocked'].includes(status)) {
+    throw new Error('Невалиден статус на разговор.')
+  }
+
+  const { data, error } = await supabase
+    .from('conversations')
+    .update({ status })
+    .eq('id', conversationId)
+    .select(CONVERSATION_SELECT)
+    .single()
+
+  if (error) throw error
+  if (data?.deleted_at) return null
+  return enrichConversation(data || null)
 }

@@ -24,6 +24,7 @@ import Admin from './pages/Admin.jsx'
 import AdminEvidence from './pages/AdminEvidence.jsx'
 import MyProfile from './pages/MyProfile.jsx'
 import Inbox from './pages/Inbox.jsx'
+import ChatClientProfile from './pages/ChatClientProfile.jsx'
 import Checkout from './pages/Checkout.jsx'
 import Order from './pages/Order.jsx'
 import MyOrders from './pages/MyOrders.jsx'
@@ -308,6 +309,7 @@ function AppRoutes() {
             <Route path="/moy-profil" element={<ProtectedRoute><MyProfile /></ProtectedRoute>} />
             <Route path="/porachki" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />
             <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
+            <Route path="/inbox/:conversationId/client-profile" element={<ProtectedRoute><ChatClientProfile /></ProtectedRoute>} />
             <Route path="/inbox/:conversationId" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
             <Route path="/checkout/success" element={<Checkout />} />
             <Route path="/checkout/:type/:id" element={<Checkout />} />

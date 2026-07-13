@@ -402,6 +402,7 @@ Deno.serve(async (req) => {
         .eq('client_id', user.id)
         .eq('partner_id', partnerId)
         .eq('status', 'open')
+        .is('deleted_at', null)
         .order('updated_at', { ascending: false })
 
       if (existingError) throw existingError
@@ -472,6 +473,7 @@ Deno.serve(async (req) => {
         .eq('client_id', user.id)
         .eq('partner_id', service.partner_id)
         .eq('status', 'open')
+        .is('deleted_at', null)
         .order('updated_at', { ascending: false })
       if (conversationError) throw conversationError
       let conversation = (openConversations || []).find((row) => !row.project_id) || (openConversations || [])[0] || null
@@ -598,6 +600,7 @@ Deno.serve(async (req) => {
         .single()
       if (conversationError) throw conversationError
       if (!isParticipant(conversation, user.id)) throw new Error('Conversation access denied.')
+      if (conversation.deleted_at) throw new Error('Conversation was deleted.')
       if (conversation.status !== 'open') throw new Error('Conversation is not open.')
 
       const since = new Date(Date.now() - 60_000).toISOString()
@@ -738,6 +741,7 @@ Deno.serve(async (req) => {
       const { data: conversation, error: conversationError } = await adminClient.from('conversations').select('*').eq('id', conversationId).single()
       if (conversationError) throw conversationError
       if (!isParticipant(conversation, user.id)) throw new Error('Conversation access denied.')
+      if (conversation.deleted_at) throw new Error('Conversation was deleted.')
       if (conversation.status !== 'open') throw new Error('Conversation is not open.')
 
       if (replyToMessageId) {
@@ -791,6 +795,7 @@ Deno.serve(async (req) => {
       const { data: conversation, error: conversationError } = await adminClient.from('conversations').select('*').eq('id', conversationId).single()
       if (conversationError) throw conversationError
       if (conversation.partner_id !== user.id) throw new Error('Само партньорът може да изпрати оферта.')
+      if (conversation.deleted_at) throw new Error('Conversation was deleted.')
       if (conversation.status !== 'open') throw new Error('Conversation is not open.')
 
       const title = maskText(payload.title)

@@ -19,6 +19,7 @@ alter table public.message_flags enable row level security;
 
 drop policy if exists "participants can read own message flags" on public.message_flags;
 drop policy if exists "participants can upsert own message flags" on public.message_flags;
+drop policy if exists "participants can update own message flags" on public.message_flags;
 drop policy if exists "users can delete own message flags" on public.message_flags;
 
 create policy "participants can read own message flags"

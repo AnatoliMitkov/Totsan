@@ -18,12 +18,14 @@ alter table public.image_cleanup_log drop constraint if exists image_cleanup_log
 
 -- Drop restrictive select policy and make metadata public-readable (so banners/avatars load for guests)
 drop policy if exists "users can read own image metadata" on public.image_metadata;
+drop policy if exists "anyone can read active image metadata" on public.image_metadata;
 create policy "anyone can read active image metadata"
   on public.image_metadata for select
   to public
   using (not is_deleted_from_db);
 
 -- Allow authenticated users to insert metadata if they own the profile or if it's their user ID
+drop policy if exists "users can insert own image metadata" on public.image_metadata;
 drop policy if exists "users can insert own image metadata" on public.image_metadata;
 create policy "users can insert own image metadata"
   on public.image_metadata for insert

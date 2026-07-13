@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AlertTriangle, Check, Copy, CornerUpLeft, Download, FileText, Forward, ImageOff, Info, MoreVertical, Pause, Pin, Play, Share2, SmilePlus, Star, Volume2, X } from 'lucide-react'
 import OfferCard from './OfferCard.jsx'
 import ServiceRequestCard from './ServiceRequestCard.jsx'
@@ -37,6 +38,9 @@ export default function MessageBubble({
   onRevealInlineControls,
 }) {
   const bubbleRef = useRef(null)
+  const longPressTimerRef = useRef(null)
+  const actionsMenuRef = useRef(null)
+  const messageInfoRef = useRef(null)
   const own = message.sender_id === userId
   const system = message.kind === 'system'
   const offer = message.kind === 'offer' && message.offer
@@ -44,8 +48,10 @@ export default function MessageBubble({
   const reference = message.kind === 'text' ? decodeChatReferenceBody(message.body) : null
   const [reactionPickerOpen, setReactionPickerOpen] = useState(false)
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false)
+  const [actionsMenuPosition, setActionsMenuPosition] = useState('up')
   const [messageInfoOpen, setMessageInfoOpen] = useState(false)
   const [importantPaletteOpen, setImportantPaletteOpen] = useState(false)
+  const [isMobileViewport, setIsMobileViewport] = useState(false)
   const [actionFeedback, setActionFeedback] = useState('')
   const [messageFlags, setMessageFlags] = useState(() => loadLocalMessageFlags(userId, message.id, message.message_flags))
   const reactions = Array.isArray(message.reactions) ? message.reactions : []
@@ -98,10 +104,38 @@ export default function MessageBubble({
   }, [onRevealInlineControls, reactionPickerOpen])
 
   useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const updateViewport = () => setIsMobileViewport(mediaQuery.matches)
+    updateViewport()
+    mediaQuery.addEventListener?.('change', updateViewport)
+    return () => mediaQuery.removeEventListener?.('change', updateViewport)
+  }, [])
+
+  useLayoutEffect(() => {
+    if (!actionsMenuOpen || !actionsMenuRef.current) return undefined
+
+    const menu = actionsMenuRef.current
+    const threadBody = menu.closest('.chat-thread-body')
+    if (!threadBody) return undefined
+
+    const menuRect = menu.getBoundingClientRect()
+    const bodyRect = threadBody.getBoundingClientRect()
+    const nextPosition = menuRect.top < bodyRect.top + 12 ? 'down' : 'up'
+
+    if (nextPosition !== actionsMenuPosition) {
+      setActionsMenuPosition(nextPosition)
+      return undefined
+    }
+
+    onRevealInlineControls?.(menu)
+    return undefined
+  }, [actionsMenuOpen, actionsMenuPosition, importantPaletteOpen, onRevealInlineControls])
+
+  useEffect(() => {
     if (!actionsMenuOpen && !messageInfoOpen) return undefined
 
     function handlePointerDown(event) {
-      if (!bubbleRef.current?.contains(event.target)) {
+      if (!bubbleRef.current?.contains(event.target) && !actionsMenuRef.current?.contains(event.target) && !messageInfoRef.current?.contains(event.target)) {
         setActionsMenuOpen(false)
         setMessageInfoOpen(false)
         setImportantPaletteOpen(false)
@@ -133,9 +167,31 @@ export default function MessageBubble({
     onSaveMessageFlags?.(message.id, localFlags)
   }, [message.id, message.message_flags, onSaveMessageFlags, userId])
 
+  useEffect(() => () => {
+    if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current)
+  }, [])
+
   function closeActionsMenu() {
     setActionsMenuOpen(false)
     setImportantPaletteOpen(false)
+  }
+
+  function startLongPress(event) {
+    if (event.pointerType === 'mouse') return
+    if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current)
+    longPressTimerRef.current = window.setTimeout(() => {
+      setActionsMenuOpen(true)
+      setActionsMenuPosition('up')
+      setMessageInfoOpen(false)
+      setReactionPickerOpen(false)
+      longPressTimerRef.current = null
+    }, 420)
+  }
+
+  function cancelLongPress() {
+    if (!longPressTimerRef.current) return
+    window.clearTimeout(longPressTimerRef.current)
+    longPressTimerRef.current = null
   }
 
   async function copyMessage() {
@@ -181,6 +237,42 @@ export default function MessageBubble({
     closeActionsMenu()
   }
 
+  const actionsMenu = actionsMenuOpen ? (
+    <div ref={actionsMenuRef} className={`chat-message-actions-menu chat-message-actions-menu-position-${actionsMenuPosition} ${own ? 'chat-message-actions-menu-own' : 'chat-message-actions-menu-other'}`}>
+      {importantPaletteOpen && <ImportantColorPalette value={importantColor} onSelect={chooseImportantColor} onBack={() => setImportantPaletteOpen(false)} />}
+      <button type="button" onClick={() => setImportantPaletteOpen((value) => !value)} className={`chat-message-action-item ${isStarred ? 'is-active' : ''}`}>
+        <Star size={16} />
+        <span>{isStarred ? 'Промени цвят' : 'Важно'}</span>
+      </button>
+      <MessageActionButton icon={Pin} label={isPinned ? 'Откачи' : 'Закачи'} onClick={() => toggleFlag('pinned')} active={isPinned} />
+      <MessageActionButton icon={CornerUpLeft} label="Отговор" onClick={() => { closeActionsMenu(); onReplyToMessage?.(message) }} />
+      <MessageActionButton icon={SmilePlus} label="Реакция" onClick={() => { closeActionsMenu(); setReactionPickerOpen(true) }} />
+      <MessageActionButton icon={Info} label="Инфо" onClick={() => { closeActionsMenu(); setMessageInfoOpen(true) }} />
+      {messageActionText && <MessageActionButton icon={Copy} label="Копирай" onClick={copyMessage} />}
+      {downloadableAttachments.length > 0 && <MessageActionButton icon={Download} label={downloadableAttachments.length > 1 ? 'Изтегли файлове' : 'Изтегли'} onClick={downloadMessageAttachments} />}
+      {(messageActionText || downloadableAttachments.length > 0) && <MessageActionButton icon={Share2} label="Сподели" onClick={shareMessage} />}
+    </div>
+  ) : null
+
+  const messageInfoPanel = messageInfoOpen ? (
+    <MessageInfoPanel
+      panelRef={messageInfoRef}
+      own={own}
+      senderName={senderName}
+      kindLabel={messageKindLabel}
+      createdAt={message.created_at}
+      attachments={attachments}
+      onClose={() => setMessageInfoOpen(false)}
+    />
+  ) : null
+
+  const actionFeedbackPanel = actionFeedback ? (
+    <div className={`chat-message-feedback ${own ? 'chat-message-feedback-own' : 'chat-message-feedback-other'}`}>
+      <Check size={13} />
+      <span>{actionFeedback}</span>
+    </div>
+  ) : null
+
   return (
     <div ref={bubbleRef} className={`group flex w-full min-w-0 gap-3 ${own ? 'justify-end' : 'justify-start'} ${wrapperSpacingClass}`}>
       {!own && (
@@ -192,11 +284,17 @@ export default function MessageBubble({
         <div
           className={`relative min-w-0 overflow-visible border ${bubblePaddingClass} ${bubbleRadiusClass} ${bubbleSurfaceClass} ${bubbleSizeClass} ${isPinned ? 'chat-message-pinned' : ''} ${isStarred ? 'chat-message-starred' : ''}`}
           style={importantStyle}
+          onPointerDown={startLongPress}
+          onPointerUp={cancelLongPress}
+          onPointerCancel={cancelLongPress}
+          onPointerLeave={cancelLongPress}
+          onContextMenu={(event) => event.preventDefault()}
         >
           <button
             type="button"
             onClick={() => {
               setActionsMenuOpen((value) => !value)
+              setActionsMenuPosition('up')
               setMessageInfoOpen(false)
             }}
             className={`chat-message-more ${own ? 'chat-message-more-own' : 'chat-message-more-other'}`}
@@ -206,37 +304,19 @@ export default function MessageBubble({
             <MoreVertical size={17} />
           </button>
           {actionFeedback && (
-            <div className={`chat-message-feedback ${own ? 'chat-message-feedback-own' : 'chat-message-feedback-other'}`}>
-              <Check size={13} />
-              <span>{actionFeedback}</span>
-            </div>
+            isMobileViewport && typeof document !== 'undefined'
+              ? createPortal(actionFeedbackPanel, document.body)
+              : actionFeedbackPanel
           )}
           {actionsMenuOpen && (
-            <div className={`chat-message-actions-menu ${own ? 'chat-message-actions-menu-own' : 'chat-message-actions-menu-other'}`}>
-              {importantPaletteOpen && <ImportantColorPalette value={importantColor} onSelect={chooseImportantColor} onBack={() => setImportantPaletteOpen(false)} />}
-              <button type="button" onClick={() => setImportantPaletteOpen((value) => !value)} className={`chat-message-action-item ${isStarred ? 'is-active' : ''}`}>
-                <Star size={16} />
-                <span>{isStarred ? 'Промени цвят' : 'Важно'}</span>
-              </button>
-              <MessageActionButton icon={Pin} label={isPinned ? 'Откачи' : 'Закачи'} onClick={() => toggleFlag('pinned')} active={isPinned} />
-              <MessageActionButton icon={Star} label={isStarred ? 'Махни звезда' : 'Важно'} onClick={() => toggleFlag('starred')} active={isStarred} />
-              <MessageActionButton icon={Info} label="Инфо" onClick={() => { closeActionsMenu(); setMessageInfoOpen(true) }} />
-              <MessageActionButton icon={CornerUpLeft} label="Отговор" onClick={() => { closeActionsMenu(); onReplyToMessage?.(message) }} />
-              <MessageActionButton icon={SmilePlus} label="Реакция" onClick={() => { closeActionsMenu(); setReactionPickerOpen(true) }} />
-              {messageActionText && <MessageActionButton icon={Copy} label="Копирай" onClick={copyMessage} />}
-              {downloadableAttachments.length > 0 && <MessageActionButton icon={Download} label={downloadableAttachments.length > 1 ? 'Изтегли файлове' : 'Изтегли'} onClick={downloadMessageAttachments} />}
-              {(messageActionText || downloadableAttachments.length > 0) && <MessageActionButton icon={Share2} label="Сподели" onClick={shareMessage} />}
-            </div>
+            isMobileViewport && typeof document !== 'undefined'
+              ? createPortal(actionsMenu, document.body)
+              : actionsMenu
           )}
           {messageInfoOpen && (
-            <MessageInfoPanel
-              own={own}
-              senderName={senderName}
-              kindLabel={messageKindLabel}
-              createdAt={message.created_at}
-              attachments={attachments}
-              onClose={() => setMessageInfoOpen(false)}
-            />
+            isMobileViewport && typeof document !== 'undefined'
+              ? createPortal(messageInfoPanel, document.body)
+              : messageInfoPanel
           )}
           {replyPreview && (
             <button
@@ -308,26 +388,6 @@ export default function MessageBubble({
             ))}
           </div>
         )}
-
-        <div className={`mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted md:opacity-0 md:transition md:group-hover:opacity-100 md:group-focus-within:opacity-100 ${own ? 'justify-end' : 'justify-start'}`}>
-          <button
-            type="button"
-            onClick={() => onReplyToMessage?.(message)}
-            className="inline-flex items-center gap-1 rounded-full border border-transparent px-2 py-1 transition hover:border-line hover:bg-paper hover:text-ink"
-          >
-            <CornerUpLeft size={13} />
-            <span>Отговор</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setReactionPickerOpen((value) => !value)}
-            className="inline-flex items-center gap-1 rounded-full border border-transparent px-2 py-1 transition hover:border-line hover:bg-paper hover:text-ink"
-            aria-expanded={reactionPickerOpen}
-          >
-            {reactionPickerOpen ? <X size={13} /> : <SmilePlus size={13} />}
-            <span>Реакция</span>
-          </button>
-        </div>
 
         {reactionPickerOpen && (
           <div className={`mt-2 flex flex-wrap gap-2 rounded-2xl border border-line bg-paper/95 px-3 py-2 shadow-[0_16px_36px_-28px_rgba(15,23,42,0.35)] backdrop-blur-sm ${own ? 'self-end' : 'self-start'}`}>
@@ -497,7 +557,7 @@ function AttachmentPreview({ attachment, own, senderName, senderAvatarUrl, sende
 }
 
 function MessageActionButton({ icon: Icon, label, onClick, active = false }) {
-  if (Icon === CornerUpLeft || Icon === SmilePlus || Icon === Star) return null
+  if (Icon === Star) return null
   const RenderIcon = Icon === Share2 ? Forward : Icon
   const renderLabel = Icon === Share2 ? 'Препрати' : label
 
@@ -535,7 +595,7 @@ function ImportantColorPalette({ value, onSelect, onBack }) {
   )
 }
 
-function MessageInfoPanel({ own, senderName, kindLabel, createdAt, attachments, onClose }) {
+function MessageInfoPanel({ panelRef, own, senderName, kindLabel, createdAt, attachments, onClose }) {
   const created = createdAt ? new Date(createdAt) : null
   const sentLabel = created
     ? created.toLocaleString('bg-BG', {
@@ -553,7 +613,7 @@ function MessageInfoPanel({ own, senderName, kindLabel, createdAt, attachments, 
     : 'Няма'
 
   return (
-    <div className={`chat-message-info-panel ${own ? 'chat-message-info-panel-own' : 'chat-message-info-panel-other'}`}>
+    <div ref={panelRef} className={`chat-message-info-panel ${own ? 'chat-message-info-panel-own' : 'chat-message-info-panel-other'}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">Инфо</div>
