@@ -594,7 +594,7 @@ function ScopeStep({ draft, set, errors }) {
       <Field id="offer-included" label="Какво е включено" required error={errors.included}>
         <textarea id="offer-included" rows={9} value={draft.included} onChange={(event) => set('included', event.target.value)} className={textareaClass(errors.included)} placeholder={'Един резултат или дейност на ред.\n\nНапример:\nФункционално разпределение\nКонцепция за материали'} aria-invalid={Boolean(errors.included)} aria-describedby={errors.included ? 'offer-included-error' : undefined} />
       </Field>
-      <details className="group w-full rounded-2xl border border-line bg-soft/55 p-4 sm:p-5" defaultOpen={hasOptionalScope}>
+      <Disclosure className="group w-full rounded-2xl border border-line bg-soft/55 p-4 sm:p-5" initialOpen={hasOptionalScope}>
         <summary className="flex cursor-pointer list-none items-start gap-3 outline-none focus-visible:ring-4 focus-visible:ring-accent/10">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-paper text-accentDeep"><Plus size={18} /></span>
           <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-ink">Граници на обхвата</span><span className="mt-1 block text-xs leading-5 text-muted">Уточни само ако има изключения или ангажименти на клиента.</span></span>
@@ -608,7 +608,7 @@ function ScopeStep({ draft, set, errors }) {
             <textarea id="offer-client-requirements" rows={4} value={draft.clientRequirements} onChange={(event) => set('clientRequirements', event.target.value)} className={TEXTAREA} placeholder="Един ред = една точка" />
           </Field>
         </div>
-      </details>
+      </Disclosure>
     </div>
   )
 }
@@ -640,7 +640,7 @@ function PriceStep({ draft, set, setPriceBreakdown, computed, errors }) {
       )}
 
       {draft.offerType !== 'staged' && (
-        <details className="group rounded-2xl border border-line bg-paper p-4" defaultOpen={hasBreakdown} onToggle={(event) => { if (event.currentTarget.open) enableBreakdown() }}>
+        <Disclosure className="group rounded-2xl border border-line bg-paper p-4" initialOpen={hasBreakdown} onToggle={(event) => { if (event.currentTarget.open) enableBreakdown() }}>
           <summary className="flex cursor-pointer list-none items-center gap-3 text-sm font-semibold text-ink outline-none focus-visible:ring-4 focus-visible:ring-accent/10">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-soft text-accentDeep"><Plus size={16} /></span>
             Добави ценова разбивка
@@ -654,7 +654,7 @@ function PriceStep({ draft, set, setPriceBreakdown, computed, errors }) {
             <MoneyInput label="Транспорт" value={draft.transportPrice} onChange={(value) => setPriceBreakdown('transportPrice', value)} />
           </div>
           {computed.partsTotal > 0 && <div className="mt-3 text-right text-xs text-muted">Сбор на разбивката: <strong className="text-ink">{formatEurWithBgn(computed.partsTotal)}</strong></div>}
-        </details>
+        </Disclosure>
       )}
 
       <div className="grid gap-4 rounded-2xl border border-line bg-soft/45 p-4 sm:grid-cols-2 sm:p-5">
@@ -727,13 +727,13 @@ function StageCard({ stage, index, count, setStage, removeStage, moveStage, erro
       <Field id={`stage-${index}-description`} label="Резултат от етапа" optional className="mt-4">
         <textarea id={`stage-${index}-description`} rows={3} value={stage.description} onChange={(event) => setStage(index, 'description', event.target.value)} className={TEXTAREA} />
       </Field>
-      <details className="group mt-4 rounded-xl border border-line bg-soft/45 p-3" defaultOpen={hasDetails}>
+      <Disclosure className="group mt-4 rounded-xl border border-line bg-soft/45 p-3" initialOpen={hasDetails}>
         <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-semibold text-ink outline-none"><Plus size={15} className="text-accentDeep" /> Допълнителни настройки <ChevronDown size={15} className="ml-auto text-muted transition group-open:rotate-180" /></summary>
         <div className="mt-3 grid gap-4 border-t border-line pt-3 md:grid-cols-2">
           <Field id={`stage-${index}-condition`} label="Условие за старт" optional><input id={`stage-${index}-condition`} value={stage.startCondition} onChange={(event) => setStage(index, 'startCondition', event.target.value)} className={CONTROL} /></Field>
           <Field id={`stage-${index}-payment`} label="Бележка за плащане" optional><input id={`stage-${index}-payment`} value={stage.payment} onChange={(event) => setStage(index, 'payment', event.target.value)} className={CONTROL} /></Field>
         </div>
-      </details>
+      </Disclosure>
     </article>
   )
 }
@@ -746,8 +746,8 @@ function ClientPreview({ preview }) {
         <div><div className="text-sm font-semibold text-ink">Това ще види клиентът</div><p className="mt-0.5 text-xs text-muted">Прегледът използва същия изглед като офертата в чата.</p></div>
       </div>
       <div className="rounded-[1.75rem] border border-line bg-soft/65 p-3 sm:p-5">
-        <div className="mx-auto max-w-[44rem] rounded-[1.6rem] border border-line bg-paper p-4 shadow-[0_24px_60px_-46px_rgba(13,35,64,0.7)] sm:p-5">
-          <OfferDocumentView offer={preview} showStatus={false} />
+        <div className="mx-auto max-w-[45.3125rem]">
+          <OfferDocumentView offer={preview} showStatus={false} defaultConditionsOpen />
         </div>
       </div>
     </div>
@@ -921,6 +921,21 @@ function isValidCurrentOrFutureDate(value) {
   const date = new Date(`${value}T12:00:00`)
   if (Number.isNaN(date.getTime()) || localDateValue(date) !== value) return false
   return value >= localDateValue(new Date())
+}
+
+function Disclosure({ initialOpen = false, onToggle, children, ...detailsProps }) {
+  const [open, setOpen] = useState(initialOpen)
+
+  function handleToggle(event) {
+    setOpen(event.currentTarget.open)
+    onToggle?.(event)
+  }
+
+  return (
+    <details {...detailsProps} open={open} onToggle={handleToggle}>
+      {children}
+    </details>
+  )
 }
 
 function SectionLabel({ children }) { return <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">{children}</div> }

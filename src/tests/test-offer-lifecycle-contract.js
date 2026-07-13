@@ -8,6 +8,8 @@ const webhook = read('supabase/functions/payments-webhook/index.ts')
 const chatSendMessage = read('supabase/functions/chat-send-message/index.ts')
 const composer = read('src/components/chat/OfferComposer.jsx')
 const offerDocument = read('src/components/offers/OfferDocumentView.jsx')
+const offerCard = read('src/components/chat/OfferCard.jsx')
+const messageBubble = read('src/components/chat/MessageBubble.jsx')
 const chatThread = read('src/components/chat/ChatThread.jsx')
 const conversationList = read('src/components/chat/ConversationList.jsx')
 
@@ -63,10 +65,25 @@ describe('offer lifecycle contract', () => {
   })
 
   it('keeps scope details visible directly below included work', () => {
-    assert.match(offerDocument, /Section title="Какво е включено" className=\{panel\}/)
-    assert.match(offerDocument, /Section title="Граници на обхвата" className=\{panel\}/)
+    assert.match(offerDocument, /Section title="Какво е включено"/)
+    assert.match(offerDocument, /Section title="Граници на обхвата"/)
     assert.match(offerDocument, /TextList title="Не е включено"/)
     assert.match(offerDocument, /TextList title="Клиентът осигурява"/)
+  })
+
+  it('uses one responsive light offer document in preview and chat', () => {
+    assert.match(offerDocument, /max-w-\[45\.3125rem\][\s\S]*bg-white/)
+    assert.match(offerDocument, /function PriceAccent\([\s\S]*sm:absolute sm:right-0 sm:top-0/)
+    assert.match(offerDocument, /function TimelineAccent\(/)
+    assert.match(offerDocument, /function ValidityAccent\(/)
+    assert.match(offerDocument, /rounded-\[1\.5625rem\][\s\S]*bg-\[#f1bdc2\]/)
+    assert.doesNotMatch(offerDocument, /compact/)
+    assert.match(messageBubble, /isOfferDocument[\s\S]*border-transparent bg-transparent text-ink shadow-none/)
+    assert.match(composer, /OfferDocumentView offer=\{preview\} showStatus=\{false\} defaultConditionsOpen/)
+    assert.match(offerCard, /OfferDocumentView offer=\{document\} defaultConditionsOpen=\{false\}/)
+    assert.doesNotMatch(offerCard, /compact/)
+    assert.match(composer, /function Disclosure\(/)
+    assert.doesNotMatch(composer, /defaultOpen=/)
   })
 
   it('keeps the jump-to-latest arrow readable over any chat background', () => {

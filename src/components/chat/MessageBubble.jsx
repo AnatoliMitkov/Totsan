@@ -73,18 +73,19 @@ export default function MessageBubble({
   const avatarCandidates = participant?.avatar_candidates || []
   const participantName = getParticipantDisplayName(participant)
   const bubbleRadiusClass = bubbleRadius(own, groupPosition)
-  const forceLightBubble = Boolean(serviceRequest)
-  const bubbleSurfaceClass = own
-    ? forceLightBubble
-      ? 'border-line/90 bg-soft/95 text-ink shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] backdrop-blur-sm'
-      : 'border-accentDeep bg-accentDeep text-paper shadow-[0_14px_34px_-24px_rgba(22,62,162,0.62)]'
-    : 'border-line/90 bg-soft/95 text-ink shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] backdrop-blur-sm'
+  const isOfferDocument = Boolean(offer)
+  const forceLightBubble = Boolean(serviceRequest || isOfferDocument)
+  const bubbleSurfaceClass = isOfferDocument
+    ? 'border-transparent bg-transparent text-ink shadow-none'
+    : own && !forceLightBubble
+      ? 'border-accentDeep bg-accentDeep text-paper shadow-[0_14px_34px_-24px_rgba(22,62,162,0.62)]'
+      : 'border-line/90 bg-soft/95 text-ink shadow-[0_12px_26px_-24px_rgba(15,23,42,0.28)] backdrop-blur-sm'
   const bubbleSizeClass = offer || serviceRequest || reference
     ? 'w-full max-w-[min(92vw,42rem)] sm:max-w-[min(78%,44rem)] lg:max-w-[min(72%,46rem)]'
     : audioOnlyMessage
       ? 'w-full max-w-[min(84vw,20.5rem)] sm:max-w-[20.5rem]'
     : 'w-fit max-w-[min(82vw,34rem)] sm:max-w-[min(74%,38rem)] lg:max-w-[min(62%,42rem)]'
-  const bubblePaddingClass = audioOnlyMessage ? 'px-3 py-2.5' : 'px-4 py-3'
+  const bubblePaddingClass = isOfferDocument ? 'p-0' : audioOnlyMessage ? 'px-3 py-2.5' : 'px-4 py-3'
   const wrapperSpacingClass = groupedWithPrevious ? 'mt-1.5' : 'mt-4 first:mt-0'
   const alignmentClass = own ? 'items-end' : 'items-start'
   const downloadableAttachments = attachments.filter((attachment) => !isDeletedAttachment(attachment))
@@ -337,7 +338,7 @@ export default function MessageBubble({
           {serviceRequest ? (
             <ServiceRequestCard request={serviceRequest} conversation={conversation} userId={userId} onAction={onServiceRequestAction} compact={false} />
           ) : offer ? (
-            <OfferCard offer={message.offer} conversation={conversation} userId={userId} onAction={onOfferAction} compact={own} messageCreatedAt={message.created_at} />
+            <OfferCard offer={message.offer} conversation={conversation} userId={userId} onAction={onOfferAction} messageCreatedAt={message.created_at} />
           ) : reference ? (
             <CatalogReferenceCard reference={reference} compact={own} />
           ) : message.body ? (
