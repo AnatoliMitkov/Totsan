@@ -54,6 +54,7 @@ const ACCOUNT_AVATAR_SELECT = 'id, full_name, display_name, avatar_url, email'
 const LEGACY_MESSAGE_PREVIEW_SELECT = 'id, conversation_id, sender_id, kind, body, offer_id, created_at'
 const MESSAGE_PREVIEW_SELECT = 'id, conversation_id, sender_id, kind, body, offer_id, reply_to_message_id, created_at'
 const REACTION_SELECT = 'id, message_id, user_id, emoji, created_at'
+const MESSAGE_FLAG_SELECT = 'id, message_id, user_id, pinned, starred, color, created_at, updated_at'
 export const MESSAGE_PAGE_SIZE = 30
 const SHARED_PROJECT_CONTEXT_KEY = 'totsan.chatSharedProjectContext.v1'
 const SHARED_PROJECT_CONTEXT_LIMIT = 50
@@ -61,6 +62,7 @@ const CHAT_REFERENCE_PREFIX = '__totsan_ref__:'
 const chatFeatureSupport = {
   replies: null,
   reactions: null,
+  messageFlags: null,
 }
 
 function normalizeChatReferencePayload(payload) {
@@ -173,6 +175,16 @@ function isMissingReplyColumnError(error) {
 function isMissingReactionsTableError(error) {
   const text = supabaseErrorText(error)
   return text.includes('message_reactions') && (
+    text.includes('schema cache')
+    || text.includes('does not exist')
+    || text.includes('not found')
+    || text.includes('relation')
+  )
+}
+
+function isMissingMessageFlagsTableError(error) {
+  const text = supabaseErrorText(error)
+  return text.includes('message_flags') && (
     text.includes('schema cache')
     || text.includes('does not exist')
     || text.includes('not found')
@@ -570,6 +582,85 @@ export async function loadMessageReactions(messageIds = []) {
   return reactionsByMessageId
 }
 
+export async function loadMessageFlags(messageIds = []) {
+  const uniqueIds = [...new Set(messageIds.filter(Boolean))]
+  if (uniqueIds.length === 0 || chatFeatureSupport.messageFlags === false) return new Map()
+
+  const { data, error } = await supabase
+    .from('message_flags')
+    .select(MESSAGE_FLAG_SELECT)
+    .in('message_id', uniqueIds)
+
+  if (error) {
+    if (isMissingMessageFlagsTableError(error)) {
+      chatFeatureSupport.messageFlags = false
+      return new Map()
+    }
+    throw error
+  }
+  chatFeatureSupport.messageFlags = true
+
+  const flagsByMessageId = new Map()
+  ;(data || []).forEach((flag) => {
+    flagsByMessageId.set(flag.message_id, {
+      pinned: Boolean(flag.pinned),
+      starred: Boolean(flag.starred),
+      color: String(flag.color || ''),
+    })
+  })
+  return flagsByMessageId
+}
+
+export async function saveMessageFlagState(messageId, flags = {}) {
+  if (!messageId) return null
+  const { data: sessionData } = await supabase.auth.getSession()
+  const userId = sessionData.session?.user?.id
+  if (!userId) throw new Error('Трябва да си влязъл, за да маркираш съобщения.')
+
+  const pinned = Boolean(flags.pinned)
+  const starred = Boolean(flags.starred)
+  const color = starred && flags.color ? String(flags.color) : null
+
+  if (!pinned && !starred) {
+    const { error } = await supabase
+      .from('message_flags')
+      .delete()
+      .eq('message_id', messageId)
+      .eq('user_id', userId)
+    if (error) {
+      if (isMissingMessageFlagsTableError(error)) {
+        chatFeatureSupport.messageFlags = false
+        return null
+      }
+      throw error
+    }
+    return null
+  }
+
+  const { data, error } = await supabase
+    .from('message_flags')
+    .upsert({
+      message_id: messageId,
+      user_id: userId,
+      pinned,
+      starred,
+      color,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'message_id,user_id' })
+    .select(MESSAGE_FLAG_SELECT)
+    .single()
+
+  if (error) {
+    if (isMissingMessageFlagsTableError(error)) {
+      chatFeatureSupport.messageFlags = false
+      return null
+    }
+    throw error
+  }
+  chatFeatureSupport.messageFlags = true
+  return data
+}
+
 async function loadOrdersByOfferIds(offerIds = []) {
   const uniqueIds = [...new Set(offerIds.filter(Boolean))]
   if (uniqueIds.length === 0) return new Map()
@@ -595,9 +686,10 @@ async function enrichMessages(rows = []) {
   const replyIds = [...new Set(messages.map((message) => message.reply_to_message_id).filter((replyId) => replyId && !messageIdSet.has(replyId)))]
 
   const offerIds = [...new Set(messages.map((message) => message.offer_id).filter(Boolean))]
-  const [replyRows, reactionsByMessageId, ordersByOfferId] = await Promise.all([
+  const [replyRows, reactionsByMessageId, flagsByMessageId, ordersByOfferId] = await Promise.all([
     loadMessagePreviewsByIds(replyIds),
     loadMessageReactions(messageIds),
+    loadMessageFlags(messageIds),
     loadOrdersByOfferIds(offerIds),
   ])
 
@@ -619,6 +711,7 @@ async function enrichMessages(rows = []) {
     })() : null,
     reply_to_message: message.reply_to_message_id ? repliesById.get(message.reply_to_message_id) || null : null,
     reactions: reactionsByMessageId.get(message.id) || [],
+    message_flags: flagsByMessageId.get(message.id) || null,
   }))
 }
 
@@ -1134,6 +1227,7 @@ export function subscribeToConversation(conversationId, onChange) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'offers', filter: `conversation_id=eq.${conversationId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'service_requests', filter: `conversation_id=eq.${conversationId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'message_flags' }, onChange)
     .subscribe()
 
   return () => { supabase.removeChannel(channel) }

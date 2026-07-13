@@ -14,6 +14,13 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
   'image/png',
   'image/webp',
   'image/gif',
+  'audio/aac',
+  'audio/m4a',
+  'audio/mp4',
+  'audio/mpeg',
+  'audio/ogg',
+  'audio/wav',
+  'audio/webm',
   'application/pdf',
   'text/plain',
   'text/csv',
@@ -226,6 +233,16 @@ function sanitizeAttachmentName(value: unknown) {
   return text.slice(0, 160) || 'file'
 }
 
+function normalizeAttachmentWaveform(value: unknown) {
+  if (!Array.isArray(value)) return null
+  const levels = value
+    .map((item) => Number(item))
+    .filter((item) => Number.isFinite(item))
+    .map((item) => Math.max(0.04, Math.min(1, item)))
+    .slice(0, 80)
+  return levels.length >= 8 ? levels : null
+}
+
 function normalizeAttachments(value: unknown, conversationId: string, senderId: string) {
   const input = Array.isArray(value) ? value : []
   if (input.length > MAX_ATTACHMENTS_PER_MESSAGE) throw new Error('Too many attachments.')
@@ -240,6 +257,9 @@ function normalizeAttachments(value: unknown, conversationId: string, senderId: 
     const originalSize = Number(record.original_size || 0)
     const width = Number(record.width || 0)
     const height = Number(record.height || 0)
+    const duration = Number(record.duration || 0)
+    const audio = type.startsWith('audio/')
+    const waveform = audio ? normalizeAttachmentWaveform(record.waveform) : null
 
     if (bucket !== CHAT_ATTACHMENTS_BUCKET) throw new Error('Attachment bucket is invalid.')
     if (!path.startsWith(`conversations/${conversationId}/${senderId}/`)) throw new Error('Attachment path is invalid.')
@@ -252,13 +272,15 @@ function normalizeAttachments(value: unknown, conversationId: string, senderId: 
       name: sanitizeAttachmentName(record.name),
       size: Math.round(size),
       type,
-      kind: type.startsWith('image/') ? 'image' : 'file',
+      kind: type.startsWith('image/') ? 'image' : (type.startsWith('audio/') ? 'audio' : 'file'),
       original_name: sanitizeAttachmentName(record.original_name || record.name),
       original_size: Number.isFinite(originalSize) && originalSize > 0 ? Math.round(originalSize) : Math.round(size),
       original_type: ALLOWED_ATTACHMENT_TYPES.has(String(record.original_type || '')) ? String(record.original_type) : type,
       optimized: Boolean(record.optimized),
       width: Number.isFinite(width) && width > 0 ? Math.round(width) : null,
       height: Number.isFinite(height) && height > 0 ? Math.round(height) : null,
+      duration: audio && Number.isFinite(duration) && duration > 0 ? Math.min(3600, Math.round(duration)) : null,
+      waveform,
     }
   })
 }
@@ -267,7 +289,10 @@ function attachmentPreview(attachments: Array<Record<string, unknown>>) {
   if (!attachments.length) return ''
   if (attachments.length === 1) {
     const name = sanitizeAttachmentName(attachments[0].name)
-    return String(attachments[0].kind || '') === 'image' ? `Image: ${name}` : `File: ${name}`
+    const kind = String(attachments[0].kind || '')
+    if (kind === 'image') return `Image: ${name}`
+    if (kind === 'audio') return `Voice message: ${name}`
+    return `File: ${name}`
   }
   return `${attachments.length} attachments`
 }

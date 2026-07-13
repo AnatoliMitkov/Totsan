@@ -11,6 +11,13 @@ const ALLOWED_CHAT_ATTACHMENT_TYPES = new Set([
   'image/png',
   'image/webp',
   'image/gif',
+  'audio/aac',
+  'audio/m4a',
+  'audio/mp4',
+  'audio/mpeg',
+  'audio/ogg',
+  'audio/wav',
+  'audio/webm',
   'application/pdf',
   'text/plain',
   'text/csv',
@@ -32,6 +39,13 @@ const EXTENSION_BY_TYPE = {
   'image/png': 'png',
   'image/webp': 'webp',
   'image/gif': 'gif',
+  'audio/aac': 'aac',
+  'audio/m4a': 'm4a',
+  'audio/mp4': 'm4a',
+  'audio/mpeg': 'mp3',
+  'audio/ogg': 'ogg',
+  'audio/wav': 'wav',
+  'audio/webm': 'webm',
   'application/pdf': 'pdf',
   'text/plain': 'txt',
   'text/csv': 'csv',
@@ -44,6 +58,10 @@ const EXTENSION_BY_TYPE = {
 
 export function isImageAttachment(attachment) {
   return String(attachment?.type || '').startsWith('image/')
+}
+
+export function isAudioAttachment(attachment) {
+  return String(attachment?.type || '').startsWith('audio/')
 }
 
 export function isDeletedAttachment(attachment) {
@@ -98,6 +116,19 @@ function extensionFor(file) {
 function replaceExtension(fileName, nextExtension) {
   const baseName = String(fileName || 'image').replace(/\.[^.]+$/, '') || 'image'
   return `${baseName}.${nextExtension}`
+}
+
+function getVoiceFileMeta(file) {
+  const meta = file?.__chatVoiceMeta || {}
+  const duration = Number(meta.duration || 0)
+  const waveform = Array.isArray(meta.waveform)
+    ? meta.waveform.map(Number).filter(Number.isFinite).map((level) => Math.max(0.04, Math.min(1, level))).slice(0, 80)
+    : []
+
+  return {
+    duration: Number.isFinite(duration) && duration > 0 ? Math.round(duration) : null,
+    waveform: waveform.length >= 8 ? waveform : null,
+  }
 }
 
 function constrainSize(width, height, maxEdge) {
@@ -236,6 +267,7 @@ export async function uploadChatAttachments({ conversationId, userId, files }) {
   for (const file of fileList) {
     const prepared = await prepareChatAttachmentFile(file)
     const uploadFile = prepared.file
+    const voiceMeta = isAudioAttachment({ type: uploadFile.type }) ? getVoiceFileMeta(file) : { duration: null, waveform: null }
     const path = attachmentPath({ conversationId, userId, file: uploadFile })
     const { data, error } = await supabase.storage
       .from(CHAT_ATTACHMENTS_BUCKET)
@@ -253,13 +285,15 @@ export async function uploadChatAttachments({ conversationId, userId, files }) {
       name: file.name,
       size: uploadFile.size,
       type: uploadFile.type,
-      kind: isImageAttachment({ type: uploadFile.type }) ? 'image' : 'file',
+      kind: isImageAttachment({ type: uploadFile.type }) ? 'image' : (isAudioAttachment({ type: uploadFile.type }) ? 'audio' : 'file'),
       original_name: prepared.originalName,
       original_size: prepared.originalSize,
       original_type: prepared.originalType,
       optimized: prepared.optimized,
       width: prepared.width || null,
       height: prepared.height || null,
+      duration: voiceMeta.duration,
+      waveform: voiceMeta.waveform,
     })
   }
 

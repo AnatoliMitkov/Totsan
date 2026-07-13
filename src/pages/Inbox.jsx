@@ -4,11 +4,15 @@ import ConversationList from '../components/chat/ConversationList.jsx'
 import ChatThread from '../components/chat/ChatThread.jsx'
 import ComposeBar from '../components/chat/ComposeBar.jsx'
 import OfferComposer from '../components/chat/OfferComposer.jsx'
+import Avatar from '../components/Avatar.jsx'
 import { useAccount } from '../lib/account.js'
 import {
   archiveConversation,
   conversationRole,
   getMessageCursor,
+  getMessageSnippet,
+  getConversationTitle,
+  getOtherParticipant,
   isClient,
   isPartner,
   loadConversation,
@@ -20,6 +24,7 @@ import {
   markConversationRead,
   mergeMessagesById,
   MESSAGE_PAGE_SIZE,
+  saveMessageFlagState,
   sendOffer,
   sendAttachmentMessage,
   sendCatalogReference,
@@ -68,6 +73,7 @@ export default function Inbox() {
   const [scrollToLatestToken, setScrollToLatestToken] = useState(0)
   const [replyTarget, setReplyTarget] = useState(null)
   const [replyNotFoundId, setReplyNotFoundId] = useState(null)
+  const [forwardDraft, setForwardDraft] = useState(null)
   const [offerOpen, setOfferOpen] = useState(false)
   const [referenceLibrary, setReferenceLibrary] = useState({ status: 'idle', profileId: '', services: [], portfolio: [] })
   const initialLoadRef = useRef(false)
@@ -198,6 +204,36 @@ export default function Inbox() {
     const patchMessages = (rows = []) => rows.map((message) => (
       message.id === messageId
         ? { ...message, reactions }
+        : message
+    ))
+
+    if (conversationId === activeConversationId) {
+      setMessages((current) => {
+        const nextMessages = patchMessages(current)
+        const cached = threadCacheRef.current.get(`${userId}:${conversationId}`) || {}
+        writeThreadCache(conversationId, {
+          messages: nextMessages,
+          pagination: cached.pagination || pagination,
+          status: 'ready',
+        })
+        return nextMessages
+      })
+      return
+    }
+
+    const cached = threadCacheRef.current.get(`${userId}:${conversationId}`)
+    if (!cached?.messages) return
+    writeThreadCache(conversationId, {
+      messages: patchMessages(cached.messages),
+    })
+  }, [activeConversationId, pagination, writeThreadCache])
+
+  const patchMessageFlags = useCallback((conversationId, messageId, flags) => {
+    if (!conversationId || !messageId) return
+
+    const patchMessages = (rows = []) => rows.map((message) => (
+      message.id === messageId
+        ? { ...message, message_flags: flags }
         : message
     ))
 
@@ -646,9 +682,21 @@ export default function Inbox() {
         return
       }
 
+      if (payload.table === 'message_flags') {
+        const row = payload.new || payload.old || {}
+        const messageId = row.message_id
+        if (!messageId || row.user_id !== userId) return
+        patchMessageFlags(activeConversationId, messageId, payload.eventType === 'DELETE' ? null : {
+          pinned: Boolean(row.pinned),
+          starred: Boolean(row.starred),
+          color: String(row.color || ''),
+        })
+        return
+      }
+
       scheduleConversationRefresh()
     })
-  }, [accessDenied, isGuest, activeConversationId, loadFreshMessage, mergeIncomingMessages, patchOfferMessage, refreshMessageReactions, scheduleConversationRefresh])
+  }, [accessDenied, isGuest, activeConversationId, loadFreshMessage, mergeIncomingMessages, patchMessageFlags, patchOfferMessage, refreshMessageReactions, scheduleConversationRefresh, userId])
 
   useEffect(() => {
     return () => {
@@ -661,12 +709,21 @@ export default function Inbox() {
   async function submitMessage(event) {
     event.preventDefault()
     if (!activeConversationId || (!draft.trim() && draftFiles.length === 0)) return
+    setError('')
     setMessageStatus('sending')
 
     try {
-      const attachments = draftFiles.length
-        ? await uploadChatAttachments({ conversationId: activeConversationId, userId, files: draftFiles })
-        : []
+      let attachments = []
+      try {
+        attachments = draftFiles.length
+          ? await uploadChatAttachments({ conversationId: activeConversationId, userId, files: draftFiles })
+          : []
+      } catch (uploadError) {
+        if (!draft.trim()) throw uploadError
+        attachments = []
+        setDraftFiles([])
+        setError('Файловете не се качиха, затова изпратихме само текста.')
+      }
       const result = attachments.length
         ? await sendAttachmentMessage({
           conversationId: activeConversationId,
@@ -695,6 +752,34 @@ export default function Inbox() {
     }
   }
 
+  async function handleSendVoice(file) {
+    if (!activeConversationId || !file) return
+    setError('')
+    setMessageStatus('sending')
+
+    try {
+      const attachments = await uploadChatAttachments({ conversationId: activeConversationId, userId, files: [file] })
+      const result = await sendAttachmentMessage({
+        conversationId: activeConversationId,
+        body: '',
+        attachments,
+        replyToMessageId: replyTarget?.id || '',
+      })
+      if (result?.message?.id) {
+        const nextMessage = await loadFreshMessage(result.message.id, result.message)
+        if (nextMessage) mergeIncomingMessages(activeConversationId, [nextMessage])
+      }
+      setScrollToLatestToken((value) => value + 1)
+      setReplyTarget(null)
+      setMessageStatus('idle')
+      scheduleConversationRefresh()
+    } catch (sendError) {
+      setError(sendError.message || 'Гласовото съобщение не се изпрати.')
+      setMessageStatus('idle')
+      throw sendError
+    }
+  }
+
   async function handleSendReference({ referenceType, referenceId }) {
     if (!activeConversationId || !referenceType || !referenceId) return
     setMessageStatus('sending')
@@ -717,6 +802,38 @@ export default function Inbox() {
       setError(referenceError.message || 'Препратката не се изпрати.')
       setMessageStatus('idle')
       throw referenceError
+    }
+  }
+
+  function handleForwardMessage(message, text = '') {
+    const body = buildForwardMessageBody(message, text)
+    if (!body.trim()) {
+      setError('Това съобщение не може да се препрати като текст.')
+      return
+    }
+    setForwardDraft({ sourceMessageId: message?.id || '', body })
+  }
+
+  async function submitForwardMessage(targetConversationId) {
+    if (!targetConversationId || !forwardDraft?.body) return
+    setMessageStatus('sending')
+    setError('')
+
+    try {
+      const result = await sendTextMessage({
+        conversationId: targetConversationId,
+        body: forwardDraft.body,
+      })
+      if (result?.message?.id) {
+        const nextMessage = await loadFreshMessage(result.message.id, result.message)
+        if (nextMessage) mergeIncomingMessages(targetConversationId, [nextMessage])
+      }
+      setForwardDraft(null)
+      setMessageStatus('idle')
+      scheduleConversationRefresh()
+    } catch (forwardError) {
+      setError(forwardError.message || 'Съобщението не се препрати.')
+      setMessageStatus('idle')
     }
   }
 
@@ -816,6 +933,12 @@ export default function Inbox() {
 
   function handleRemoveDraftFile(index) {
     setDraftFiles((current) => current.filter((_, currentIndex) => currentIndex !== index))
+    setError('')
+  }
+
+  function handleDraftChange(value) {
+    setDraft(value)
+    if (error) setError('')
   }
 
   async function handleToggleReaction(messageId, emoji, active) {
@@ -825,6 +948,22 @@ export default function Inbox() {
       await refreshMessageReactions(activeConversationId, messageId)
     } catch (reactionError) {
       setError(reactionError.message || 'Реакцията не се обнови.')
+    }
+  }
+
+  async function handleSaveMessageFlags(messageId, flags) {
+    if (!activeConversationId || !messageId) return
+    const normalizedFlags = {
+      pinned: Boolean(flags?.pinned),
+      starred: Boolean(flags?.starred),
+      color: flags?.starred ? String(flags?.color || '') : '',
+    }
+    patchMessageFlags(activeConversationId, messageId, normalizedFlags)
+
+    try {
+      await saveMessageFlagState(messageId, normalizedFlags)
+    } catch (flagError) {
+      setError(flagError.message || 'Маркирането на съобщението не се запази.')
     }
   }
 
@@ -883,7 +1022,7 @@ export default function Inbox() {
           <button type="button" onClick={() => loadAll()} className="btn btn-ghost mt-5">Опитай пак</button>
         </Panel>
       ) : (
-        <div className="grid min-h-0 min-w-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)] lg:gap-3 xl:grid-cols-[minmax(20rem,23rem)_minmax(0,1fr)]">
+        <div className="grid min-h-0 min-w-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[minmax(15.5rem,17.25rem)_minmax(0,1fr)] lg:gap-4 xl:grid-cols-[minmax(16rem,18rem)_minmax(0,1fr)]">
           <div className={`${hasSelectedConversation ? 'hidden lg:flex' : 'flex'} min-h-0 min-w-0`}>
             <ConversationList
               conversations={visibleConversations}
@@ -922,6 +1061,8 @@ export default function Inbox() {
                   onReplyToMessage={handleReplyToMessage}
                   onScrollNotFound={handleScrollNotFound}
                   onToggleReaction={handleToggleReaction}
+                  onForwardMessage={handleForwardMessage}
+                  onSaveMessageFlags={handleSaveMessageFlags}
                   onLoadOlder={loadOlderMessages}
                   hasOlder={pagination.hasOlder}
                   isLoadingOlder={pagination.isLoadingOlder}
@@ -932,7 +1073,7 @@ export default function Inbox() {
                 {safeActiveConversation && safeActiveConversation.status === 'open' && threadStatus === 'ready' && (
                   <ComposeBar
                     value={draft}
-                    onChange={setDraft}
+                    onChange={handleDraftChange}
                     onSubmit={submitMessage}
                     canSendOffer={role === 'partner'}
                     onOpenOffer={() => setOfferOpen(true)}
@@ -945,6 +1086,7 @@ export default function Inbox() {
                     onRemoveFile={handleRemoveDraftFile}
                     referenceLibrary={referenceLibrary}
                     onSendReference={handleSendReference}
+                    onSendVoice={handleSendVoice}
                   />
                 )}
               </>
@@ -952,16 +1094,77 @@ export default function Inbox() {
           </div>
         </div>
       )}
+      {forwardDraft && (
+        <ForwardMessageDialog
+          conversations={visibleConversations.filter((conversation) => conversation.id !== activeConversationId)}
+          userId={userId}
+          status={messageStatus}
+          onCancel={() => setForwardDraft(null)}
+          onSelect={submitForwardMessage}
+        />
+      )}
       {!accessDenied && !isGuest && <OfferComposer open={offerOpen} onClose={() => setOfferOpen(false)} onSubmit={submitOffer} status={messageStatus} userId={userId} serviceRequest={activeServiceRequest} conversationId={activeConversationId} services={referenceLibrary.services} servicesStatus={referenceLibrary.status} />}
       {account?.account_status === 'banned' && <div className="shrink-0 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Акаунтът е блокиран. Някои действия може да бъдат ограничени.</div>}
     </InboxShell>
   )
 }
 
+function ForwardMessageDialog({ conversations, userId, status, onCancel, onSelect }) {
+  const sending = status === 'sending'
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/28 px-4 py-6 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-[1.75rem] border border-line bg-paper p-4 shadow-[0_30px_90px_-38px_rgba(13,35,64,0.6)]">
+        <div className="flex items-start justify-between gap-3 border-b border-line/70 pb-3">
+          <div>
+            <h2 className="font-display text-2xl text-ink">Препрати към</h2>
+            <p className="mt-1 text-sm text-muted">Избери разговор, в който да изпратим копие като текст.</p>
+          </div>
+          <button type="button" onClick={onCancel} className="rounded-full border border-line bg-soft p-2 text-muted transition hover:text-ink" aria-label="Затвори">
+            ×
+          </button>
+        </div>
+        <div className="mt-3 grid max-h-[22rem] gap-2 overflow-y-auto pr-1">
+          {conversations.length ? conversations.map((conversation) => (
+            <button
+              key={conversation.id}
+              type="button"
+              disabled={sending}
+              onClick={() => onSelect(conversation.id)}
+              className="flex min-w-0 items-center gap-3 rounded-2xl border border-line bg-soft/70 px-3 py-2.5 text-left transition hover:border-accentDeep/35 hover:bg-accentSoft/35 disabled:opacity-60"
+            >
+              <Avatar
+                src={getOtherParticipant(conversation, userId)?.avatar_url || ''}
+                srcCandidates={getOtherParticipant(conversation, userId)?.avatar_candidates || []}
+                name={getConversationTitle(conversation, userId)}
+                size={38}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold text-ink">{getConversationTitle(conversation, userId)}</span>
+                <span className="block truncate text-xs text-muted">{conversation.last_message_preview || 'Разговор'}</span>
+              </span>
+            </button>
+          )) : (
+            <div className="rounded-2xl border border-dashed border-line p-4 text-center text-sm text-muted">
+              Няма друг разговор, към който да препратим.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function buildForwardMessageBody(message, text = '') {
+  const content = String(text || getMessageSnippet(message, { maxLength: 800 }) || '').trim()
+  if (!content) return ''
+  return `Препратено съобщение:\n${content}`
+}
+
 function InboxShell({ children }) {
   return (
-    <section className="h-full min-h-0 overflow-hidden bg-soft px-0 py-0 sm:px-[var(--pad-x)] sm:py-3">
-      <div className="container-page flex h-full min-h-0 min-w-0 max-w-screen-2xl flex-col gap-0 overflow-hidden sm:gap-3">
+    <section className="h-full min-h-0 overflow-hidden bg-soft px-0 py-0 sm:px-3 sm:py-3 xl:px-4 2xl:px-5">
+      <div className="inbox-desktop-frame flex h-full min-h-0 min-w-0 flex-col gap-0 overflow-hidden sm:gap-3">
         {children}
       </div>
     </section>

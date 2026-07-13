@@ -70,6 +70,8 @@ export default function ChatThread({
   onScrollNotFound,
   onNavigateToMessage,
   onToggleReaction,
+  onForwardMessage,
+  onSaveMessageFlags,
   onBack,
   onLoadOlder,
   hasOlder = false,
@@ -425,7 +427,7 @@ export default function ChatThread({
       </div>
 
       <div ref={threadBodyRef} className="chat-thread-body min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 md:px-4 md:py-5">
-        <div className="mx-auto flex w-full max-w-5xl flex-col">
+        <div className="chat-thread-content mx-auto flex w-full flex-col">
           {status === 'loading' && (
             <div className="space-y-4" aria-live="polite" aria-busy="true">
               <ThreadLoadingBubble align="start" widthClass="max-w-[14rem]" />
@@ -462,6 +464,8 @@ export default function ChatThread({
                   onReplyToMessage={onReplyToMessage}
                   onNavigateToMessage={scrollToMessageById}
                   onToggleReaction={onToggleReaction}
+                  onForwardMessage={onForwardMessage}
+                  onSaveMessageFlags={onSaveMessageFlags}
                   showAvatar={item.showAvatar}
                   showTimestamp={item.showTimestamp}
                   groupPosition={item.groupPosition}
