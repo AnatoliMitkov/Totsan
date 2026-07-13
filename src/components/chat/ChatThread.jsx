@@ -67,6 +67,8 @@ export default function ChatThread({
   onOfferAction,
   onServiceRequestAction,
   onReplyToMessage,
+  onScrollNotFound,
+  onNavigateToMessage,
   onToggleReaction,
   onBack,
   onLoadOlder,
@@ -85,6 +87,7 @@ export default function ChatThread({
   const scrollAnimationRef = useRef(0)
   const [activeMediaIndex, setActiveMediaIndex] = useState(null)
   const [showJumpToLatest, setShowJumpToLatest] = useState(false)
+  const [highlightedMessageId, setHighlightedMessageId] = useState(null)
 
   function animateThreadScrollTo(targetTop, { duration = 320 } = {}) {
     const container = threadBodyRef.current
@@ -172,6 +175,25 @@ export default function ChatThread({
     if (!container) return
     if (scrollElementIntoThreadView(targetElement)) return
     if (stickToBottomRef.current) scheduleScrollToBottom('smooth')
+  }
+
+  function scrollToMessageById(messageId) {
+    if (!messageId) return
+    const item = threadItems.find((t) => t.type === 'message' && t.id === messageId)
+    if (item) {
+      setHighlightedMessageId(messageId)
+      setTimeout(() => {
+        const el = document.querySelector(`[data-message-id="${messageId}"]`)
+        scrollElementIntoThreadView(el)
+        setTimeout(() => setHighlightedMessageId(null), 2000)
+      }, 0)
+      return
+    }
+    if (hasOlder && !isLoadingOlder && status === 'ready') {
+      onLoadOlder?.().then(() => scrollToMessageById(messageId))
+    } else {
+      onScrollNotFound?.(messageId, false)
+    }
   }
 
   const visibleMessages = useMemo(() => {
@@ -363,8 +385,8 @@ export default function ChatThread({
   const IdentityTag = participantHref ? Link : 'div'
 
   return (
-    <div className="relative flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-paper shadow-[0_18px_50px_-42px_rgba(15,23,42,0.28)] sm:rounded-3xl sm:border sm:border-line">
-      <div className="z-10 shrink-0 border-b border-line bg-paper/96 px-3 py-2.5 backdrop-blur-sm md:px-5 md:py-3">
+    <div className="chat-thread-shell relative flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-paper sm:rounded-3xl sm:border">
+      <div className="chat-thread-header z-10 shrink-0 border-b px-3 py-2.5 backdrop-blur-sm md:px-5 md:py-3">
         <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,48%)] lg:items-start">
           <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
             <button
@@ -402,7 +424,7 @@ export default function ChatThread({
         </div>
       </div>
 
-      <div ref={threadBodyRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-soft/35 px-3 py-4 md:px-4 md:py-5">
+      <div ref={threadBodyRef} className="chat-thread-body min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 md:px-4 md:py-5">
         <div className="mx-auto flex w-full max-w-5xl flex-col">
           {status === 'loading' && (
             <div className="space-y-4" aria-live="polite" aria-busy="true">
@@ -426,24 +448,30 @@ export default function ChatThread({
             item.type === 'date' ? (
               <DateSeparator key={item.id} label={item.label} />
             ) : (
-              <MessageBubble
+              <div
                 key={item.id}
-                message={{ ...item.message, body: item.message.kind === 'system' ? compactSystemText(item.message.body) : item.message.body }}
-                userId={userId}
-                conversation={conversation}
-                onOfferAction={onOfferAction}
-                onServiceRequestAction={onServiceRequestAction}
-                onReplyToMessage={onReplyToMessage}
-                onToggleReaction={onToggleReaction}
-                showAvatar={item.showAvatar}
-                showTimestamp={item.showTimestamp}
-                groupPosition={item.groupPosition}
-                groupedWithPrevious={item.groupedWithPrevious}
-                groupedWithNext={item.groupedWithNext}
-                mediaItems={mediaItems}
-                onOpenMedia={setActiveMediaIndex}
-                onRevealInlineControls={revealInlineControls}
-              />
+                data-message-id={item.message.id}
+                className={highlightedMessageId === item.message.id ? 'motion-safe:message-highlight' : ''}
+              >
+                <MessageBubble
+                  message={{ ...item.message, body: item.message.kind === 'system' ? compactSystemText(item.message.body) : item.message.body }}
+                  userId={userId}
+                  conversation={conversation}
+                  onOfferAction={onOfferAction}
+                  onServiceRequestAction={onServiceRequestAction}
+                  onReplyToMessage={onReplyToMessage}
+                  onNavigateToMessage={scrollToMessageById}
+                  onToggleReaction={onToggleReaction}
+                  showAvatar={item.showAvatar}
+                  showTimestamp={item.showTimestamp}
+                  groupPosition={item.groupPosition}
+                  groupedWithPrevious={item.groupedWithPrevious}
+                  groupedWithNext={item.groupedWithNext}
+                  mediaItems={mediaItems}
+                  onOpenMedia={setActiveMediaIndex}
+                  onRevealInlineControls={revealInlineControls}
+                />
+              </div>
             )
           ))}
           {status === 'ready' && !threadItems.length && (

@@ -67,6 +67,7 @@ export default function Inbox() {
   const [draftFiles, setDraftFiles] = useState([])
   const [scrollToLatestToken, setScrollToLatestToken] = useState(0)
   const [replyTarget, setReplyTarget] = useState(null)
+  const [replyNotFoundId, setReplyNotFoundId] = useState(null)
   const [offerOpen, setOfferOpen] = useState(false)
   const [referenceLibrary, setReferenceLibrary] = useState({ status: 'idle', profileId: '', services: [], portfolio: [] })
   const initialLoadRef = useRef(false)
@@ -772,6 +773,12 @@ export default function Inbox() {
     setReplyTarget(message)
   }
 
+  function handleScrollNotFound(messageId, wasFound) {
+    if (wasFound) return
+    setReplyNotFoundId(messageId)
+    setTimeout(() => setReplyNotFoundId(null), 5000)
+  }
+
   async function handleServiceRequestAction(request, nextStatus) {
     setMessageStatus('sending')
     setError('')
@@ -899,6 +906,11 @@ export default function Inbox() {
               </div>
             ) : (
               <>
+                {replyNotFoundId && (
+                  <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+                    Оригиналният запис вече не е наличен.
+                  </div>
+                )}
                 <ChatThread
                   conversation={safeActiveConversation}
                   messages={safeMessages}
@@ -908,6 +920,7 @@ export default function Inbox() {
                   onOfferAction={handleOfferAction}
                   onServiceRequestAction={handleServiceRequestAction}
                   onReplyToMessage={handleReplyToMessage}
+                  onScrollNotFound={handleScrollNotFound}
                   onToggleReaction={handleToggleReaction}
                   onLoadOlder={loadOlderMessages}
                   hasOlder={pagination.hasOlder}

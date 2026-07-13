@@ -5,7 +5,7 @@ import {
   FileText,
   FolderKanban,
   Loader2,
-  Paperclip,
+  Mic,
   Plus,
   Send,
   Sparkles,
@@ -124,9 +124,9 @@ export default function ComposeBar({
   return (
     <form
       onSubmit={onSubmit}
-      className="w-full min-w-0 shrink-0 border-t border-line bg-paper/96 px-3 py-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-12px_34px_-30px_rgba(15,23,42,0.45)] backdrop-blur-sm sm:rounded-3xl sm:border sm:px-4 sm:py-3.5"
+      className="chat-compose-shell"
     >
-      <div className="mx-auto flex min-w-0 max-w-5xl flex-col gap-2.5 md:gap-3">
+      <div className="chat-compose-inner">
         {replyPreview && (
           <div className="flex min-w-0 items-start justify-between gap-3 rounded-2xl border border-line bg-soft/92 px-3 py-2.5 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.35)]">
             <div className="flex min-w-0 items-start gap-2.5">
@@ -237,18 +237,30 @@ export default function ComposeBar({
           </div>
         )}
 
-        <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-end">
-          <div className="flex min-w-0 flex-1 items-end gap-2">
+        <div className="chat-compose-bar">
+          <div className="chat-compose-primary">
             <button
               type="button"
               onClick={toggleReferenceMenu}
               disabled={!canShareReferences || disabled}
-              className="btn btn-ghost aspect-square w-auto shrink-0 justify-center !px-3 !py-3 text-sm disabled:cursor-not-allowed disabled:opacity-45"
+              className="chat-compose-icon-button"
               aria-label="Прикачи услуга или портфолио"
               aria-expanded={referenceMenuOpen}
             >
-              {referenceStatus === 'loading' ? <Loader2 size={17} className="animate-spin" /> : <Plus size={17} />}
+              {referenceStatus === 'loading' ? <Loader2 size={21} className="animate-spin" /> : <Plus size={25} strokeWidth={1.9} />}
             </button>
+
+            {canSendOffer && (
+              <button
+                type="button"
+                onClick={onOpenOffer}
+                disabled={disabled}
+                className="chat-compose-icon-button chat-compose-offer-button"
+                aria-label="Оферта"
+              >
+                <Sparkles size={25} strokeWidth={1.9} />
+              </button>
+            )}
 
             <textarea
               ref={textareaRef}
@@ -258,11 +270,11 @@ export default function ComposeBar({
               rows={1}
               disabled={disabled}
               placeholder="Напиши съобщение..."
-              className="chat-compose-textarea max-h-[9.5rem] min-h-[2.85rem] min-w-0 w-full flex-1 resize-none overflow-y-auto rounded-2xl border border-line bg-soft/95 px-4 py-3 text-sm leading-relaxed outline-none transition placeholder:text-muted/80 focus:border-ink disabled:cursor-not-allowed disabled:opacity-70"
+              className="chat-compose-textarea"
             />
           </div>
 
-          <div className={`grid min-w-0 gap-2 md:flex md:w-auto md:pb-1 ${canSendOffer ? 'grid-cols-[auto_1fr_1fr]' : 'grid-cols-[auto_1fr]'}`}>
+          <div className="chat-compose-actions">
             <input
               ref={fileInputRef}
               type="file"
@@ -279,28 +291,18 @@ export default function ComposeBar({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || files.length >= MAX_CHAT_ATTACHMENTS}
-              className="btn btn-ghost aspect-square w-full justify-center !px-3 !py-3 text-sm disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
+              className="chat-compose-icon-button"
               aria-label="Attach files"
             >
-              <Paperclip size={17} />
+              <Mic size={25} strokeWidth={1.9} />
             </button>
-            {canSendOffer && (
-              <button
-                type="button"
-                onClick={onOpenOffer}
-                disabled={disabled}
-                className="btn btn-ghost w-full justify-center !py-3 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Sparkles size={17} /> Оферта
-              </button>
-            )}
             <button
               type="submit"
               disabled={!canSubmit}
               aria-label={disabled ? 'Sending message' : 'Send message'}
-              className="btn btn-primary w-full justify-center !py-3 text-sm disabled:cursor-not-allowed disabled:opacity-55"
+              className="chat-compose-send-button"
             >
-              <Send size={17} /> {disabled ? 'Изпращане...' : 'Изпрати'}
+              {disabled ? <Loader2 size={22} className="animate-spin" /> : <Send size={25} strokeWidth={1.9} />}
             </button>
           </div>
         </div>

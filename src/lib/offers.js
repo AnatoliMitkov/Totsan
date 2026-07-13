@@ -46,7 +46,7 @@ export function normalizeAcceptedOffer(offer = null, snapshot = undefined) {
   const conditionSource = asObject(document.conditions)
 
   return {
-    schemaVersion: hasSnapshot ? Number(document.schemaVersion || 1) : 0,
+    schemaVersion: Number(document.schemaVersion || (hasSnapshot ? 1 : 0)),
     source: hasSnapshot ? 'snapshot' : 'offer',
     offerId: firstText(document.offerId, row.id),
     offerType,

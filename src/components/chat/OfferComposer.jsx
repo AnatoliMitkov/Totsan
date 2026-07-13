@@ -806,16 +806,33 @@ function computeDraft(draft) {
 }
 
 function buildPayload(draft, computed) {
+  const title = draft.title.trim()
+  const summary = draft.summary.trim()
+  const priceAmount = computed.totalPrice
+  const deliveryDays = moneyValue(draft.timelineDays)
+  const expiresAt = dateToExpiry(draft.validUntil)
+
   return {
-    title: draft.title.trim(), summary: draft.summary.trim(), description: draft.summary.trim(), offerType: draft.offerType,
+    title, summary, description: summary, offerType: draft.offerType,
     priceType: draft.priceType, currency: 'EUR', executionMode: draft.offerType === 'staged' ? 'staged' : 'single',
-    stages: computed.stages, deliverables: computed.includedItems, priceAmount: computed.totalPrice,
-    deliveryDays: moneyValue(draft.timelineDays), revisions: 0, expiresAt: dateToExpiry(draft.validUntil),
+    stages: computed.stages, deliverables: computed.includedItems, priceAmount,
+    deliveryDays, revisions: 0, expiresAt,
     offerDetails: {
-      schemaVersion: OFFER_DOCUMENT_VERSION, offerType: draft.offerType, validUntil: draft.validUntil,
+      schemaVersion: OFFER_DOCUMENT_VERSION,
+      title,
+      summary,
+      description: summary,
+      offerType: draft.offerType,
+      validUntil: draft.validUntil,
+      expiresAt,
       includedItems: computed.includedItems, excludedItems: computed.excludedItems, clientRequirements: computed.clientRequirementItems,
-      priceType: draft.priceType, priceBreakdown: computed.priceBreakdown, materialsMode: draft.materialsMode, vatStatus: draft.vatStatus,
-      timeline: { days: moneyValue(draft.timelineDays), earliestStartDate: draft.earliestStartDate, dependencies: draft.timelineDependencies.trim() },
+      deliverables: computed.includedItems,
+      priceType: draft.priceType,
+      priceAmount,
+      currency: 'EUR',
+      deliveryDays,
+      priceBreakdown: computed.priceBreakdown, materialsMode: draft.materialsMode, vatStatus: draft.vatStatus,
+      timeline: { days: deliveryDays, earliestStartDate: draft.earliestStartDate, dependencies: draft.timelineDependencies.trim() },
       stages: computed.stages, payment: { method: draft.paymentMethod, terms: draft.paymentTerms.trim(), notes: draft.paymentNotes.trim() },
       conditions: { scopeChanges: draft.scopeChangeTerms.trim(), cancellation: draft.cancellationTerms.trim(), unforeseenWork: draft.unforeseenTerms.trim() },
     },

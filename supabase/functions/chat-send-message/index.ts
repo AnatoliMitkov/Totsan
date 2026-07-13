@@ -154,17 +154,6 @@ function maskJsonValue(value: unknown): { value: unknown; wasMasked: boolean } {
   return { value, wasMasked: false }
 }
 
-function normalizeOfferDetails(value: unknown) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return { details: {}, wasMasked: false }
-  const result = maskJsonValue(value)
-  return {
-    details: result.value && typeof result.value === 'object' && !Array.isArray(result.value)
-      ? result.value as Record<string, unknown>
-      : {},
-    wasMasked: result.wasMasked,
-  }
-}
-
 function normalizeOfferStages(value: unknown) {
   if (!Array.isArray(value)) return []
 
@@ -783,9 +772,12 @@ Deno.serve(async (req) => {
       const summary = maskText(payload.summary || '')
       const description = maskText(payload.description)
       const deliverables = maskList(payload.deliverables)
-      const detailsResult = normalizeOfferDetails(payload.offerDetails)
-      const offerType = normalizeOfferType(payload.offerType || detailsResult.details.offerType)
-      const priceType = normalizePriceType(payload.priceType || detailsResult.details.priceType || (offerType === 'staged' ? 'staged' : 'fixed'))
+      const detailsResult = maskJsonValue(payload.offerDetails)
+      const offerDetails = detailsResult.value && typeof detailsResult.value === 'object' && !Array.isArray(detailsResult.value)
+        ? detailsResult.value as Record<string, unknown>
+        : {}
+      const offerType = normalizeOfferType(payload.offerType || (offerDetails as any).offerType)
+      const priceType = normalizePriceType(payload.priceType || (offerDetails as any).priceType || (offerType === 'staged' ? 'staged' : 'fixed'))
       const executionMode = offerType === 'staged' ? 'staged' : normalizeExecutionMode(payload.executionMode)
       const stages = normalizeOfferStages(payload.stages)
       if (!title.masked.trim()) throw new Error('Офертата има нужда от заглавие.')
@@ -793,13 +785,13 @@ Deno.serve(async (req) => {
       const priceAmount = Number(payload.priceAmount || 0)
       const deliveryDays = Number(payload.deliveryDays || 0)
       const revisions = Number(payload.revisions || 0)
-      const offerDetails = {
-        ...detailsResult.details,
-        offerType,
-        priceType,
-        summary: summary.masked.trim(),
-        stages,
-      }
+      const normalizedPriceAmount = Number.isFinite(priceAmount) ? Math.max(0, Math.round(priceAmount)) : null
+      const normalizedDeliveryDays = Number.isFinite(deliveryDays) ? Math.max(0, Math.round(deliveryDays)) : null
+      const normalizedRevisions = Number.isFinite(revisions) ? Math.max(0, Math.round(revisions)) : null
+      const currency = String(payload.currency || 'EUR').trim().toUpperCase().slice(0, 3) || 'EUR'
+      const timeline = (offerDetails as any).timeline && typeof (offerDetails as any).timeline === 'object' && !Array.isArray((offerDetails as any).timeline)
+        ? (offerDetails as any).timeline
+        : {}
       const { data: activeServiceRequest, error: activeRequestError } = await adminClient
         .from('service_requests')
         .select('*')
@@ -820,10 +812,10 @@ Deno.serve(async (req) => {
         deliverables: deliverables.items,
         price_type: priceType,
         offer_details: offerDetails,
-        price_amount: Number.isFinite(priceAmount) ? Math.max(0, Math.round(priceAmount)) : null,
-        currency: String(payload.currency || 'EUR').trim().toUpperCase().slice(0, 3) || 'EUR',
-        delivery_days: Number.isFinite(deliveryDays) ? Math.max(0, Math.round(deliveryDays)) : null,
-        revisions: Number.isFinite(revisions) ? Math.max(0, Math.round(revisions)) : null,
+        price_amount: normalizedPriceAmount,
+        currency,
+        delivery_days: normalizedDeliveryDays,
+        revisions: normalizedRevisions,
         execution_mode: executionMode,
         stages,
         expires_at: payload.expiresAt || null,

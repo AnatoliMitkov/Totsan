@@ -5,6 +5,7 @@ import { describe, it } from 'node:test'
 const migration = read('supabase/migrations/20260710000000_accepted_offer_snapshot.sql')
 const checkout = read('supabase/functions/payments-checkout/index.ts')
 const webhook = read('supabase/functions/payments-webhook/index.ts')
+const chatSendMessage = read('supabase/functions/chat-send-message/index.ts')
 const composer = read('src/components/chat/OfferComposer.jsx')
 const offerDocument = read('src/components/offers/OfferDocumentView.jsx')
 const chatThread = read('src/components/chat/ChatThread.jsx')
@@ -84,6 +85,12 @@ describe('offer lifecycle contract', () => {
     assert.match(offerDocument, /Тип цена:/)
     assert.match(offerDocument, /Материали:/)
     assert.match(offerDocument, /ДДС:/)
+  })
+
+  it('stores the same rich offer document used by preview into chat persistence', () => {
+    assert.match(composer, /offerDetails: \{[\s\S]*title,[\s\S]*priceAmount,[\s\S]*deliveryDays,[\s\S]*includedItems/s)
+    assert.match(chatSendMessage, /const offerDetails = detailsResult\.value/)
+    assert.doesNotMatch(chatSendMessage, /title: title\.masked\.trim\(\).*priceAmount: normalizedPriceAmount[\s\S]*includedItems/s)
   })
 
   it('only sends an offer from the explicit send button', () => {

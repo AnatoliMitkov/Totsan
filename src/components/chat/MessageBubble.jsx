@@ -16,6 +16,7 @@ export default function MessageBubble({
   onOfferAction,
   onServiceRequestAction,
   onReplyToMessage,
+  onNavigateToMessage,
   onToggleReaction,
   showAvatar = true,
   showTimestamp = true,
@@ -77,10 +78,14 @@ export default function MessageBubble({
       <div className={`flex min-w-0 max-w-full flex-1 flex-col ${alignmentClass}`}>
         <div className={`min-w-0 overflow-hidden border px-4 py-3 ${bubbleRadiusClass} ${bubbleSurfaceClass} ${bubbleSizeClass}`}>
           {replyPreview && (
-            <div className={`mb-3 rounded-2xl border px-3 py-2 text-xs ${own && !forceLightBubble ? 'border-paper/15 bg-paper/10 text-paper/85' : 'border-line/70 bg-paper/80 text-muted'}`}>
+            <button
+              type="button"
+              onClick={() => onNavigateToMessage?.(message.reply_to_message_id)}
+              className={`mb-3 cursor-pointer rounded-2xl border px-3 py-2 text-xs outline-none transition hover:bg-soft/80 focus-visible:ring-2 focus-visible:ring-accentDeep/25 ${own && !forceLightBubble ? 'border-paper/15 bg-paper/10 text-paper/85' : 'border-line/70 bg-paper/80 text-muted'}`}
+            >
               <div className={`truncate font-medium ${own && !forceLightBubble ? 'text-paper' : 'text-ink'}`}>{replyPreview.senderLabel}</div>
               <div className="mt-1 break-words whitespace-normal opacity-80">{replyPreview.body}</div>
-            </div>
+            </button>
           )}
           {serviceRequest ? (
             <ServiceRequestCard request={serviceRequest} conversation={conversation} userId={userId} onAction={onServiceRequestAction} compact={false} />
