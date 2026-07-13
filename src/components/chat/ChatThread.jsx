@@ -1,34 +1,16 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Download, ImageOff, LoaderCircle, MessageCircle, ShieldCheck, X } from 'lucide-react'
+import { ArrowLeft, Ban, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, CircleUserRound, Download, Flag, ImageOff, Link2, LoaderCircle, MessageCircle, MoreVertical, Search, ShieldCheck, Trash2, X } from 'lucide-react'
 import MessageBubble from './MessageBubble.jsx'
 import Avatar from '../Avatar.jsx'
-import { compactSystemText, getConversationTitle, getOtherParticipant, getOtherParticipantRole, getParticipantPublicHref, getRoleLabel } from '../../lib/chat.js'
+import ShieldHandsIcon from './ShieldHandsIcon.jsx'
+import { compactSystemText, decodeChatCallBody, getConversationTitle, getOtherParticipant, getParticipantPublicHref } from '../../lib/chat.js'
 import { createChatAttachmentSignedUrl, isDeletedAttachment, isImageAttachment } from '../../lib/chat-attachments.js'
 
-const ACTIVE_ORDER_STATUSES = new Set(['paid', 'in_progress'])
 const BOTTOM_STICK_THRESHOLD = 96
 const JUMP_TO_LATEST_THRESHOLD = 220
 const TOP_LOAD_THRESHOLD = 72
-
-function conversationStateLabel(status = '') {
-  if (status === 'open') return 'Отворен'
-  if (status === 'closed') return 'Затворен'
-  if (status === 'blocked') return 'Ограничен'
-  return status || 'Разговор'
-}
-
-function compactOrderStatusLine(orderStatus) {
-  if (!orderStatus?.status) return ''
-  if (ACTIVE_ORDER_STATUSES.has(orderStatus.status)) return 'Офертата е платена · Поръчката е активна'
-  if (orderStatus.status === 'delivered') return 'Офертата е платена · Поръчката е предадена'
-  if (orderStatus.status === 'completed') return 'Офертата е платена · Поръчката е завършена'
-  if (orderStatus.status === 'pending_payment') return 'Офертата чака защитено плащане'
-  if (orderStatus.status === 'cancelled') return 'Поръчката е отменена'
-  if (orderStatus.status === 'refunded') return 'Поръчката е възстановена'
-  if (orderStatus.status === 'disputed') return 'Поръчката е в спор'
-  return ''
-}
 
 function startOfDay(value) {
   const date = new Date(value)
@@ -43,6 +25,9 @@ function isSameDay(left, right) {
 function canGroupMessages(left, right) {
   if (!left || !right) return false
   if (left.kind === 'system' || right.kind === 'system') return false
+  // Conversation invitations are complete interaction cards, not text fragments.
+  // Keeping each card separate preserves its boundaries and reading rhythm.
+  if (decodeChatCallBody(left.body) || decodeChatCallBody(right.body)) return false
   return left.sender_id === right.sender_id && isSameDay(left.created_at, right.created_at)
 }
 
@@ -63,11 +48,22 @@ export default function ChatThread({
   conversation,
   messages,
   userId,
-  orderStatus,
   onOfferAction,
   onServiceRequestAction,
   onReplyToMessage,
+  onScrollNotFound,
+  onNavigateToMessage,
   onToggleReaction,
+  onForwardMessage,
+  onSaveMessageFlags,
+  onOpenContact,
+  onCloseConversation,
+  onBlockConversation,
+  onDeleteConversation,
+  onSendCallInvite,
+  onScheduleCall,
+  onCallInviteAction,
+  onReportConversation,
   onBack,
   onLoadOlder,
   hasOlder = false,
@@ -85,6 +81,21 @@ export default function ChatThread({
   const scrollAnimationRef = useRef(0)
   const [activeMediaIndex, setActiveMediaIndex] = useState(null)
   const [showJumpToLatest, setShowJumpToLatest] = useState(false)
+  const [highlightedMessageId, setHighlightedMessageId] = useState(null)
+  const [conversationMenuOpen, setConversationMenuOpen] = useState(false)
+  const [securityTipOpen, setSecurityTipOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isMobileViewport, setIsMobileViewport] = useState(false)
+  const conversationActionsRef = useRef(null)
+  const securityPointerFocusRef = useRef(false)
+  const securityClickOpenRef = useRef(false)
+
+  function closeSecurityTip() {
+    securityClickOpenRef.current = false
+    securityPointerFocusRef.current = false
+    setSecurityTipOpen(false)
+  }
 
   function animateThreadScrollTo(targetTop, { duration = 320 } = {}) {
     const container = threadBodyRef.current
@@ -174,6 +185,25 @@ export default function ChatThread({
     if (stickToBottomRef.current) scheduleScrollToBottom('smooth')
   }
 
+  function scrollToMessageById(messageId) {
+    if (!messageId) return
+    const item = threadItems.find((t) => t.type === 'message' && t.id === messageId)
+    if (item) {
+      setHighlightedMessageId(messageId)
+      setTimeout(() => {
+        const el = document.querySelector(`[data-message-id="${messageId}"]`)
+        scrollElementIntoThreadView(el)
+        setTimeout(() => setHighlightedMessageId(null), 2000)
+      }, 0)
+      return
+    }
+    if (hasOlder && !isLoadingOlder && status === 'ready') {
+      onLoadOlder?.().then(() => scrollToMessageById(messageId))
+    } else {
+      onScrollNotFound?.(messageId, false)
+    }
+  }
+
   const visibleMessages = useMemo(() => {
     const seenSystemKeys = new Set()
     return messages.filter((message) => {
@@ -225,6 +255,49 @@ export default function ChatThread({
 
     return items
   }, [userId, visibleMessages])
+
+  const filteredThreadItems = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase('bg-BG')
+    if (!query) return threadItems
+
+    return threadItems.filter((item) => {
+      if (item.type === 'date') return false
+      const message = item.message || {}
+      const attachmentText = Array.isArray(message.attachments)
+        ? message.attachments.map((attachment) => `${attachment?.name || ''} ${attachment?.type || ''}`).join(' ')
+        : ''
+      return `${message.body || ''} ${attachmentText}`.toLocaleLowerCase('bg-BG').includes(query)
+    })
+  }, [searchQuery, threadItems])
+
+  const searchResultCount = useMemo(() => (
+    filteredThreadItems.filter((item) => item.type === 'message').length
+  ), [filteredThreadItems])
+
+  useEffect(() => {
+    function closeConversationActions(event) {
+      if (!conversationActionsRef.current?.contains(event.target)) {
+        setConversationMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', closeConversationActions)
+    return () => document.removeEventListener('pointerdown', closeConversationActions)
+  }, [])
+
+  useEffect(() => {
+    setConversationMenuOpen(false)
+    setSearchOpen(false)
+    setSearchQuery('')
+  }, [conversation?.id])
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)')
+    const updateViewport = () => setIsMobileViewport(mediaQuery.matches)
+    updateViewport()
+    mediaQuery.addEventListener?.('change', updateViewport)
+    return () => mediaQuery.removeEventListener?.('change', updateViewport)
+  }, [])
 
   const mediaItems = useMemo(() => {
     const items = []
@@ -356,17 +429,14 @@ export default function ChatThread({
   const avatarUrl = otherParticipant?.avatar_url || ''
   const avatarCandidates = otherParticipant?.avatar_candidates || []
   const displayName = getConversationTitle(conversation, userId)
-  const participantRole = getOtherParticipantRole(conversation, userId)
-  const roleLabel = getRoleLabel(participantRole)
-  const statusLine = compactOrderStatusLine(orderStatus)
   const participantHref = getParticipantPublicHref(conversation, userId)
   const IdentityTag = participantHref ? Link : 'div'
 
   return (
-    <div className="relative flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-paper shadow-[0_18px_50px_-42px_rgba(15,23,42,0.28)] sm:rounded-3xl sm:border sm:border-line">
-      <div className="z-10 shrink-0 border-b border-line bg-paper/96 px-3 py-2.5 backdrop-blur-sm md:px-5 md:py-3">
-        <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,48%)] lg:items-start">
-          <div className="flex min-w-0 items-center gap-2.5 md:gap-3">
+    <div className="chat-thread-shell relative flex h-full min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-paper sm:rounded-3xl sm:border">
+      <div className="chat-thread-header z-10 shrink-0 border-b px-3 py-2.5 backdrop-blur-sm md:px-5 md:py-3">
+        <div className="flex min-w-0 items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 md:gap-3">
             <button
               type="button"
               onClick={onBack}
@@ -377,33 +447,108 @@ export default function ChatThread({
             </button>
           <IdentityTag
             {...(participantHref ? { to: participantHref } : {})}
-            className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl p-1 -m-1 transition md:gap-3 md:p-1.5 md:-m-1.5 ${participantHref ? 'hover:bg-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accentDeep/25' : ''}`}
+            className={`flex min-w-0 max-w-[min(28rem,100%)] flex-none items-center gap-2.5 rounded-2xl p-1 -m-1 transition md:gap-3 md:p-1.5 md:-m-1.5 ${participantHref ? 'hover:bg-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accentDeep/25' : ''}`}
           >
             <Avatar src={avatarUrl} srcCandidates={avatarCandidates} name={displayName} size={44} />
             <div className="min-w-0 flex-1">
               <h1 className="truncate font-display text-lg leading-tight text-ink md:text-2xl">{displayName}</h1>
-              <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted md:gap-2">
-                <span className="shrink-0 rounded-full border border-line bg-soft px-2.5 py-1">{roleLabel}</span>
-                <span className="shrink-0 rounded-full border border-line bg-soft px-2.5 py-1">{conversationStateLabel(conversation.status)}</span>
-                {participantHref && participantRole === 'client' && (
-                  <span className="shrink-0 rounded-full border border-accent/20 bg-accentSoft px-2.5 py-1 font-semibold text-accentDeep">Моето пространство</span>
-                )}
-              </div>
-              {statusLine && <div className="mt-1.5 hidden break-words text-sm text-muted sm:block">{statusLine}</div>}
             </div>
           </IdentityTag>
           </div>
-          <div className="hidden min-w-0 flex-col gap-2 md:flex">
-            <div className="flex min-w-0 items-start gap-2 rounded-2xl border border-line bg-soft/90 px-3 py-2 text-sm text-muted backdrop-blur-sm">
-              <ShieldCheck size={17} className="mt-0.5 shrink-0 text-accentDeep" />
-              <p className="min-w-0 break-words whitespace-normal">Сигурност: пази комуникацията в Totsan и провери условията на офертата преди плащане. Не споделяй чувствителни платежни данни в чата.</p>
+          <div ref={conversationActionsRef} className="relative flex shrink-0 items-center gap-1.5">
+            <div className="relative">
+              <button
+                type="button"
+                className="chat-thread-security-button"
+                aria-label="Информация за сигурност"
+                aria-expanded={securityTipOpen}
+                onMouseEnter={() => {
+                  if (!securityClickOpenRef.current) setSecurityTipOpen(true)
+                }}
+                onMouseLeave={() => {
+                  if (!securityClickOpenRef.current) setSecurityTipOpen(false)
+                }}
+                onPointerDown={() => {
+                  securityPointerFocusRef.current = true
+                }}
+                onFocus={() => {
+                  if (!securityPointerFocusRef.current) setSecurityTipOpen(true)
+                }}
+                onBlur={() => {
+                  if (!securityClickOpenRef.current) closeSecurityTip()
+                }}
+                onClick={() => {
+                  if (securityClickOpenRef.current) {
+                    closeSecurityTip()
+                    return
+                  }
+                  securityClickOpenRef.current = true
+                  securityPointerFocusRef.current = false
+                  setSecurityTipOpen(true)
+                }}
+              >
+                <ShieldHandsIcon />
+              </button>
+              {securityTipOpen && (
+                isMobileViewport && typeof document !== 'undefined'
+                  ? createPortal(
+                    <SecurityTipOverlay onClose={closeSecurityTip} />,
+                    document.body,
+                  )
+                  : <SecurityTipOverlay />
+              )}
             </div>
+            <button
+              type="button"
+              className="chat-thread-more-button"
+              aria-label="Действия за разговора"
+              aria-expanded={conversationMenuOpen}
+              onClick={() => setConversationMenuOpen((value) => !value)}
+            >
+              <MoreVertical size={22} aria-hidden="true" />
+            </button>
+            {conversationMenuOpen && (
+              <div className="chat-conversation-actions-menu" role="menu" aria-label="Действия за разговора">
+                <ChatConversationAction icon={CircleUserRound} label="Информация за контакта" onClick={() => { setConversationMenuOpen(false); onOpenContact?.() }} />
+                <ChatConversationAction icon={Search} label="Търси в разговора" onClick={() => { setConversationMenuOpen(false); setSearchOpen(true) }} />
+                <div className="chat-conversation-actions-divider" />
+                <ChatConversationAction icon={X} label="Затвори чата" onClick={() => { setConversationMenuOpen(false); onCloseConversation?.() }} />
+                <ChatConversationAction icon={Link2} label="Изпрати покана за разговор" onClick={() => { setConversationMenuOpen(false); onSendCallInvite?.() }} />
+                <ChatConversationAction icon={CalendarDays} label="Насрочи разговор" onClick={() => { setConversationMenuOpen(false); onScheduleCall?.() }} />
+                <div className="chat-conversation-actions-divider" />
+                <ChatConversationAction icon={Flag} label="Докладвай" onClick={() => { setConversationMenuOpen(false); onReportConversation?.() }} />
+                <ChatConversationAction icon={Ban} label="Блокирай" destructive onClick={() => { setConversationMenuOpen(false); onBlockConversation?.() }} />
+                <ChatConversationAction icon={Trash2} label="Изтрий чата" destructive onClick={() => { setConversationMenuOpen(false); onDeleteConversation?.() }} />
+              </div>
+            )}
           </div>
         </div>
+        {searchOpen && (
+          <div className="chat-thread-search mt-3">
+            <Search size={17} className="shrink-0 text-muted" aria-hidden="true" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Търси в разговора..."
+              autoFocus
+              aria-label="Търси в разговора"
+            />
+            <span className="hidden text-xs text-muted sm:inline">{searchQuery ? `${searchResultCount} резултата` : 'Въведи дума или фраза'}</span>
+            <button
+              type="button"
+              onClick={() => { setSearchOpen(false); setSearchQuery('') }}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-muted transition hover:bg-paper hover:text-ink"
+              aria-label="Затвори търсенето"
+            >
+              <X size={17} />
+            </button>
+          </div>
+        )}
       </div>
 
-      <div ref={threadBodyRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-soft/35 px-3 py-4 md:px-4 md:py-5">
-        <div className="mx-auto flex w-full max-w-5xl flex-col">
+      <div ref={threadBodyRef} className="chat-thread-body min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 md:px-4 md:py-5">
+        <div className="chat-thread-content mx-auto flex w-full flex-col">
           {status === 'loading' && (
             <div className="space-y-4" aria-live="polite" aria-busy="true">
               <ThreadLoadingBubble align="start" widthClass="max-w-[14rem]" />
@@ -422,28 +567,42 @@ export default function ChatThread({
               <span>Зареждаме по-стари съобщения...</span>
             </div>
           )}
-          {status === 'ready' && threadItems.map((item) => (
+          {status === 'ready' && searchQuery && searchResultCount === 0 && (
+            <div className="rounded-2xl border border-dashed border-line bg-soft/70 p-6 text-center text-sm text-muted">
+              Няма съобщения, които съвпадат с търсенето.
+            </div>
+          )}
+          {status === 'ready' && filteredThreadItems.map((item) => (
             item.type === 'date' ? (
               <DateSeparator key={item.id} label={item.label} />
             ) : (
-              <MessageBubble
+              <div
                 key={item.id}
-                message={{ ...item.message, body: item.message.kind === 'system' ? compactSystemText(item.message.body) : item.message.body }}
-                userId={userId}
-                conversation={conversation}
-                onOfferAction={onOfferAction}
-                onServiceRequestAction={onServiceRequestAction}
-                onReplyToMessage={onReplyToMessage}
-                onToggleReaction={onToggleReaction}
-                showAvatar={item.showAvatar}
-                showTimestamp={item.showTimestamp}
-                groupPosition={item.groupPosition}
-                groupedWithPrevious={item.groupedWithPrevious}
-                groupedWithNext={item.groupedWithNext}
-                mediaItems={mediaItems}
-                onOpenMedia={setActiveMediaIndex}
-                onRevealInlineControls={revealInlineControls}
-              />
+                data-message-id={item.message.id}
+                className={`flow-root ${highlightedMessageId === item.message.id ? 'motion-safe:message-highlight' : ''}`}
+              >
+                <MessageBubble
+                  message={{ ...item.message, body: item.message.kind === 'system' ? compactSystemText(item.message.body) : item.message.body }}
+                  userId={userId}
+                  conversation={conversation}
+                  onOfferAction={onOfferAction}
+                  onServiceRequestAction={onServiceRequestAction}
+                  onReplyToMessage={onReplyToMessage}
+                  onNavigateToMessage={scrollToMessageById}
+                  onToggleReaction={onToggleReaction}
+                  onForwardMessage={onForwardMessage}
+                  onSaveMessageFlags={onSaveMessageFlags}
+                  onCallInviteAction={onCallInviteAction}
+                  showAvatar={item.showAvatar}
+                  showTimestamp={item.showTimestamp}
+                  groupPosition={item.groupPosition}
+                  groupedWithPrevious={item.groupedWithPrevious}
+                  groupedWithNext={item.groupedWithNext}
+                  mediaItems={mediaItems}
+                  onOpenMedia={setActiveMediaIndex}
+                  onRevealInlineControls={revealInlineControls}
+                />
+              </div>
             )
           ))}
           {status === 'ready' && !threadItems.length && (
@@ -457,10 +616,10 @@ export default function ChatThread({
         <button
           type="button"
           onClick={() => scrollToBottom('smooth')}
-          className="absolute bottom-4 left-1/2 z-20 grid h-9 w-9 -translate-x-1/2 place-items-center rounded-full border border-paper/15 bg-ink/58 text-paper shadow-[0_16px_34px_-20px_rgba(15,23,42,0.68)] backdrop-blur-xl transition hover:bg-ink/72 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-paper/30 md:bottom-5"
+          className="absolute bottom-4 left-1/2 z-20 grid h-10 w-10 -translate-x-1/2 place-items-center rounded-full border-2 border-paper bg-ink text-paper shadow-[0_16px_34px_-16px_rgba(15,23,42,0.58)] transition hover:scale-105 hover:bg-accentDeep focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/25 md:bottom-5"
           aria-label="Към най-новите съобщения"
         >
-          <ChevronDown size={20} strokeWidth={2.5} />
+          <ChevronDown size={21} strokeWidth={2.8} aria-hidden="true" />
         </button>
       )}
       <ChatMediaViewer
@@ -633,6 +792,42 @@ function ThreadLoadingBubble({ align = 'start', widthClass = 'max-w-[16rem]' }) 
         <div className="mt-2 h-3 w-2/3 animate-pulse rounded-full bg-line/55" />
       </div>
     </div>
+  )
+}
+
+function ChatConversationAction({ icon: Icon, label, destructive = false, onClick }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className={`chat-conversation-action ${destructive ? 'chat-conversation-action-destructive' : ''}`}
+    >
+      <Icon size={17} strokeWidth={2} aria-hidden="true" />
+      <span>{label}</span>
+    </button>
+  )
+}
+
+function SecurityTipOverlay({ onClose }) {
+  return (
+    <>
+      {onClose && (
+        <button
+          type="button"
+          className="chat-thread-security-backdrop"
+          onPointerDown={onClose}
+          onMouseDown={onClose}
+          onTouchStart={onClose}
+          onClick={onClose}
+          aria-label="Затвори информацията за сигурност"
+        />
+      )}
+      <div className="chat-thread-security-tooltip" role="tooltip">
+        <ShieldCheck size={16} className="mt-0.5 shrink-0 text-accentDeep" />
+        <p>Пази комуникацията в Totsan и провери условията на офертата преди плащане. Не споделяй чувствителни платежни данни в чата.</p>
+      </div>
+    </>
   )
 }
 

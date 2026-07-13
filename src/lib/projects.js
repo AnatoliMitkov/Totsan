@@ -572,6 +572,20 @@ export async function loadSharedClientProject(shareId) {
   }
 }
 
+export async function loadChatClientProfile(conversationId) {
+  if (!conversationId) return null
+  const { data, error } = await supabase.rpc('get_chat_client_profile', { p_conversation_id: conversationId })
+  if (error) throw error
+  if (!data || !data.account) return null
+
+  return {
+    conversation: data.conversation || null,
+    account: data.account || null,
+    project: data.project ? normalizeProject(data.project) : null,
+    media: await withSignedMediaUrls(Array.isArray(data.media) ? data.media.filter(Boolean) : []),
+  }
+}
+
 export function projectDraftFromPendingBrief(pendingBrief, baseProject = null) {
   const currentProject = { ...DEFAULT_PROJECT, ...(baseProject || {}) }
 

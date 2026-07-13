@@ -2549,6 +2549,15 @@ function PortfolioProjectCard({ item, active = false, onOpen }) {
   const meta = getPortfolioMeta(item)
   const accent = item.budgetBand || item.budget_band || 'Проект от практиката'
 
+  let pills = []
+  if (accent.includes(',')) {
+    pills = accent.split(',').map(s => s.trim()).filter(Boolean)
+  } else if (accent.includes('·')) {
+    pills = accent.split('·').map(s => s.trim()).filter(Boolean)
+  } else {
+    pills = [accent.trim()].filter(Boolean)
+  }
+
   return (
     <button
       type="button"
@@ -2567,9 +2576,16 @@ function PortfolioProjectCard({ item, active = false, onOpen }) {
         <span className={`absolute left-4 top-4 rounded-full px-3 py-1 text-xs font-semibold shadow-sm ${item.isPublished ? 'bg-white/90 text-ink' : 'bg-amber-100 text-amber-800'}`}>
           {item.isPublished ? 'Публичен' : 'Скрит'}
         </span>
-        <span className="absolute bottom-4 left-4 right-4 truncate rounded-full border border-white/15 bg-ink/28 px-3 py-1.5 text-xs font-semibold text-paper shadow-[0_14px_35px_rgba(7,31,55,0.18)] backdrop-blur-md">
-          {accent}
-        </span>
+        <div className="absolute bottom-4 left-4 right-4 flex flex-wrap gap-1.5">
+          {pills.slice(0, 5).map((pill, idx) => (
+            <span
+              key={idx}
+              className="rounded-full border border-white/15 bg-ink/28 px-3 py-1 text-xs font-semibold text-paper backdrop-blur-md whitespace-nowrap"
+            >
+              {pill}
+            </span>
+          ))}
+        </div>
       </div>
 
       <div className="p-5">
@@ -2603,6 +2619,7 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
   const dragPointerIdRef = useRef(null)
   const isDraggingRef = useRef(false)
   const mediaListRef = useRef(null)
+  const accentCount = (draft.budgetBand || '').split(',').map(s => s.trim()).filter(Boolean).length
   const checklist = getPortfolioChecklist(draft, media)
   const requiredChecks = getPortfolioRequiredChecks(draft, media)
   const missingRequired = requiredChecks.filter(item => !item.done)
@@ -2831,7 +2848,22 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
                 <div className="p-5">
                   <div className="flex flex-wrap gap-2">
                     {layer && <span className="rounded-full bg-soft px-3 py-1 text-xs font-semibold text-accentDeep">Слой {layer.number} · {layer.title}</span>}
-                    {draft.budgetBand && <span className="rounded-full bg-ink px-3 py-1 text-xs font-semibold text-paper">{draft.budgetBand}</span>}
+                    {draft.budgetBand && (() => {
+                      let draftPills = []
+                      const accentVal = draft.budgetBand
+                      if (accentVal.includes(',')) {
+                        draftPills = accentVal.split(',').map(s => s.trim()).filter(Boolean)
+                      } else if (accentVal.includes('·')) {
+                        draftPills = accentVal.split('·').map(s => s.trim()).filter(Boolean)
+                      } else {
+                        draftPills = [accentVal.trim()].filter(Boolean)
+                      }
+                      return draftPills.slice(0, 5).map((pill, idx) => (
+                        <span key={idx} className="rounded-full bg-ink px-3 py-1 text-xs font-semibold text-paper">
+                          {pill}
+                        </span>
+                      ))
+                    })()}
                     {!draft.isPublished && <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">Скрит</span>}
                   </div>
                   <h4 className="mt-4 break-words font-display text-[clamp(2.2rem,4vw,3.25rem)] leading-none text-ink">{draft.title || 'Заглавие на проекта'}</h4>
@@ -2842,7 +2874,7 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 <MiniFact label="Локация" value={draft.city || 'Не е посочена'} />
                 <MiniFact label="Година" value={draft.year || 'Не е посочена'} />
-                <MiniFact label="Акцент" value={draft.budgetBand || 'Добави силен акцент'} />
+                <MiniFact label="Акценти" value={draft.budgetBand || 'Добави акценти'} />
               </div>
 
               {media.length > 0 && (
@@ -2890,7 +2922,17 @@ function PortfolioProjectModal({ draft, state, onClose, onChange, onSubmit, onUp
                   />
                 </div>
                 <Field label="Година"><input type="number" min="1900" max="2100" value={draft.year} onChange={event => onChange('year', event.target.value)} className={INPUT} /></Field>
-                <Field label="Силен акцент"><input value={draft.budgetBand} onChange={event => onChange('budgetBand', event.target.value)} className={INPUT} placeholder="Преди/След · 6 кв.м." /></Field>
+                <Field label={<FieldLabelWithCounter label="Акценти" count={accentCount} limit={5} />}>
+                  <input
+                    value={draft.budgetBand}
+                    onChange={event => onChange('budgetBand', event.target.value)}
+                    className={`${INPUT} ${accentCount > 5 ? 'border-red-500 focus:ring-red-500' : ''}`}
+                    placeholder="55 кв.м., Минимализъм, Преди/След"
+                  />
+                  {accentCount > 5 && (
+                    <p className="mt-1 text-xs text-red-500 font-medium">Моля, въведете до 5 акцента.</p>
+                  )}
+                </Field>
               </div>
 
               <Field label="Кратко описание"><textarea rows={5} value={draft.description} onChange={event => onChange('description', event.target.value)} className={INPUT} placeholder="Проблем → роля → решение → резултат" /></Field>
@@ -3002,6 +3044,7 @@ function PortfolioProjectDialog({ draft, state, onClose, onChange, onSubmit, onU
   const requiredChecks = getPortfolioRequiredChecks(draft, media)
   const missingRequired = requiredChecks.filter(item => !item.done)
   const completionPercent = Math.round((checklist.filter(item => item.done).length / checklist.length) * 100)
+  const accentCount = (draft.budgetBand || '').split(',').map(s => s.trim()).filter(Boolean).length
 
   useEffect(() => {
     function handleEscape(event) {
@@ -3095,7 +3138,17 @@ function PortfolioProjectDialog({ draft, state, onClose, onChange, onSubmit, onU
                         />
                       </div>
                       <Field label="Година"><input type="number" min="1900" max="2100" value={draft.year} onChange={event => onChange('year', event.target.value)} className={INPUT} placeholder="2025" /></Field>
-                      <Field label="Силен акцент"><input value={draft.budgetBand} onChange={event => onChange('budgetBand', event.target.value)} className={INPUT} placeholder="55 кв.м. · Преди/След" /></Field>
+                      <Field label={<FieldLabelWithCounter label="Акценти" count={accentCount} limit={5} />}>
+                        <input
+                          value={draft.budgetBand}
+                          onChange={event => onChange('budgetBand', event.target.value)}
+                          className={`${INPUT} ${accentCount > 5 ? 'border-red-500 focus:ring-red-500' : ''}`}
+                          placeholder="55 кв.м., Минимализъм, Преди/След"
+                        />
+                        {accentCount > 5 && (
+                          <p className="mt-1 text-xs text-red-500 font-medium">Моля, въведете до 5 акцента.</p>
+                        )}
+                      </Field>
                     </div>
                   </>
                 )}
@@ -3585,7 +3638,7 @@ function PortfolioHelpPanel({ section, layer }) {
   const content = {
     basics: {
       title: 'Какво вижда клиентът първо',
-      lines: ['Кратко и ясно заглавие.', 'Силен акцент, който хваща окото.', 'Град и слой, за да има контекст.'],
+      lines: ['Кратко и ясно заглавие.', 'Акценти, които хващат окото.', 'Град и слой, за да има контекст.'],
     },
     story: {
       title: 'Как да разкажеш проекта',

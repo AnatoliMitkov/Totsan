@@ -114,7 +114,7 @@ export default function PortfolioProject() {
     item?.layerSlug ? { key: 'layer', label: 'Категория', value: layerLabel, icon: Layers3 } : null,
     item?.city ? { key: 'city', label: 'Град', value: item.city, icon: MapPin } : null,
     item?.year ? { key: 'year', label: 'Година', value: String(item.year), icon: CalendarDays } : null,
-    item?.budgetBand ? { key: 'accent', label: 'Акцент', value: item.budgetBand, icon: Sparkles } : null,
+    item?.budgetBand ? { key: 'accent', label: 'Акценти', value: item.budgetBand, icon: Sparkles } : null,
   ].filter(Boolean)), [item?.budgetBand, item?.city, item?.layerSlug, item?.year, layerLabel])
 
   const seoConfig = useMemo(() => {

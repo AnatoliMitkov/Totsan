@@ -14,6 +14,9 @@ export const CONVERSATION_SELECT = `
   is_read_by_partner,
   hidden_by_client_at,
   hidden_by_partner_at,
+  deleted_at,
+  delete_after,
+  deleted_by,
   created_at,
   updated_at
 `
@@ -54,13 +57,16 @@ const ACCOUNT_AVATAR_SELECT = 'id, full_name, display_name, avatar_url, email'
 const LEGACY_MESSAGE_PREVIEW_SELECT = 'id, conversation_id, sender_id, kind, body, offer_id, created_at'
 const MESSAGE_PREVIEW_SELECT = 'id, conversation_id, sender_id, kind, body, offer_id, reply_to_message_id, created_at'
 const REACTION_SELECT = 'id, message_id, user_id, emoji, created_at'
+const MESSAGE_FLAG_SELECT = 'id, message_id, user_id, pinned, starred, color, created_at, updated_at'
 export const MESSAGE_PAGE_SIZE = 30
 const SHARED_PROJECT_CONTEXT_KEY = 'totsan.chatSharedProjectContext.v1'
 const SHARED_PROJECT_CONTEXT_LIMIT = 50
 const CHAT_REFERENCE_PREFIX = '__totsan_ref__:'
+const CHAT_CALL_PREFIX = '__totsan_call__:'
 const chatFeatureSupport = {
   replies: null,
   reactions: null,
+  messageFlags: null,
 }
 
 function normalizeChatReferencePayload(payload) {
@@ -112,6 +118,34 @@ export function decodeChatReferenceBody(value = '') {
   }
 }
 
+export function encodeChatCallBody(payload = {}) {
+  const mode = payload.mode === 'scheduled' ? 'scheduled' : 'request'
+  const duration = Number(payload.duration)
+  const startsAt = String(payload.startsAt || '')
+  const normalized = {
+    mode,
+    purpose: String(payload.purpose || 'Уточняване на детайли').trim().slice(0, 100),
+    duration: [15, 30, 45, 60].includes(duration) ? duration : 30,
+    startsAt: startsAt && !Number.isNaN(new Date(startsAt).getTime()) ? startsAt : '',
+    channel: ['phone', 'video', 'in_person'].includes(payload.channel) ? payload.channel : 'video',
+    location: String(payload.location || '').trim().slice(0, 300),
+    note: String(payload.note || '').trim().slice(0, 600),
+    status: ['pending', 'accepted', 'declined', 'cancelled'].includes(payload.status) ? payload.status : 'pending',
+  }
+  return `${CHAT_CALL_PREFIX}${JSON.stringify(normalized)}`
+}
+
+export function decodeChatCallBody(value = '') {
+  const text = String(value || '')
+  if (!text.startsWith(CHAT_CALL_PREFIX)) return null
+  try {
+    const payload = JSON.parse(text.slice(CHAT_CALL_PREFIX.length))
+    return JSON.parse(encodeChatCallBody(payload).slice(CHAT_CALL_PREFIX.length))
+  } catch {
+    return null
+  }
+}
+
 export function getChatReferenceLabel(reference) {
   if (!reference) return ''
   return reference.type === 'service' ? 'Споделена услуга' : 'Споделено портфолио'
@@ -133,6 +167,9 @@ export function getMessageSnippet(message, { maxLength = 160, missing = 'Съо�
   if (message.kind === 'offer') return 'Оферта'
   if (message.kind === 'service_request') return 'Заявка за услуга'
   if (message.kind === 'system') return compactSystemText(message.body || '')
+
+  const call = decodeChatCallBody(message.body)
+  if (call) return call.startsAt ? 'Предложен разговор' : 'Покана за разговор'
 
   const reference = decodeChatReferenceBody(message.body)
   if (reference) {
@@ -173,6 +210,16 @@ function isMissingReplyColumnError(error) {
 function isMissingReactionsTableError(error) {
   const text = supabaseErrorText(error)
   return text.includes('message_reactions') && (
+    text.includes('schema cache')
+    || text.includes('does not exist')
+    || text.includes('not found')
+    || text.includes('relation')
+  )
+}
+
+function isMissingMessageFlagsTableError(error) {
+  const text = supabaseErrorText(error)
+  return text.includes('message_flags') && (
     text.includes('schema cache')
     || text.includes('does not exist')
     || text.includes('not found')
@@ -313,7 +360,7 @@ export function getParticipantPublicHref(conversation, userId) {
   const role = getOtherParticipantRole(conversation, userId)
   const participant = getOtherParticipant(conversation, userId)
 
-  if (role === 'client' && conversation?.sharedProject?.shareId) {
+  if (role === 'client' && isPartner(conversation, userId) && conversation?.sharedProject?.shareId) {
     return `/proekt/${conversation.sharedProject.shareId}`
   }
 
@@ -570,6 +617,101 @@ export async function loadMessageReactions(messageIds = []) {
   return reactionsByMessageId
 }
 
+export async function loadMessageFlags(messageIds = []) {
+  const uniqueIds = [...new Set(messageIds.filter(Boolean))]
+  if (uniqueIds.length === 0 || chatFeatureSupport.messageFlags === false) return new Map()
+
+  const { data, error } = await supabase
+    .from('message_flags')
+    .select(MESSAGE_FLAG_SELECT)
+    .in('message_id', uniqueIds)
+
+  if (error) {
+    if (isMissingMessageFlagsTableError(error)) {
+      chatFeatureSupport.messageFlags = false
+      return new Map()
+    }
+    throw error
+  }
+  chatFeatureSupport.messageFlags = true
+
+  const flagsByMessageId = new Map()
+  ;(data || []).forEach((flag) => {
+    flagsByMessageId.set(flag.message_id, {
+      pinned: Boolean(flag.pinned),
+      starred: Boolean(flag.starred),
+      color: String(flag.color || ''),
+    })
+  })
+  return flagsByMessageId
+}
+
+export async function saveMessageFlagState(messageId, flags = {}) {
+  if (!messageId) return null
+  const { data: sessionData } = await supabase.auth.getSession()
+  const userId = sessionData.session?.user?.id
+  if (!userId) throw new Error('Трябва да си влязъл, за да маркираш съобщения.')
+
+  const pinned = Boolean(flags.pinned)
+  const starred = Boolean(flags.starred)
+  const color = starred && flags.color ? String(flags.color) : null
+
+  if (!pinned && !starred) {
+    const { error } = await supabase
+      .from('message_flags')
+      .delete()
+      .eq('message_id', messageId)
+      .eq('user_id', userId)
+    if (error) {
+      if (isMissingMessageFlagsTableError(error)) {
+        chatFeatureSupport.messageFlags = false
+        return null
+      }
+      throw error
+    }
+    return null
+  }
+
+  const { data, error } = await supabase
+    .from('message_flags')
+    .upsert({
+      message_id: messageId,
+      user_id: userId,
+      pinned,
+      starred,
+      color,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'message_id,user_id' })
+    .select(MESSAGE_FLAG_SELECT)
+    .single()
+
+  if (error) {
+    if (isMissingMessageFlagsTableError(error)) {
+      chatFeatureSupport.messageFlags = false
+      return null
+    }
+    throw error
+  }
+  chatFeatureSupport.messageFlags = true
+  return data
+}
+
+async function loadOrdersByOfferIds(offerIds = []) {
+  const uniqueIds = [...new Set(offerIds.filter(Boolean))]
+  if (uniqueIds.length === 0) return new Map()
+
+  const { data, error } = await supabase
+    .from('orders')
+    // Keep this lightweight lookup compatible with orders created before the
+    // payment-method migration. The card only needs the order id and status
+    // to provide a reliable route from an accepted offer to its order.
+    .select('id, offer_id, status')
+    .in('offer_id', uniqueIds)
+
+  if (error) return new Map()
+  return new Map((data || []).filter((order) => order?.offer_id && order?.id).map((order) => [order.offer_id, order]))
+}
+
 async function enrichMessages(rows = []) {
   const messages = sortMessages(dedupeMessagesById(rows || []))
   if (messages.length === 0) return []
@@ -578,9 +720,12 @@ async function enrichMessages(rows = []) {
   const messageIdSet = new Set(messageIds)
   const replyIds = [...new Set(messages.map((message) => message.reply_to_message_id).filter((replyId) => replyId && !messageIdSet.has(replyId)))]
 
-  const [replyRows, reactionsByMessageId] = await Promise.all([
+  const offerIds = [...new Set(messages.map((message) => message.offer_id).filter(Boolean))]
+  const [replyRows, reactionsByMessageId, flagsByMessageId, ordersByOfferId] = await Promise.all([
     loadMessagePreviewsByIds(replyIds),
     loadMessageReactions(messageIds),
+    loadMessageFlags(messageIds),
+    loadOrdersByOfferIds(offerIds),
   ])
 
   const repliesById = new Map()
@@ -595,8 +740,13 @@ async function enrichMessages(rows = []) {
 
   return messages.map((message) => ({
     ...message,
+    offer: message.offer ? (() => {
+      const order = ordersByOfferId.get(message.offer_id)
+      return order ? { ...message.offer, orderId: order.id, orderStatus: order.status } : message.offer
+    })() : null,
     reply_to_message: message.reply_to_message_id ? repliesById.get(message.reply_to_message_id) || null : null,
     reactions: reactionsByMessageId.get(message.id) || [],
+    message_flags: flagsByMessageId.get(message.id) || null,
   }))
 }
 
@@ -803,6 +953,7 @@ export async function loadConversations() {
     rows = rows.filter((conversation) => {
       if (conversation.client_id === userId && conversation.hidden_by_client_at) return false
       if (conversation.partner_id === userId && conversation.hidden_by_partner_at) return false
+      if (conversation.deleted_at) return false
       return true
     })
   }
@@ -818,6 +969,7 @@ export async function loadConversation(conversationId) {
     .eq('id', conversationId)
     .maybeSingle()
   if (error) throw error
+  if (data?.deleted_at) return null
   return enrichConversation(data || null)
 }
 
@@ -927,6 +1079,7 @@ async function findOpenConversation({ clientId, partnerId, projectId = '' }) {
     .eq('client_id', clientId)
     .eq('partner_id', partnerId)
     .eq('status', 'open')
+    .is('deleted_at', null)
     .order('updated_at', { ascending: false })
 
   if (error) throw error
@@ -1021,6 +1174,16 @@ export async function sendTextMessage({ conversationId, body, replyToMessageId =
   return result
 }
 
+export async function sendCallInvite({ conversationId, payload = {} }) {
+  if (!conversationId) throw new Error('Липсва разговор.')
+  return invokeChatAction('send_call_invite', { conversationId, ...payload })
+}
+
+export async function respondToCallInvite({ messageId, action }) {
+  if (!messageId || !['accept', 'decline'].includes(action)) throw new Error('Невалиден отговор за разговора.')
+  return invokeChatAction('respond_call_invite', { messageId, action })
+}
+
 export async function sendAttachmentMessage({ conversationId, body = '', attachments = [], replyToMessageId = '' }) {
   const result = await invokeChatAction('send_message', {
     conversationId,
@@ -1041,34 +1204,38 @@ export async function sendCatalogReference({ conversationId, referenceType, refe
   return result
 }
 
-export async function toggleMessageReaction({ messageId, emoji, userId, active }) {
+export async function toggleMessageReaction({ messageId, emoji, userId }) {
   if (!messageId || !emoji || !userId) throw new Error('Липсва реакция или съобщение.')
 
-  if (active) {
+  // Read ownership from the source of truth so another participant's emoji
+  // can never be mistaken for the current user's reaction in a stale UI.
+  const { data: existingReaction, error: lookupError } = await supabase
+    .from('message_reactions')
+    .select('id')
+    .eq('message_id', messageId)
+    .eq('user_id', userId)
+    .eq('emoji', emoji)
+    .maybeSingle()
+
+  if (lookupError) throw lookupError
+
+  if (existingReaction?.id) {
     const { error } = await supabase
       .from('message_reactions')
       .delete()
-      .eq('message_id', messageId)
-      .eq('user_id', userId)
-      .eq('emoji', emoji)
+      .eq('id', existingReaction.id)
     if (error) throw error
     return
   }
 
   const { error } = await supabase
     .from('message_reactions')
-    .upsert(
-      {
-        message_id: messageId,
-        user_id: userId,
-        emoji,
-      },
-      {
-        onConflict: 'message_id,user_id,emoji',
-        ignoreDuplicates: true,
-      },
-    )
-  if (error) throw error
+    .insert({
+      message_id: messageId,
+      user_id: userId,
+      emoji,
+    })
+  if (error && error.code !== '23505') throw error
 }
 
 export async function sendOffer({ conversationId, offer }) {
@@ -1112,6 +1279,7 @@ export function subscribeToConversation(conversationId, onChange) {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'offers', filter: `conversation_id=eq.${conversationId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'service_requests', filter: `conversation_id=eq.${conversationId}` }, onChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'message_flags' }, onChange)
     .subscribe()
 
   return () => { supabase.removeChannel(channel) }
@@ -1138,4 +1306,33 @@ export async function archiveConversation(conversation, userId) {
 
   if (error) throw error
   return data
+}
+
+export async function deleteConversationForEveryone(conversationId) {
+  if (!conversationId) throw new Error('Липсва разговор.')
+
+  const { data, error } = await supabase.rpc('delete_conversation_for_everyone', {
+    p_conversation_id: conversationId,
+  })
+
+  if (error) throw error
+  return enrichConversation(data || null)
+}
+
+export async function updateConversationStatus(conversationId, status) {
+  if (!conversationId) throw new Error('Липсва разговор.')
+  if (!['open', 'closed', 'blocked'].includes(status)) {
+    throw new Error('Невалиден статус на разговор.')
+  }
+
+  const { data, error } = await supabase
+    .from('conversations')
+    .update({ status })
+    .eq('id', conversationId)
+    .select(CONVERSATION_SELECT)
+    .single()
+
+  if (error) throw error
+  if (data?.deleted_at) return null
+  return enrichConversation(data || null)
 }

@@ -4,6 +4,7 @@ import { LAYER_HEROS, WHAT_YOU_FIND_IMAGES, SHOWCASE_IMAGES } from '../data/imag
 import ProfessionalCard from '../components/ProfessionalCard.jsx'
 import { useProfileDirectory } from '../lib/profiles.js'
 import { buildBreadcrumbSchema, buildFaqSchema, useSeo } from '../lib/seo.js'
+import { loadPublicPortfolioByLayer, getProjectCover, getPortfolioMeta, portfolioProjectPath } from '../lib/portfolio.js'
 
 export default function Layer({ slug }) {
   const { slug: routeSlug } = useParams()
@@ -328,31 +329,209 @@ function Showcase({ layer }) {
   const sc = layer.showcase
   const imgs = SHOWCASE_IMAGES[layer.slug] || []
   const isMaterialsLayer = layer.slug === 'materiali'
+  const [projects, setProjects] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    async function fetchProjects() {
+      try {
+        const data = await loadPublicPortfolioByLayer(layer.slug)
+        if (!active) return
+        setProjects(data || [])
+      } catch (err) {
+        console.error('Failed to load portfolio items for showcase:', err)
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+    fetchProjects()
+    return () => {
+      active = false
+    }
+  }, [layer.slug])
+
+  const fallbackItems = useMemo(() => {
+    return sc.items.map(it => {
+      let whoClean = 'Вдъхновение от практиката'
+      if (it.who) {
+        const parts = it.who.split('·')
+        if (parts.length > 1) {
+          whoClean = `Вдъхновение · ${parts[1].trim()}`
+        } else {
+          whoClean = `Вдъхновение · ${it.who.trim()}`
+        }
+      }
+      return {
+        ...it,
+        who: whoClean
+      }
+    })
+  }, [sc.items])
+
+  const itemsToRender = useMemo(() => {
+    if (projects.length === 0) return []
+    let list = [...projects]
+    while (list.length < 8) {
+      list = [...list, ...projects]
+    }
+    return [...list, ...list]
+  }, [projects])
+
+  if (loading) {
+    return (
+      <section className="section !pt-0">
+        <div className="container-page">
+          <div className="eyebrow">{sc.label}</div>
+          <h2 className="h-section mt-2 max-w-3xl">
+            {isMaterialsLayer ? 'Материали в реални проекти' : 'Виж какво вече е създадено.'}
+          </h2>
+          <div className="mt-10 grid gap-5 md:grid-cols-3">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="card p-0 overflow-hidden bg-paper/50 animate-pulse h-[400px] flex flex-col justify-between border border-line/40">
+                <div className="aspect-[4/3] bg-cloud/50 w-full" />
+                <div className="p-6 flex-1 space-y-3">
+                  <div className="h-4 bg-cloud/60 rounded w-1/4" />
+                  <div className="h-6 bg-cloud/70 rounded w-3/4" />
+                </div>
+                <div className="p-6 border-t border-line/40 h-16 bg-cloud/30" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   return (
-    <section className="section !pt-0">
+    <section className="section !pt-0 overflow-hidden">
       <div className="container-page">
-        <div className="eyebrow reveal">{sc.label}</div>
-        <h2 className="h-section mt-2 reveal max-w-3xl">{isMaterialsLayer ? 'Материали в реални проекти' : 'Виж какво вече е създадено.'}</h2>
+        <div className="eyebrow">{sc.label}</div>
+        <h2 className="h-section mt-2 max-w-3xl">{isMaterialsLayer ? 'Материали в реални проекти' : 'Виж какво вече е създадено.'}</h2>
         {isMaterialsLayer && (
-          <p className="mt-3 max-w-2xl text-muted reveal">
+          <p className="mt-3 max-w-2xl text-muted">
             Вижте как различни материали изглеждат в завършени обекти и каква роля имат в проекта.
           </p>
         )}
-        <div className="mt-10 grid gap-5 md:grid-cols-3">
-          {sc.items.map((it,i) => (
-            <article key={i} className="card reveal img-zoom-host p-0 overflow-hidden bg-paper">
-              <div className="media-frame aspect-[4/3]">
-                <img src={imgs[i]} alt={it.t} loading="lazy" decoding="async" className="img-cover img-zoom" />
-                <div className="absolute top-3 left-3 text-xs px-2.5 py-1 rounded-full bg-paper/90 text-ink backdrop-blur">{isMaterialsLayer ? 'Материали' : `Слой ${layer.number}`}</div>
-              </div>
-              <div className="p-6 border-t border-line">
-                <div className="h-card">{it.t}</div>
-                <div className="text-muted text-sm mt-1">{it.who}</div>
-              </div>
-            </article>
-          ))}
-        </div>
       </div>
+
+      {projects.length === 0 ? (
+        <div className="container-page mt-10">
+          <div className="grid gap-5 md:grid-cols-3">
+            {fallbackItems.map((it, i) => (
+              <article key={i} className="card img-zoom-host p-0 overflow-hidden bg-paper">
+                <div className="media-frame aspect-[4/3]">
+                  <img src={imgs[i]} alt={it.t} loading="lazy" decoding="async" className="img-cover img-zoom" />
+                  <div className="absolute top-3 left-3 text-xs px-2.5 py-1 rounded-full bg-paper/90 text-ink backdrop-blur font-semibold">{isMaterialsLayer ? 'Материали' : `Слой ${layer.number}`}</div>
+                </div>
+                <div className="p-6 border-t border-line">
+                  <div className="h-card">{it.t}</div>
+                  <div className="text-muted text-sm mt-1">{it.who}</div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      ) : projects.length < 3 ? (
+        <div className="container-page mt-10">
+          <div className="flex flex-wrap justify-center gap-6">
+            {projects.map((item) => {
+              const cover = getProjectCover(item)
+              const meta = getPortfolioMeta(item)
+              return (
+                <Link
+                  key={item.id}
+                  to={portfolioProjectPath(item.profile?.slug || '', item.id)}
+                  className="card img-zoom-host p-0 overflow-hidden bg-paper w-[290px] sm:w-[360px] md:w-[400px] shrink-0 flex flex-col justify-between hover:border-ink/30 transition-colors block group"
+                >
+                  <div>
+                    <div className="media-frame aspect-[4/3] relative overflow-hidden bg-soft">
+                      {cover ? (
+                        <img
+                          src={cover}
+                          alt={item.title}
+                          loading="lazy"
+                          decoding="async"
+                          className="img-cover img-zoom w-full h-full object-cover transition duration-700 ease-out"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-soft text-muted text-sm font-medium">Няма снимка</div>
+                      )}
+                      <div className="absolute top-3 left-3 text-xs px-2.5 py-1 rounded-full bg-paper/90 text-ink backdrop-blur font-semibold">Слой {layer.number}</div>
+                      {meta && (
+                        <span className="absolute bottom-3 left-3 right-3 truncate rounded-full border border-white/15 bg-ink/28 px-3 py-1.5 text-xs font-semibold text-paper shadow-[0_14px_35px_rgba(7,31,55,0.18)] backdrop-blur-md">{meta}</span>
+                      )}
+                    </div>
+                    <div className="p-6">
+                      {item.profile?.tag && (
+                        <span className="inline-flex items-center rounded-full bg-soft px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accentDeep mb-2">{item.profile.tag}</span>
+                      )}
+                      <h3 className="h-card line-clamp-2 leading-tight text-ink font-semibold group-hover:text-accentDeep transition-colors duration-200">{item.title}</h3>
+                    </div>
+                  </div>
+                  <div className="px-6 pb-6 border-t border-line/60 pt-4 flex items-center justify-between">
+                    <div className="min-w-0">
+                      <div className="text-xs text-muted">Студио / Партньор</div>
+                      <div className="text-sm font-semibold text-ink truncate mt-0.5">{item.profile?.name || 'Totsan Партньор'}</div>
+                    </div>
+                    <div className="text-accentDeep font-semibold text-xs shrink-0 flex items-center gap-1 group-hover:underline">Виж проекта &rarr;</div>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="mask-marquee w-full mt-10 relative">
+          <div className="animate-marquee-ltr flex gap-6 py-4">
+            {itemsToRender.map((item, index) => {
+              const cover = getProjectCover(item)
+              const meta = getPortfolioMeta(item)
+              return (
+                <Link
+                  key={`${item.id}-${index}`}
+                  to={portfolioProjectPath(item.profile?.slug || '', item.id)}
+                  className="card img-zoom-host p-0 overflow-hidden bg-paper w-[290px] sm:w-[360px] md:w-[400px] shrink-0 flex flex-col justify-between hover:border-ink/30 transition-colors block group"
+                >
+                  <div>
+                    <div className="media-frame aspect-[4/3] relative overflow-hidden bg-soft">
+                      {cover ? (
+                        <img
+                          src={cover}
+                          alt={item.title}
+                          loading="lazy"
+                          decoding="async"
+                          className="img-cover img-zoom w-full h-full object-cover transition duration-700 ease-out"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-soft text-muted text-sm font-medium">Няма снимка</div>
+                      )}
+                      <div className="absolute top-3 left-3 text-xs px-2.5 py-1 rounded-full bg-paper/90 text-ink backdrop-blur font-semibold">Слой {layer.number}</div>
+                      {meta && (
+                        <span className="absolute bottom-3 left-3 right-3 truncate rounded-full border border-white/15 bg-ink/28 px-3 py-1.5 text-xs font-semibold text-paper shadow-[0_14px_35px_rgba(7,31,55,0.18)] backdrop-blur-md">{meta}</span>
+                      )}
+                    </div>
+                    <div className="p-6">
+                      {item.profile?.tag && (
+                        <span className="inline-flex items-center rounded-full bg-soft px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accentDeep mb-2">{item.profile.tag}</span>
+                      )}
+                      <h3 className="h-card line-clamp-2 leading-tight text-ink font-semibold group-hover:text-accentDeep transition-colors duration-200">{item.title}</h3>
+                    </div>
+                  </div>
+                  <div className="px-6 pb-6 border-t border-line/60 pt-4 flex items-center justify-between">
+                    <div className="min-w-0">
+                      <div className="text-xs text-muted">Студио / Партньор</div>
+                      <div className="text-sm font-semibold text-ink truncate mt-0.5">{item.profile?.name || 'Totsan Партньор'}</div>
+                    </div>
+                    <div className="text-accentDeep font-semibold text-xs shrink-0 flex items-center gap-1 group-hover:underline">Виж проекта &rarr;</div>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </section>
   )
 }

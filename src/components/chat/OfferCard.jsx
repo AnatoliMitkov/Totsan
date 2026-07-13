@@ -1,327 +1,229 @@
-import { useState } from 'react'
-import { CheckCircle2, Clock, CreditCard, HelpCircle, Layers3, PenLine, ShieldCheck, XCircle } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { ArrowRight, CheckCircle2, HelpCircle, PenLine, Undo2, XCircle } from 'lucide-react'
 import { conversationRole } from '../../lib/chat.js'
-import { formatEurWithBgn } from '../../lib/money.js'
+import { normalizeAcceptedOffer } from '../../lib/offers.js'
+import OfferDocumentView from '../offers/OfferDocumentView.jsx'
 
-const OFFER_TYPE_LABELS = {
-  final: 'Финална оферта',
-  estimate: 'Предварителна оценка',
-  staged: 'Поетапна оферта',
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+const ISO_DATE_PREFIX_PATTERN = /^(\d{4})-(\d{2})-(\d{2})(?:$|[Tt ])/
+
+const ACTION_COPY = {
+  accepted: {
+    busy: 'Приемаме офертата…',
+    done: 'Офертата е приета. Подготвяме поръчката.',
+    error: 'Офертата не беше приета. Опитай отново.',
+  },
+  question: {
+    busy: 'Подготвяме въпроса…',
+    done: 'Въпросът е подготвен. Допълни го и го изпрати в чата.',
+    error: 'Въпросът не беше подготвен. Опитай отново.',
+  },
+  change_requested: {
+    busy: 'Изпращаме искането…',
+    done: 'Искането за промяна е изпратено в разговора.',
+    error: 'Искането за промяна не беше изпратено. Опитай отново.',
+  },
+  declined: {
+    busy: 'Отказваме офертата…',
+    done: 'Офертата е отказана.',
+    error: 'Офертата не беше отказана. Опитай отново.',
+  },
+  withdrawn: {
+    busy: 'Изтегляме офертата…',
+    done: 'Офертата е изтеглена.',
+    error: 'Офертата не беше изтеглена. Опитай отново.',
+  },
 }
 
-const PRICE_TYPE_LABELS = {
-  fixed: 'Фиксирана цена',
-  estimate: 'Ориентировъчна цена',
-  hourly: 'Почасова / на ден',
-  staged: 'По етапи',
-}
-
-const MATERIAL_MODE_LABELS = {
-  included: 'Материалите са включени',
-  client: 'Материалите се осигуряват от клиента',
-  separate: 'Материалите се уточняват отделно',
-}
-
-const VAT_LABELS = {
-  included: 'С ДДС',
-  excluded: 'Без ДДС',
-  not_registered: 'Партньорът не е регистриран по ДДС',
-  invoice: 'Уточнява се във фактурата',
-}
-
-export default function OfferCard({ offer, conversation, userId, onAction, compact = false, messageCreatedAt = '' }) {
+export default function OfferCard({ offer, conversation, userId, onAction, messageCreatedAt = '' }) {
   const role = conversationRole(conversation, userId)
+  const canClientAct = role === 'client' && offer?.status === 'sent'
+  const canPartnerAct = role === 'partner' && offer?.status === 'sent'
+  const [busyAction, setBusyAction] = useState('')
+  const [feedback, setFeedback] = useState({ tone: '', message: '' })
+  const busyRef = useRef(false)
+  const document = useMemo(() => normalizeAcceptedOffer(offer), [offer])
+  const expiry = useMemo(() => getExpiry(document.validUntil), [document.validUntil])
+  const canClientAccept = canClientAct && document.offerType !== 'estimate'
+  const acceptanceExpired = canClientAccept && expiry.expired
+  const isBusy = Boolean(busyAction)
   const providerName = conversation?.partner?.name || conversation?.partner?.display_name || 'Партньорът в разговора'
-  const canClientAct = role === 'client' && offer.status === 'sent'
-  const canPartnerAct = role === 'partner' && offer.status === 'sent'
-  const [withdrawStatus, setWithdrawStatus] = useState('idle')
-  const details = getOfferDetails(offer)
-  const offerType = offer.offer_type || details.offerType || (offer.execution_mode === 'staged' ? 'staged' : 'final')
-  const priceType = offer.price_type || details.priceType || (offerType === 'staged' ? 'staged' : 'fixed')
-  const timeline = details.timeline || {}
-  const payment = details.payment || {}
-  const conditions = details.conditions || {}
-  const includedItems = getStringArray(details.includedItems, offer.deliverables)
-  const excludedItems = getStringArray(details.excludedItems, details.notIncluded)
-  const clientRequirements = getStringArray(details.clientRequirements, details.clientProvides)
-  const materialsMode = details.materialsMode || details.materialsNote || ''
-  const vatStatus = details.vatStatus || ''
-  const stages = normalizeStages(details.stages || offer.stages)
-  const createdLabel = formatOfferTimestamp(offer.created_at || messageCreatedAt)
-  const validUntil = details.validUntil || offer.expires_at || ''
-  const summary = offer.summary || details.summary || offer.description || ''
+  const createdLabel = formatTimestamp(offer?.created_at || messageCreatedAt)
+  const orderId = offer?.orderId || offer?.order_id || ''
+  const outcomeCopy = getOutcomeCopy({
+    canClientAct,
+    canPartnerAct,
+    offerType: document.offerType,
+    expiry,
+  })
 
-  async function handleWithdraw() {
-    if (!canPartnerAct || withdrawStatus === 'withdrawing') return
-    setWithdrawStatus('withdrawing')
+  async function runAction(action) {
+    const clientActionAllowed = action === 'accepted'
+      ? canClientAccept && !expiry.expired
+      : canClientAct
+    const allowed = action === 'withdrawn' ? canPartnerAct : clientActionAllowed
+    if (!allowed || busyRef.current) return
+
+    busyRef.current = true
+    setBusyAction(action)
+    setFeedback({ tone: 'status', message: ACTION_COPY[action].busy })
     try {
-      await onAction?.(offer, 'withdrawn')
+      await onAction?.(offer, action)
+      setFeedback({ tone: 'status', message: ACTION_COPY[action].done })
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: error?.message || ACTION_COPY[action].error,
+      })
     } finally {
-      setWithdrawStatus('idle')
+      busyRef.current = false
+      setBusyAction('')
     }
   }
 
   return (
-    <div className={`min-w-0 max-w-full ${compact ? 'text-paper' : 'text-ink'}`}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <div className="text-xs uppercase tracking-[0.14em] opacity-70">Оферта</div>
-          <h3 className="mt-1 break-words font-display text-2xl leading-tight">{offer.title}</h3>
-          {createdLabel && <div className="mt-1 text-[11px] opacity-60">{createdLabel}</div>}
+    <div className="min-w-0 max-w-full">
+      <OfferDocumentView offer={document} defaultConditionsOpen={false} />
+
+      <div className="mt-3 rounded-2xl border border-line/90 bg-soft/80 p-3 text-ink shadow-[0_16px_40px_-36px_rgba(13,35,64,0.65)] sm:p-4">
+        <div className="flex flex-wrap gap-2 text-xs text-muted">
+          <span className="rounded-full border border-line bg-white px-2.5 py-1">Партньор: {providerName}</span>
+          {createdLabel ? <span className="rounded-full border border-line bg-white px-2.5 py-1">Изпратена: {createdLabel}</span> : null}
         </div>
-        <StatusPill status={offer.status} compact={compact} />
-      </div>
 
-      {summary && <p className="mt-3 break-words whitespace-pre-wrap text-sm leading-6 opacity-80">{summary}</p>}
+        {outcomeCopy ? (
+          <p className={`mt-3 rounded-xl border px-3.5 py-3 text-xs leading-5 ${getOutcomeTone(expiry.expired)}`}>
+            {outcomeCopy}
+          </p>
+        ) : null}
 
-      <div className="mt-4 flex flex-wrap gap-2 text-xs">
-        <InlineBadge compact={compact}>{OFFER_TYPE_LABELS[offerType] || 'Оферта'}</InlineBadge>
-        <InlineBadge compact={compact}>{PRICE_TYPE_LABELS[priceType] || 'Цена по оферта'}</InlineBadge>
-        <InlineBadge compact={compact}>Доставчик: {providerName}</InlineBadge>
-        <InlineBadge compact={compact}>
-          <span className="inline-flex items-center gap-1.5"><ShieldCheck size={13} /> Плащане през Totsan</span>
-        </InlineBadge>
-      </div>
-
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <Info icon={CreditCard} label="Обща цена" value={offer.price_amount ? formatEurWithBgn(offer.price_amount) : 'По уточнение'} />
-        <Info icon={Clock} label="Срок" value={offer.delivery_days ? `${offer.delivery_days} работни дни` : timeline.days ? `${timeline.days} работни дни` : 'По уточнение'} />
-      </div>
-
-      {(validUntil || timeline.earliestStartDate || timeline.dependencies) && (
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          {validUntil && <MiniFact label="Валидна до" value={formatDate(validUntil)} />}
-          {timeline.earliestStartDate && <MiniFact label="Най-ранен старт" value={formatDate(timeline.earliestStartDate)} />}
-          {timeline.dependencies && <MiniFact label="Зависимости" value={timeline.dependencies} />}
-        </div>
-      )}
-
-      {stages.length > 0 && (
-        <OfferSection title="Етапи" icon={Layers3} compact={compact}>
-          <ol className="space-y-3">
-            {stages.map((stage) => (
-              <li key={`${stage.order}-${stage.title}-${stage.description}`} className="flex min-w-0 gap-3">
-                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-current/10 text-xs font-semibold">{stage.order}</span>
-                <div className="min-w-0">
-                  <div className="break-words text-sm font-semibold">{stage.title || `Етап ${stage.order}`}</div>
-                  {stage.description && <p className="mt-1 break-words whitespace-pre-wrap text-sm opacity-75">{stage.description}</p>}
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs opacity-75">
-                    {stage.durationDays > 0 && <span>Срок: {stage.durationDays} работни дни</span>}
-                    {stage.priceAmount > 0 && <span>{formatEurWithBgn(stage.priceAmount)}</span>}
-                    {stage.startCondition && <span>Условие за старт: {stage.startCondition}</span>}
-                    {stage.payment && <span>{stage.payment}</span>}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </OfferSection>
-      )}
-
-      {includedItems.length > 0 && (
-        <OfferSection title="Какво включва" compact={compact}>
-          <CheckList items={includedItems} />
-        </OfferSection>
-      )}
-
-      {(excludedItems.length > 0 || clientRequirements.length > 0) && (
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          {excludedItems.length > 0 && (
-            <OfferSection title="Не е включено" compact={compact} tight>
-              <PlainList items={excludedItems} />
-            </OfferSection>
-          )}
-          {clientRequirements.length > 0 && (
-            <OfferSection title="Клиентът осигурява" compact={compact} tight>
-              <PlainList items={clientRequirements} />
-            </OfferSection>
-          )}
-        </div>
-      )}
-
-      {(materialsMode || vatStatus) && (
-        <div className="mt-4 flex flex-wrap gap-2 text-xs">
-          {materialsMode && (
-            <InlineBadge compact={compact}>{MATERIAL_MODE_LABELS[materialsMode] || materialsMode}</InlineBadge>
-          )}
-          {vatStatus && (
-            <InlineBadge compact={compact}>{VAT_LABELS[vatStatus] || vatStatus}</InlineBadge>
-          )}
-        </div>
-      )}
-
-      {(payment.terms || payment.notes) && (
-        <OfferSection title="Условия за плащане" icon={CreditCard} compact={compact}>
-          <div className="space-y-2 text-sm">
-            {payment.terms && <p className="break-words whitespace-pre-wrap opacity-80">{payment.terms}</p>}
-            {payment.notes && <p className="break-words whitespace-pre-wrap opacity-75">{payment.notes}</p>}
+        {(canClientAct || canPartnerAct) ? (
+          <div className="mt-3 grid gap-2 sm:flex sm:flex-wrap" aria-busy={isBusy}>
+            {canClientAccept ? (
+              <button
+                type="button"
+                onClick={() => runAction('accepted')}
+                disabled={isBusy || acceptanceExpired}
+                className="btn btn-primary min-h-11 w-full justify-center !py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto sm:min-w-[11rem]"
+              >
+                <CheckCircle2 size={17} />
+                {acceptanceExpired ? 'Срокът е изтекъл' : busyAction === 'accepted' ? 'Приемаме…' : 'Приеми офертата'}
+              </button>
+            ) : null}
+            {canClientAct ? (
+              <button type="button" onClick={() => runAction('question')} disabled={isBusy} className="btn btn-ghost min-h-11 w-full justify-center bg-white !py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto">
+                <HelpCircle size={17} /> {busyAction === 'question' ? 'Подготвяме…' : 'Попитай'}
+              </button>
+            ) : null}
+            {canClientAct ? (
+              <button type="button" onClick={() => runAction('change_requested')} disabled={isBusy} className="btn btn-ghost min-h-11 w-full justify-center bg-white !py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto">
+                <PenLine size={17} /> {busyAction === 'change_requested' ? 'Изпращаме…' : 'Поискай промяна'}
+              </button>
+            ) : null}
+            {canClientAct ? (
+              <button type="button" onClick={() => runAction('declined')} disabled={isBusy} className="btn min-h-11 w-full justify-center border border-red-200 bg-white !py-2.5 text-sm text-red-700 hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto">
+                <XCircle size={17} /> {busyAction === 'declined' ? 'Отказваме…' : 'Откажи'}
+              </button>
+            ) : null}
+            {canPartnerAct ? (
+              <button type="button" onClick={() => runAction('withdrawn')} disabled={isBusy} className="btn btn-ghost min-h-11 w-full justify-center border border-line bg-white !py-2.5 text-sm text-ink disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto">
+                <Undo2 size={17} /> {busyAction === 'withdrawn' ? 'Изтегляме…' : 'Изтегли офертата'}
+              </button>
+            ) : null}
           </div>
-        </OfferSection>
-      )}
+        ) : null}
 
-      {(conditions.scopeChanges || conditions.cancellation || conditions.unforeseenWork) && (
-        <OfferSection title="Условия" compact={compact}>
-          <PlainList items={[conditions.scopeChanges, conditions.cancellation, conditions.unforeseenWork].filter(Boolean)} />
-        </OfferSection>
-      )}
+        {offer?.status === 'accepted' && orderId ? (
+          <Link to={`/order/${orderId}`} className="btn btn-primary mt-3 min-h-11 w-full justify-center !py-2.5 text-sm sm:w-auto">
+            Отвори поръчката <ArrowRight size={17} />
+          </Link>
+        ) : null}
 
-      {(canClientAct || canPartnerAct) && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {canClientAct && <button type="button" onClick={() => onAction?.(offer, 'accepted')} className="btn btn-primary !py-2 text-sm">Приеми офертата</button>}
-          {canClientAct && <button type="button" onClick={() => onAction?.(offer, 'question')} className="btn btn-ghost !py-2 text-sm"><HelpCircle size={17} /> Попитай</button>}
-          {canClientAct && <button type="button" onClick={() => onAction?.(offer, 'change_requested')} className="btn btn-ghost !py-2 text-sm"><PenLine size={17} /> Поискай промяна</button>}
-          {canClientAct && <button type="button" onClick={() => onAction?.(offer, 'declined')} className="btn btn-ghost !py-2 text-sm"><XCircle size={17} /> Откажи</button>}
-          {canPartnerAct && (
-            <button
-              type="button"
-              onClick={handleWithdraw}
-              disabled={withdrawStatus === 'withdrawing'}
-              className="btn btn-ghost w-full justify-center border border-line bg-paper !px-5 !py-3 text-sm font-semibold text-ink shadow-sm transition hover:border-ink hover:bg-ink hover:text-paper disabled:cursor-wait disabled:opacity-70 sm:w-auto"
-            >
-              {withdrawStatus === 'withdrawing' ? 'Изтегля се...' : 'Изтегли офертата'}
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function getOfferDetails(offer) {
-  const details = offer?.offer_details
-  if (!details) return {}
-  if (typeof details === 'string') {
-    try {
-      const parsed = JSON.parse(details)
-      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
-    } catch {
-      return {}
-    }
-  }
-  return typeof details === 'object' && !Array.isArray(details) ? details : {}
-}
-
-function getStringArray(...sources) {
-  for (const source of sources) {
-    if (Array.isArray(source) && source.length > 0) {
-      return source.map((item) => String(item || '').trim()).filter(Boolean)
-    }
-  }
-  return []
-}
-
-function normalizeStages(value) {
-  if (!Array.isArray(value)) return []
-  return value
-    .filter((stage) => stage && typeof stage === 'object' && !Array.isArray(stage))
-    .map((stage, index) => ({
-      title: String(stage.title || '').trim(),
-      description: String(stage.description || '').trim(),
-      durationDays: Number(stage.durationDays || stage.duration_days || stage.days || 0),
-      priceAmount: Number(stage.priceAmount || stage.price_amount || stage.price || 0),
-      payment: String(stage.payment || '').trim(),
-      startCondition: String(stage.startCondition || stage.start_condition || '').trim(),
-      order: Number.isFinite(Number(stage.order)) ? Number(stage.order) : index + 1,
-    }))
-    .filter((stage) => stage.title || stage.description || stage.priceAmount > 0)
-    .sort((left, right) => left.order - right.order)
-}
-
-function Info({ icon: Icon, label, value }) {
-  return (
-    <div className="min-w-0 rounded-2xl border border-current/15 px-3 py-2">
-      <Icon size={15} className="opacity-70" />
-      <div className="mt-1 text-[11px] uppercase tracking-[0.12em] opacity-60">{label}</div>
-      <div className="break-words text-sm font-semibold">{value}</div>
-    </div>
-  )
-}
-
-function MiniFact({ label, value }) {
-  return (
-    <div className="min-w-0 rounded-2xl border border-current/10 bg-current/5 px-3 py-2">
-      <div className="text-[10px] uppercase tracking-[0.12em] opacity-55">{label}</div>
-      <div className="mt-1 break-words text-xs font-semibold">{value}</div>
-    </div>
-  )
-}
-
-function OfferSection({ title, icon: Icon, children, compact, tight = false }) {
-  return (
-    <div className={`mt-4 overflow-hidden rounded-2xl border border-current/10 bg-current/5 ${tight ? 'p-3' : 'p-3 sm:p-4'}`}>
-      <div className="flex min-w-0 items-center gap-2 text-[11px] uppercase tracking-[0.12em] opacity-60">
-        {Icon && <Icon size={14} />}
-        <span>{title}</span>
+        {feedback.message ? (
+          <p
+            role={feedback.tone === 'error' ? 'alert' : 'status'}
+            aria-live={feedback.tone === 'error' ? 'assertive' : 'polite'}
+            aria-atomic="true"
+            className={`mt-3 rounded-xl border px-3.5 py-3 text-xs leading-5 ${getFeedbackTone(feedback.tone)}`}
+          >
+            {feedback.message}
+          </p>
+        ) : null}
       </div>
-      <div className={`mt-3 ${compact ? 'text-paper' : 'text-ink'}`}>{children}</div>
     </div>
   )
 }
 
-function CheckList({ items }) {
-  return (
-    <ul className="space-y-2 text-sm">
-      {items.map((item, index) => (
-        <li key={`${item}-${index}`} className="flex min-w-0 items-start gap-2.5">
-          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-current/10">
-            <CheckCircle2 size={13} className="opacity-80" />
-          </span>
-          <span className="min-w-0 break-words whitespace-normal">{item}</span>
-        </li>
-      ))}
-    </ul>
-  )
-}
+function getExpiry(value) {
+  const text = String(value || '').trim()
+  if (!text) return { expired: false, label: '', timestamp: null }
 
-function PlainList({ items }) {
-  return (
-    <ul className="space-y-2 text-sm opacity-80">
-      {items.map((item, index) => (
-        <li key={`${item}-${index}`} className="break-words whitespace-pre-wrap">{item}</li>
-      ))}
-    </ul>
-  )
-}
-
-function InlineBadge({ compact, children }) {
-  return (
-    <span className={`max-w-full rounded-full border px-3 py-1.5 ${compact ? 'border-paper/20 bg-paper/10 text-paper/85' : 'border-line bg-paper text-muted'}`}>
-      <span className="break-words whitespace-normal">{children}</span>
-    </span>
-  )
-}
-
-function StatusPill({ status, compact }) {
-  const labels = {
-    draft: 'Чернова',
-    sent: 'Изпратена',
-    viewed: 'Видяна',
-    question: 'Има въпрос',
-    accepted: 'Приета',
-    declined: 'Отказана',
-    withdrawn: 'Изтеглена',
-    expired: 'Изтекла',
-    change_requested: 'Искана промяна',
+  const isoDate = ISO_DATE_PREFIX_PATTERN.exec(text)
+  if (isoDate && !isValidCalendarDate(Number(isoDate[1]), Number(isoDate[2]), Number(isoDate[3]))) {
+    return { expired: false, label: '', timestamp: null }
   }
-  return <span className={`max-w-full rounded-full border px-3 py-1 text-xs ${compact ? 'border-paper/30 text-paper/80' : 'border-line bg-paper text-muted'}`}>{labels[status] || status}</span>
+
+  const dateOnly = DATE_ONLY_PATTERN.exec(text)
+  let timestamp = null
+
+  if (dateOnly) {
+    const year = Number(dateOnly[1])
+    const month = Number(dateOnly[2])
+    const day = Number(dateOnly[3])
+    const date = new Date(0)
+    date.setHours(23, 59, 59, 999)
+    date.setFullYear(year, month - 1, day)
+    timestamp = date.getTime()
+  } else {
+    const parsed = Date.parse(text)
+    if (Number.isFinite(parsed)) timestamp = parsed
+  }
+
+  if (!Number.isFinite(timestamp)) return { expired: false, label: '', timestamp: null }
+  return {
+    expired: timestamp <= Date.now(),
+    label: new Intl.DateTimeFormat('bg-BG', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(timestamp)),
+    timestamp,
+  }
 }
 
-function formatOfferTimestamp(value) {
+function isValidCalendarDate(year, month, day) {
+  const date = new Date(0)
+  date.setHours(12, 0, 0, 0)
+  date.setFullYear(year, month - 1, day)
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day
+}
+
+function getOutcomeCopy({ canClientAct, canPartnerAct, offerType, expiry }) {
+  if (!canClientAct && !canPartnerAct) return ''
+  if (expiry.expired) {
+    const expiryCopy = `Срокът на офертата изтече${expiry.label ? ` на ${expiry.label}` : ''}.`
+    return canClientAct
+      ? `${expiryCopy} Поискай актуализирана оферта, преди да продължиш.`
+      : `${expiryCopy} Клиентът вече не може да я приеме; изтегли я и изпрати нова.`
+  }
+  if (canClientAct && offerType === 'estimate') {
+    return 'Това е предварителна оценка и не създава поръчка. Уточни детайлите в разговора.'
+  }
+  if (canClientAct) return 'При приемане ще се създаде поръчка с точно тези условия.'
+  if (offerType === 'estimate') return 'Клиентът може да зададе въпрос или да поиска промяна по оценката.'
+  return 'Клиентът може да приеме офертата. Изтеглянето спира следващите действия по нея.'
+}
+
+function getOutcomeTone(expired) {
+  if (expired) return 'border-amber-200 bg-amber-50 text-amber-900'
+  return 'border-line bg-white text-muted'
+}
+
+function getFeedbackTone(tone) {
+  if (tone === 'error') return 'border-red-200 bg-red-50 text-red-800'
+  return 'border-accent/20 bg-accentSoft/70 text-accentDeep'
+}
+
+function formatTimestamp(value) {
   if (!value) return ''
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
-  return new Intl.DateTimeFormat('bg-BG', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
-}
-
-function formatDate(value) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return String(value)
-  return new Intl.DateTimeFormat('bg-BG', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date)
+  return new Intl.DateTimeFormat('bg-BG', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(date)
 }

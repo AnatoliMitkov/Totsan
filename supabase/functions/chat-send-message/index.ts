@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.49.8'
 
-const MASK = '[скрито от Totsan - общувайте в платформата]'
 const MESSAGE_KINDS = new Set(['text', 'attachment'])
+const CHAT_CALL_PREFIX = '__totsan_call__:'
 const OFFER_STATUSES = new Set(['accepted', 'declined', 'withdrawn', 'change_requested'])
 const SERVICE_REQUEST_STATUSES = new Set(['negotiating', 'declined', 'cancelled'])
 const REFERENCE_TYPES = new Set(['service', 'portfolio'])
@@ -15,6 +15,13 @@ const ALLOWED_ATTACHMENT_TYPES = new Set([
   'image/png',
   'image/webp',
   'image/gif',
+  'audio/aac',
+  'audio/m4a',
+  'audio/mp4',
+  'audio/mpeg',
+  'audio/ogg',
+  'audio/wav',
+  'audio/webm',
   'application/pdf',
   'text/plain',
   'text/csv',
@@ -51,12 +58,44 @@ function optionalUuid(value: unknown) {
   return assertUuid(value, 'Optional uuid')
 }
 
-function maskText(value: unknown) {
-  const original = String(value || '')
-  const masked = original
+const MASK = '[скрито от Totsan - общувайте в платформата]'
+const ISO_DATE_TIME_PATTERN = /\b\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])(?:[Tt ](?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:[.,]\d{1,9})?)?(?:[Zz]|[+-](?:0\d|1[0-3]):[0-5]\d|[+-]14:00)?)?\b/g
+
+function isValidIsoDateTimeFragment(fragment = '') {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(fragment)
+  if (!match) return false
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1] || 0
+  return day >= 1 && day <= daysInMonth
+}
+
+export function maskContactText(original = '') {
+  const maskedDirectContacts = original
     .replace(/https?:\/\/\S+/gi, MASK)
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, MASK)
-    .replace(/\+?\d[\d\s().-]{6,}/g, MASK)
+
+  const preservedFragments = []
+  const protectedText = maskedDirectContacts.replace(ISO_DATE_TIME_PATTERN, (fragment) => {
+    if (!isValidIsoDateTimeFragment(fragment)) return fragment
+    const token = `\uE000${preservedFragments.length}\uE001`
+    preservedFragments.push({ token, fragment })
+    return token
+  })
+
+  let masked = protectedText.replace(/\+?\d[\d\s().-]{6,}/g, MASK)
+  for (const { token, fragment } of preservedFragments) {
+    masked = masked.split(token).join(fragment)
+  }
+  return masked
+}
+
+function maskText(value: unknown) {
+  const original = String(value || '')
+  const masked = maskContactText(original)
   return {
     original,
     masked,
@@ -121,17 +160,6 @@ function maskJsonValue(value: unknown): { value: unknown; wasMasked: boolean } {
   }
 
   return { value, wasMasked: false }
-}
-
-function normalizeOfferDetails(value: unknown) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return { details: {}, wasMasked: false }
-  const result = maskJsonValue(value)
-  return {
-    details: result.value && typeof result.value === 'object' && !Array.isArray(result.value)
-      ? result.value as Record<string, unknown>
-      : {},
-    wasMasked: result.wasMasked,
-  }
 }
 
 function normalizeOfferStages(value: unknown) {
@@ -206,6 +234,29 @@ function sanitizeAttachmentName(value: unknown) {
   return text.slice(0, 160) || 'file'
 }
 
+function normalizeCallLocation(value: unknown) {
+  const original = String(value || '').trim().slice(0, 300)
+  if (!original) return { value: '', wasMasked: false }
+  try {
+    const url = new URL(original)
+    if (url.protocol === 'http:' || url.protocol === 'https:') return { value: url.href, wasMasked: false }
+  } catch {
+    // A non-URL location continues through the normal privacy filter.
+  }
+  const result = maskText(original)
+  return { value: result.masked.trim().slice(0, 300), wasMasked: result.wasMasked }
+}
+
+function normalizeAttachmentWaveform(value: unknown) {
+  if (!Array.isArray(value)) return null
+  const levels = value
+    .map((item) => Number(item))
+    .filter((item) => Number.isFinite(item))
+    .map((item) => Math.max(0.04, Math.min(1, item)))
+    .slice(0, 80)
+  return levels.length >= 8 ? levels : null
+}
+
 function normalizeAttachments(value: unknown, conversationId: string, senderId: string) {
   const input = Array.isArray(value) ? value : []
   if (input.length > MAX_ATTACHMENTS_PER_MESSAGE) throw new Error('Too many attachments.')
@@ -220,6 +271,9 @@ function normalizeAttachments(value: unknown, conversationId: string, senderId: 
     const originalSize = Number(record.original_size || 0)
     const width = Number(record.width || 0)
     const height = Number(record.height || 0)
+    const duration = Number(record.duration || 0)
+    const audio = type.startsWith('audio/')
+    const waveform = audio ? normalizeAttachmentWaveform(record.waveform) : null
 
     if (bucket !== CHAT_ATTACHMENTS_BUCKET) throw new Error('Attachment bucket is invalid.')
     if (!path.startsWith(`conversations/${conversationId}/${senderId}/`)) throw new Error('Attachment path is invalid.')
@@ -232,13 +286,15 @@ function normalizeAttachments(value: unknown, conversationId: string, senderId: 
       name: sanitizeAttachmentName(record.name),
       size: Math.round(size),
       type,
-      kind: type.startsWith('image/') ? 'image' : 'file',
+      kind: type.startsWith('image/') ? 'image' : (type.startsWith('audio/') ? 'audio' : 'file'),
       original_name: sanitizeAttachmentName(record.original_name || record.name),
       original_size: Number.isFinite(originalSize) && originalSize > 0 ? Math.round(originalSize) : Math.round(size),
       original_type: ALLOWED_ATTACHMENT_TYPES.has(String(record.original_type || '')) ? String(record.original_type) : type,
       optimized: Boolean(record.optimized),
       width: Number.isFinite(width) && width > 0 ? Math.round(width) : null,
       height: Number.isFinite(height) && height > 0 ? Math.round(height) : null,
+      duration: audio && Number.isFinite(duration) && duration > 0 ? Math.min(3600, Math.round(duration)) : null,
+      waveform,
     }
   })
 }
@@ -247,7 +303,10 @@ function attachmentPreview(attachments: Array<Record<string, unknown>>) {
   if (!attachments.length) return ''
   if (attachments.length === 1) {
     const name = sanitizeAttachmentName(attachments[0].name)
-    return String(attachments[0].kind || '') === 'image' ? `Image: ${name}` : `File: ${name}`
+    const kind = String(attachments[0].kind || '')
+    if (kind === 'image') return `Image: ${name}`
+    if (kind === 'audio') return `Voice message: ${name}`
+    return `File: ${name}`
   }
   return `${attachments.length} attachments`
 }
@@ -275,7 +334,7 @@ function nextReadFlags(conversation: { client_id: string; partner_id: string }, 
   }
 }
 
-async function auditMasked(adminClient: ReturnType<typeof createClient>, actorId: string, messageId: string | null, payload: Record<string, unknown>) {
+async function auditMasked(adminClient: any, actorId: string, messageId: string | null, payload: Record<string, unknown>) {
   const { error } = await adminClient.from('audit_log').insert({
     actor_id: actorId,
     action: 'chat_content_masked',
@@ -286,7 +345,7 @@ async function auditMasked(adminClient: ReturnType<typeof createClient>, actorId
   if (error) console.error('chat-send-message audit error', error)
 }
 
-async function hasActivePartnerAccess(adminClient: ReturnType<typeof createClient>, partnerId: string, profileId: string | null) {
+async function hasActivePartnerAccess(adminClient: any, partnerId: string, profileId: string | null) {
   const { data, error } = await adminClient.rpc('has_active_partner_access', {
     check_user_id: partnerId,
     check_profile_id: profileId,
@@ -357,6 +416,7 @@ Deno.serve(async (req) => {
         .eq('client_id', user.id)
         .eq('partner_id', partnerId)
         .eq('status', 'open')
+        .is('deleted_at', null)
         .order('updated_at', { ascending: false })
 
       if (existingError) throw existingError
@@ -408,7 +468,7 @@ Deno.serve(async (req) => {
 
       let packageQuery = adminClient
         .from('partner_service_packages')
-        .select('id, title, description, features, price_amount, currency, is_active')
+        .select('id, title, description, features, price_amount, currency, delivery_days, revisions, is_active')
         .eq('service_id', serviceId)
         .eq('is_active', true)
       packageQuery = requestedPackageId ? packageQuery.eq('id', requestedPackageId) : packageQuery.order('created_at').limit(1)
@@ -427,6 +487,7 @@ Deno.serve(async (req) => {
         .eq('client_id', user.id)
         .eq('partner_id', service.partner_id)
         .eq('status', 'open')
+        .is('deleted_at', null)
         .order('updated_at', { ascending: false })
       if (conversationError) throw conversationError
       let conversation = (openConversations || []).find((row) => !row.project_id) || (openConversations || [])[0] || null
@@ -553,6 +614,7 @@ Deno.serve(async (req) => {
         .single()
       if (conversationError) throw conversationError
       if (!isParticipant(conversation, user.id)) throw new Error('Conversation access denied.')
+      if (conversation.deleted_at) throw new Error('Conversation was deleted.')
       if (conversation.status !== 'open') throw new Error('Conversation is not open.')
 
       const since = new Date(Date.now() - 60_000).toISOString()
@@ -599,7 +661,7 @@ Deno.serve(async (req) => {
           priceLabel: meta.priceLabel,
           deliveryLabel: meta.deliveryLabel,
           slug: service.slug,
-          profileSlug: String((service.profile as Record<string, unknown> | null)?.slug || ''),
+          profileSlug: String((service.profile as unknown as Record<string, unknown> | null)?.slug || ''),
         })
         preview = `Споделена услуга: ${service.title}`
       }
@@ -612,7 +674,7 @@ Deno.serve(async (req) => {
           .maybeSingle()
         if (itemError) throw itemError
 
-        const profile = item?.profile as Record<string, unknown> | null
+        const profile = item?.profile as unknown as Record<string, unknown> | null
         if (!item?.id || !profile || String(profile.user_id || '') !== conversation.partner_id) {
           throw new Error('Портфолио проектът не принадлежи на този разговор.')
         }
@@ -693,6 +755,7 @@ Deno.serve(async (req) => {
       const { data: conversation, error: conversationError } = await adminClient.from('conversations').select('*').eq('id', conversationId).single()
       if (conversationError) throw conversationError
       if (!isParticipant(conversation, user.id)) throw new Error('Conversation access denied.')
+      if (conversation.deleted_at) throw new Error('Conversation was deleted.')
       if (conversation.status !== 'open') throw new Error('Conversation is not open.')
 
       if (replyToMessageId) {
@@ -741,20 +804,123 @@ Deno.serve(async (req) => {
       return jsonResponse(200, { ok: true, message, wasMasked: bodyResult.wasMasked, originalBody: bodyResult.original })
     }
 
+    if (action === 'send_call_invite') {
+      const conversationId = assertUuid(payload.conversationId, 'Conversation id')
+      const { data: conversation, error: conversationError } = await adminClient.from('conversations').select('*').eq('id', conversationId).single()
+      if (conversationError) throw conversationError
+      if (!isParticipant(conversation, user.id)) throw new Error('Conversation access denied.')
+      if (conversation.deleted_at || conversation.status !== 'open') throw new Error('Conversation is not open.')
+
+      const mode = payload.mode === 'scheduled' ? 'scheduled' : 'request'
+      const duration = Number(payload.duration)
+      if (![15, 30, 45, 60].includes(duration)) throw new Error('Call duration is invalid.')
+      const startsAt = String(payload.startsAt || '')
+      if (mode === 'scheduled' && (!startsAt || Number.isNaN(new Date(startsAt).getTime()))) {
+        throw new Error('Call time is invalid.')
+      }
+
+      const purposeResult = maskText(payload.purpose || 'Уточняване на детайли')
+      const locationResult = normalizeCallLocation(payload.location || '')
+      const noteResult = maskText(payload.note || '')
+      const callPayload = {
+        mode,
+        purpose: purposeResult.masked.trim().slice(0, 100) || 'Уточняване на детайли',
+        duration,
+        startsAt: mode === 'scheduled' ? startsAt : '',
+        channel: ['phone', 'video', 'in_person'].includes(String(payload.channel)) ? String(payload.channel) : 'video',
+        location: locationResult.value,
+        note: noteResult.masked.trim().slice(0, 600),
+        status: 'pending',
+      }
+      const body = `${CHAT_CALL_PREFIX}${JSON.stringify(callPayload)}`
+      const wasMasked = purposeResult.wasMasked || locationResult.wasMasked || noteResult.wasMasked
+
+      const { data: message, error: messageError } = await adminClient.from('messages').insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        kind: 'text',
+        body,
+        attachments: [],
+        was_masked: wasMasked,
+      }).select('*').single()
+      if (messageError) throw messageError
+
+      const preview = mode === 'scheduled' ? 'Предложен разговор' : 'Покана за разговор'
+      await adminClient.from('conversations').update({
+        last_message_at: message.created_at,
+        last_message_preview: preview,
+        ...nextReadFlags(conversation, user.id),
+      }).eq('id', conversationId)
+
+      return jsonResponse(200, { ok: true, message, wasMasked })
+    }
+
+    if (action === 'respond_call_invite') {
+      const messageId = assertUuid(payload.messageId, 'Message id')
+      const responseAction = String(payload.action || '')
+      if (responseAction !== 'accept' && responseAction !== 'decline') throw new Error('Call invite response is invalid.')
+
+      const { data: invite, error: inviteError } = await adminClient.from('messages').select('*').eq('id', messageId).single()
+      if (inviteError) throw inviteError
+      if (!String(invite.body || '').startsWith(CHAT_CALL_PREFIX)) throw new Error('Message is not a call invitation.')
+
+      const { data: conversation, error: conversationError } = await adminClient.from('conversations').select('*').eq('id', invite.conversation_id).single()
+      if (conversationError) throw conversationError
+      if (!isParticipant(conversation, user.id) || invite.sender_id === user.id) throw new Error('Only the recipient can respond to this invitation.')
+
+      let callPayload: Record<string, unknown>
+      try { callPayload = JSON.parse(String(invite.body).slice(CHAT_CALL_PREFIX.length)) } catch { throw new Error('Call invitation is invalid.') }
+      if (callPayload.status && callPayload.status !== 'pending') throw new Error('This invitation has already been answered.')
+      callPayload.status = responseAction === 'accept' ? 'accepted' : 'declined'
+
+      const { data: updatedInvite, error: updateError } = await adminClient
+        .from('messages')
+        .update({ body: `${CHAT_CALL_PREFIX}${JSON.stringify(callPayload)}` })
+        .eq('id', invite.id)
+        .select('*')
+        .single()
+      if (updateError) throw updateError
+
+      const responseBody = responseAction === 'accept'
+        ? 'Поканата за разговор е приета.'
+        : 'Поканата за разговор е отказана.'
+      const { data: responseMessage, error: responseError } = await adminClient.from('messages').insert({
+        conversation_id: conversation.id,
+        sender_id: user.id,
+        kind: 'system',
+        body: responseBody,
+        attachments: [],
+        was_masked: false,
+      }).select('*').single()
+      if (responseError) throw responseError
+
+      await adminClient.from('conversations').update({
+        last_message_at: responseMessage.created_at,
+        last_message_preview: responseBody,
+        ...nextReadFlags(conversation, user.id),
+      }).eq('id', conversation.id)
+
+      return jsonResponse(200, { ok: true, invite: updatedInvite, message: responseMessage })
+    }
+
     if (action === 'send_offer') {
       const conversationId = assertUuid(payload.conversationId, 'Conversation id')
       const { data: conversation, error: conversationError } = await adminClient.from('conversations').select('*').eq('id', conversationId).single()
       if (conversationError) throw conversationError
       if (conversation.partner_id !== user.id) throw new Error('Само партньорът може да изпрати оферта.')
+      if (conversation.deleted_at) throw new Error('Conversation was deleted.')
       if (conversation.status !== 'open') throw new Error('Conversation is not open.')
 
       const title = maskText(payload.title)
       const summary = maskText(payload.summary || '')
       const description = maskText(payload.description)
       const deliverables = maskList(payload.deliverables)
-      const detailsResult = normalizeOfferDetails(payload.offerDetails)
-      const offerType = normalizeOfferType(payload.offerType || detailsResult.details.offerType)
-      const priceType = normalizePriceType(payload.priceType || detailsResult.details.priceType || (offerType === 'staged' ? 'staged' : 'fixed'))
+      const detailsResult = maskJsonValue(payload.offerDetails)
+      const offerDetails = detailsResult.value && typeof detailsResult.value === 'object' && !Array.isArray(detailsResult.value)
+        ? detailsResult.value as Record<string, unknown>
+        : {}
+      const offerType = normalizeOfferType(payload.offerType || (offerDetails as any).offerType)
+      const priceType = normalizePriceType(payload.priceType || (offerDetails as any).priceType || (offerType === 'staged' ? 'staged' : 'fixed'))
       const executionMode = offerType === 'staged' ? 'staged' : normalizeExecutionMode(payload.executionMode)
       const stages = normalizeOfferStages(payload.stages)
       if (!title.masked.trim()) throw new Error('Офертата има нужда от заглавие.')
@@ -762,13 +928,13 @@ Deno.serve(async (req) => {
       const priceAmount = Number(payload.priceAmount || 0)
       const deliveryDays = Number(payload.deliveryDays || 0)
       const revisions = Number(payload.revisions || 0)
-      const offerDetails = {
-        ...detailsResult.details,
-        offerType,
-        priceType,
-        summary: summary.masked.trim(),
-        stages,
-      }
+      const normalizedPriceAmount = Number.isFinite(priceAmount) ? Math.max(0, Math.round(priceAmount)) : null
+      const normalizedDeliveryDays = Number.isFinite(deliveryDays) ? Math.max(0, Math.round(deliveryDays)) : null
+      const normalizedRevisions = Number.isFinite(revisions) ? Math.max(0, Math.round(revisions)) : null
+      const currency = String(payload.currency || 'EUR').trim().toUpperCase().slice(0, 3) || 'EUR'
+      const timeline = (offerDetails as any).timeline && typeof (offerDetails as any).timeline === 'object' && !Array.isArray((offerDetails as any).timeline)
+        ? (offerDetails as any).timeline
+        : {}
       const { data: activeServiceRequest, error: activeRequestError } = await adminClient
         .from('service_requests')
         .select('*')
@@ -789,10 +955,10 @@ Deno.serve(async (req) => {
         deliverables: deliverables.items,
         price_type: priceType,
         offer_details: offerDetails,
-        price_amount: Number.isFinite(priceAmount) ? Math.max(0, Math.round(priceAmount)) : null,
-        currency: String(payload.currency || 'EUR').trim().toUpperCase().slice(0, 3) || 'EUR',
-        delivery_days: Number.isFinite(deliveryDays) ? Math.max(0, Math.round(deliveryDays)) : null,
-        revisions: Number.isFinite(revisions) ? Math.max(0, Math.round(revisions)) : null,
+        price_amount: normalizedPriceAmount,
+        currency,
+        delivery_days: normalizedDeliveryDays,
+        revisions: normalizedRevisions,
         execution_mode: executionMode,
         stages,
         expires_at: payload.expiresAt || null,
@@ -857,7 +1023,7 @@ Deno.serve(async (req) => {
 
       let updatedOffer = null
       let order = null
-      if (status === 'accepted' && offer.service_request_id) {
+      if (status === 'accepted') {
         const { data: accepted, error: acceptError } = await adminClient.rpc('accept_service_offer', {
           p_offer_id: offerId,
           p_client_id: user.id,
@@ -880,8 +1046,8 @@ Deno.serve(async (req) => {
 
       const labels: Record<string, string> = {
         accepted: order
-          ? 'Финалната оферта е приета. Създадена е поръчка, която очаква защитено плащане през Totsan.'
-          : 'Офертата е приета. Следва защитено плащане през Totsan според условията на офертата.',
+          ? 'Финалната оферта е приета. Създадена е поръчка, която очаква плащане.'
+          : 'Офертата е приета. Следва плащане според условията на офертата.',
         declined: 'Офертата е отказана.',
         withdrawn: 'Офертата е изтеглена от партньора.',
         change_requested: 'Клиентът поиска промяна по офертата.',

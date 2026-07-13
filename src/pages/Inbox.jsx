@@ -1,14 +1,20 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Ban, Trash2, XCircle } from 'lucide-react'
 import ConversationList from '../components/chat/ConversationList.jsx'
 import ChatThread from '../components/chat/ChatThread.jsx'
 import ComposeBar from '../components/chat/ComposeBar.jsx'
 import OfferComposer from '../components/chat/OfferComposer.jsx'
+import CallPlannerDialog from '../components/chat/CallPlannerDialog.jsx'
+import Avatar from '../components/Avatar.jsx'
 import { useAccount } from '../lib/account.js'
 import {
-  archiveConversation,
   conversationRole,
+  deleteConversationForEveryone,
   getMessageCursor,
+  getMessageSnippet,
+  getConversationTitle,
+  getOtherParticipant,
   isClient,
   isPartner,
   loadConversation,
@@ -20,18 +26,22 @@ import {
   markConversationRead,
   mergeMessagesById,
   MESSAGE_PAGE_SIZE,
+  saveMessageFlagState,
   sendOffer,
   sendAttachmentMessage,
   sendCatalogReference,
+  sendCallInvite,
+  respondToCallInvite,
   sendTextMessage,
   subscribeToConversation,
   subscribeToConversationList,
   toggleMessageReaction,
+  updateConversationStatus,
   updateOfferStatus,
   updateServiceRequestStatus,
 } from '../lib/chat.js'
 import { normalizeAttachmentFiles, uploadChatAttachments } from '../lib/chat-attachments.js'
-import { loadPublicPartnerServicesForProfile } from '../lib/partner-services.js'
+import { loadPartnerServicesForProfile, loadPublicPartnerServicesForProfile } from '../lib/partner-services.js'
 import { loadProfilePortfolio } from '../lib/portfolio.js'
 
 const EMPTY_PAGINATION = {
@@ -67,7 +77,12 @@ export default function Inbox() {
   const [draftFiles, setDraftFiles] = useState([])
   const [scrollToLatestToken, setScrollToLatestToken] = useState(0)
   const [replyTarget, setReplyTarget] = useState(null)
+  const [replyNotFoundId, setReplyNotFoundId] = useState(null)
+  const [forwardDraft, setForwardDraft] = useState(null)
   const [offerOpen, setOfferOpen] = useState(false)
+  const [callPlanner, setCallPlanner] = useState(null)
+  const [confirmAction, setConfirmAction] = useState(null)
+  const [confirmStatus, setConfirmStatus] = useState('idle')
   const [referenceLibrary, setReferenceLibrary] = useState({ status: 'idle', profileId: '', services: [], portfolio: [] })
   const initialLoadRef = useRef(false)
   const threadTokenRef = useRef(0)
@@ -197,6 +212,36 @@ export default function Inbox() {
     const patchMessages = (rows = []) => rows.map((message) => (
       message.id === messageId
         ? { ...message, reactions }
+        : message
+    ))
+
+    if (conversationId === activeConversationId) {
+      setMessages((current) => {
+        const nextMessages = patchMessages(current)
+        const cached = threadCacheRef.current.get(`${userId}:${conversationId}`) || {}
+        writeThreadCache(conversationId, {
+          messages: nextMessages,
+          pagination: cached.pagination || pagination,
+          status: 'ready',
+        })
+        return nextMessages
+      })
+      return
+    }
+
+    const cached = threadCacheRef.current.get(`${userId}:${conversationId}`)
+    if (!cached?.messages) return
+    writeThreadCache(conversationId, {
+      messages: patchMessages(cached.messages),
+    })
+  }, [activeConversationId, pagination, writeThreadCache])
+
+  const patchMessageFlags = useCallback((conversationId, messageId, flags) => {
+    if (!conversationId || !messageId) return
+
+    const patchMessages = (rows = []) => rows.map((message) => (
+      message.id === messageId
+        ? { ...message, message_flags: flags }
         : message
     ))
 
@@ -561,7 +606,7 @@ export default function Inbox() {
 
       try {
         const [services, portfolio] = await Promise.all([
-          loadPublicPartnerServicesForProfile(partnerProfileId),
+          role === 'partner' ? loadPartnerServicesForProfile(partnerProfileId) : loadPublicPartnerServicesForProfile(partnerProfileId),
           loadProfilePortfolio(partnerProfileId),
         ])
         if (!active) return
@@ -586,7 +631,7 @@ export default function Inbox() {
     return () => {
       active = false
     }
-  }, [activeConversation, partnerProfileId])
+  }, [activeConversation, partnerProfileId, role])
 
   useEffect(() => {
     const handlePopState = () => {
@@ -645,9 +690,21 @@ export default function Inbox() {
         return
       }
 
+      if (payload.table === 'message_flags') {
+        const row = payload.new || payload.old || {}
+        const messageId = row.message_id
+        if (!messageId || row.user_id !== userId) return
+        patchMessageFlags(activeConversationId, messageId, payload.eventType === 'DELETE' ? null : {
+          pinned: Boolean(row.pinned),
+          starred: Boolean(row.starred),
+          color: String(row.color || ''),
+        })
+        return
+      }
+
       scheduleConversationRefresh()
     })
-  }, [accessDenied, isGuest, activeConversationId, loadFreshMessage, mergeIncomingMessages, patchOfferMessage, refreshMessageReactions, scheduleConversationRefresh])
+  }, [accessDenied, isGuest, activeConversationId, loadFreshMessage, mergeIncomingMessages, patchMessageFlags, patchOfferMessage, refreshMessageReactions, scheduleConversationRefresh, userId])
 
   useEffect(() => {
     return () => {
@@ -660,12 +717,21 @@ export default function Inbox() {
   async function submitMessage(event) {
     event.preventDefault()
     if (!activeConversationId || (!draft.trim() && draftFiles.length === 0)) return
+    setError('')
     setMessageStatus('sending')
 
     try {
-      const attachments = draftFiles.length
-        ? await uploadChatAttachments({ conversationId: activeConversationId, userId, files: draftFiles })
-        : []
+      let attachments = []
+      try {
+        attachments = draftFiles.length
+          ? await uploadChatAttachments({ conversationId: activeConversationId, userId, files: draftFiles })
+          : []
+      } catch (uploadError) {
+        if (!draft.trim()) throw uploadError
+        attachments = []
+        setDraftFiles([])
+        setError('Файловете не се качиха, затова изпратихме само текста.')
+      }
       const result = attachments.length
         ? await sendAttachmentMessage({
           conversationId: activeConversationId,
@@ -694,6 +760,34 @@ export default function Inbox() {
     }
   }
 
+  async function handleSendVoice(file) {
+    if (!activeConversationId || !file) return
+    setError('')
+    setMessageStatus('sending')
+
+    try {
+      const attachments = await uploadChatAttachments({ conversationId: activeConversationId, userId, files: [file] })
+      const result = await sendAttachmentMessage({
+        conversationId: activeConversationId,
+        body: '',
+        attachments,
+        replyToMessageId: replyTarget?.id || '',
+      })
+      if (result?.message?.id) {
+        const nextMessage = await loadFreshMessage(result.message.id, result.message)
+        if (nextMessage) mergeIncomingMessages(activeConversationId, [nextMessage])
+      }
+      setScrollToLatestToken((value) => value + 1)
+      setReplyTarget(null)
+      setMessageStatus('idle')
+      scheduleConversationRefresh()
+    } catch (sendError) {
+      setError(sendError.message || 'Гласовото съобщение не се изпрати.')
+      setMessageStatus('idle')
+      throw sendError
+    }
+  }
+
   async function handleSendReference({ referenceType, referenceId }) {
     if (!activeConversationId || !referenceType || !referenceId) return
     setMessageStatus('sending')
@@ -719,8 +813,40 @@ export default function Inbox() {
     }
   }
 
+  function handleForwardMessage(message, text = '') {
+    const body = buildForwardMessageBody(message, text)
+    if (!body.trim()) {
+      setError('Това съобщение не може да се препрати като текст.')
+      return
+    }
+    setForwardDraft({ sourceMessageId: message?.id || '', body })
+  }
+
+  async function submitForwardMessage(targetConversationId) {
+    if (!targetConversationId || !forwardDraft?.body) return
+    setMessageStatus('sending')
+    setError('')
+
+    try {
+      const result = await sendTextMessage({
+        conversationId: targetConversationId,
+        body: forwardDraft.body,
+      })
+      if (result?.message?.id) {
+        const nextMessage = await loadFreshMessage(result.message.id, result.message)
+        if (nextMessage) mergeIncomingMessages(targetConversationId, [nextMessage])
+      }
+      setForwardDraft(null)
+      setMessageStatus('idle')
+      scheduleConversationRefresh()
+    } catch (forwardError) {
+      setError(forwardError.message || 'Съобщението не се препрати.')
+      setMessageStatus('idle')
+    }
+  }
+
   async function submitOffer(offer) {
-    if (!activeConversationId) return
+    if (!activeConversationId) return false
     setMessageStatus('sending')
 
     try {
@@ -730,12 +856,13 @@ export default function Inbox() {
         if (nextMessage) mergeIncomingMessages(activeConversationId, [nextMessage])
       }
       setScrollToLatestToken((value) => value + 1)
-      setOfferOpen(false)
       setMessageStatus('idle')
       scheduleConversationRefresh()
+      return true
     } catch (offerError) {
       setError(offerError.message || 'Офертата не се изпрати.')
       setMessageStatus('idle')
+      return false
     }
   }
 
@@ -769,6 +896,12 @@ export default function Inbox() {
   function handleReplyToMessage(message) {
     if (!message?.id) return
     setReplyTarget(message)
+  }
+
+  function handleScrollNotFound(messageId, wasFound) {
+    if (wasFound) return
+    setReplyNotFoundId(messageId)
+    setTimeout(() => setReplyNotFoundId(null), 5000)
   }
 
   async function handleServiceRequestAction(request, nextStatus) {
@@ -808,6 +941,12 @@ export default function Inbox() {
 
   function handleRemoveDraftFile(index) {
     setDraftFiles((current) => current.filter((_, currentIndex) => currentIndex !== index))
+    setError('')
+  }
+
+  function handleDraftChange(value) {
+    setDraft(value)
+    if (error) setError('')
   }
 
   async function handleToggleReaction(messageId, emoji, active) {
@@ -820,22 +959,115 @@ export default function Inbox() {
     }
   }
 
-  const handleArchiveConversation = useCallback(async (conversation) => {
-    if (!conversation || !userId) return
+  async function handleSaveMessageFlags(messageId, flags) {
+    if (!activeConversationId || !messageId) return
+    const normalizedFlags = {
+      pinned: Boolean(flags?.pinned),
+      starred: Boolean(flags?.starred),
+      color: flags?.starred ? String(flags?.color || '') : '',
+    }
+    patchMessageFlags(activeConversationId, messageId, normalizedFlags)
+
     try {
-      await archiveConversation(conversation, userId)
-      
+      await saveMessageFlagState(messageId, normalizedFlags)
+    } catch (flagError) {
+      setError(flagError.message || 'Маркирането на съобщението не се запази.')
+    }
+  }
+
+  const handleDeleteConversation = useCallback(async (conversation) => {
+    if (!conversation?.id) return
+    try {
+      await deleteConversationForEveryone(conversation.id)
+
       const nextConversations = conversationsRef.current.filter((c) => c.id !== conversation.id)
       setConversations(nextConversations)
-      
+
       if (conversation.id === selectedConversationId) {
         setSelectedConversationId('')
         navigate('/inbox', { replace: true })
       }
+      setError('')
     } catch (err) {
-      setError(err.message || 'Грешка при архивиране на разговора.')
+      setError(err.message || 'Грешка при изтриване на разговора.')
     }
-  }, [navigate, userId, selectedConversationId])
+  }, [navigate, selectedConversationId])
+
+  async function handleConversationStatus(statusValue) {
+    if (!safeActiveConversation) return
+    try {
+      const updatedConversation = await updateConversationStatus(safeActiveConversation.id, statusValue)
+      setConversations((current) => current.map((conversation) => (
+        conversation.id === updatedConversation.id ? { ...conversation, ...updatedConversation } : conversation
+      )))
+      setError('')
+    } catch (statusError) {
+      setError(statusError.message || 'Статусът на разговора не се промени.')
+    }
+  }
+
+  async function handleConfirmAction() {
+    if (!confirmAction || confirmStatus === 'working') return
+    setConfirmStatus('working')
+    try {
+      if (confirmAction.type === 'delete') {
+        await handleDeleteConversation(confirmAction.conversation)
+      } else if (confirmAction.type === 'status') {
+        await handleConversationStatus(confirmAction.statusValue)
+      }
+      setConfirmAction(null)
+    } finally {
+      setConfirmStatus('idle')
+    }
+  }
+
+  function handleSendCallInvite() { setCallPlanner({ mode: 'request' }) }
+
+  function handleScheduleCall() { setCallPlanner({ mode: 'scheduled' }) }
+
+  async function submitCallPlanner(payload) {
+    if (!activeConversationId) return
+    setError('')
+    setMessageStatus('sending')
+    try {
+      const result = await sendCallInvite({ conversationId: activeConversationId, payload })
+      if (result?.message?.id) {
+        const nextMessage = await loadFreshMessage(result.message.id, result.message)
+        if (nextMessage) mergeIncomingMessages(activeConversationId, [nextMessage])
+      }
+      setCallPlanner(null)
+      setScrollToLatestToken((value) => value + 1)
+      scheduleConversationRefresh()
+    } catch (inviteError) {
+      setError(inviteError.message || 'Поканата за разговор не се изпрати.')
+    } finally {
+      setMessageStatus('idle')
+    }
+  }
+
+  async function handleCallInviteAction(message, action) {
+    if (action === 'reschedule') {
+      setCallPlanner({ mode: 'scheduled' })
+      return
+    }
+    if (!activeConversationId) return
+    setMessageStatus('sending')
+    try {
+      const result = await respondToCallInvite({ messageId: message.id, action })
+      if (result?.invite?.id) mergeIncomingMessages(activeConversationId, [result.invite])
+      if (result?.message?.id) mergeIncomingMessages(activeConversationId, [result.message])
+      setScrollToLatestToken((value) => value + 1)
+      scheduleConversationRefresh()
+    } catch (callError) {
+      setError(callError.message || 'Отговорът за разговора не се изпрати.')
+    } finally {
+      setMessageStatus('idle')
+    }
+  }
+
+  function handleReportConversation() {
+    setError('Докладването ще бъде добавено към центъра за поддръжка. Засега можеш да ни изпратиш детайлите през формата за контакт.')
+  }
 
 
   if (loading) return <InboxShell><Panel title="Зареждаме..." /></InboxShell>
@@ -875,7 +1107,7 @@ export default function Inbox() {
           <button type="button" onClick={() => loadAll()} className="btn btn-ghost mt-5">Опитай пак</button>
         </Panel>
       ) : (
-        <div className="grid min-h-0 min-w-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[minmax(18rem,21rem)_minmax(0,1fr)] lg:gap-3 xl:grid-cols-[minmax(20rem,23rem)_minmax(0,1fr)]">
+        <div className="grid min-h-0 min-w-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[minmax(15.5rem,17.25rem)_minmax(0,1fr)] lg:gap-4 xl:grid-cols-[minmax(16rem,18rem)_minmax(0,1fr)]">
           <div className={`${hasSelectedConversation ? 'hidden lg:flex' : 'flex'} min-h-0 min-w-0`}>
             <ConversationList
               conversations={visibleConversations}
@@ -883,7 +1115,6 @@ export default function Inbox() {
               userId={userId}
               statusByConversation={conversationStatuses}
               onSelect={handleSelectConversation}
-              onArchive={handleArchiveConversation}
             />
           </div>
           <div className={`${hasSelectedConversation ? 'flex' : 'hidden lg:flex'} min-h-0 min-w-0 flex-col overflow-hidden lg:gap-3`}>
@@ -898,16 +1129,34 @@ export default function Inbox() {
               </div>
             ) : (
               <>
+                {replyNotFoundId && (
+                  <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+                    Оригиналният запис вече не е наличен.
+                  </div>
+                )}
                 <ChatThread
                   conversation={safeActiveConversation}
                   messages={safeMessages}
                   userId={userId}
-                  orderStatus={conversationStatuses.get(activeConversationId) || null}
                   onBack={handleBackToList}
                   onOfferAction={handleOfferAction}
                   onServiceRequestAction={handleServiceRequestAction}
                   onReplyToMessage={handleReplyToMessage}
+                  onScrollNotFound={handleScrollNotFound}
                   onToggleReaction={handleToggleReaction}
+                  onForwardMessage={handleForwardMessage}
+                  onSaveMessageFlags={handleSaveMessageFlags}
+                  onOpenContact={() => {
+                    const href = getParticipantPublicHref(safeActiveConversation, userId)
+                    if (href) navigate(href)
+                  }}
+                  onCloseConversation={() => setConfirmAction({ type: 'status', statusValue: 'closed' })}
+                  onBlockConversation={() => setConfirmAction({ type: 'status', statusValue: 'blocked' })}
+                  onDeleteConversation={() => setConfirmAction({ type: 'delete', conversation: safeActiveConversation })}
+                  onSendCallInvite={handleSendCallInvite}
+                  onScheduleCall={handleScheduleCall}
+                  onCallInviteAction={handleCallInviteAction}
+                  onReportConversation={handleReportConversation}
                   onLoadOlder={loadOlderMessages}
                   hasOlder={pagination.hasOlder}
                   isLoadingOlder={pagination.isLoadingOlder}
@@ -918,7 +1167,7 @@ export default function Inbox() {
                 {safeActiveConversation && safeActiveConversation.status === 'open' && threadStatus === 'ready' && (
                   <ComposeBar
                     value={draft}
-                    onChange={setDraft}
+                    onChange={handleDraftChange}
                     onSubmit={submitMessage}
                     canSendOffer={role === 'partner'}
                     onOpenOffer={() => setOfferOpen(true)}
@@ -931,6 +1180,7 @@ export default function Inbox() {
                     onRemoveFile={handleRemoveDraftFile}
                     referenceLibrary={referenceLibrary}
                     onSendReference={handleSendReference}
+                    onSendVoice={handleSendVoice}
                   />
                 )}
               </>
@@ -938,16 +1188,153 @@ export default function Inbox() {
           </div>
         </div>
       )}
-      {!accessDenied && !isGuest && <OfferComposer open={offerOpen} onClose={() => setOfferOpen(false)} onSubmit={submitOffer} status={messageStatus} serviceRequest={activeServiceRequest} />}
+      {forwardDraft && (
+        <ForwardMessageDialog
+          conversations={visibleConversations.filter((conversation) => conversation.id !== activeConversationId)}
+          userId={userId}
+          status={messageStatus}
+          onCancel={() => setForwardDraft(null)}
+          onSelect={submitForwardMessage}
+        />
+      )}
+      {confirmAction && (
+        <ConfirmActionDialog
+          action={confirmAction}
+          status={confirmStatus}
+          onCancel={() => {
+            if (confirmStatus !== 'working') setConfirmAction(null)
+          }}
+          onConfirm={handleConfirmAction}
+        />
+      )}
+      {callPlanner && <CallPlannerDialog mode={callPlanner.mode} status={messageStatus} onClose={() => { if (messageStatus !== 'sending') setCallPlanner(null) }} onSubmit={submitCallPlanner} />}
+      {!accessDenied && !isGuest && <OfferComposer open={offerOpen} onClose={() => setOfferOpen(false)} onSubmit={submitOffer} status={messageStatus} userId={userId} serviceRequest={activeServiceRequest} conversationId={activeConversationId} services={referenceLibrary.services} servicesStatus={referenceLibrary.status} />}
       {account?.account_status === 'banned' && <div className="shrink-0 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Акаунтът е блокиран. Някои действия може да бъдат ограничени.</div>}
     </InboxShell>
   )
 }
 
+function ForwardMessageDialog({ conversations, userId, status, onCancel, onSelect }) {
+  const sending = status === 'sending'
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/28 px-4 py-6 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-[1.75rem] border border-line bg-paper p-4 shadow-[0_30px_90px_-38px_rgba(13,35,64,0.6)]">
+        <div className="flex items-start justify-between gap-3 border-b border-line/70 pb-3">
+          <div>
+            <h2 className="font-display text-2xl text-ink">Препрати към</h2>
+            <p className="mt-1 text-sm text-muted">Избери разговор, в който да изпратим копие като текст.</p>
+          </div>
+          <button type="button" onClick={onCancel} className="rounded-full border border-line bg-soft p-2 text-muted transition hover:text-ink" aria-label="Затвори">
+            ×
+          </button>
+        </div>
+        <div className="mt-3 grid max-h-[22rem] gap-2 overflow-y-auto pr-1">
+          {conversations.length ? conversations.map((conversation) => (
+            <button
+              key={conversation.id}
+              type="button"
+              disabled={sending}
+              onClick={() => onSelect(conversation.id)}
+              className="flex min-w-0 items-center gap-3 rounded-2xl border border-line bg-soft/70 px-3 py-2.5 text-left transition hover:border-accentDeep/35 hover:bg-accentSoft/35 disabled:opacity-60"
+            >
+              <Avatar
+                src={getOtherParticipant(conversation, userId)?.avatar_url || ''}
+                srcCandidates={getOtherParticipant(conversation, userId)?.avatar_candidates || []}
+                name={getConversationTitle(conversation, userId)}
+                size={38}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold text-ink">{getConversationTitle(conversation, userId)}</span>
+                <span className="block truncate text-xs text-muted">{conversation.last_message_preview || 'Разговор'}</span>
+              </span>
+            </button>
+          )) : (
+            <div className="rounded-2xl border border-dashed border-line p-4 text-center text-sm text-muted">
+              Няма друг разговор, към който да препратим.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ConfirmActionDialog({ action, status, onCancel, onConfirm }) {
+  const working = status === 'working'
+  const config = getConfirmActionCopy(action)
+  const Icon = config.icon
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-ink/35 px-4 py-6 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="flex h-[223px] w-full max-w-[392px] flex-col items-center rounded-[25px] bg-white px-6 pb-5 pt-5 shadow-[0_30px_90px_-38px_rgba(13,35,64,0.65)] animate-in zoom-in-95 slide-in-from-bottom-3 duration-200">
+        <Icon size={60} className={config.iconClassName} strokeWidth={1.2} />
+        <h2 className="mt-5 whitespace-nowrap text-center font-['Inter'] text-[24px] font-normal leading-none text-black">
+          {config.title}
+        </h2>
+        <div className="mt-8 flex items-center justify-center gap-[15px]">
+          <button
+            type="button"
+            disabled={working}
+            onClick={onCancel}
+            className="grid h-[35px] w-[120px] place-items-center rounded-[25px] border border-[rgba(32,72,128,0.5)] bg-white text-[16px] font-normal leading-none text-black transition hover:bg-soft disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Откажи
+          </button>
+          <button
+            type="button"
+            disabled={working}
+            onClick={onConfirm}
+            className={`grid h-[35px] w-[120px] place-items-center rounded-[25px] text-[16px] font-normal leading-none text-white transition disabled:cursor-not-allowed disabled:opacity-70 ${config.confirmClassName}`}
+          >
+            {working ? '...' : config.confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function getConfirmActionCopy(action) {
+  if (action?.type === 'delete') {
+    return {
+      title: 'Изтриване на чат?',
+      confirmLabel: 'Изтрий',
+      icon: Trash2,
+      iconClassName: 'text-red-600',
+      confirmClassName: 'bg-red-600 hover:bg-red-700',
+    }
+  }
+
+  if (action?.statusValue === 'blocked') {
+    return {
+      title: 'Блокиране на разговор?',
+      confirmLabel: 'Блокирай',
+      icon: Ban,
+      iconClassName: 'text-red-600',
+      confirmClassName: 'bg-red-600 hover:bg-red-700',
+    }
+  }
+
+  return {
+    title: 'Затваряне на чат?',
+    confirmLabel: 'Затвори',
+    icon: XCircle,
+    iconClassName: 'text-accentDeep',
+    confirmClassName: 'bg-accentDeep hover:bg-ink',
+  }
+}
+
+function buildForwardMessageBody(message, text = '') {
+  const content = String(text || getMessageSnippet(message, { maxLength: 800 }) || '').trim()
+  if (!content) return ''
+  return `Препратено съобщение:\n${content}`
+}
+
 function InboxShell({ children }) {
   return (
-    <section className="h-full min-h-0 overflow-hidden bg-soft px-0 py-0 sm:px-[var(--pad-x)] sm:py-3">
-      <div className="container-page flex h-full min-h-0 min-w-0 max-w-screen-2xl flex-col gap-0 overflow-hidden sm:gap-3">
+    <section className="h-full min-h-0 overflow-hidden bg-soft px-0 py-0 sm:px-3 sm:py-3 xl:px-4 2xl:px-5">
+      <div className="inbox-desktop-frame flex h-full min-h-0 min-w-0 flex-col gap-0 overflow-hidden sm:gap-3">
         {children}
       </div>
     </section>

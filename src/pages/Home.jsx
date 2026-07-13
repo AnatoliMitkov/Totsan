@@ -29,7 +29,7 @@ const HERO_VIDEO_SOURCES = [
 const HOME_FAQ_ITEMS = [
   {
     question: 'Колко струва да използвам Totsan?',
-    answer: 'За теб като клиент започването в Totsan е безплатно. При приета оферта плащането минава през защитено плащане в платформата и сумата се освобождава към партньора след потвърждение.',
+    answer: 'За теб като клиент започването в Totsan е безплатно. При приета оферта плащането може да се обработи чрез Stripe и статусът му се вижда в поръчката.',
   },
   {
     question: 'Как избирате кои хора влизат?',
@@ -494,7 +494,7 @@ function TrustPromise() {
     'Ясен път от идея до реализация.',
     'Платформата не взима такса от клиента.',
     'Видими след преглед и активиране.',
-    'Сумата по приета оферта се държи през защитен процес и се освобождава към партньора след потвърждение.'
+    'Плащането по приета оферта се обработва чрез Stripe и се проследява в поръчката.'
   ]
   const items = [
     { k: 'Проверка преди видимост', v: 'Партньорите минават през преглед, преди да бъдат показани като активни в платформата.', icon: <UserCheck className="text-accent" size={24} /> },
@@ -623,7 +623,7 @@ function LayersTimelineExplorer() {
           </p>
         </div>
 
-        <div className="grid min-w-0 lg:grid-cols-[22rem_minmax(0,1fr)] gap-10 items-start">
+        <div className="grid min-w-0 lg:grid-cols-[22rem_minmax(0,1fr)] gap-10 items-center">
           {/* Vertical Menu Timeline */}
           <div className="flex w-full min-w-0 flex-col gap-3 relative border-l border-line pl-4 py-2">
             {LAYERS.map((layer, index) => {
@@ -1031,7 +1031,7 @@ function DreamBuilderQuiz() {
               </Link>
             </div>
             <p className="mt-4 text-center text-xs text-muted">
-              Започването е безплатно · плащането по оферта минава през защитен процес.
+              Започването е безплатно · плащането по оферта се обработва чрез Stripe.
             </p>
           </div>
         )}
