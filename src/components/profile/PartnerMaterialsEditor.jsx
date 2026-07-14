@@ -11,6 +11,7 @@ import {
   savePartnerMaterialCapability,
 } from '../../lib/partner-materials.js'
 import { getBrandsForCategory, getMaterialCategories, getMaterialCategory, getProductBrand } from '../../lib/product-metadata.js'
+import { ProfileWorkspaceSectionHeader, ProfileWorkspaceSurface } from './ProfileWorkspaceShell.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 
@@ -198,22 +199,19 @@ export default function PartnerMaterialsEditor({ profile }) {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-3xl border border-line bg-paper p-5 md:p-7">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="eyebrow">Материали и марки</div>
-            <h2 className="mt-2 font-display text-3xl text-ink">Запазени категории</h2>
-            <p className="mt-2 text-sm text-muted">Подреди материалите и марките, с които работиш. Новите записи чакат кратък admin преглед преди да излязат публично.</p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
+      <ProfileWorkspaceSurface>
+        <ProfileWorkspaceSectionHeader
+          eyebrow="Профил"
+          title="Материали и марки"
+          description="Подреди материалите и марките, с които работиш. Новите записи чакат кратък admin преглед преди да излязат публично."
+          action={<div className="flex flex-wrap items-center gap-2">
             <StatPill label="Активни" value={items.length} />
             <StatPill label="Публични" value={publicCount} />
             <button type="button" onClick={openNewCapability} className="btn btn-primary">
               <Plus size={18} /> Нова категория
             </button>
-          </div>
-        </div>
+          </div>}
+        />
 
         {items.length > 0 ? (
           <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -226,7 +224,7 @@ export default function PartnerMaterialsEditor({ profile }) {
             Още няма добавени материали или марки. Започни от бутона за нова категория.
           </div>
         )}
-      </section>
+      </ProfileWorkspaceSurface>
 
       {isEditorOpen && (
         <div
