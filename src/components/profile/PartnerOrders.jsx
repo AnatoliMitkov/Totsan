@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CreditCard, RefreshCw } from 'lucide-react'
 import { ORDER_STATUS_LABELS, formatOrderDate, formatOrderMoney, loadPartnerOrders, orderStatusTone } from '../../lib/orders.js'
+import { ProfileWorkspaceSectionHeader, ProfileWorkspaceSurface } from './ProfileWorkspaceShell.jsx'
 
 export default function PartnerOrders({ userId }) {
   const [orders, setOrders] = useState([])
@@ -29,16 +30,14 @@ export default function PartnerOrders({ userId }) {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-3xl border border-line bg-paper p-5 md:p-7">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <div className="eyebrow">Поръчки</div>
-            <h2 className="mt-2 font-display text-3xl text-ink">Работа към клиенти</h2>
-            <p className="mt-2 text-sm text-muted">Поръчките от оферти и партньорски услуги се управляват от детайлната страница.</p>
-          </div>
-          <button type="button" onClick={load} className="btn btn-ghost"><RefreshCw size={18} /> Обнови</button>
-        </div>
-      </div>
+      <ProfileWorkspaceSurface>
+        <ProfileWorkspaceSectionHeader
+          eyebrow="Работа"
+          title="Поръчки"
+          description="Поръчките от оферти и партньорски услуги се управляват от детайлната страница."
+          action={<button type="button" onClick={load} className="btn btn-ghost"><RefreshCw size={18} /> Обнови</button>}
+        />
+      </ProfileWorkspaceSurface>
 
       <div className="grid gap-4">
         {orders.map(order => <PartnerOrderCard key={order.id} order={order} />)}
@@ -67,5 +66,5 @@ function PartnerOrderCard({ order }) {
 }
 
 function Panel({ title, children }) {
-  return <div className="rounded-3xl border border-line bg-paper p-6"><h2 className="font-display text-2xl text-ink">{title}</h2>{children && <div className="mt-3">{children}</div>}</div>
+  return <ProfileWorkspaceSurface><h2 className="font-display text-2xl text-ink">{title}</h2>{children && <div className="mt-3">{children}</div>}</ProfileWorkspaceSurface>
 }

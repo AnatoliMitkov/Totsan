@@ -45,6 +45,7 @@ import { deleteStorageRefs, diffStorageRefs, mediaAndCoverStorageRefs } from '..
 import FallbackImage from '../FallbackImage.jsx'
 import TotsanSelect from '../ui/TotsanSelect.jsx'
 import { LocationMultiCombobox } from '../ui/LocationCombobox.jsx'
+import { ProfileWorkspaceSectionHeader, ProfileWorkspaceSurface } from './ProfileWorkspaceShell.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-base font-normal leading-6 outline-none transition focus:border-ink'
 
@@ -564,19 +565,13 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
 
   return (
     <div className="space-y-5">
-      <section className="rounded-3xl border border-line bg-paper p-5 md:p-7">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-          <div className="max-w-3xl">
-            <div className="eyebrow">Моите услуги</div>
-            <h2 className="mt-2 font-display text-4xl leading-none text-ink md:text-5xl">Моите услуги</h2>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              Подреди офертите си като ясни продуктови карти: какво включват, от каква цена започват, къде работиш и дали са готови за публикуване.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={startNewService} className="btn btn-primary"><Plus size={18} /> Нова услуга</button>
-          </div>
-        </div>
+      <ProfileWorkspaceSurface>
+        <ProfileWorkspaceSectionHeader
+          eyebrow="Профил"
+          title="Услуги"
+          description="Подреди офертите си като ясни продуктови карти: какво включват, от каква цена започват, къде работиш и дали са готови за публикуване."
+          action={<button type="button" onClick={startNewService} className="btn btn-primary"><Plus size={18} /> Нова услуга</button>}
+        />
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <StatTile label="Всички услуги" value={items.length} active={serviceFilter === 'all'} onClick={() => setServiceFilter('all')} />
@@ -613,7 +608,7 @@ export default function PartnerServiceEditor({ profile, userId, onProfileSummary
             <button type="button" onClick={startNewService} className="btn btn-primary mt-5"><Plus size={18} /> Нова услуга</button>
           </div>
         )}
-      </section>
+      </ProfileWorkspaceSurface>
 
       {isEditorOpen && createPortal(
         <div

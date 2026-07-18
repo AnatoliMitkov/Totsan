@@ -6,6 +6,7 @@ import { createConversationWithClient } from '../../lib/chat.js'
 import { useNavigate } from 'react-router-dom'
 import { LAYERS } from '../../data/layers.js'
 import { formatMoneyRange } from '../../lib/money.js'
+import { ProfileWorkspaceSectionHeader, ProfileWorkspaceSurface } from './ProfileWorkspaceShell.jsx'
 
 export default function PartnerInquiries({ profileSlug, partnerId }) {
   const navigate = useNavigate()
@@ -93,7 +94,7 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
   }
 
   if (status === 'loading') {
-    return <div className="rounded-3xl border border-line bg-paper p-5 md:p-7 text-center text-muted">Зареждане на запитвания...</div>
+    return <ProfileWorkspaceSurface className="text-center text-muted">Зареждане на запитвания...</ProfileWorkspaceSurface>
   }
 
   if (status === 'error') {
@@ -105,11 +106,13 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-3xl border border-line bg-paper p-5 md:p-7">
-        <div className="eyebrow">Запитвания от клиенти</div>
-        <h2 className="mt-2 font-display text-3xl text-ink">Директни запитвания от профила ти</h2>
-        <p className="mt-2 text-sm text-muted">Тук се появяват съобщенията от клиенти, които са използвали формата "Поискай оферта".</p>
-      </div>
+      <ProfileWorkspaceSurface>
+        <ProfileWorkspaceSectionHeader
+          eyebrow="Работа"
+          title="Запитвания"
+          description="Тук се появяват съобщенията от клиенти, които са използвали формата „Поискай оферта“."
+        />
+      </ProfileWorkspaceSurface>
 
       {activeInquiries.length > 0 && (
         <div className="space-y-3">
@@ -127,7 +130,7 @@ export default function PartnerInquiries({ profileSlug, partnerId }) {
             ].filter(Boolean)
 
             return (
-              <div key={inq.id} className={`overflow-hidden rounded-3xl border p-5 transition-colors md:p-7 ${inq.status === 'new' ? 'border-accent/30 bg-accent/5' : 'border-line bg-paper'}`}>
+              <div key={inq.id} className={`overflow-hidden rounded-3xl border p-5 transition-colors md:p-6 ${inq.status === 'new' ? 'border-accent/30 bg-accent/5' : 'border-line bg-paper'}`}>
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 font-medium text-ink">

@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import {
+  ArrowRight,
   BriefcaseBusiness,
   Camera,
   Check,
@@ -25,7 +26,7 @@ import {
   PlayCircle,
   Plus,
   Save,
-  Send,
+  Star,
   Tags,
   Trash2,
   UserRound,
@@ -72,7 +73,6 @@ import ImageCropperModal from './ImageCropperModal.jsx'
 import Avatar from '../Avatar.jsx'
 import PublicProfileBanner from './PublicProfileBanner.jsx'
 import PublicProfileAvatar from './PublicProfileAvatar.jsx'
-import PublicProfilePanel from './PublicProfilePanel.jsx'
 import PartnerServiceEditor from './PartnerServiceEditor.jsx'
 import PartnerMaterialsEditor from './PartnerMaterialsEditor.jsx'
 import PartnerOrders from './PartnerOrders.jsx'
@@ -82,6 +82,8 @@ import FloatingSaveBar from './FloatingSaveBar.jsx'
 import TotsanSelect from '../ui/TotsanSelect.jsx'
 import { LocationCombobox, LocationMultiCombobox } from '../ui/LocationCombobox.jsx'
 import { normalizeLocationList, normalizeLocationValue } from '../../lib/locations.js'
+import { buildPartnerOverviewAction, PARTNER_WORKSPACE_NAV } from '../../lib/profile-workspace.js'
+import ProfileWorkspaceShell, { ProfileWorkspaceSectionHeader, ProfileWorkspaceSurface } from './ProfileWorkspaceShell.jsx'
 
 const INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-sm outline-none transition focus:border-ink'
 const COMPACT_INPUT = 'mt-2 w-full rounded-2xl border border-line bg-paper px-3 py-3 text-sm outline-none transition focus:border-ink'
@@ -653,6 +655,17 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
   const availableTabs = useMemo(() => (
     TABS.filter((tab) => !tab.layerSlug || profileDraft.layerSlug === tab.layerSlug)
   ), [profileDraft.layerSlug])
+  const availableNavGroups = useMemo(() => {
+    const byId = new Map(availableTabs.map((tab) => [tab.id, tab]))
+    const newInquiryCount = (dashboardState.inquiries || []).filter((item) => item.status === 'new').length
+    return PARTNER_WORKSPACE_NAV.map((group) => ({
+      ...group,
+      tabs: group.tabIds
+        .map((id) => byId.get(id))
+        .filter(Boolean)
+        .map((tab) => tab.id === 'inquiries' && newInquiryCount ? { ...tab, badge: String(newInquiryCount) } : tab),
+    })).filter((group) => group.tabs.length)
+  }, [availableTabs, dashboardState.inquiries])
   const profileCompletion = useMemo(() => (
     getProfileCompletion(preview, portfolio, profileDraft.layerSlug === 'ideya' ? profileDraft.layer01Meta : null)
   ), [portfolio, preview, profileDraft.layer01Meta, profileDraft.layerSlug])
@@ -1076,129 +1089,48 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
 
   return (
     <>
-      <PublicProfileBanner
-        imageSrc={preview.coverUrl || ''}
-        imageAlt=""
-        imageStyle={{ objectPosition: `50% ${preview.coverY ?? 50}%` }}
-        heightClass="h-[clamp(15rem,68vw,19rem)] md:aspect-[1600/520] md:h-auto md:min-h-0"
-        className="group cursor-pointer focus-within:ring-2 focus-within:ring-ink"
-        onClick={openBannerEditor}
-        onMouseEnter={() => setBannerHintVisible(true)}
-        onMouseLeave={() => setBannerHintVisible(false)}
-        onFocus={() => setBannerHintVisible(true)}
-        onBlur={() => setBannerHintVisible(false)}
-        placeholderLabel="Добавете банер"
-        placeholderClassName="hidden md:grid"
-      >
-      </PublicProfileBanner>
-      {/* Keep the file input outside the clickable banner to avoid recursive input.click() bubbling. */}
-      <input
-        id="partner-cover-upload"
-        type="file"
-        accept=".jpg,.jpeg,.png,.webp"
-        className="hidden"
-        onChange={handleCoverFileChange}
-      />
-      <div className="relative z-10 flex flex-col bg-soft pb-10">
-        <div className="container-page -mt-4 w-full space-y-5 px-4 sm:-mt-8 md:-mt-24 md:px-6">
-        {subscriptionState.message && (
+      <ProfileWorkspaceShell
+        banner={(
+          <PublicProfileBanner
+            imageSrc={preview.coverUrl || ''}
+            imageAlt=""
+            imageStyle={{ objectPosition: `50% ${preview.coverY ?? 50}%` }}
+            heightClass="h-[13rem] md:h-[31.25rem] lg:h-[33.25rem] xl:h-[42.5rem]"
+            className="group cursor-pointer focus-visible:ring-2 focus-visible:ring-accentDeep"
+            onClick={openBannerEditor}
+            onMouseEnter={() => setBannerHintVisible(true)}
+            onMouseLeave={() => setBannerHintVisible(false)}
+            onFocus={() => setBannerHintVisible(true)}
+            onBlur={() => setBannerHintVisible(false)}
+            placeholderLabel="Добавете банер"
+            placeholderClassName="hidden md:grid"
+          />
+        )}
+        header={(
+          <PartnerWorkspaceHeader
+            preview={preview}
+            subscriptionActive={subscriptionState.subscription?.active}
+            bannerHintVisible={bannerHintVisible}
+            onEditAvatar={openAvatarEditor}
+            onOpenPayments={startPaymentOnboarding}
+            paymentBusy={paymentState.status === 'opening' || paymentState.status === 'saving'}
+            hasPaymentAccount={Boolean(account?.stripe_account_id)}
+            onSignOut={() => supabase.auth.signOut()}
+          />
+        )}
+        notices={subscriptionState.message ? (
           <div
             role={subscriptionState.status === 'error' ? 'alert' : 'status'}
-            className={`rounded-2xl border px-4 py-3 text-sm font-medium shadow-sm ${
-              subscriptionState.status === 'error'
-                ? 'border-red-200 bg-red-50 text-red-800'
-                : subscriptionState.status === 'email-error'
-                  ? 'border-amber-200 bg-amber-50 text-amber-900'
-                : subscriptionState.subscription?.active
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                  : 'border-blue-200 bg-blue-50 text-blue-800'
-            }`}
+            className={`rounded-2xl border px-4 py-3 text-sm font-medium ${subscriptionState.status === 'error' ? 'border-red-200 bg-red-50 text-red-800' : subscriptionState.status === 'email-error' ? 'border-amber-200 bg-amber-50 text-amber-900' : subscriptionState.subscription?.active ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-blue-200 bg-blue-50 text-blue-800'}`}
           >
             {subscriptionState.message}
           </div>
-        )}
-        <PublicProfilePanel className="relative transition-all duration-300 hover:shadow-[0_20px_40px_rgba(0,0,0,0.04)]">
-          <div
-            aria-hidden={!bannerHintVisible}
-            className={`pointer-events-none absolute right-5 -top-36 z-30 hidden w-[min(21rem,calc(100vw-3rem))] origin-bottom-right rounded-2xl border border-white/20 bg-ink/94 p-4 text-left text-paper shadow-[0_24px_70px_-22px_rgba(5,12,22,0.78)] backdrop-blur-md transition-all duration-300 ease-out md:block lg:right-6 ${
-              bannerHintVisible
-                ? 'translate-y-0 scale-100 opacity-100'
-                : 'translate-y-5 scale-[0.98] opacity-0'
-            }`}
-          >
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-paper">Размер на банера</div>
-            <p className="mt-1 text-sm leading-6 text-paper/90">{BANNER_DESCRIPTION}</p>
-          </div>
-          {subscriptionState.subscription?.active && (
-            <div className="absolute right-4 top-4 z-10 rounded-full border border-accent/25 bg-accent px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-paper shadow-[0_12px_30px_rgba(36,111,232,0.22)] md:right-6 md:top-6">
-              PRO
-            </div>
-          )}
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex flex-col items-center gap-4 text-center lg:flex-row lg:items-end lg:text-left">
-              <button
-                type="button"
-                onClick={openAvatarEditor}
-                className="group relative shrink-0 rounded-3xl transition hover:ring-2 hover:ring-ink focus:outline-none focus:ring-2 focus:ring-ink"
-                aria-label={preview.imageUrl ? 'Смени снимка' : 'Добавете снимка'}
-              >
-                <PublicProfileAvatar src={preview.imageUrl || ''} alt={preview.name} name={preview.name} imageStyle={getProfileImageStyle(preview)} statusTitle="Партньорски профил" sizeClassName="h-24 w-24 sm:h-28 sm:w-28 md:h-32 md:w-32" statusClassName="bottom-0.5 right-0.5 h-4 w-4 border-[3px] sm:bottom-1 sm:right-1 sm:h-5 sm:w-5 sm:border-4" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center rounded-3xl bg-ink/45 px-3 text-center text-paper opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
-                  <Camera size={24} />
-                  <span className="mt-1 text-xs font-semibold">{preview.imageUrl ? 'Смени снимка' : 'Добавете снимка'}</span>
-                </div>
-              </button>
-              <div className="min-w-0 pb-1">
-                <div className="eyebrow">Партньорски профил</div>
-                <h1 className="mt-2 break-words font-display text-[clamp(2rem,7vw,3.25rem)] font-semibold leading-[0.95] tracking-tight text-ink">{preview.name}</h1>
-                <p className="mt-2 text-sm text-muted">{preview.headline || preview.tag} · {preview.city}</p>
-                <div className="mt-3 inline-flex max-w-full rounded-full border border-line bg-soft px-3 py-1 text-center text-xs font-medium text-muted">
-                  Слой {preview.layerNumber} · {preview.layerTitle}
-                </div>
-              </div>
-            </div>
-            <div className="flex w-full flex-col gap-3 pb-1 sm:flex-row sm:flex-wrap lg:w-auto lg:justify-end">
-              {preview.isPublished && <Link to={`/profil/${preview.slug}`} className="btn btn-primary w-full justify-center sm:w-auto"><Eye size={18} /> Виж публично</Link>}
-              <button
-                type="button"
-                onClick={startPaymentOnboarding}
-                disabled={paymentState.status === 'opening' || paymentState.status === 'saving'}
-                className="btn btn-ghost w-full justify-center sm:w-auto"
-                title="Плащания"
-              >
-                {paymentState.status === 'opening' || paymentState.status === 'saving' ? <Loader2 size={18} className="animate-spin" /> : <CreditCard size={18} />}
-                {account?.stripe_account_id ? 'Плащания' : 'Настрой плащания'}
-              </button>
-              <button className="btn btn-ghost w-full justify-center sm:w-auto" onClick={() => supabase.auth.signOut()}><LogOut size={18} /> Изход</button>
-            </div>
-          </div>
-          {paymentState.message && (
-            <div
-              role={paymentState.status === 'error' ? 'alert' : 'status'}
-              className={`mt-5 rounded-2xl border px-4 py-3 text-sm font-medium ${
-                paymentState.status === 'error'
-                  ? 'border-red-200 bg-red-50 text-red-800'
-                  : paymentState.status === 'saved'
-                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                    : 'border-blue-200 bg-blue-50 text-blue-800'
-              }`}
-            >
-              {paymentState.message}
-            </div>
-          )}
-        </PublicProfilePanel>
-
-        <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
-          <WorkspaceSidebar
-            tabs={availableTabs}
-            activeTab={activeTab}
-            profile={preview}
-            completion={profileCompletion}
-            portfolioCount={portfolio.length}
-            onTabChange={changeActiveTab}
-          />
-
-          <main ref={workspaceContentRef} className="min-w-0 space-y-5">
+        ) : null}
+        navGroups={availableNavGroups}
+        activeTab={activeTab}
+        onTabChange={changeActiveTab}
+        contentRef={workspaceContentRef}
+      >
             {activeTab === 'overview' && (
               <OverviewDashboard
                 preview={preview}
@@ -1207,7 +1139,9 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
                 completion={profileCompletion}
                 dashboardState={dashboardState}
                 subscriptionState={subscriptionState}
+                paymentState={paymentState}
                 onAction={openWorkspaceTarget}
+                onOpenPayments={startPaymentOnboarding}
                 onManageSubscription={openSubscriptionPortal}
                 onRefreshSubscription={() => setSubscriptionRefreshKey(key => key + 1)}
                 onCancelSubscription={cancelSubscriptionAtPeriodEnd}
@@ -1276,6 +1210,7 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
 
             {activeTab === 'security' && (
               <div className="space-y-5">
+                <WorkspaceTabIntro eyebrow="Акаунт" title="Сигурност" description="Управлявайте защитата на акаунта и критичните действия от ясно разделени секции." />
                 <TotpMfaManager session={session} />
                 <AccountDangerZone account={account} session={session} />
               </div>
@@ -1284,10 +1219,10 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
             {activeTab === 'contact' && (
               <ContactPreview profile={preview} onEdit={() => changeActiveTab('profile')} />
             )}
-          </main>
-        </div>
-        </div>
-      </div>
+      </ProfileWorkspaceShell>
+
+      {/* Keep the file input outside the clickable banner to avoid recursive input.click() bubbling. */}
+      <input id="partner-cover-upload" type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden" onChange={handleCoverFileChange} />
 
       {bannerEditor.open && (
         <ImageCropperModal
@@ -1336,6 +1271,94 @@ export default function PartnerProfileWorkspace({ profile, userId, account, sess
         }}
       />
     </>
+  )
+}
+
+function PartnerWorkspaceHeader({
+  preview,
+  subscriptionActive,
+  bannerHintVisible,
+  onEditAvatar,
+  onOpenPayments,
+  paymentBusy,
+  hasPaymentAccount,
+  onSignOut,
+}) {
+  const locationLine = [preview.headline || preview.tag, preview.city].filter(Boolean).join(' · ')
+
+  return (
+    <ProfileWorkspaceSurface
+      className="relative p-4 shadow-[0_30px_95px_rgba(5,12,22,0.28)] sm:p-5 md:p-6"
+      style={{
+        background: 'linear-gradient(180deg, rgba(5, 12, 22, 0.24) 0%, rgba(5, 12, 22, 0.14) 100%)',
+        borderColor: 'rgba(255, 255, 255, 0.06)',
+        backdropFilter: 'blur(18px) saturate(150%)',
+        WebkitBackdropFilter: 'blur(18px) saturate(150%)',
+      }}
+    >
+      <div
+        aria-hidden={!bannerHintVisible}
+        className={`pointer-events-none absolute right-5 -top-36 z-30 hidden w-[min(21rem,calc(100vw-3rem))] origin-bottom-right rounded-2xl border border-white/20 bg-ink/60 p-4 text-left text-paper shadow-[0_24px_70px_-22px_rgba(5,12,22,0.78)] backdrop-blur-xl transition-all duration-300 ease-out md:block ${bannerHintVisible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-4 scale-[0.98] opacity-0'}`}
+      >
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-paper">Размер на банера</div>
+        <p className="mt-1 text-sm leading-6 text-paper/90">{BANNER_DESCRIPTION}</p>
+      </div>
+
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+        <div className="flex min-w-0 flex-col items-center gap-4 text-center sm:flex-row sm:items-end sm:text-left">
+          <button
+            type="button"
+            onClick={onEditAvatar}
+            className="group relative shrink-0 rounded-3xl border border-[#1c1c1c] outline-none transition hover:ring-2 hover:ring-ink focus-visible:ring-2 focus-visible:ring-accentDeep/35"
+            aria-label={preview.imageUrl ? 'Смени снимка' : 'Добавете снимка'}
+          >
+            <PublicProfileAvatar
+              src={preview.imageUrl || ''}
+              alt={preview.name}
+              name={preview.name}
+              imageStyle={getProfileImageStyle(preview)}
+              statusTitle="Партньорски профил"
+              sizeClassName="h-24 w-24 sm:h-28 sm:w-28"
+              statusClassName="bottom-0.5 right-0.5 h-4 w-4 border-[3px] sm:bottom-1 sm:right-1 sm:h-5 sm:w-5 sm:border-4"
+            />
+            <div className="absolute inset-0 flex flex-col items-center justify-center rounded-3xl bg-ink/45 px-3 text-center text-paper opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
+              <Camera size={22} aria-hidden="true" />
+              <span className="mt-1 text-xs font-semibold">{preview.imageUrl ? 'Смени снимка' : 'Добавете снимка'}</span>
+            </div>
+          </button>
+
+          <div className="min-w-0 pb-1">
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+              <div className="eyebrow !text-[#f1f1f1]">Партньорски профил</div>
+              {subscriptionActive ? <span className="rounded-full bg-accent px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-paper">PRO</span> : null}
+            </div>
+            <h1 className="mt-2 break-words font-display text-[clamp(2rem,6vw,2.75rem)] font-semibold leading-[1] tracking-tight text-[#f1f1f1]">{preview.name}</h1>
+            {locationLine ? <p className="mt-2 text-sm leading-6 text-[#f1f1f1]">{locationLine}</p> : null}
+            <div className="mt-3 flex flex-wrap justify-center gap-2 sm:justify-start">
+              <span className="rounded-full border border-line bg-soft px-3 py-1 text-xs font-medium text-muted">Слой {preview.layerNumber} · {preview.layerTitle}</span>
+              <span className={`rounded-full border px-3 py-1 text-xs font-medium ${preview.isPublished ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>{preview.isPublished ? 'Публичен профил' : 'Скрит профил'}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid w-full gap-2 sm:grid-cols-3 xl:flex xl:w-auto xl:flex-wrap xl:justify-end">
+          {preview.isPublished ? <Link to={`/profil/${preview.slug}`} className="btn btn-primary min-h-11 justify-center px-4 py-2.5"><Eye size={17} /> Виж публично</Link> : null}
+          <button type="button" onClick={onOpenPayments} disabled={paymentBusy} className="btn btn-ghost !text-[#f1f1f1] min-h-11 justify-center px-4 py-2.5">
+            {paymentBusy ? <Loader2 size={17} className="animate-spin" /> : <CreditCard size={17} />}
+            {hasPaymentAccount ? 'Плащания' : 'Настрой плащания'}
+          </button>
+          <button type="button" className="btn btn-ghost !text-[#f1f1f1] min-h-11 justify-center px-4 py-2.5" onClick={onSignOut}><LogOut size={17} /> Изход</button>
+        </div>
+      </div>
+    </ProfileWorkspaceSurface>
+  )
+}
+
+function WorkspaceTabIntro({ eyebrow, title, description }) {
+  return (
+    <ProfileWorkspaceSurface>
+      <ProfileWorkspaceSectionHeader eyebrow={eyebrow} title={title} description={description} />
+    </ProfileWorkspaceSurface>
   )
 }
 
@@ -1521,53 +1544,6 @@ function getProfileCompletion(profile, portfolio, layer01Meta) {
   }
 }
 
-function WorkspaceSidebar({ tabs, activeTab, profile, completion, portfolioCount, onTabChange }) {
-  return (
-    <aside className="min-w-0 max-w-full overflow-hidden rounded-[2rem] border border-line bg-paper p-4 shadow-[0_20px_65px_-45px_rgba(13,35,64,0.28)] lg:sticky lg:top-24 lg:overflow-visible">
-      <nav className="flex w-full min-w-0 max-w-full gap-1 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:flex-col lg:overflow-visible lg:pb-0">
-        {tabs.map((tab) => {
-          const Icon = tab.icon
-          const isActive = activeTab === tab.id
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => onTabChange(tab.id)}
-              className={`inline-flex min-h-12 shrink-0 snap-start items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition lg:w-full ${isActive ? 'bg-ink text-paper shadow-[0_16px_35px_-22px_rgba(13,35,64,0.8)]' : 'text-muted hover:bg-soft hover:text-ink'}`}
-            >
-              <Icon size={18} />
-              <span>{tab.label}</span>
-            </button>
-          )
-        })}
-      </nav>
-
-      <div className="mt-4 hidden border-t border-line pt-5 lg:block">
-        <div className="rounded-[1.5rem] border border-line bg-soft/70 p-4">
-          <div className="text-xs uppercase tracking-[0.14em] text-muted">Профил завършеност</div>
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <div className="font-display text-4xl leading-none text-ink">{completion.percent}%</div>
-            <div className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600">
-              <Check size={18} />
-            </div>
-          </div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-paper">
-            <div className="h-full rounded-full bg-accentDeep" style={{ width: `${completion.percent}%` }} />
-          </div>
-          <div className="mt-3 text-sm text-muted">{completion.done}/{completion.total} попълнени секции</div>
-        </div>
-
-        <div className="mt-4 grid gap-3">
-          <InfoTile label="Статус" value={profile.isPublished ? 'Публичен' : 'Скрит'} icon={CircleDot} tone={profile.isPublished ? 'success' : 'neutral'} />
-          <InfoTile label="Слой" value={`${profile.layerNumber} · ${profile.layerTitle}`} icon={Compass} />
-          <InfoTile label="Проекти" value={portfolioCount} icon={FolderKanban} />
-        </div>
-
-      </div>
-    </aside>
-  )
-}
-
 function OverviewDashboard({
   preview,
   stats,
@@ -1575,7 +1551,9 @@ function OverviewDashboard({
   completion,
   dashboardState,
   subscriptionState,
+  paymentState,
   onAction,
+  onOpenPayments,
   onManageSubscription,
   onRefreshSubscription,
   onCancelSubscription,
@@ -1588,114 +1566,45 @@ function OverviewDashboard({
   const inquiries = Array.isArray(dashboardState?.inquiries) ? dashboardState.inquiries : []
   const services = Array.isArray(dashboardState?.services) ? dashboardState.services : []
   const inquiryProjects = dashboardState?.inquiryProjects || {}
-  const activeInquiries = inquiries.filter(item => item.status === 'new' || item.status === 'seen')
+  const activeInquiries = inquiries.filter(item => item.status === 'new' || item.status === 'seen' || item.status === 'replied')
   const newInquiries = inquiries.filter(item => item.status === 'new')
-  const latestInquiry = inquiries[0] || null
-  const latestProject = inquirySupportsProjectContext(latestInquiry) && latestInquiry?.client_id
-    ? inquiryProjects[latestInquiry.client_id]
-    : null
   const reviewCount = Number(stats?.reviews_count || 0)
   const rating = Number(stats?.avg_rating || 0)
   const publishedServices = services.filter(item => item.isPublished || item.is_published)
   const nextSteps = getDashboardNextSteps({ preview: safePreview, completion: safeCompletion, portfolio: safePortfolio, services }).slice(0, 3)
-  const heroMessage = getDashboardHeroMessage(safePreview, safeCompletion, safePortfolio)
-
-  const kpis = [
-    {
-      label: 'Нови заявки',
-      value: String(newInquiries.length),
-      detail: activeInquiries.length ? `${activeInquiries.length} активни общо` : 'Няма нови заявки',
-      icon: Mail,
-      tone: 'bg-accent/10 text-accentDeep',
-      onClick: () => onAction('inquiries'),
-    },
-    {
-      label: 'Активни разговори',
-      value: '0',
-      detail: 'Ще се отчита от реални чатове',
-      icon: MessagesSquare,
-      tone: 'bg-[#E9F1FF] text-[#16468F]',
-      onClick: () => onAction('inbox'),
-    },
-    {
-      label: 'Изпратени оферти',
-      value: '0',
-      detail: 'Скоро',
-      icon: Send,
-      tone: 'bg-[#EEF7F1] text-[#207246]',
-      disabled: true,
-    },
-    {
-      label: 'Активна работа',
-      value: '0',
-      detail: 'Скоро',
-      icon: BriefcaseBusiness,
-      tone: 'bg-[#F7F1E8] text-[#8A5B18]',
-      disabled: true,
-    },
-  ]
+  const priorityAction = buildPartnerOverviewAction({ dashboardState, subscriptionState, paymentState, completion: safeCompletion, preview: safePreview, nextSteps })
+  const actionProject = inquirySupportsProjectContext(priorityAction.inquiry) && priorityAction.inquiry?.client_id
+    ? inquiryProjects[priorityAction.inquiry.client_id]
+    : null
 
   return (
-    <div className="space-y-5">
-      <section className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.95),rgba(236,244,253,0.88)_42%,rgba(255,255,255,0.78)),linear-gradient(135deg,rgba(13,35,64,0.08),rgba(255,255,255,0))] p-5 shadow-[0_24px_70px_rgba(13,35,64,0.08)] md:p-7">
-        <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-accent/10 blur-3xl" />
-        <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_21rem] xl:items-stretch">
-          <div>
-            <div className="eyebrow">Totsan Pro workspace</div>
-            <h2 className="mt-3 max-w-3xl font-display text-[clamp(2.2rem,5vw,4.4rem)] leading-[0.9] tracking-tight text-ink">
-              Здравей, {safePreview.name || 'партньор'}.
-            </h2>
-            <p className="mt-4 max-w-2xl text-base leading-7 text-muted md:text-lg">{heroMessage}</p>
-            <div className="mt-6 flex flex-wrap gap-2">
-              <StatusPill label={safePreview.isPublished ? 'Published' : 'Hidden'} value={safePreview.isPublished ? 'Профилът е видим' : 'Профилът е скрит'} strong={safePreview.isPublished} />
-              <StatusPill label="Каталог" value={safePreview.isPublished ? 'Видим в каталога' : 'Не се показва'} strong={safePreview.isPublished} />
-              <StatusPill label="Готовност" value={`${safeCompletion.percent}%`} strong={safeCompletion.percent >= 80} />
-            </div>
-          </div>
-
-          <div className="rounded-[1.75rem] border border-white/80 bg-paper/80 p-5 shadow-[0_18px_50px_rgba(13,35,64,0.08)] backdrop-blur">
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">Следваща стъпка</div>
-                <div className="mt-3 font-display text-5xl leading-none text-ink">{safeCompletion.percent}%</div>
-              </div>
-              <div className="pb-1 text-sm font-medium text-muted">{safeCompletion.done}/{safeCompletion.total}</div>
-            </div>
-            <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-soft">
-              <div className="h-full rounded-full bg-ink shadow-[0_0_24px_rgba(13,35,64,0.28)]" style={{ width: `${safeCompletion.percent}%` }} />
-            </div>
-            <p className="mt-4 text-sm leading-6 text-muted">{nextSteps[0]?.description || 'Профилът изглежда готов. Следи заявките и поддържай портфолиото актуално.'}</p>
-            <button type="button" onClick={() => onAction(nextSteps[0]?.tab || 'profile', nextSteps[0])} className="btn btn-primary mt-5 w-full justify-center">
-              {nextSteps[0]?.cta || 'Подобри профила'}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {kpis.map(item => <DashboardKpi key={item.label} {...item} />)}
-      </section>
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(20rem,0.85fr)]">
-        <LatestInquiryCardEnhanced
-          inquiry={latestInquiry}
-          project={latestProject}
-          services={services}
-          profileSlug={safePreview.slug}
-          status={dashboardState?.status}
-          onOpen={() => onAction('inquiries')}
-          onImprove={() => onAction('profile')}
-        />
-
+    <div>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_21rem] xl:items-start 2xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-5">
-          <SubscriptionStatusCard
-            state={subscriptionState}
-            onManage={onManageSubscription}
-            onRefresh={onRefreshSubscription}
-            onCancel={onCancelSubscription}
-            onResume={onResumeSubscription}
-            onResendEmail={onResendSubscriptionEmail}
-          />
+          <PriorityActionCard action={priorityAction} project={actionProject} onAction={onAction} onOpenPayments={onOpenPayments} onManageSubscription={onManageSubscription} />
+
+          <ProfileWorkspaceSurface aria-label="Реални показатели" className="p-3 md:p-3">
+            <div className="px-2 pb-3 pt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">Показатели</div>
+            <div className="grid grid-cols-2 gap-2 2xl:grid-cols-4">
+              <OverviewMetric label="Нови / активни" value={`${newInquiries.length} / ${activeInquiries.length}`} detail="Клиентски заявки" icon={Mail} onClick={() => onAction('inquiries')} />
+              <OverviewMetric label="Видими услуги" value={`${publishedServices.length} / ${services.length}`} detail="Публикувани услуги" icon={BriefcaseBusiness} onClick={() => onAction('services')} />
+              <OverviewMetric label="Портфолио" value={String(safePortfolio.length)} detail="Проекти" icon={FolderKanban} onClick={() => onAction('portfolio')} />
+              <OverviewMetric label="Рейтинг" value={reviewCount ? rating.toFixed(1) : '—'} detail={reviewCount ? `${reviewCount} отзива` : 'Няма отзиви'} icon={Star} />
+            </div>
+          </ProfileWorkspaceSurface>
+
+          <ProfileWorkspaceSurface>
+            <div className="eyebrow">Работни секции</div>
+            <p className="mt-2 text-sm leading-6 text-muted">Продължете към разговорите, изпълнението или новите клиентски заявки.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <WorkShortcut icon={MessagesSquare} title="Разговори" description="Клиентски чатове и оферти" onClick={() => onAction('inbox')} />
+              <WorkShortcut icon={CreditCard} title="Поръчки" description="Изпълнение и плащания" onClick={() => onAction('orders')} />
+              <WorkShortcut icon={Mail} title="Запитвания" description="Нови клиентски заявки" onClick={() => onAction('inquiries')} />
+            </div>
+          </ProfileWorkspaceSurface>
+        </div>
+
+        <aside className="space-y-5">
           <TrustCard
             preview={safePreview}
             completion={safeCompletion}
@@ -1705,11 +1614,85 @@ function OverviewDashboard({
             rating={rating}
             reviewCount={reviewCount}
             accountStatus={safePreview.isPublished ? 'Одобрен профил' : 'Скрит профил'}
+            onImprove={() => onAction(nextSteps[0]?.tab || 'profile', nextSteps[0])}
           />
-          <NextStepsCard steps={nextSteps} onAction={onAction} />
-        </div>
+          <SubscriptionStatusCard
+            state={subscriptionState}
+            onManage={onManageSubscription}
+            onRefresh={onRefreshSubscription}
+            onCancel={onCancelSubscription}
+            onResume={onResumeSubscription}
+            onResendEmail={onResendSubscriptionEmail}
+          />
+        </aside>
       </div>
     </div>
+  )
+}
+
+function PriorityActionCard({ action, project, onAction, onOpenPayments, onManageSubscription }) {
+  const inquiry = action.inquiry || null
+  const city = project?.city || inquiry?.city || ''
+  const budget = project ? formatMoneyRange(project.budget_min, project.budget_max, project.budget_currency || 'EUR') : ''
+  const facts = inquiry ? [
+    { label: 'Тип', value: getInquirySourceLabel(inquiry.source) },
+    { label: 'Статус', value: getInquiryStatusLabel(inquiry.status) },
+    city ? { label: 'Град', value: city } : null,
+    budget ? { label: 'Бюджет', value: budget } : null,
+  ].filter(Boolean) : []
+  const problem = action.kind === 'problem'
+
+  function handleAction() {
+    if (action.target === 'payments') return onOpenPayments?.()
+    if (action.target === 'subscription') return onManageSubscription?.()
+    return onAction(action.target, action.focusId ? { focusId: action.focusId } : undefined)
+  }
+
+  return (
+    <section className={`overflow-hidden rounded-3xl border p-5 md:p-6 ${problem ? 'border-red-200 bg-red-50/70' : action.kind === 'inquiry' ? 'border-accentDeep/25 bg-accentSoft/45' : 'border-accentDeep/20 bg-gradient-to-br from-paper to-accentSoft/40'}`}>
+      <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0 max-w-3xl">
+          <div className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${problem ? 'text-red-700' : 'text-accentDeep'}`}>{action.eyebrow}</div>
+          <h2 className="mt-2 font-display text-[clamp(1.9rem,4vw,2.6rem)] leading-[1.05] text-ink">{action.title}</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted md:text-[15px]">{action.description}</p>
+        </div>
+        <button type="button" onClick={handleAction} className="btn btn-primary shrink-0 justify-center md:self-end">{action.cta}<ArrowRight size={17} /></button>
+      </div>
+      {facts.length ? (
+        <dl className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {facts.map((fact) => <MiniFact key={fact.label} label={fact.label} value={fact.value} />)}
+        </dl>
+      ) : null}
+    </section>
+  )
+}
+
+function OverviewMetric({ label, value, detail, icon: Icon, onClick }) {
+  const Component = onClick ? 'button' : 'div'
+  return (
+    <Component type={onClick ? 'button' : undefined} onClick={onClick} className={`min-w-0 rounded-2xl bg-soft/65 p-4 text-left ${onClick ? 'transition hover:bg-accentSoft/65 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accentDeep/25' : ''}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{label}</div>
+          <div className="mt-2 font-display text-2xl leading-none text-ink">{value}</div>
+          <div className="mt-2 text-xs leading-5 text-muted">{detail}</div>
+        </div>
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-paper text-accentDeep"><Icon size={16} /></span>
+      </div>
+    </Component>
+  )
+}
+
+function WorkShortcut({ icon: Icon, title, description, onClick }) {
+  return (
+    <button type="button" onClick={onClick} className="group flex min-h-20 items-center gap-3 rounded-2xl border border-line bg-soft/60 p-4 text-left outline-none transition hover:border-accentDeep/35 hover:bg-accentSoft/35 focus-visible:ring-2 focus-visible:ring-accentDeep/25">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-paper text-accentDeep"><Icon size={17} /></span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-ink">{title}</span>
+        <span className="mt-1 block text-xs leading-5 text-muted">{description}</span>
+      </span>
+      <ArrowRight size={15} className="shrink-0 text-accentDeep transition group-hover:translate-x-0.5" />
+    </button>
   )
 }
 
@@ -1791,7 +1774,7 @@ function SubscriptionStatusCard({ state, onManage, onRefresh, onCancel, onResume
 
   if (isLoading) {
     return (
-      <section className="rounded-[1.75rem] border border-line bg-paper p-5">
+      <section className="rounded-3xl border border-line bg-paper p-5">
         <div className="h-4 w-32 rounded-full bg-soft" />
         <div className="mt-4 h-7 w-48 rounded-full bg-soft" />
         <div className="mt-3 h-4 w-full rounded-full bg-soft" />
@@ -1800,7 +1783,7 @@ function SubscriptionStatusCard({ state, onManage, onRefresh, onCancel, onResume
   }
 
   return (
-    <section className={`rounded-[1.75rem] border p-5 shadow-[0_20px_60px_-52px_rgba(13,35,64,0.24)] ${cardClass}`}>
+    <section className={`rounded-3xl border p-5 ${cardClass}`}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className={`text-xs font-semibold uppercase tracking-[0.14em] ${active ? 'text-emerald-700' : isConfirmFailed ? 'text-red-700' : isConfirming ? 'text-blue-700' : 'text-muted'}`}>Абонамент</div>
@@ -1932,13 +1915,6 @@ function SubscriptionStatusCard({ state, onManage, onRefresh, onCancel, onResume
   )
 }
 
-function getDashboardHeroMessage(preview, completion, portfolio) {
-  if (!preview.isPublished) return 'Профилът е скрит — довърши липсващите полета, за да го публикуваш уверено.'
-  if (!portfolio.length) return 'Профилът е видим. Добави портфолио, за да повишиш доверието преди първата оферта.'
-  if (completion.percent < 80) return 'Профилът е видим, но има още няколко детайла, които ще помогнат на клиентите да изберат теб.'
-  return 'Профилът е видим — готов си да получаваш повече запитвания и да работиш от едно място.'
-}
-
 function getDashboardNextSteps({ preview, completion, portfolio, services }) {
   const steps = []
   const hasContact = Boolean(preview.phone || preview.emailPublic || preview.website)
@@ -1965,213 +1941,38 @@ function getDashboardNextSteps({ preview, completion, portfolio, services }) {
   return steps
 }
 
-function DashboardKpi({ label, value, detail, icon: Icon, tone, onClick, disabled = false }) {
-  const isClickable = typeof onClick === 'function' && !disabled
-  const Component = isClickable ? 'button' : 'article'
-  const interactiveClass = isClickable
-    ? 'cursor-pointer text-left hover:-translate-y-0.5 hover:border-ink/20 hover:shadow-[0_20px_55px_rgba(13,35,64,0.09)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 focus-visible:ring-offset-2 focus-visible:ring-offset-soft'
-    : 'cursor-default opacity-85'
-
-  return (
-    <Component type={isClickable ? 'button' : undefined} onClick={isClickable ? onClick : undefined} className={`group w-full rounded-[1.65rem] border border-white/70 bg-paper/88 p-5 shadow-[0_14px_42px_rgba(13,35,64,0.06)] transition ${interactiveClass}`}>
-      <div className="flex items-start justify-between gap-4">
-        <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${tone}`}>
-          <Icon size={20} />
-        </div>
-        <div className="font-display text-4xl leading-none text-ink">{value}</div>
-      </div>
-      <div className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-muted">{label}</div>
-      <div className="mt-1 text-sm text-ink/75">{detail}</div>
-    </Component>
-  )
-}
-
-function LatestInquiryCard({ inquiry, project, status, onOpen, onImprove }) {
-  if (!inquiry) {
-    return (
-      <section className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_18px_55px_rgba(13,35,64,0.05)] md:p-7">
-        <div className="eyebrow">Последен клиентски контекст</div>
-        <div className="mt-8 rounded-[1.75rem] border border-dashed border-line bg-soft/70 p-7 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-paper text-accentDeep shadow-sm">
-            <Mail size={24} />
-          </div>
-          <h3 className="mt-4 font-display text-3xl text-ink">Първата подходяща заявка ще се появи тук.</h3>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted">
-            {status === 'loading' ? 'Проверяваме за реални заявки...' : 'Няма да показваме примерни клиенти или измислени бюджети.'}
-          </p>
-          <button type="button" onClick={onImprove} className="btn btn-primary mt-6 justify-center">Подобри профила</button>
-        </div>
-      </section>
-    )
-  }
-
-  const city = project?.address_city || project?.city || ''
-  const budget = project?.budget_min ? formatMoneyRange(project.budget_min, project.budget_max, project.budget_currency) : ''
-  const context = project?.idea_description || inquiry.message || ''
-  const title = project?.title || inquiry.name || 'Клиентска заявка'
-
-  return (
-    <section className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_18px_55px_rgba(13,35,64,0.05)] md:p-7">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="eyebrow">Последна заявка</div>
-          <h3 className="mt-2 break-words font-display text-3xl text-ink">{title}</h3>
-        </div>
-        {inquiry.status === 'new' && <span className="inline-flex w-fit rounded-full bg-accent px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white">Ново</span>}
-      </div>
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <MiniFact label="Град" value={city || 'Не е посочен'} />
-        <MiniFact label="Бюджет" value={budget || 'Не е посочен'} />
-        <MiniFact label="Статус" value={inquiry.status || 'получена'} />
-      </div>
-
-      {context && (
-        <div className="mt-5 rounded-3xl border border-line bg-soft/70 p-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Контекст</div>
-          <p className="mt-2 line-clamp-4 text-sm leading-6 text-ink">{context}</p>
-        </div>
-      )}
-
-      <button type="button" onClick={onOpen} className="btn btn-primary mt-6 justify-center">
-        Виж заявката
-      </button>
-    </section>
-  )
-}
-
-function LatestInquiryCardEnhanced({ inquiry, project, services = [], profileSlug = '', status, onOpen, onImprove }) {
-  if (!inquiry) {
-    return (
-      <section className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_18px_55px_rgba(13,35,64,0.05)] md:p-7">
-        <div className="eyebrow">Последен клиентски контекст</div>
-        <div className="mt-8 rounded-[1.75rem] border border-dashed border-line bg-soft/70 p-7 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-paper text-accentDeep shadow-sm">
-            <Mail size={24} />
-          </div>
-          <h3 className="mt-4 font-display text-3xl text-ink">Първата подходяща заявка ще се появи тук.</h3>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted">
-            {status === 'loading' ? 'Проверяваме за реални заявки...' : 'Няма да показваме примерни клиенти или измислени бюджети.'}
-          </p>
-          <button type="button" onClick={onImprove} className="btn btn-primary mt-6 justify-center">Подобри профила</button>
-        </div>
-      </section>
-    )
-  }
-
-  const isProjectInquiry = inquirySupportsProjectContext(inquiry)
-  const targetService = Array.isArray(services) ? services.find((item) => item.slug === inquiry.target_slug) : null
-  const targetLabel = targetService?.title || (inquiry.target_slug && inquiry.target_slug !== profileSlug ? inquiry.target_slug : 'Профил')
-  const city = isProjectInquiry ? (project?.address_city || project?.city || '') : ''
-  const budget = isProjectInquiry && project?.budget_min
-    ? formatMoneyRange(project.budget_min, project.budget_max, project.budget_currency)
-    : ''
-  const context = isProjectInquiry
-    ? (project?.idea_description || inquiry.message || '')
-    : (inquiry.message || '')
-  const title = isProjectInquiry
-    ? (project?.title || inquiry.name || 'Клиентска заявка')
-    : (targetService ? `Запитване за ${targetService.title}` : inquiry.name || 'Клиентска заявка')
-  const factItems = [
-    { label: 'Тип', value: getInquirySourceLabel(inquiry.source) },
-    { label: 'Към', value: targetLabel },
-    { label: 'Статус', value: getInquiryStatusLabel(inquiry.status) },
-    city ? { label: 'Град', value: city } : null,
-    budget ? { label: 'Бюджет', value: budget } : null,
-  ].filter(Boolean)
-
-  return (
-    <section className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_18px_55px_rgba(13,35,64,0.05)] md:p-7">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="eyebrow">Последна заявка</div>
-          <h3 className="mt-2 break-words font-display text-3xl text-ink">{title}</h3>
-        </div>
-        {inquiry.status === 'new' && <span className="inline-flex w-fit rounded-full bg-accent px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white">Ново</span>}
-      </div>
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        {factItems.map((item) => <MiniFact key={`${item.label}-${item.value}`} label={item.label} value={item.value} />)}
-      </div>
-
-      {inquiry.contact && (
-        <div className="mt-5 rounded-3xl border border-line bg-paper px-4 py-3 text-sm text-muted">
-          Контакт: <span className="font-medium text-ink">{inquiry.contact}</span>
-        </div>
-      )}
-
-      {context && (
-        <div className="mt-5 rounded-3xl border border-line bg-soft/70 p-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Контекст</div>
-          <p className="mt-2 line-clamp-4 text-sm leading-6 text-ink">{context}</p>
-        </div>
-      )}
-
-      <button type="button" onClick={onOpen} className="btn btn-primary mt-6 justify-center">
-        Виж заявката
-      </button>
-    </section>
-  )
-}
-
-function TrustCard({ preview, completion, portfolioCount, serviceCount, publishedServiceCount, rating, reviewCount, accountStatus }) {
+function TrustCard({ preview, completion, accountStatus, onImprove }) {
   const items = [
-    { label: 'Готовност', value: `${completion.percent}%`, ok: completion.percent >= 80 },
-    { label: 'Портфолио', value: portfolioCount ? `${portfolioCount} проекта` : 'Няма още', ok: portfolioCount > 0 },
-    { label: 'Услуги', value: serviceCount ? `${publishedServiceCount}/${serviceCount} видими` : 'Няма още', ok: publishedServiceCount > 0 },
+    { label: 'Секции', value: `${completion.done}/${completion.total}`, ok: completion.percent === 100 },
     { label: 'Каталог', value: preview.isPublished ? 'Видим' : 'Скрит', ok: preview.isPublished },
-    { label: 'Оценка', value: reviewCount ? `${rating.toFixed(1)} (${reviewCount})` : 'Няма още', ok: reviewCount > 0 },
     { label: 'Статус', value: accountStatus, ok: preview.isPublished },
   ]
 
   return (
-    <section className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_18px_55px_rgba(13,35,64,0.05)] md:p-6">
-      <div className="eyebrow">Доверие</div>
-      <h3 className="mt-2 font-display text-3xl text-ink">Профилна готовност</h3>
-      <div className="mt-5 grid gap-2">
+    <section className="rounded-3xl border border-line bg-paper p-5">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <div className="eyebrow">Профил</div>
+          <h3 className="mt-2 font-display text-2xl text-ink">Готовност</h3>
+        </div>
+        <div className="font-display text-4xl leading-none text-ink">{completion.percent}%</div>
+      </div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-soft" role="progressbar" aria-label="Завършеност на профила" aria-valuemin="0" aria-valuemax="100" aria-valuenow={completion.percent}>
+        <div className="h-full rounded-full bg-accentDeep transition-all" style={{ width: `${completion.percent}%` }} />
+      </div>
+      <div className="mt-4 grid gap-2">
         {items.map(item => (
-          <div key={item.label} className="flex items-center justify-between gap-3 rounded-2xl bg-soft/75 px-4 py-3">
+          <div key={item.label} className="flex items-center justify-between gap-3 rounded-2xl bg-soft/75 px-3 py-2.5">
             <div className="flex min-w-0 items-center gap-3">
-              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${item.ok ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${item.ok ? 'bg-emerald-500' : 'bg-amber-400'}`} aria-hidden="true" />
               <span className="truncate text-sm font-medium text-ink">{item.label}</span>
             </div>
             <span className="max-w-[55%] truncate text-right text-sm text-muted">{item.value}</span>
           </div>
         ))}
       </div>
+      {completion.percent < 100 ? <button type="button" onClick={onImprove} className="btn btn-ghost mt-4 w-full justify-center">Подобри профила</button> : null}
     </section>
-  )
-}
-
-function NextStepsCard({ steps, onAction }) {
-  return (
-    <section className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_18px_55px_rgba(13,35,64,0.05)] md:p-6">
-      <div className="eyebrow">Следващи действия</div>
-      <div className="mt-4 space-y-3">
-        {steps.length ? steps.map((step, index) => (
-          <button key={`${step.title}-${index}`} type="button" onClick={() => onAction(step.tab, step)} className="group w-full rounded-3xl border border-line bg-soft/65 p-4 text-left transition hover:-translate-y-0.5 hover:border-ink/25 hover:bg-paper hover:shadow-[0_12px_35px_rgba(13,35,64,0.06)]">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="font-medium text-ink">{step.title}</div>
-                <p className="mt-1 text-sm leading-5 text-muted">{step.description}</p>
-              </div>
-              <span className="shrink-0 rounded-full bg-paper px-3 py-1 text-xs font-semibold text-accentDeep shadow-sm transition group-hover:bg-ink group-hover:text-paper">{step.cta}</span>
-            </div>
-          </button>
-        )) : (
-          <div className="rounded-3xl border border-dashed border-line bg-soft p-5 text-sm leading-6 text-muted">Няма критични липси. Поддържай заявките и портфолиото актуални.</div>
-        )}
-      </div>
-    </section>
-  )
-}
-
-function StatusPill({ label, value, strong = false }) {
-  return (
-    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] ${strong ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-line bg-paper/80 text-muted'}`}>
-      <span className={`h-2 w-2 rounded-full ${strong ? 'bg-emerald-500' : 'bg-amber-400'}`} />
-      <span className="normal-case tracking-normal">{label}: {value}</span>
-    </span>
   )
 }
 
@@ -2405,11 +2206,11 @@ function PortfolioEditor({ items, draft, state, onSelect, onNew, onChange, onSub
 
   return (
     <div className="space-y-5">
-      <section className="rounded-[2rem] border border-white/70 bg-paper/90 p-5 shadow-[0_18px_55px_rgba(13,35,64,0.05)] md:p-7">
+      <section className="rounded-3xl border border-line bg-paper p-5 md:p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
             <div className="eyebrow">Портфолио</div>
-            <h2 className="mt-2 font-display text-4xl leading-none text-ink md:text-5xl">Проекти като продуктови карти</h2>
+            <h2 className="mt-2 font-display text-3xl leading-tight text-ink md:text-4xl">Проекти като продуктови карти</h2>
             <p className="mt-3 text-sm leading-6 text-muted">
               Покажи най-важното първо: снимка, заглавие, слой, град, година и силен акцент. Детайлите се отварят в popup.
             </p>
@@ -3884,7 +3685,7 @@ function ContactPreview({ profile, onEdit }) {
 
 function ProfileIntroCard() {
   return (
-    <div className="rounded-[2rem] border border-line bg-paper p-5 shadow-[0_20px_65px_-45px_rgba(13,35,64,0.28)] md:p-6">
+    <div className="rounded-3xl border border-line bg-paper p-5 md:p-6">
       <div className="flex items-start gap-4">
         <div className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[1.35rem] border border-line bg-soft text-accentDeep">
           <UserRound size={24} />
@@ -3902,7 +3703,7 @@ function ProfileIntroCard() {
 
 function ProfileSection({ number, icon: Icon, title, children, className = '' }) {
   return (
-    <section className={`rounded-[2rem] border border-line bg-paper p-5 shadow-[0_20px_65px_-45px_rgba(13,35,64,0.28)] md:p-6 ${className}`.trim()}>
+    <section className={`rounded-3xl border border-line bg-paper p-5 md:p-6 ${className}`.trim()}>
       <div className="flex items-center gap-3">
         <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-soft text-accentDeep">
           <Icon size={20} />
@@ -3913,28 +3714,6 @@ function ProfileSection({ number, icon: Icon, title, children, className = '' })
         {children}
       </div>
     </section>
-  )
-}
-
-function InfoTile({ label, value, icon: Icon, tone = 'neutral' }) {
-  const iconTone = tone === 'success'
-    ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-    : 'bg-soft text-accentDeep border-line'
-
-  return (
-    <div className="rounded-[1.4rem] border border-line bg-paper p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-xs uppercase tracking-[0.14em] text-muted">{label}</div>
-          <div className="mt-2 text-sm font-medium text-ink">{value}</div>
-        </div>
-        {Icon && (
-          <div className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border ${iconTone}`}>
-            <Icon size={16} />
-          </div>
-        )}
-      </div>
-    </div>
   )
 }
 
