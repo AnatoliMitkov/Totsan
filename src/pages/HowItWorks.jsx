@@ -1,7 +1,23 @@
 import { Link } from 'react-router-dom'
 import { LAYERS } from '../data/layers.js'
+import { buildBreadcrumbSchema, buildFaqSchema, useSeo } from '../lib/seo.js'
 
 export default function HowItWorks() {
+  useSeo({
+    title: 'Как работи Totsan — стъпка по стъпка',
+    description: 'Виж как Totsan подрежда проекта ти в пет слоя и те води от brief до правилния специалист, услуга или материално решение.',
+    canonicalPath: '/kak-raboti',
+    jsonLd: [
+      buildBreadcrumbSchema([
+        { name: 'Начало', path: '/' },
+        { name: 'Как работи', path: '/kak-raboti' },
+      ]),
+      buildFaqSchema([
+        { question: 'Какво представляват петте слоя на Totsan?', answer: 'Totsan разделя целия процес на ремонт, строителство и обзавеждане на 5 последователни слоя: от концепция и архитектура до финални декоративни акценти.' },
+        { question: 'Как започва един проект?', answer: 'Започваш с краткия Guided Project Brief, отговаряш на няколко въпроса и Totsan те насочва към правилния слой, специалист или следваща стъпка.' },
+      ]),
+    ],
+  })
   return (
     <>
       <section className="section !pt-20 bg-gradient-to-br from-soft to-cloud">

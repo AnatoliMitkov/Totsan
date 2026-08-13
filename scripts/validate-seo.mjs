@@ -34,6 +34,40 @@ async function main() {
     problems.push('Generated sitemap XML contains private routes.')
   }
 
+  const distHtml = await readRequiredFile(path.join(distDir, 'index.html'), 'dist/index.html')
+  if (distHtml) {
+    if (!distHtml.includes('<h1')) {
+      problems.push('index.html is missing an <h1> heading element in static fallback markup.')
+    }
+    if (!distHtml.includes('application/ld+json')) {
+      problems.push('index.html is missing initial static JSON-LD structured data.')
+    }
+  }
+
+  const { getDefaultSeo } = await import('../src/lib/seo.js')
+  const auditedRoutes = [
+    '/',
+    '/banya',
+    '/dekorativni-akcenti',
+    '/gradina-i-dvor',
+    '/kak-raboti',
+    '/katalog',
+    '/kontakt',
+    '/kuhni',
+    '/obshti-usloviya',
+    '/osvetlenie-i-tekstil',
+  ]
+
+  for (const routePath of auditedRoutes) {
+    const routeSeo = getDefaultSeo(routePath)
+    if (!routeSeo || !routeSeo.title) {
+      problems.push(`Route ${routePath} is missing title in getDefaultSeo.`)
+    }
+    if (!routeSeo || !routeSeo.jsonLd || routeSeo.jsonLd.length === 0) {
+      problems.push(`Route ${routePath} is missing structured JSON-LD data.`)
+    }
+  }
+
   if (problems.length > 0) {
     console.error('SEO validation failed:')
     problems.forEach((problem) => console.error(`- ${problem}`))

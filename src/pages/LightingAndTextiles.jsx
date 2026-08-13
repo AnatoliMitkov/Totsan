@@ -7,6 +7,7 @@ import {
 import { gsap } from 'gsap'
 import { WHAT_YOU_FIND_IMAGES, SHOWCASE_IMAGES } from '../data/images.js'
 import { formatDualCurrency, formatDualCurrencyRange } from '../lib/money.js'
+import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
 
 const U = (id, w = 1200) =>
   `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&q=80&w=${w}`
@@ -44,6 +45,18 @@ const EXTRAS = [
 
 export default function LightingAndTextiles() {
   const pageRef = useRef(null)
+
+  useSeo({
+    title: 'Осветление и текстил | Totsan',
+    description: 'Открий осветление, текстил и финални решения за завършване на интериора и атмосферата у дома.',
+    canonicalPath: '/osvetlenie-i-tekstil',
+    jsonLd: [
+      buildBreadcrumbSchema([
+        { name: 'Начало', path: '/' },
+        { name: 'Осветление и текстил', path: '/osvetlenie-i-tekstil' },
+      ]),
+    ],
+  })
 
   useEffect(() => {
     window.scrollTo({ top: 0 })

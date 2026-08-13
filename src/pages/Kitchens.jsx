@@ -7,6 +7,7 @@ import {
 import { gsap } from 'gsap'
 import { WHAT_YOU_FIND_IMAGES, SHOWCASE_IMAGES } from '../data/images.js'
 import { formatDualCurrency, formatDualCurrencyRange } from '../lib/money.js'
+import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
 
 const U = (id, w = 1200) =>
   `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&q=80&w=${w}`
@@ -45,6 +46,18 @@ const EXTRAS = [
 
 export default function Kitchens() {
   const pageRef = useRef(null)
+
+  useSeo({
+    title: 'Кухни | Totsan',
+    description: 'Разгледай кухни, мебели по поръчка и свързани специалисти и материални решения за слоя на обзавеждането.',
+    canonicalPath: '/kuhni',
+    jsonLd: [
+      buildBreadcrumbSchema([
+        { name: 'Начало', path: '/' },
+        { name: 'Кухни', path: '/kuhni' },
+      ]),
+    ],
+  })
 
   useEffect(() => {
     window.scrollTo({ top: 0 })

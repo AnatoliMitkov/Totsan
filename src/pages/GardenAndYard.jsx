@@ -14,6 +14,7 @@ import {
   Trees 
 } from 'lucide-react'
 import { gsap } from 'gsap'
+import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
 
 // Unsplash image helpers
 const U = (id, w = 1200) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&q=80&w=${w}`
@@ -22,6 +23,18 @@ const U = (id, w = 1200) => `https://images.unsplash.com/photo-${id}?auto=format
 
 export default function GardenAndYard() {
   const pageRef = useRef(null)
+
+  useSeo({
+    title: 'Градина и двор | Totsan',
+    description: 'Идеи, специалисти и решения за градина, двор и външни пространства в слоя за декорация и финал.',
+    canonicalPath: '/gradina-i-dvor',
+    jsonLd: [
+      buildBreadcrumbSchema([
+        { name: 'Начало', path: '/' },
+        { name: 'Градина и двор', path: '/gradina-i-dvor' },
+      ]),
+    ],
+  })
 
   // GSAP animations on page load
   useEffect(() => {

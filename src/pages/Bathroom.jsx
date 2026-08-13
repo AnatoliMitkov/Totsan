@@ -46,6 +46,18 @@ const EXTRAS = [
 export default function Bathroom() {
   const pageRef = useRef(null)
 
+  useSeo({
+    title: 'Баня — решения, плочки, смесители и специалисти | Totsan',
+    description: 'Специалисти, услуги и материални решения за баня, довършителни работи и обзавеждане през Totsan.',
+    canonicalPath: '/banya',
+    jsonLd: [
+      buildBreadcrumbSchema([
+        { name: 'Начало', path: '/' },
+        { name: 'Баня', path: '/banya' },
+      ]),
+    ],
+  })
+
   useEffect(() => {
     window.scrollTo({ top: 0 })
     const ctx = gsap.context(() => {

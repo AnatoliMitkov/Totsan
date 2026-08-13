@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { gsap } from 'gsap'
 import { LAYER_HEROS, SHOWCASE_IMAGES, WHAT_YOU_FIND_IMAGES } from '../data/images.js'
+import { buildBreadcrumbSchema, useSeo } from '../lib/seo.js'
 
 const U = (id, w = 1200) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&q=80&w=${w}`
 
@@ -52,6 +53,18 @@ const FEATURES = [
 
 export default function DecorativeAccents() {
   const pageRef = useRef(null)
+
+  useSeo({
+    title: 'Декоративни акценти | Totsan',
+    description: 'Подбрани идеи и решения за декоративни акценти, финални щрихи и завършен вид на пространството.',
+    canonicalPath: '/dekorativni-akcenti',
+    jsonLd: [
+      buildBreadcrumbSchema([
+        { name: 'Начало', path: '/' },
+        { name: 'Декоративни акценти', path: '/dekorativni-akcenti' },
+      ]),
+    ],
+  })
 
   useEffect(() => {
     window.scrollTo({ top: 0 })

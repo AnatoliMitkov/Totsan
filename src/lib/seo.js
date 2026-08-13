@@ -15,74 +15,92 @@ const STATIC_ROUTE_SEO = {
   '/start': {
     title: 'Започни проект — Guided Project Brief | Totsan',
     description: 'Отговори на три кратки въпроса и Totsan ще те насочи към правилния слой, специалист или следваща стъпка за проекта ти.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'Започни проект', path: '/start' }])],
   },
   '/uslugi': {
     title: 'Услуги и пакети от партньори | Totsan',
     description: 'Разгледай публикувани партньорски услуги с ясен обхват, цена и директен път към разговор с партньора.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'Услуги', path: '/uslugi' }])],
   },
   '/katalog': {
     title: 'Каталог със специалисти, услуги и материали | Totsan',
     description: 'Намери проверени специалисти, одобрени услуги и материални решения за петте слоя на ремонта, строителството и обзавеждането.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'Каталог', path: '/katalog' }])],
   },
   '/pro': {
     title: 'Totsan Pro — за специалисти, студиа и марки',
     description: 'Totsan Pro събира профил, услуги, заявки и чат на едно място за майстори, студиа, изпълнители и марки.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'Totsan Pro', path: '/pro' }])],
   },
   '/kak-raboti': {
     title: 'Как работи Totsan',
     description: 'Виж как Totsan подрежда проекта ти в пет слоя и те води от brief до правилния специалист, услуга или материално решение.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'Как работи', path: '/kak-raboti' }])],
   },
   '/za-nas': {
     title: 'За Totsan',
     description: 'Научи повече за Totsan, подхода ни към проверените партньори и защо подреждаме целия процес в пет ясни слоя.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'За нас', path: '/za-nas' }])],
   },
   '/kontakt': {
     title: 'Контакт | Totsan',
     description: 'Изпрати кратко запитване до Totsan и ще се върнем с подходящи хора и следващи стъпки за проекта ти.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'Контакт', path: '/kontakt' }])],
   },
   '/obshti-usloviya': {
     title: 'Общи условия | Totsan',
     description: 'Общи условия за използване на платформата Totsan.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'Общи условия', path: '/obshti-usloviya' }])],
   },
   '/politika-za-poveritelnost': {
     title: 'Политика за поверителност | Totsan',
     description: 'Политика за поверителност и обработване на лични данни в Totsan.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'Политика за поверителност', path: '/politika-za-poveritelnost' }])],
   },
   '/vizualizacia': {
     title: '3D визуализация | Totsan',
     description: 'Разгледай 3D визуализация като част от началните слоеве на проекта и заяви следваща стъпка през Totsan.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: '3D визуализация', path: '/vizualizacia' }])],
   },
   '/gradina-i-dvor': {
     title: 'Градина и двор | Totsan',
     description: 'Идеи, специалисти и решения за градина, двор и външни пространства в слоя за декорация и финал.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'Градина и двор', path: '/gradina-i-dvor' }])],
   },
   '/tapeti-i-cvetove': {
     title: 'Тапети и цветове | Totsan',
     description: 'Разгледай идеи, материали и специалисти за тапети, акцентни стени и цветови решения през Totsan.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'Тапети и цветове', path: '/tapeti-i-cvetove' }])],
   },
   '/dekorativni-akcenti': {
     title: 'Декоративни акценти | Totsan',
     description: 'Подбрани идеи и решения за декоративни акценти, финални щрихи и завършен вид на пространството.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'Декоративни акценти', path: '/dekorativni-akcenti' }])],
   },
   '/terasi-i-vunshni-zoni': {
     title: 'Тераси и външни зони | Totsan',
     description: 'Решения за тераси, външни зони, осветление, перголи и озеленяване през финалния слой на Totsan.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'Тераси и външни зони', path: '/terasi-i-vunshni-zoni' }])],
   },
   '/kuhni': {
     title: 'Кухни | Totsan',
     description: 'Разгледай кухни, мебели по поръчка и свързани специалисти и материални решения за слоя на обзавеждането.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'Кухни', path: '/kuhni' }])],
   },
   '/spalnya-i-dnevna': {
     title: 'Спалня и дневна | Totsan',
     description: 'Идеи и решения за спалня и дневна с правилните специалисти, материали и следващи стъпки в Totsan.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'Спалня и дневна', path: '/spalnya-i-dnevna' }])],
   },
   '/banya': {
     title: 'Баня | Totsan',
     description: 'Специалисти, услуги и материални решения за баня, довършителни работи и обзавеждане през Totsan.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'Баня', path: '/banya' }])],
   },
   '/osvetlenie-i-tekstil': {
     title: 'Осветление и текстил | Totsan',
     description: 'Открий осветление, текстил и финални решения за завършване на интериора и атмосферата у дома.',
+    jsonLd: [buildBreadcrumbSchema([{ name: 'Начало', path: '/' }, { name: 'Осветление и текстил', path: '/osvetlenie-i-tekstil' }])],
   },
 }
 
