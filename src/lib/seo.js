@@ -249,8 +249,21 @@ export function buildOrganizationSchema() {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name: 'Totsan',
+    alternateName: ['Totsan Design', 'Тотсан', 'totsan.com'],
     url: `${CANONICAL_ORIGIN}/`,
     logo: DEFAULT_IMAGE,
+    description: DEFAULT_DESCRIPTION,
+    areaServed: {
+      '@type': 'Country',
+      name: 'Bulgaria',
+    },
+    knowsAbout: [
+      'Ремонт и строителство',
+      'Интериорен дизайн',
+      'Обзавеждане',
+      '3D визуализация',
+      'Архитектура',
+    ],
   }
 }
 
@@ -259,6 +272,7 @@ export function buildWebsiteSchema() {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'Totsan',
+    alternateName: ['Totsan Design', 'Тотсан'],
     url: `${CANONICAL_ORIGIN}/`,
   }
 }
